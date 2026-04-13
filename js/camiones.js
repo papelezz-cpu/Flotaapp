@@ -1,5 +1,14 @@
 // ── FLOTA / CAMIONES ──────────────────────────────────
 
+function renderStars(rating) {
+  const full  = Math.floor(rating);
+  const empty = 5 - full;
+  return '<span class="stars">' +
+    '★'.repeat(full) + '<span class="stars-empty">' + '★'.repeat(empty) + '</span>' +
+    ` <span class="stars-num">${rating}</span>` +
+    '</span>';
+}
+
 let allCamiones = [];
 
 async function renderCamiones(filtroTipo = '') {
@@ -50,6 +59,7 @@ async function renderCamiones(filtroTipo = '') {
     const badgeClass = c.estado === 'disponible' ? 'badge-avail' : c.estado === 'ocupado' ? 'badge-busy' : 'badge-maint';
     const label      = c.estado === 'disponible' ? '✓ Disponible' : c.estado === 'ocupado' ? '⏳ En servicio' : '🔧 Mantenimiento';
     const disabled   = c.estado !== 'disponible' ? 'disabled' : '';
+    const stars      = c.calificacion ? renderStars(c.calificacion) : '';
 
     return `
       <div class="truck-card">
@@ -58,6 +68,7 @@ async function renderCamiones(filtroTipo = '') {
             <div class="truck-id">${c.id}</div>
             <div class="truck-type">${c.tipo}</div>
             <div class="truck-empresa">🏢 ${c.empresaNombre}</div>
+            ${stars ? `<div class="truck-stars">${stars}</div>` : ''}
           </div>
           <div class="badge ${badgeClass}">${label}</div>
         </div>

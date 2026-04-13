@@ -25,6 +25,10 @@
 .truck-id { font-family: 'Syne', sans-serif; font-size: 1.05rem; font-weight: 700; }
 .truck-type    { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
 .truck-empresa { font-size: 0.75rem; color: var(--accent); margin-top: 3px; font-weight: 500; }
+.truck-stars   { margin-top: 4px; }
+.stars         { font-size: 0.78rem; color: #f59e0b; letter-spacing: 1px; }
+.stars-empty   { color: rgba(245,158,11,0.25); }
+.stars-num     { font-size: 0.7rem; color: var(--text-muted); letter-spacing: 0; margin-left: 2px; }
 
 /* ── BADGES ──────────────────────────────────────────── */
 .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
