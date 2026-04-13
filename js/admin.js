@@ -4,9 +4,12 @@ async function renderAdmin() {
   const list = document.getElementById('admin-list');
   list.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
 
-  // Superadmin ve todos; admin solo ve los suyos
-  let query = sb.from('camiones').select('*').order('id');
-  if (currentUser.rol === 'admin') {
+  // Superadmin ve todo; admin solo ve los camiones donde él es propietario
+  let query = sb.from('camiones')
+    .select('*, propietario:perfiles(nombre)')
+    .order('id');
+
+  if (currentUser.rol !== 'superadmin') {
     query = query.eq('propietario_id', currentUser.id);
   }
 
@@ -24,6 +27,7 @@ async function renderAdmin() {
 
   list.innerHTML = data.map(c => {
     const badgeClass = c.estado === 'disponible' ? 'badge-avail' : c.estado === 'ocupado' ? 'badge-busy' : 'badge-maint';
+    const empresa    = c.propietario?.nombre || '—';
     return `
       <div class="truck-list-item">
         <div class="truck-list-item-info">
@@ -31,6 +35,7 @@ async function renderAdmin() {
           <div class="truck-list-item-sub">
             ${c.operador} · ${c.capacidad} ton ·
             <span class="badge ${badgeClass}" style="font-size:0.68rem">${c.estado}</span>
+            ${currentUser.rol === 'superadmin' ? `· <em style="color:var(--text-muted)">${empresa}</em>` : ''}
           </div>
         </div>
         <button class="btn-edit" onclick="toggleEstado('${c.id}','${c.estado}')">Cambiar estado</button>
@@ -41,7 +46,8 @@ async function renderAdmin() {
 async function toggleEstado(id, estadoActual) {
   const opts = ['disponible', 'ocupado', 'mantenimiento'];
   const next = opts[(opts.indexOf(estadoActual) + 1) % opts.length];
-  await sb.from('camiones').update({ estado: next }).eq('id', id);
+  const { error } = await sb.from('camiones').update({ estado: next }).eq('id', id);
+  if (error) { showToast('Error: no tienes permiso para cambiar este camión'); return; }
   await renderAdmin();
   showToast(`Estado de ${id} cambiado a: ${next}`);
 }
@@ -56,11 +62,10 @@ async function agregarCamion() {
   if (!id || !op || !cap) { alert('Completa todos los campos.'); return; }
 
   const emojis = { 'Torton': '🚛', 'Rabón': '🚚', 'Full': '🚛', 'Plataforma': '🏗️' };
-
   const { error } = await sb.from('camiones').insert({
     id, tipo, capacidad: cap, operador: op, estado,
     emoji: emojis[tipo] || '🚛',
-    propietario_id: currentUser.id   // siempre queda a nombre del usuario actual
+    propietario_id: currentUser.id  // queda a nombre del usuario que lo da de alta
   });
   if (error) { alert('Error: ' + (error.message || 'No se pudo agregar.')); return; }
 

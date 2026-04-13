@@ -8,7 +8,10 @@ async function renderCamiones(filtroTipo = '') {
   const count = document.getElementById('count-label');
   grid.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
 
-  let query = sb.from('camiones').select('*').order('id');
+  // Join con perfiles para obtener el nombre del propietario
+  let query = sb.from('camiones')
+    .select('*, propietario:perfiles(nombre)')
+    .order('id');
   if (filtroTipo) query = query.eq('tipo', filtroTipo);
 
   const { data, error } = await query;
@@ -39,6 +42,8 @@ async function renderCamiones(filtroTipo = '') {
     const badgeClass = c.estado === 'disponible' ? 'badge-avail' : c.estado === 'ocupado' ? 'badge-busy' : 'badge-maint';
     const label      = c.estado === 'disponible' ? '✓ Disponible' : c.estado === 'ocupado' ? '⏳ En servicio' : '🔧 Mantenimiento';
     const disabled   = c.estado !== 'disponible' ? 'disabled' : '';
+    const empresa    = c.propietario?.nombre || '—';
+
     return `
       <div class="truck-card">
         <div class="truck-header">
@@ -53,7 +58,7 @@ async function renderCamiones(filtroTipo = '') {
           <div class="spec-item"><div class="spec-label">Capacidad</div><div class="spec-value">${c.capacidad} ton</div></div>
           <div class="spec-item"><div class="spec-label">Tipo</div><div class="spec-value">${c.tipo}</div></div>
           <div class="spec-item"><div class="spec-label">Operador</div><div class="spec-value">${c.operador}</div></div>
-          <div class="spec-item"><div class="spec-label">Unidad</div><div class="spec-value">${c.id}</div></div>
+          <div class="spec-item"><div class="spec-label">Empresa</div><div class="spec-value">${empresa}</div></div>
         </div>
         <div class="truck-footer">
           <button class="btn-detail" onclick="openDetail('${c.id}')">Ver detalle</button>
@@ -70,5 +75,6 @@ function filtrarCamiones() {
 function openDetail(id) {
   const c = allCamiones.find(x => x.id === id);
   if (!c) return;
-  alert(`📋 Detalle — ${c.id}\n\nTipo: ${c.tipo}\nCapacidad: ${c.capacidad} ton\nOperador: ${c.operador}\nEstado: ${c.estado}`);
+  const empresa = c.propietario?.nombre || '—';
+  alert(`📋 Detalle — ${c.id}\n\nTipo: ${c.tipo}\nCapacidad: ${c.capacidad} ton\nOperador: ${c.operador}\nEmpresa: ${empresa}\nEstado: ${c.estado}`);
 }
