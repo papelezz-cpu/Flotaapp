@@ -1,0 +1,79 @@
+/* ── LIGHT MODE (azul cielo) ─────────────────────────── */
+body.light {
+  --navy:         #e8f4fd;
+  --navy-mid:     #ffffff;
+  --navy-light:   #cce4f6;
+  --steel:        #93c5e8;
+  --accent:       #2563eb;
+  --accent-bright:#1d4ed8;
+  --silver:       #4a6fa5;
+  --white:        #0d1f3c;
+  --text-main:    #0d1f3c;
+  --text-muted:   #4a6fa5;
+}
+
+body.light::before {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(37,99,235,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(147,197,232,0.3) 0%, transparent 60%);
+}
+
+body.light header {
+  background: rgba(240,248,255,0.92);
+  border-bottom: 1px solid rgba(37,99,235,0.2);
+}
+body.light .nav-tabs  { background: rgba(0,0,0,0.07); }
+body.light .nav-tab   { color: #4a6fa5; }
+
+body.light .hero {
+  background: linear-gradient(135deg, #fff, #cce4f6);
+  border-color: rgba(37,99,235,0.2);
+}
+body.light .stat-card { background: rgba(255,255,255,0.85); border-color: rgba(37,99,235,0.15); }
+
+body.light .truck-card { background: #fff; border-color: rgba(37,99,235,0.18); }
+body.light .truck-card:hover {
+  border-color: rgba(37,99,235,0.5);
+  box-shadow: 0 12px 32px rgba(37,99,235,0.12);
+}
+body.light .truck-img-area {
+  background: linear-gradient(135deg, rgba(204,228,246,0.8), rgba(147,197,232,0.4));
+  border-color: rgba(37,99,235,0.1);
+}
+body.light .truck-footer { border-color: rgba(37,99,235,0.1); }
+
+body.light .search-group input,
+body.light .search-group select {
+  background: rgba(255,255,255,0.85);
+  border-color: rgba(37,99,235,0.3);
+  color: #0d1f3c;
+}
+body.light .search-group select option { background: #fff; }
+
+body.light .reserv-table      { background: #fff; border-color: rgba(37,99,235,0.18); }
+body.light .reserv-row.header { background: rgba(37,99,235,0.05); }
+body.light .reserv-row:hover  { background: rgba(37,99,235,0.04); }
+
+body.light .admin-card { background: #fff; border-color: rgba(37,99,235,0.18); }
+
+body.light .form-group input,
+body.light .form-group textarea,
+body.light .form-group select {
+  background: rgba(232,244,253,0.7);
+  border-color: rgba(37,99,235,0.25);
+  color: #0d1f3c;
+}
+body.light .form-group select option { background: #fff; }
+
+body.light .modal         { background: #fff; border-color: rgba(37,99,235,0.3); }
+body.light .modal-overlay { background: rgba(190,220,245,0.75); }
+body.light .btn-cancel    { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); color: #4a6fa5; }
+
+body.light .truck-list-item { background: rgba(232,244,253,0.7); }
+body.light .btn-detail { background: rgba(37,99,235,0.1); border-color: rgba(37,99,235,0.3); }
+body.light .btn-edit   { background: rgba(37,99,235,0.1); border-color: rgba(37,99,235,0.3); }
+
+body.light .user-chip  { background: rgba(37,99,235,0.1); border-color: rgba(37,99,235,0.22); }
+body.light .btn-theme  { background: rgba(0,0,0,0.04); border-color: rgba(37,99,235,0.2); }
+
+body.light .login-box  { background: #fff; border-color: rgba(37,99,235,0.3); }

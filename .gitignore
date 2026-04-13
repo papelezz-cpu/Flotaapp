@@ -1,0 +1,12 @@
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Variables de entorno (nunca subir credenciales)
+.env
+.env.local
+
+# Editores
+.vscode/
+*.suo
+*.user

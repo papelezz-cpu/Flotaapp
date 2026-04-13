@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a1628">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>FlotaPro — Disponibilidad de Flota</title>
+
+  <!-- Fuentes -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/login.css">
+  <link rel="stylesheet" href="css/theme.css">
+
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- ══ HEADER ══════════════════════════════════════════ -->
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">🚛</div>
+      FlotaPro
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active"        onclick="showView('cliente', this)">Disponibilidad</button>
+      <button class="nav-tab"               onclick="showView('reservaciones', this)">Reservaciones</button>
+      <button class="nav-tab admin-only"    onclick="showView('admin', this)">Admin</button>
+      <button class="nav-tab superadmin-only" onclick="showView('usuarios', this)">Usuarios</button>
+    </div>
+    <div class="header-right">
+      <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
+      <div class="user-chip">
+        <span>👤</span>
+        <strong id="user-label">—</strong>
+        <button class="btn-logout" onclick="logout()" title="Cerrar sesión">✕</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ══ VISTA: DISPONIBILIDAD ═══════════════════════════ -->
+<div id="view-cliente" class="view active">
+  <div class="page">
+    <div class="hero">
+      <h1>Disponibilidad de Flota</h1>
+      <p>Consulta y agenda camiones disponibles para tu carga</p>
+      <div class="search-bar">
+        <div class="search-group">
+          <label>Fecha de inicio</label>
+          <input type="date" id="fecha-inicio">
+        </div>
+        <div class="search-group">
+          <label>Fecha de fin</label>
+          <input type="date" id="fecha-fin">
+        </div>
+        <div class="search-group" style="min-width:130px">
+          <label>Tipo de camión</label>
+          <select id="filtro-tipo">
+            <option value="">Todos</option>
+            <option value="Torton">Torton</option>
+            <option value="Rabón">Rabón</option>
+            <option value="Full">Full</option>
+            <option value="Plataforma">Plataforma</option>
+          </select>
+        </div>
+        <button class="btn-search" onclick="filtrarCamiones()">Buscar</button>
+      </div>
+    </div>
+    <div class="stats-row" id="stats-row"></div>
+    <div class="section-title">Unidades disponibles <span id="count-label"></span></div>
+    <div class="truck-grid" id="truck-grid"></div>
+  </div>
+</div>
+
+<!-- ══ VISTA: RESERVACIONES ════════════════════════════ -->
+<div id="view-reservaciones" class="view">
+  <div class="page">
+    <div class="section-title">Reservaciones activas</div>
+    <div class="reserv-table">
+      <div class="reserv-row header">
+        <div>Unidad</div><div>Cliente</div><div>Inicio</div><div>Fin</div><div>Estado</div>
+      </div>
+      <div id="reserv-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ VISTA: ADMIN ════════════════════════════════════ -->
+<div id="view-admin" class="view">
+  <div class="page">
+    <div class="section-title">Panel de Administración</div>
+    <div class="admin-grid">
+
+      <div class="admin-card">
+        <h3>➕ Agregar unidad</h3>
+        <div class="form-group">
+          <label>ID / Número de unidad</label>
+          <input type="text" id="admin-id" placeholder="Ej. T-401">
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="admin-tipo">
+            <option>Torton</option><option>Rabón</option>
+            <option>Full</option><option>Plataforma</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Capacidad (toneladas)</label>
+          <input type="number" id="admin-cap" placeholder="Ej. 22">
+        </div>
+        <div class="form-group">
+          <label>Operador</label>
+          <input type="text" id="admin-op" placeholder="Nombre del operador">
+        </div>
+        <div class="form-group">
+          <label>Estado</label>
+          <select id="admin-estado">
+            <option value="disponible">Disponible</option>
+            <option value="ocupado">Ocupado</option>
+            <option value="mantenimiento">Mantenimiento</option>
+          </select>
+        </div>
+        <button class="btn-add" onclick="agregarCamion()">Agregar unidad</button>
+      </div>
+
+      <div class="admin-card">
+        <h3>🚛 Unidades registradas</h3>
+        <div class="truck-list-admin" id="admin-list"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══ VISTA: USUARIOS (solo superadmin) ══════════════ -->
+<div id="view-usuarios" class="view">
+  <div class="page">
+    <div class="section-title">Gestión de Usuarios</div>
+    <div class="admin-grid">
+
+      <div class="admin-card">
+        <h3>➕ Crear usuario</h3>
+        <div class="form-group">
+          <label>Nombre completo</label>
+          <input type="text" id="nu-nombre" placeholder="Ej. María López">
+        </div>
+        <div class="form-group">
+          <label>Correo electrónico</label>
+          <input type="email" id="nu-email" placeholder="correo@empresa.com">
+        </div>
+        <div class="form-group">
+          <label>Contraseña temporal</label>
+          <input type="password" id="nu-pass" placeholder="Mínimo 6 caracteres">
+        </div>
+        <div class="form-group">
+          <label>Rol</label>
+          <select id="nu-rol">
+            <option value="admin">Admin (ve panel de administración)</option>
+            <option value="cliente">Cliente (solo disponibilidad y reservas)</option>
+          </select>
+        </div>
+        <button class="btn-add" onclick="crearUsuario()">Crear usuario</button>
+      </div>
+
+      <div class="admin-card">
+        <h3>👥 Usuarios registrados</h3>
+        <div class="truck-list-admin" id="usuarios-list">
+          <div class="empty-state"><div class="icon">⏳</div>Cargando...</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL RESERVA ═══════════════════════════════════ -->
+<div class="modal-overlay" id="modal-reserva">
+  <div class="modal">
+    <h2>Agendar unidad</h2>
+    <p class="sub" id="modal-truck-name">Camión seleccionado</p>
+    <div class="form-group">
+      <label>Nombre / Empresa</label>
+      <input type="text" id="res-nombre" placeholder="Tu nombre o empresa">
+    </div>
+    <div class="form-group">
+      <label>Teléfono de contacto</label>
+      <input type="tel" id="res-tel" placeholder="+52 999 000 0000">
+    </div>
+    <div class="form-group">
+      <label>Fecha de inicio</label>
+      <input type="date" id="res-fecha-ini">
+    </div>
+    <div class="form-group">
+      <label>Fecha de fin</label>
+      <input type="date" id="res-fecha-fin">
+    </div>
+    <div class="form-group">
+      <label>Descripción de la carga</label>
+      <textarea id="res-desc" rows="3" placeholder="Tipo de mercancía, origen, destino..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-confirm" onclick="confirmarReserva()">Confirmar reserva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TOAST ════════════════════════════════════════════ -->
+<div class="toast" id="toast"></div>
+
+<!-- ══ LOGIN ════════════════════════════════════════════ -->
+<div id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="logo-icon">🚛</div>
+      FlotaPro
+    </div>
+    <p class="login-sub">Inicia sesión para continuar</p>
+    <div class="login-error" id="login-error">Correo o contraseña incorrectos</div>
+    <div class="form-group">
+      <label>Correo electrónico</label>
+      <input type="email" id="login-user" placeholder="correo@empresa.com"
+             autocomplete="username" onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" id="login-pass" placeholder="••••••••"
+             autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <button class="btn-login" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- ══ SCRIPTS (orden importante) ══════════════════════ -->
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/views.js"></script>
+<script src="js/camiones.js"></script>
+<script src="js/reservaciones.js"></script>
+<script src="js/modal.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/usuarios.js"></script>
+<script src="js/main.js"></script>
+
+</body>
+</html>

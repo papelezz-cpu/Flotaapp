@@ -1,0 +1,61 @@
+/* ── VARIABLES ───────────────────────────────────────── */
+:root {
+  --navy:         #0a1628;
+  --navy-mid:     #112240;
+  --navy-light:   #1d3461;
+  --steel:        #2a4a7f;
+  --accent:       #4e8ef7;
+  --accent-bright:#7eb3ff;
+  --silver:       #b8c8e8;
+  --white:        #f0f4ff;
+  --green:        #22c55e;
+  --amber:        #f59e0b;
+  --red:          #ef4444;
+  --text-main:    #e8f0ff;
+  --text-muted:   #7a9cc4;
+}
+
+/* ── RESET ───────────────────────────────────────────── */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--navy);
+  color: var(--text-main);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── BACKGROUND GRADIENT ─────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(78,142,247,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(29,52,97,0.6) 0%, transparent 60%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ── ANIMATIONS ──────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── VIEWS ───────────────────────────────────────────── */
+.view { display: none; animation: fadeUp 0.3s ease; }
+.view.active { display: block; }
+
+/* ── EMPTY STATE ─────────────────────────────────────── */
+.empty-state {
+  text-align: center; padding: 40px;
+  color: var(--text-muted); font-size: 0.9rem;
+}
+.empty-state .icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+/* ── ROLE VISIBILITY ─────────────────────────────────── */
+.admin-only      { display: none; }
+.superadmin-only { display: none; }
+body.role-admin      .admin-only      { display: inline-block; }
+body.role-superadmin .admin-only      { display: inline-block; }
+body.role-superadmin .superadmin-only { display: inline-block; }
