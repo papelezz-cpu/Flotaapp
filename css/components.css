@@ -175,7 +175,7 @@
   border-radius: 16px; overflow: hidden;
 }
 .reserv-row {
-  display: grid; grid-template-columns: 80px 1fr 120px 120px 100px;
+  display: grid; grid-template-columns: 70px 120px 1fr 100px 100px 90px;
   gap: 12px; align-items: center; padding: 14px 20px;
   border-bottom: 1px solid rgba(78,142,247,0.08);
   font-size: 0.85rem; transition: background 0.15s;
@@ -188,10 +188,12 @@
   font-weight: 600; padding-bottom: 10px;
   background: rgba(78,142,247,0.05);
 }
-.reserv-id { font-family: 'Syne', sans-serif; font-weight: 700; color: var(--accent); }
+.reserv-id      { font-family: 'Syne', sans-serif; font-weight: 700; color: var(--accent); }
+.reserv-empresa { font-size: 0.82rem; color: var(--accent); font-weight: 500; }
 
 @media (max-width: 520px) {
-  .reserv-row { grid-template-columns: 70px 1fr 90px; }
+  .reserv-row { grid-template-columns: 65px 1fr 85px; }
+  .reserv-row > *:nth-child(2),
   .reserv-row > *:nth-child(4),
   .reserv-row > *:nth-child(5) { display: none; }
 }
