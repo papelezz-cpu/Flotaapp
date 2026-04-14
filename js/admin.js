@@ -53,23 +53,32 @@ async function toggleEstado(id, estadoActual) {
 }
 
 async function agregarCamion() {
-  const id     = document.getElementById('admin-id').value.trim();
   const tipo   = document.getElementById('admin-tipo').value;
   const cap    = parseInt(document.getElementById('admin-cap').value) || 0;
   const op     = document.getElementById('admin-op').value.trim();
   const estado = document.getElementById('admin-estado').value;
 
-  if (!id || !op || !cap) { alert('Completa todos los campos.'); return; }
+  if (!op || !cap) { alert('Completa todos los campos.'); return; }
+
+  // Generar ID automático: letra del tipo + número correlativo
+  const prefijos = { 'Torton': 'T', 'Rabón': 'R', 'Full': 'F', 'Plataforma': 'P' };
+  const letra = prefijos[tipo] || 'U';
+
+  const { data: existentes } = await sb.from('camiones').select('id').like('id', `${letra}-%`);
+  const maxNum = (existentes || []).reduce((max, c) => {
+    const n = parseInt(c.id.split('-')[1]) || 0;
+    return Math.max(max, n);
+  }, 0);
+  const id = `${letra}-${String(maxNum + 1).padStart(3, '0')}`;
 
   const emojis = { 'Torton': '🚛', 'Rabón': '🚚', 'Full': '🚛', 'Plataforma': '🏗️' };
   const { error } = await sb.from('camiones').insert({
     id, tipo, capacidad: cap, operador: op, estado,
     emoji: emojis[tipo] || '🚛',
-    propietario_id: currentUser.id  // queda a nombre del usuario que lo da de alta
+    propietario_id: currentUser.id
   });
   if (error) { alert('Error: ' + (error.message || 'No se pudo agregar.')); return; }
 
-  document.getElementById('admin-id').value  = '';
   document.getElementById('admin-op').value  = '';
   document.getElementById('admin-cap').value = '';
   await renderAdmin();
