@@ -2,12 +2,11 @@
 
 let allCamiones = [];
 
-async function renderCamiones(filtroTipo = '') {
+async function renderCamiones(filtroTipo = '', fechaIni = '', fechaFin = '') {
   const grid  = document.getElementById('truck-grid');
   const stats = document.getElementById('stats-row');
   const count = document.getElementById('count-label');
 
-  // #6 — Skeleton loader
   grid.innerHTML = skeletonGrid(6);
 
   let query = sb.from('camiones').select('*').eq('aprobacion', 'aprobada').order('id');
@@ -27,6 +26,19 @@ async function renderCamiones(filtroTipo = '') {
 
   allCamiones = data.map(c => ({ ...c, empresaNombre: ownerMap[c.propietario_id] || '—' }));
 
+  // ── Filtro por fechas: buscar qué camiones tienen reservas que se traslapan ──
+  let busyIds = new Set();
+  const buscarPorFecha = fechaIni && fechaFin;
+  if (buscarPorFecha) {
+    const { data: reservas } = await sb.from('reservaciones')
+      .select('unidad')
+      .in('estado', ['Activa', 'Pendiente'])
+      .lte('fecha_ini', fechaFin)   // la reserva empieza antes del fin buscado
+      .gte('fecha_fin', fechaIni);  // la reserva termina después del inicio buscado
+    (reservas || []).forEach(r => busyIds.add(r.unidad));
+  }
+
+  // ── Stats (basados en estado real del camión, no en fechas) ──
   const disp = data.filter(c => c.estado === 'disponible').length;
   const ocup = data.filter(c => c.estado === 'ocupado').length;
   const mant = data.filter(c => c.estado === 'mantenimiento').length;
@@ -37,18 +49,33 @@ async function renderCamiones(filtroTipo = '') {
     <div class="stat-card"><div class="stat-num red">${mant}</div><div class="stat-label">Mantenimiento</div></div>
     <div class="stat-card"><div class="stat-num" style="color:var(--accent-bright)">${data.length}</div><div class="stat-label">Total unidades</div></div>
   `;
-  count.textContent = `— ${disp} de ${data.length}`;
+
+  const disponibles = buscarPorFecha
+    ? allCamiones.filter(c => c.estado !== 'mantenimiento' && !busyIds.has(c.id)).length
+    : disp;
+  count.textContent = buscarPorFecha
+    ? `— ${disponibles} disponibles para esas fechas`
+    : `— ${disp} de ${data.length}`;
 
   if (data.length === 0) {
     grid.innerHTML = `<div class="empty-state"><div class="icon">🔍</div>No se encontraron unidades.</div>`;
     return;
   }
 
-  // #1 — XSS: usar esc() en todos los campos de usuario
   grid.innerHTML = allCamiones.map(c => {
-    const badgeClass = c.estado === 'disponible' ? 'badge-avail' : c.estado === 'ocupado' ? 'badge-busy' : 'badge-maint';
-    const label      = c.estado === 'disponible' ? '✓ Disponible' : c.estado === 'ocupado' ? '⏳ En servicio' : '🔧 Mantenimiento';
-    const disabled   = c.estado !== 'disponible' ? 'disabled' : '';
+    // Si se buscó por fechas, el badge refleja disponibilidad para esas fechas
+    let estadoEfectivo = c.estado;
+    if (buscarPorFecha && c.estado !== 'mantenimiento') {
+      estadoEfectivo = busyIds.has(c.id) ? 'ocupado' : 'disponible';
+    }
+
+    const badgeClass = estadoEfectivo === 'disponible' ? 'badge-avail'
+                     : estadoEfectivo === 'ocupado'    ? 'badge-busy'
+                     : 'badge-maint';
+    const label      = estadoEfectivo === 'disponible' ? '✓ Disponible'
+                     : estadoEfectivo === 'ocupado'    ? '⏳ En servicio'
+                     : '🔧 Mantenimiento';
+    const disabled   = estadoEfectivo !== 'disponible' ? 'disabled' : '';
     const stars      = c.calificacion ? renderStars(c.calificacion) : '';
 
     return `
@@ -88,7 +115,10 @@ function renderStars(rating) {
 }
 
 function filtrarCamiones() {
-  renderCamiones(document.getElementById('filtro-tipo').value);
+  const tipo     = document.getElementById('filtro-tipo').value;
+  const fechaIni = document.getElementById('fecha-inicio').value;
+  const fechaFin = document.getElementById('fecha-fin').value;
+  renderCamiones(tipo, fechaIni, fechaFin);
 }
 
 // openDetail() está definido en detalle.js

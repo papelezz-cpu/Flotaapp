@@ -14,20 +14,23 @@ async function openDetail(id) {
 
   const modal = document.getElementById('modal-detalle');
   modal.classList.add('open');
+  // Resetear reservas del camión anterior para evitar datos cruzados
+  detalleReservas = [];
+
   // Mostrar cargando directamente en el body (evita bugs si el modal se abre varias veces)
   const body = document.getElementById('detalle-body');
   body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:180px;color:var(--text-muted);font-size:0.88rem">Cargando...</div>`;
 
-  // Cargar perfil de la empresa
-  const { data: perfil } = await sb.from('perfiles').select('*').eq('user_id', c.propietario_id).single();
-
-  // Cargar reservas para el calendario
+  // Cargar perfil de la empresa y reservas en paralelo
   const hoy = today();
-  const { data: reservas } = await sb.from('reservaciones')
-    .select('fecha_ini, fecha_fin, estado')
-    .eq('unidad', id)
-    .in('estado', ['Activa', 'Pendiente'])
-    .gte('fecha_fin', hoy);
+  const [{ data: perfil }, { data: reservas }] = await Promise.all([
+    sb.from('perfiles').select('*').eq('user_id', c.propietario_id).single(),
+    sb.from('reservaciones')
+      .select('fecha_ini, fecha_fin, estado')
+      .eq('unidad', id)
+      .in('estado', ['Activa', 'Pendiente'])
+      .gte('fecha_fin', hoy)
+  ]);
   detalleReservas = reservas || [];
 
   // Botón Agendar solo si disponible
