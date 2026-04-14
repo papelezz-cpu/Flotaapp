@@ -14,13 +14,14 @@ async function openDetail(id) {
 
   const modal = document.getElementById('modal-detalle');
   modal.classList.add('open');
-  document.getElementById('detalle-loading').style.display = 'block';
-  document.getElementById('detalle-content').style.display = 'none';
+  // Mostrar cargando directamente en el body (evita bugs si el modal se abre varias veces)
+  const body = document.getElementById('detalle-body');
+  body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:180px;color:var(--text-muted);font-size:0.88rem">Cargando...</div>`;
 
   // Cargar perfil de la empresa
   const { data: perfil } = await sb.from('perfiles').select('*').eq('user_id', c.propietario_id).single();
 
-  // Cargar reservas para el calendario (próximos 3 meses)
+  // Cargar reservas para el calendario
   const hoy = today();
   const { data: reservas } = await sb.from('reservaciones')
     .select('fecha_ini, fecha_fin, estado')
@@ -28,9 +29,6 @@ async function openDetail(id) {
     .in('estado', ['Activa', 'Pendiente'])
     .gte('fecha_fin', hoy);
   detalleReservas = reservas || [];
-
-  document.getElementById('detalle-loading').style.display = 'none';
-  document.getElementById('detalle-content').style.display = 'block';
 
   // Botón Agendar solo si disponible
   const btnAgendar = document.getElementById('btn-detalle-agendar');
@@ -142,8 +140,9 @@ function renderCalendar() {
   const booked  = new Set();
   const pending = new Set();
   detalleReservas.forEach(r => {
-    const from = new Date(r.fecha_ini + 'T00:00');
-    const to   = new Date(r.fecha_fin + 'T00:00');
+    // Tomar solo la parte de fecha (Supabase puede devolver timestamp completo)
+    const from = new Date(r.fecha_ini.split('T')[0] + 'T00:00');
+    const to   = new Date(r.fecha_fin.split('T')[0] + 'T00:00');
     for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
       if (d.getFullYear() === calYear && d.getMonth() === calMonth) {
         const key = d.getDate();

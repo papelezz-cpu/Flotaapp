@@ -129,7 +129,12 @@ async function aceptarReserva(reservaId, unidad) {
   // Obtener datos antes de actualizar para el email
   const { data: r } = await sb.from('reservaciones').select('*').eq('id', reservaId).single();
   await sb.from('reservaciones').update({ estado: 'Activa' }).eq('id', reservaId);
-  await sb.from('camiones').update({ estado: 'ocupado' }).eq('id', unidad);
+
+  // Marcar ocupado solo si la reserva ya inició; si es futura, el camión sigue disponible hoy
+  const fechaIni = r?.fecha_ini ? r.fecha_ini.split('T')[0] : null;
+  if (fechaIni && fechaIni <= today()) {
+    await sb.from('camiones').update({ estado: 'ocupado' }).eq('id', unidad);
+  }
 
   // Email al cliente: reserva aceptada (con CC al superadmin)
   _enviarEmail('reserva_aceptada', {
@@ -143,7 +148,10 @@ async function aceptarReserva(reservaId, unidad) {
 
   await renderReserv();
   await loadNotificaciones();
-  showToast('✓ Reserva aceptada — camión marcado como en servicio');
+  const toastMsg = fechaIni && fechaIni <= today()
+    ? '✓ Reserva aceptada — camión marcado como en servicio'
+    : '✓ Reserva aceptada — el camión quedará en servicio a partir del ' + fmtFecha(fechaIni);
+  showToast(toastMsg);
 }
 
 async function rechazarReserva(reservaId, unidad) {
