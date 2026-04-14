@@ -7,8 +7,17 @@ function showView(v, btn) {
   document.getElementById('view-' + v).classList.add('active');
   if (btn) btn.classList.add('active');
 
+  // Cerrar menú hamburguesa al navegar
+  document.getElementById('btn-hamburger')?.classList.remove('open');
+  document.querySelector('.nav-tabs')?.classList.remove('open');
+
   if (v === 'cliente')       renderCamiones();
   if (v === 'reservaciones') renderReserv();
   if (v === 'admin')         renderAdmin();
   if (v === 'usuarios')      renderUsuarios();
+}
+
+function toggleMenu() {
+  document.getElementById('btn-hamburger').classList.toggle('open');
+  document.querySelector('.nav-tabs').classList.toggle('open');
 }

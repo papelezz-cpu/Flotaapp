@@ -18,7 +18,7 @@ async function renderCamiones(filtroTipo = '') {
   grid.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
 
   // Camiones
-  let query = sb.from('camiones').select('*').order('id');
+  let query = sb.from('camiones').select('*').eq('aprobacion', 'aprobada').order('id');
   if (filtroTipo) query = query.eq('tipo', filtroTipo);
   const { data, error } = await query;
   if (error) {

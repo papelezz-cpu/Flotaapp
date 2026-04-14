@@ -144,8 +144,39 @@ header {
 .stat-num.red   { color: var(--red); }
 .stat-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
 
+/* ── HAMBURGER ───────────────────────────────────────── */
+.btn-hamburger {
+  display: none;
+  flex-direction: column; justify-content: center; gap: 5px;
+  background: none; border: none; cursor: pointer;
+  padding: 6px; border-radius: 8px;
+  transition: background 0.2s;
+}
+.btn-hamburger:hover { background: rgba(78,142,247,0.1); }
+.btn-hamburger span {
+  display: block; width: 22px; height: 2px;
+  background: var(--white); border-radius: 2px;
+  transition: transform 0.25s, opacity 0.25s;
+}
+.btn-hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.btn-hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.btn-hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
 /* ── MOBILE ──────────────────────────────────────────── */
-@media (max-width: 520px) {
+@media (max-width: 640px) {
+  .btn-hamburger { display: flex; }
+
+  .nav-tabs {
+    display: none;
+    position: fixed; top: 60px; left: 0; right: 0; z-index: 99;
+    background: var(--navy-dark);
+    border-bottom: 1px solid rgba(78,142,247,0.2);
+    flex-direction: column; gap: 4px; padding: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .nav-tabs.open { display: flex; }
+  .nav-tab { padding: 12px 16px; border-radius: 10px; font-size: 0.9rem; text-align: left; }
+
   .hero h1 { font-size: 1.3rem; }
-  .nav-tab { padding: 6px 10px; font-size: 0.78rem; }
+  .user-chip strong { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }

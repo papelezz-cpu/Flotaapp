@@ -30,6 +30,9 @@
       <div class="logo-icon">🚛</div>
       FlotaPro
     </div>
+    <button class="btn-hamburger" id="btn-hamburger" onclick="toggleMenu()" aria-label="Menú">
+      <span></span><span></span><span></span>
+    </button>
     <div class="nav-tabs">
       <button class="nav-tab active"        onclick="showView('cliente', this)">Disponibilidad</button>
       <button class="nav-tab"               onclick="showView('reservaciones', this)">Reservaciones</button>
@@ -125,7 +128,25 @@
             <option value="mantenimiento">Mantenimiento</option>
           </select>
         </div>
-        <button class="btn-add" onclick="agregarCamion()">Agregar unidad</button>
+        <div class="form-group">
+          <label>Fotos de la unidad</label>
+          <label class="file-upload-area" for="admin-fotos">
+            <span class="file-upload-icon">📷</span>
+            <span id="fotos-label" class="file-upload-text">Seleccionar fotos</span>
+          </label>
+          <input type="file" id="admin-fotos" multiple accept="image/*" style="display:none"
+                 onchange="updateFileLabel('admin-fotos','fotos-label')">
+        </div>
+        <div class="form-group">
+          <label>Documentación del vehículo</label>
+          <label class="file-upload-area" for="admin-docs">
+            <span class="file-upload-icon">📄</span>
+            <span id="docs-label" class="file-upload-text">Seleccionar documentos (PDF / imagen)</span>
+          </label>
+          <input type="file" id="admin-docs" multiple accept=".pdf,.jpg,.jpeg,.png" style="display:none"
+                 onchange="updateFileLabel('admin-docs','docs-label')">
+        </div>
+        <button class="btn-add" onclick="agregarCamion()">Enviar a aprobación</button>
       </div>
 
       <div class="admin-card">
@@ -133,6 +154,14 @@
         <div class="truck-list-admin" id="admin-list"></div>
       </div>
 
+    </div>
+
+    <!-- Pendientes de aprobación — solo superadmin -->
+    <div id="pendientes-section" style="display:none; margin-top:24px">
+      <div class="section-title">⏳ Unidades pendientes de aprobación</div>
+      <div class="admin-card">
+        <div class="truck-list-admin" id="pendientes-list"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -206,6 +235,18 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
       <button class="btn-confirm" onclick="confirmarReserva()">Confirmar reserva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL ARCHIVOS ══════════════════════════════════ -->
+<div class="modal-overlay" id="modal-archivos">
+  <div class="modal">
+    <h2>Archivos adjuntos</h2>
+    <p class="sub" id="modal-archivos-sub"></p>
+    <div id="archivos-list"></div>
+    <div class="modal-actions">
+      <button class="btn-confirm" onclick="document.getElementById('modal-archivos').classList.remove('open')">Cerrar</button>
     </div>
   </div>
 </div>
