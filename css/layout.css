@@ -164,8 +164,10 @@ header {
 
 /* ── MOBILE ──────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .btn-hamburger { display: flex; }
+  /* Header compacto */
+  .header-inner { gap: 0; }
 
+  /* Ocultar nav central en móvil */
   .nav-tabs {
     display: none;
     position: fixed; top: 60px; left: 0; right: 0; z-index: 99;
@@ -175,8 +177,15 @@ header {
     box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   }
   .nav-tabs.open { display: flex; }
-  .nav-tab { padding: 12px 16px; border-radius: 10px; font-size: 0.9rem; text-align: left; }
+  .nav-tab { padding: 13px 16px; border-radius: 10px; font-size: 0.9rem; text-align: left; width: 100%; }
+
+  /* Mostrar hamburger */
+  .btn-hamburger { display: flex; }
+
+  /* Simplificar header-right en móvil */
+  .btn-theme { display: none; }
+  .user-chip strong { display: none; }
+  .user-chip { padding: 4px 8px; }
 
   .hero h1 { font-size: 1.3rem; }
-  .user-chip strong { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
