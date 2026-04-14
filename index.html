@@ -26,7 +26,7 @@
 <!-- ══ HEADER ══════════════════════════════════════════ -->
 <header>
   <div class="header-inner">
-    <div class="logo">
+    <div class="logo" onclick="showView('cliente', document.querySelectorAll('.nav-tab')[0])" style="cursor:pointer">
       <div class="logo-icon">🚛</div>
       FlotaPro
     </div>
@@ -57,25 +57,29 @@
       <h1>Disponibilidad de Flota</h1>
       <p>Consulta y agenda camiones disponibles para tu carga</p>
       <div class="search-bar">
-        <div class="search-group">
-          <label>Fecha de inicio</label>
-          <input type="date" id="fecha-inicio">
+        <div class="search-dates">
+          <div class="search-group">
+            <label>Fecha de inicio</label>
+            <input type="date" id="fecha-inicio">
+          </div>
+          <div class="search-group">
+            <label>Fecha de fin</label>
+            <input type="date" id="fecha-fin">
+          </div>
         </div>
-        <div class="search-group">
-          <label>Fecha de fin</label>
-          <input type="date" id="fecha-fin">
+        <div class="search-bottom">
+          <div class="search-group" style="flex:1">
+            <label>Tipo de camión</label>
+            <select id="filtro-tipo">
+              <option value="">Todos</option>
+              <option value="Torton">Torton</option>
+              <option value="Rabón">Rabón</option>
+              <option value="Full">Full</option>
+              <option value="Plataforma">Plataforma</option>
+            </select>
+          </div>
+          <button class="btn-search" onclick="filtrarCamiones()">Buscar</button>
         </div>
-        <div class="search-group" style="min-width:130px">
-          <label>Tipo de camión</label>
-          <select id="filtro-tipo">
-            <option value="">Todos</option>
-            <option value="Torton">Torton</option>
-            <option value="Rabón">Rabón</option>
-            <option value="Full">Full</option>
-            <option value="Plataforma">Plataforma</option>
-          </select>
-        </div>
-        <button class="btn-search" onclick="filtrarCamiones()">Buscar</button>
       </div>
     </div>
     <div class="stats-row" id="stats-row"></div>

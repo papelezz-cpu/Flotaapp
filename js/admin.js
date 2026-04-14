@@ -4,7 +4,6 @@ async function renderAdmin() {
   const list = document.getElementById('admin-list');
   list.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
 
-  // Superadmin ve todo; admin solo ve sus camiones aprobados
   let query = sb.from('camiones')
     .select('*, propietario:perfiles(nombre)')
     .eq('aprobacion', 'aprobada')
@@ -37,15 +36,47 @@ async function renderAdmin() {
               ${currentUser.rol === 'superadmin' ? `· <em style="color:var(--text-muted)">${empresa}</em>` : ''}
             </div>
           </div>
-          <button class="btn-edit" onclick="toggleEstado('${c.id}','${c.estado}')">Cambiar estado</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn-edit" onclick="toggleEstado('${c.id}','${c.estado}')">Cambiar estado</button>
+            <button class="btn-edit btn-rechazar" onclick="eliminarUnidad('${c.id}')">🗑</button>
+          </div>
         </div>`;
     }).join('');
   }
 
-  // Sección de pendientes (solo superadmin)
   renderPendientes();
+  if (currentUser.rol !== 'superadmin') renderMisPendientes();
 }
 
+// Muestra las unidades pendientes del propio admin (no superadmin)
+async function renderMisPendientes() {
+  const { data } = await sb.from('camiones')
+    .select('*')
+    .eq('propietario_id', currentUser.id)
+    .eq('aprobacion', 'pendiente')
+    .order('created_at', { ascending: false });
+
+  const section = document.getElementById('pendientes-section');
+  const list    = document.getElementById('pendientes-list');
+
+  if (!data?.length) { section.style.display = 'none'; return; }
+
+  section.style.display = 'block';
+  // Sobrescribir el título de la sección
+  const titulo = section.querySelector('.section-title');
+  if (titulo) titulo.innerHTML = '⏳ Mis unidades en espera de aprobación';
+
+  list.innerHTML = data.map(c => `
+    <div class="truck-list-item">
+      <div class="truck-list-item-info">
+        <div class="truck-list-item-name">${c.emoji} ${c.id} — ${c.tipo}</div>
+        <div class="truck-list-item-sub">${c.operador} · ${c.capacidad} ton</div>
+      </div>
+      <span class="badge badge-busy" style="font-size:0.72rem">⏳ Pendiente</span>
+    </div>`).join('');
+}
+
+// Muestra las unidades pendientes de TODOS (solo superadmin)
 async function renderPendientes() {
   if (currentUser.rol !== 'superadmin') return;
 
@@ -58,10 +89,7 @@ async function renderPendientes() {
     .eq('aprobacion', 'pendiente')
     .order('created_at', { ascending: false });
 
-  if (!data?.length) {
-    section.style.display = 'none';
-    return;
-  }
+  if (!data?.length) { section.style.display = 'none'; return; }
 
   section.style.display = 'block';
   list.innerHTML = data.map(c => `
@@ -90,14 +118,21 @@ async function aprobarUnidad(id) {
 
 async function rechazarUnidad(id) {
   if (!confirm(`¿Rechazar la unidad ${id}? Se eliminará del sistema.`)) return;
-  // Eliminar archivos del storage si los hay
   const { data: c } = await sb.from('camiones').select('archivos').eq('id', id).single();
-  if (c?.archivos?.length) {
-    await sb.storage.from('unidades').remove(c.archivos);
-  }
+  if (c?.archivos?.length) await sb.storage.from('unidades').remove(c.archivos);
   await sb.from('camiones').delete().eq('id', id);
   await renderAdmin();
   showToast(`Unidad ${id} rechazada`);
+}
+
+async function eliminarUnidad(id) {
+  if (!confirm(`¿Eliminar la unidad ${id}? Esta acción no se puede deshacer.`)) return;
+  const { data: c } = await sb.from('camiones').select('archivos').eq('id', id).single();
+  if (c?.archivos?.length) await sb.storage.from('unidades').remove(c.archivos);
+  const { error } = await sb.from('camiones').delete().eq('id', id);
+  if (error) { showToast('Error: no tienes permiso para eliminar esta unidad'); return; }
+  await renderAdmin();
+  showToast(`Unidad ${id} eliminada`);
 }
 
 async function verArchivos(id) {
@@ -161,7 +196,6 @@ async function agregarCamion() {
   const fotosFiles = Array.from(document.getElementById('admin-fotos').files || []);
   const docsFiles  = Array.from(document.getElementById('admin-docs').files  || []);
   const archivos   = [];
-
   for (const file of [...fotosFiles, ...docsFiles]) {
     const path = `${currentUser.id}/${id}/${Date.now()}_${file.name}`;
     const { data: up, error: upErr } = await sb.storage.from('unidades').upload(path, file);
@@ -179,8 +213,27 @@ async function agregarCamion() {
   });
   if (error) { alert('Error: ' + (error.message || 'No se pudo agregar.')); return; }
 
-  document.getElementById('admin-op').value   = '';
-  document.getElementById('admin-cap').value  = '';
+  // Notificar al superadmin por email si la unidad queda pendiente
+  if (!esSuperAdmin) {
+    try {
+      const session = (await sb.auth.getSession()).data.session;
+      await fetch(`${FN_URL.replace('gestionar-usuario', 'enviar-notificacion')}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          camion: { id, tipo, operador: op, capacidad: cap, estado },
+          propietarioNombre: currentUser.nombre
+        })
+      });
+    } catch (_) { /* El email falla silenciosamente */ }
+  }
+
+  // Limpiar formulario
+  document.getElementById('admin-op').value    = '';
+  document.getElementById('admin-cap').value   = '';
   document.getElementById('admin-fotos').value = '';
   document.getElementById('admin-docs').value  = '';
   document.getElementById('fotos-label').textContent = 'Seleccionar fotos';
@@ -189,13 +242,13 @@ async function agregarCamion() {
   await renderAdmin();
   showToast(esSuperAdmin
     ? `✓ Unidad ${id} agregada`
-    : `✓ Unidad ${id} enviada a aprobación`);
+    : `✓ Unidad ${id} enviada — recibirás confirmación por correo`);
 }
 
 function updateFileLabel(inputId, labelId) {
   const files = document.getElementById(inputId).files;
   const label = document.getElementById(labelId);
-  if (files.length === 0) {
+  if (!files.length) {
     label.textContent = inputId === 'admin-fotos'
       ? 'Seleccionar fotos'
       : 'Seleccionar documentos (PDF / imagen)';
