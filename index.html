@@ -32,6 +32,7 @@
   <link rel="stylesheet" href="css/layout.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/login.css">
+  <link rel="stylesheet" href="css/detalle.css">
   <link rel="stylesheet" href="css/theme.css">
 
   <!-- Supabase SDK -->
@@ -298,6 +299,42 @@
   </div>
 </div>
 
+<!-- ══ MODAL DETALLE CAMIÓN ════════════════════════════ -->
+<div class="modal-overlay" id="modal-detalle">
+  <div class="modal">
+    <div class="detalle-header">
+      <div class="detalle-titulo" id="detalle-titulo"></div>
+      <div class="detalle-empresa-header" id="detalle-empresa-header"></div>
+      <div class="detalle-tabs">
+        <button class="detalle-tab active" data-tab="unidad"     onclick="switchDetalleTab('unidad')">📦 Unidad</button>
+        <button class="detalle-tab"        data-tab="empresa"    onclick="switchDetalleTab('empresa')">🏢 Empresa</button>
+        <button class="detalle-tab"        data-tab="calendario" onclick="switchDetalleTab('calendario')">📅 Disponibilidad</button>
+      </div>
+    </div>
+    <div class="detalle-body" id="detalle-body">
+      <div id="detalle-loading">Cargando...</div>
+      <div id="detalle-content" style="display:none"></div>
+    </div>
+    <div class="detalle-footer">
+      <button class="btn-cancel" onclick="closeDetalle()">Cerrar</button>
+      <button class="btn-confirm" id="btn-detalle-agendar" onclick="detalleAgendar()">Agendar esta unidad</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL SEGUIMIENTO ═══════════════════════════════ -->
+<div class="modal-overlay" id="modal-tracking">
+  <div class="modal">
+    <h2>Seguimiento de reserva</h2>
+    <div class="tracking-info" id="tracking-reserva-info"></div>
+    <div class="tracking-stepper" id="tracking-steps"></div>
+    <button class="btn-avanzar" id="tracking-btn-avanzar" onclick="avanzarTracking()"></button>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn-confirm" onclick="closeTracking()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL ARCHIVOS ══════════════════════════════════ -->
 <div class="modal-overlay" id="modal-archivos">
   <div class="modal">
@@ -343,6 +380,8 @@
 <!-- ══ SCRIPTS (orden importante) ══════════════════════ -->
 <script src="js/utils.js"></script>
 <script src="js/notificaciones.js"></script>
+<script src="js/detalle.js"></script>
+<script src="js/tracking.js"></script>
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/theme.js"></script>

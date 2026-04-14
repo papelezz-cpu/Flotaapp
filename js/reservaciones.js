@@ -34,13 +34,19 @@ async function renderReserv() {
       const badgeCls = r.estado === 'Pendiente'  ? 'badge-busy'
                      : r.estado === 'Activa'     ? 'badge-avail'
                      : 'badge-maint';
+      const trackBtn = r.estado === 'Activa'
+        ? `<button class="btn-edit" onclick="openTracking('${r.id}')" style="font-size:0.7rem">📍 ${esc(r.tracking_estado || 'Confirmado')}</button>`
+        : '';
       return `
       <div class="reserv-row reserv-row-cli">
         <div class="reserv-id">${esc(r.unidad)}</div>
         <div class="reserv-empresa">${esc(empresaMap[r.unidad] || '—')}</div>
         <div>${fmtFecha(r.fecha_ini)}</div>
         <div>${fmtFecha(r.fecha_fin)}</div>
-        <div><span class="badge ${badgeCls}">${esc(r.estado)}</span></div>
+        <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+          <span class="badge ${badgeCls}">${esc(r.estado)}</span>
+          ${trackBtn}
+        </div>
       </div>`;
     }).join('');
     return;
@@ -96,7 +102,10 @@ async function renderReserv() {
         <button class="btn-aceptar-reserva"  onclick="aceptarReserva('${r.id}','${esc(r.unidad)}')">✓ Aceptar</button>
         <button class="btn-rechazar-reserva" onclick="rechazarReserva('${r.id}','${esc(r.unidad)}')">✕ Rechazar</button>`;
     } else if (esDueno && esActiva) {
-      acciones = `<button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${esc(r.unidad)}')">Cancelar</button>`;
+      const trackStep = r.tracking_estado || 'Confirmado';
+      acciones = `
+        <button class="btn-edit" onclick="openTracking('${r.id}')" title="Ver seguimiento">📍 ${esc(trackStep)}</button>
+        <button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${esc(r.unidad)}')">Cancelar</button>`;
     }
 
     return `

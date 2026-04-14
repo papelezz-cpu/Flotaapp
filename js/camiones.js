@@ -91,8 +91,4 @@ function filtrarCamiones() {
   renderCamiones(document.getElementById('filtro-tipo').value);
 }
 
-function openDetail(id) {
-  const c = allCamiones.find(x => x.id === id);
-  if (!c) return;
-  alert(`📋 Detalle — ${c.id}\n\nEmpresa: ${c.empresaNombre}\nTipo: ${c.tipo}\nCapacidad: ${c.capacidad} ton\nOperador: ${c.operador}\nEstado: ${c.estado}`);
-}
+// openDetail() está definido en detalle.js
