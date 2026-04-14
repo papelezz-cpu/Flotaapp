@@ -60,7 +60,7 @@ body::before {
 body.role-admin      .admin-only      { display: inline-block; }
 body.role-superadmin .admin-only      { display: inline-block; }
 body.role-superadmin .superadmin-only { display: inline-block; }
-body.logged-in   .logged-in-only     { display: inline-block; }
+body.logged-in   .logged-in-only     { display: flex; }
 
 /* User chip & logout: hidden until logged in */
 .user-chip   { display: none; }

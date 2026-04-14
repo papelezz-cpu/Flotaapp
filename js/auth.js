@@ -65,6 +65,7 @@ async function doLogin() {
 
   hideLoginOverlay();
   applyUserUI();
+  loadNotificaciones();
   init();
 }
 

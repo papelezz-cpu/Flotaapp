@@ -57,44 +57,49 @@ async function confirmarReserva() {
 
   const { error: errRes } = await sb.from('reservaciones').insert({
     unidad: selectedTruck.id, cliente: nombre, cliente_email: email,
-    telefono: tel, fecha_ini: ini, fecha_fin: fin, descripcion: desc, estado: 'Activa'
+    telefono: tel, fecha_ini: ini, fecha_fin: fin, descripcion: desc,
+    estado: 'Pendiente'   // La empresa debe aceptar primero
   });
   if (errRes) { alert('Error al guardar la reserva.'); return; }
 
-  await sb.from('camiones').update({ estado: 'ocupado' }).eq('id', selectedTruck.id);
-
-  // #9 — Email de confirmación al cliente
-  if (email) {
-    try {
-      const session = (await sb.auth.getSession()).data.session;
-      const token = session?.access_token;
-      const fnBase = typeof FN_URL !== 'undefined'
-        ? FN_URL.replace('gestionar-usuario', 'enviar-notificacion')
-        : null;
-      if (fnBase && token) {
-        await fetch(fnBase, {
+  // Enviar emails (silencioso si falla — limitación del plan Resend)
+  try {
+    const session = (await sb.auth.getSession()).data.session;
+    const token   = session?.access_token;
+    const fnBase  = typeof FN_URL !== 'undefined'
+      ? FN_URL.replace('gestionar-usuario', 'enviar-notificacion')
+      : null;
+    if (fnBase && token) {
+      // Email a la empresa (dueño del camión)
+      fetch(fnBase, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          tipo: 'nueva_reserva',
+          propietario_id: selectedTruck.propietario_id,
+          camion: { id: selectedTruck.id, tipo: selectedTruck.tipo },
+          reserva: { cliente: nombre, email, telefono: tel, fecha_ini: ini, fecha_fin: fin, descripcion: desc }
+        })
+      });
+      // Email de acuse al cliente
+      if (email) {
+        fetch(fnBase, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({
             tipo: 'confirmacion_cliente',
             clienteEmail: email,
             clienteNombre: nombre,
-            camion: {
-              id: selectedTruck.id,
-              tipo: selectedTruck.tipo,
-              capacidad: selectedTruck.capacidad,
-              operador: selectedTruck.operador,
-              empresa: selectedTruck.empresaNombre
-            },
+            camion: { id: selectedTruck.id, tipo: selectedTruck.tipo, empresa: selectedTruck.empresaNombre },
             fecha_ini: ini,
             fecha_fin: fin
           })
         });
       }
-    } catch (_) { /* silencioso */ }
-  }
+    }
+  } catch (_) { /* silencioso */ }
 
   closeModal();
   await renderCamiones();
-  showToast('✓ Reserva confirmada — ¡nos vemos pronto!');
+  showToast('✓ Solicitud enviada — la empresa confirmará pronto');
 }
