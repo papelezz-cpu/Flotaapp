@@ -37,7 +37,7 @@ async function renderPedidos() {
   ]);
 
   if (error) {
-    container.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar pedidos.</div>`;
+    container.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar solicitudes.</div>`;
     return;
   }
 
@@ -65,15 +65,15 @@ async function renderPedidos() {
     const otrosPedidos = (pedidos || []).filter(p => p.cliente_id !== currentUser.id && p.estado === 'abierto');
 
     if (misPedidos.length) {
-      html += `<div class="ped-seccion-title">Mis pedidos</div>`;
+      html += `<div class="ped-seccion-title">Mis solicitudes</div>`;
       html += misPedidos.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'cliente')).join('');
     }
     if (otrosPedidos.length) {
-      html += `<div class="ped-seccion-title">Otros pedidos activos</div>`;
+      html += `<div class="ped-seccion-title">Otras solicitudes activas</div>`;
       html += otrosPedidos.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'publico')).join('');
     }
     if (!misPedidos.length && !otrosPedidos.length) {
-      html = `<div class="empty-state"><div class="icon">📋</div>Sin pedidos activos.<br><small style="color:var(--text-muted)">Publica el primero con el botón de arriba.</small></div>`;
+      html = `<div class="empty-state"><div class="icon">📋</div>Sin solicitudes activas.<br><small style="color:var(--text-muted)">Publica la primera con el botón de arriba.</small></div>`;
     }
 
   // ── ADMIN / SUPERADMIN ─────────────────────────────
@@ -94,18 +94,18 @@ async function renderPedidos() {
     );
 
     if (misNegociaciones.length) {
-      html += `<div class="ped-seccion-title">Mis negociaciones activas</div>`;
+      html += `<div class="ped-seccion-title">Mis negociaciones</div>`;
       html += misNegociaciones.map(p => {
         const mia = (ofertasMap[p.id] || []).find(o => o.admin_id === currentUser.id);
         return pedidoCardHTML(p, ofertasMap[p.id] || [], 'admin_propio', mia);
       }).join('');
     }
     if (disponibles.length) {
-      html += `<div class="ped-seccion-title">${misNegociaciones.length ? 'Otros pedidos disponibles' : 'Pedidos disponibles'}</div>`;
+      html += `<div class="ped-seccion-title">${misNegociaciones.length ? 'Otras solicitudes disponibles' : 'Solicitudes disponibles'}</div>`;
       html += disponibles.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'admin')).join('');
     }
     if (!misNegociaciones.length && !disponibles.length) {
-      html = `<div class="empty-state"><div class="icon">📋</div>No hay pedidos abiertos en este momento.</div>`;
+      html = `<div class="empty-state"><div class="icon">📋</div>No hay solicitudes abiertas en este momento.</div>`;
     }
 
   // ── PÚBLICO / GUEST ────────────────────────────────
@@ -114,7 +114,7 @@ async function renderPedidos() {
     if (abiertos.length) {
       html += abiertos.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'publico')).join('');
     } else {
-      html = `<div class="empty-state"><div class="icon">📋</div>Sin pedidos activos.<br><small>Inicia sesión como cliente para publicar uno.</small></div>`;
+      html = `<div class="empty-state"><div class="icon">📋</div>Sin solicitudes activas.<br><small>Inicia sesión como cliente para publicar una.</small></div>`;
     }
   }
 
@@ -395,7 +395,7 @@ async function responderOferta(ofertaId, accion) {
   await loadNotificaciones();
   if (pedidoDetalle) await openPedidoDetalle(pedidoDetalle.id);
   await renderPedidos();
-  showToast(accion === 'aceptar' ? '✓ ¡Acuerdo cerrado! Reservación creada' : 'Oferta rechazada');
+  showToast(accion === 'aceptar' ? '✓ ¡Acuerdo cerrado! Reservación creada' : 'Oferta declinada');
 }
 
 async function enviarContraoferta(ofertaId) {
@@ -551,7 +551,7 @@ async function cerrarAcuerdo(oferta, pedido) {
 // ── CANCELAR PEDIDO ────────────────────────────────────
 
 async function cancelarPedido(pedidoId) {
-  if (!confirm('¿Cancelar este pedido? Las ofertas activas quedarán descartadas.')) return;
+  if (!confirm('¿Cancelar esta solicitud? Las ofertas activas quedarán descartadas.')) return;
   await sb.from('pedidos').update({ estado: 'cancelado' }).eq('id', pedidoId);
   await renderPedidos();
   showToast('Pedido cancelado');
@@ -560,7 +560,7 @@ async function cancelarPedido(pedidoId) {
 // ── ELIMINAR PEDIDO (superadmin) ───────────────────────
 
 async function eliminarPedido(pedidoId) {
-  if (!confirm('¿Eliminar este pedido permanentemente? Esta acción no se puede deshacer.')) return;
+  if (!confirm('¿Eliminar esta solicitud permanentemente? Esta acción no se puede deshacer.')) return;
   // Eliminar ofertas asociadas primero (si RLS lo requiere)
   await sb.from('ofertas').delete().eq('pedido_id', pedidoId);
   const { error } = await sb.from('pedidos').delete().eq('id', pedidoId);

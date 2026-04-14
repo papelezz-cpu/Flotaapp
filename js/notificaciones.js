@@ -73,7 +73,7 @@ async function onNotifClick(id, tipo) {
     const tab = [...tabs].find(t => t.textContent.trim() === 'Reservaciones');
     if (tab) showView('reservaciones', tab);
   } else if (['nueva_oferta','respuesta_oferta','respuesta_contra_oferta'].includes(tipo)) {
-    const tab = [...tabs].find(t => t.textContent.trim() === 'Pedidos');
+    const tab = [...tabs].find(t => t.textContent.trim() === 'Solicitudes');
     if (tab) showView('pedidos', tab);
   }
   toggleNotifPanel();

@@ -50,7 +50,7 @@
     <div class="nav-tabs">
       <button class="nav-tab active"        onclick="showView('cliente', this)">Disponibilidad</button>
       <button class="nav-tab"               onclick="showView('reservaciones', this)">Reservaciones</button>
-      <button class="nav-tab"               onclick="showView('pedidos', this)">Pedidos</button>
+      <button class="nav-tab"               onclick="showView('pedidos', this)">Solicitudes</button>
       <button class="nav-tab admin-only"    onclick="showView('admin', this)">Admin</button>
       <button class="nav-tab superadmin-only" onclick="showView('usuarios', this)">Usuarios</button>
     </div>
@@ -144,10 +144,10 @@
 <div id="view-pedidos" class="view">
   <div class="page">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
-      <div class="section-title" style="margin:0">📋 Pedidos de servicio</div>
+      <div class="section-title" style="margin:0">📋 Solicitudes de servicio</div>
       <button class="btn-add" id="btn-nuevo-pedido"
               style="width:auto;padding:10px 20px;display:none"
-              onclick="openNuevoPedido()">+ Nuevo pedido</button>
+              onclick="openNuevoPedido()">+ Nueva solicitud</button>
     </div>
     <div id="pedidos-list"></div>
   </div>
@@ -527,7 +527,7 @@
 <!-- ══ MODAL NUEVO PEDIDO ══════════════════════════════ -->
 <div class="modal-overlay" id="modal-nuevo-pedido">
   <div class="modal" style="max-width:560px">
-    <h2>📋 Nuevo pedido de servicio</h2>
+    <h2>📋 Nueva solicitud de servicio</h2>
     <p class="sub">Describe lo que necesitas y los proveedores te enviarán su mejor oferta.</p>
     <div class="form-group">
       <label>Tipo de servicio requerido</label>
@@ -591,7 +591,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeNuevoPedido()">Cancelar</button>
-      <button class="btn-confirm" onclick="crearPedido()">📋 Publicar pedido</button>
+      <button class="btn-confirm" onclick="crearPedido()">📋 Publicar solicitud</button>
     </div>
   </div>
 </div>
@@ -599,7 +599,7 @@
 <!-- ══ MODAL DETALLE PEDIDO (cliente ve ofertas) ═══════ -->
 <div class="modal-overlay" id="modal-pedido-detalle">
   <div class="modal" style="max-width:520px">
-    <h2 id="pedido-detalle-titulo">Pedido</h2>
+    <h2 id="pedido-detalle-titulo">Solicitud</h2>
     <p class="sub" id="pedido-detalle-sub"></p>
     <div id="pedido-detalle-body" style="max-height:55vh;overflow-y:auto"></div>
     <div class="modal-actions" style="margin-top:16px">
@@ -612,7 +612,7 @@
 <div class="modal-overlay" id="modal-hacer-oferta">
   <div class="modal" style="max-width:460px">
     <h2>💼 Hacer oferta</h2>
-    <p class="sub" id="ho-pedido-info">Propón tu precio y el camión que asignarás.</p>
+    <p class="sub" id="ho-pedido-info">Propón tu precio y el recurso que asignarás.</p>
     <div class="form-group">
       <label>Camión que asignas</label>
       <select id="ho-camion">
