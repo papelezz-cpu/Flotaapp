@@ -15,6 +15,7 @@ function showView(v, btn) {
   if (v === 'cliente')       renderCamiones();
   if (v === 'reservaciones') renderReserv();
   if (v === 'admin')         renderAdmin();
+  if (v === 'pedidos')       renderPedidos();
   if (v === 'usuarios')      renderUsuarios();
 }
 

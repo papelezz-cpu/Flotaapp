@@ -50,6 +50,7 @@
     <div class="nav-tabs">
       <button class="nav-tab active"        onclick="showView('cliente', this)">Disponibilidad</button>
       <button class="nav-tab"               onclick="showView('reservaciones', this)">Reservaciones</button>
+      <button class="nav-tab"               onclick="showView('pedidos', this)">Pedidos</button>
       <button class="nav-tab admin-only"    onclick="showView('admin', this)">Admin</button>
       <button class="nav-tab superadmin-only" onclick="showView('usuarios', this)">Usuarios</button>
     </div>
@@ -130,6 +131,19 @@
       </div>
       <div id="reserv-body"></div>
     </div>
+  </div>
+</div>
+
+<!-- ══ VISTA: PEDIDOS ══════════════════════════════════ -->
+<div id="view-pedidos" class="view">
+  <div class="page">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div class="section-title" style="margin:0">📋 Pedidos de servicio</div>
+      <button class="btn-add" id="btn-nuevo-pedido"
+              style="width:auto;padding:10px 20px;display:none"
+              onclick="openNuevoPedido()">+ Nuevo pedido</button>
+    </div>
+    <div id="pedidos-list"></div>
   </div>
 </div>
 
@@ -396,6 +410,114 @@
   </div>
 </div>
 
+<!-- ══ MODAL NUEVO PEDIDO ══════════════════════════════ -->
+<div class="modal-overlay" id="modal-nuevo-pedido">
+  <div class="modal" style="max-width:560px">
+    <h2>📋 Nuevo pedido de servicio</h2>
+    <p class="sub">Describe lo que necesitas y los proveedores te enviarán su mejor oferta.</p>
+    <div class="form-group">
+      <label>Tipo de camión requerido</label>
+      <select id="np-tipo">
+        <option value="Cualquiera">Cualquiera</option>
+        <option value="Torton">Torton</option>
+        <option value="Rabón">Rabón</option>
+        <option value="Full">Full</option>
+        <option value="Plataforma">Plataforma</option>
+      </select>
+    </div>
+    <div class="admin-grid" style="gap:12px">
+      <div class="form-group">
+        <label>Capacidad mínima (ton)</label>
+        <input type="number" id="np-cap" placeholder="Ej. 20">
+      </div>
+      <div class="form-group">
+        <label>Tipo de carga</label>
+        <input type="text" id="np-carga" placeholder="Ej. Electrónicos, Maquinaria">
+      </div>
+      <div class="form-group">
+        <label>Origen *</label>
+        <input type="text" id="np-origen" placeholder="Ej. Puerto de Manzanillo">
+      </div>
+      <div class="form-group">
+        <label>Destino *</label>
+        <input type="text" id="np-destino" placeholder="Ej. Bodega Industrial Norte">
+      </div>
+      <div class="form-group">
+        <label>Fecha de inicio *</label>
+        <input type="date" id="np-fecha-ini">
+      </div>
+      <div class="form-group">
+        <label>Fecha de fin</label>
+        <input type="date" id="np-fecha-fin">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Descripción de la carga</label>
+      <textarea id="np-desc" rows="3" placeholder="Tipo de mercancía, peso aproximado, requisitos especiales..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Precio que ofreces (MXN) <span style="font-weight:400;color:var(--text-muted)">— puede quedar abierto</span></label>
+      <input type="number" id="np-precio" placeholder="Ej. 8000">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeNuevoPedido()">Cancelar</button>
+      <button class="btn-confirm" onclick="crearPedido()">📋 Publicar pedido</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL DETALLE PEDIDO (cliente ve ofertas) ═══════ -->
+<div class="modal-overlay" id="modal-pedido-detalle">
+  <div class="modal" style="max-width:520px">
+    <h2 id="pedido-detalle-titulo">Pedido</h2>
+    <p class="sub" id="pedido-detalle-sub"></p>
+    <div id="pedido-detalle-body" style="max-height:55vh;overflow-y:auto"></div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn-confirm" onclick="closePedidoDetalle()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL HACER OFERTA (admin) ══════════════════════ -->
+<div class="modal-overlay" id="modal-hacer-oferta">
+  <div class="modal" style="max-width:460px">
+    <h2>💼 Hacer oferta</h2>
+    <p class="sub" id="ho-pedido-info">Propón tu precio y el camión que asignarás.</p>
+    <div class="form-group">
+      <label>Camión que asignas</label>
+      <select id="ho-camion">
+        <option value="">Sin asignar camión específico aún</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Tu precio (MXN) *</label>
+      <input type="number" id="ho-precio" placeholder="Ej. 9500">
+    </div>
+    <div class="form-group">
+      <label>Mensaje al cliente <span style="font-weight:400;color:var(--text-muted)">(opcional)</span></label>
+      <textarea id="ho-mensaje" rows="2" placeholder="Experiencia, disponibilidad, detalles del servicio..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeHacerOferta()">Cancelar</button>
+      <button class="btn-confirm" onclick="enviarOferta()">Enviar oferta</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL RESPONDER CONTRAOFERTA (admin) ════════════ -->
+<div class="modal-overlay" id="modal-responder-contra">
+  <div class="modal" style="max-width:420px">
+    <h2>↩ Contraoferta del cliente</h2>
+    <div id="contra-detalle-info" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;padding:14px;margin-bottom:20px;font-size:0.85rem"></div>
+    <p class="sub" style="margin-bottom:0">¿Aceptas la contraoferta o la rechazas?</p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeResponderContra()">Cancelar</button>
+      <button class="btn-edit btn-rechazar" style="flex:1;padding:10px;font-size:0.85rem" onclick="responderContra('rechazar')">✕ Rechazar</button>
+      <button class="btn-confirm" onclick="responderContra('aceptar')">✓ Aceptar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL EDITAR CAMIÓN ═════════════════════════════ -->
 <div class="modal-overlay" id="modal-editar">
   <div class="modal">
@@ -515,6 +637,7 @@
 <script src="js/camiones.js"></script>
 <script src="js/reservaciones.js"></script>
 <script src="js/modal.js"></script>
+<script src="js/pedidos.js"></script>
 <script src="js/admin.js"></script>
 <script src="js/usuarios.js"></script>
 <script src="js/main.js"></script>

@@ -69,9 +69,12 @@ async function onNotifClick(id, tipo) {
 
   // Navegar a la vista correspondiente
   const tabs = document.querySelectorAll('.nav-tab');
-  if (tipo === 'reserva_pendiente') {
+  if (tipo === 'reserva_pendiente' || tipo === 'reserva_aceptada' || tipo === 'reserva_rechazada') {
     const tab = [...tabs].find(t => t.textContent.trim() === 'Reservaciones');
     if (tab) showView('reservaciones', tab);
+  } else if (['nueva_oferta','respuesta_oferta','respuesta_contra_oferta'].includes(tipo)) {
+    const tab = [...tabs].find(t => t.textContent.trim() === 'Pedidos');
+    if (tab) showView('pedidos', tab);
   }
   toggleNotifPanel();
 }
