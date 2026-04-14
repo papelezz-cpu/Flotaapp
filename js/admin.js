@@ -1,5 +1,14 @@
 // ── PANEL DE ADMINISTRACIÓN ───────────────────────────
 
+const CARGO_TIPOS = ['General','Refrigerado','Peligroso','Frágil','Granel','Maquinaria','Automóviles','Contenedor'];
+
+const DIM_DEFAULTS = {
+  'Torton':     '8.5m × 2.4m × 2.5m',
+  'Rabón':      '5.5m × 2.4m × 2.4m',
+  'Full':       '14.5m × 2.5m × 2.6m',
+  'Plataforma': '13.5m × 2.5m — abierta',
+};
+
 async function renderAdmin() {
   const list = document.getElementById('admin-list');
   list.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
@@ -37,16 +46,149 @@ async function renderAdmin() {
             </div>
           </div>
           <div style="display:flex;gap:6px">
-            <button class="btn-edit" onclick="toggleEstado('${c.id}','${c.estado}')">Cambiar estado</button>
+            <button class="btn-edit" onclick="editarCamion('${c.id}')">✏ Editar</button>
             <button class="btn-edit btn-rechazar" onclick="eliminarUnidad('${c.id}')">🗑</button>
           </div>
         </div>`;
     }).join('');
   }
 
+  // Inicializar chips del formulario de agregar
+  renderCargoChipsSelect('admin-tipo-carga', []);
+  autoFillDimensiones('admin');
+
+  // Cargar perfil de empresa
+  await renderPerfilEmpresa();
+
   renderPendientes();
   if (currentUser.rol !== 'superadmin') renderMisPendientes();
 }
+
+// ── PERFIL DE EMPRESA ─────────────────────────────────
+
+function togglePerfilCard() {
+  const body = document.getElementById('perfil-card-body');
+  const icon = document.getElementById('perfil-toggle-icon');
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  icon.textContent   = isOpen ? '▼ Editar' : '▲ Ocultar';
+}
+
+async function renderPerfilEmpresa() {
+  if (!currentUser.id) return;
+  const { data: p } = await sb.from('perfiles').select('*').eq('user_id', currentUser.id).single();
+  if (!p) return;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
+  set('pe-razon',    p.razon_social);
+  set('pe-rfc',      p.rfc);
+  set('pe-telefono', p.telefono);
+  set('pe-anos',     p.anos_operacion);
+  set('pe-unidades', p.num_unidades);
+  set('pe-sct',      p.permiso_sct);
+  set('pe-desc',     p.descripcion);
+  const rc    = document.getElementById('pe-rc');
+  const carga = document.getElementById('pe-carga');
+  if (rc)    rc.checked    = !!p.seguro_rc;
+  if (carga) carga.checked = !!p.seguro_carga;
+}
+
+async function guardarPerfilEmpresa() {
+  const payload = {
+    razon_social:   document.getElementById('pe-razon').value.trim(),
+    rfc:            document.getElementById('pe-rfc').value.trim(),
+    telefono:       document.getElementById('pe-telefono').value.trim(),
+    anos_operacion: parseInt(document.getElementById('pe-anos').value)    || null,
+    num_unidades:   parseInt(document.getElementById('pe-unidades').value) || null,
+    permiso_sct:    document.getElementById('pe-sct').value.trim(),
+    descripcion:    document.getElementById('pe-desc').value.trim(),
+    seguro_rc:      document.getElementById('pe-rc').checked,
+    seguro_carga:   document.getElementById('pe-carga').checked,
+  };
+  const { error } = await sb.from('perfiles').update(payload).eq('user_id', currentUser.id);
+  if (error) { showToast('Error al guardar perfil'); return; }
+  showToast('✓ Perfil actualizado');
+  togglePerfilCard();
+}
+
+// ── CHIPS DE TIPO DE CARGA ────────────────────────────
+
+function renderCargoChipsSelect(containerId, selected = []) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = CARGO_TIPOS.map(t => {
+    const sel = selected.includes(t) ? 'selected' : '';
+    return `<button type="button" class="cargo-chip-toggle ${sel}" onclick="toggleCargaChip(this)">${esc(t)}</button>`;
+  }).join('');
+}
+
+function toggleCargaChip(btn) {
+  btn.classList.toggle('selected');
+}
+
+function getSelectedCargo(containerId) {
+  return Array.from(document.querySelectorAll(`#${containerId} .cargo-chip-toggle.selected`))
+    .map(b => b.textContent);
+}
+
+// ── DIMENSIONES AUTO-FILL ─────────────────────────────
+
+function autoFillDimensiones(prefix = 'admin') {
+  const tipo  = document.getElementById(`${prefix}-tipo`)?.value;
+  const dimEl = document.getElementById(`${prefix}-dim`);
+  if (dimEl && tipo && DIM_DEFAULTS[tipo] && !dimEl.value) {
+    dimEl.value = DIM_DEFAULTS[tipo];
+  }
+}
+
+// ── EDITAR CAMIÓN ─────────────────────────────────────
+
+async function editarCamion(id) {
+  const c = allCamiones.find(x => x.id === id);
+  if (!c) return;
+
+  document.getElementById('editar-id').value          = c.id;
+  document.getElementById('editar-subtitulo').textContent = `Unidad ${c.id} — ${c.tipo}`;
+  document.getElementById('editar-tipo').value         = c.tipo;
+  document.getElementById('editar-cap').value          = c.capacidad;
+  document.getElementById('editar-op').value           = c.operador;
+  document.getElementById('editar-placas').value       = c.placas || '';
+  document.getElementById('editar-dim').value          = c.dimensiones || '';
+  document.getElementById('editar-tiempo').value       = c.tiempo_respuesta || '';
+  document.getElementById('editar-precio').value       = c.precio_dia || '';
+  document.getElementById('editar-estado').value       = c.estado;
+
+  renderCargoChipsSelect('editar-tipo-carga', c.tipo_carga || []);
+  document.getElementById('modal-editar').classList.add('open');
+}
+
+function closeEditarCamion() {
+  document.getElementById('modal-editar').classList.remove('open');
+}
+
+async function guardarEdicion() {
+  const id = document.getElementById('editar-id').value;
+  const tipo = document.getElementById('editar-tipo').value;
+  const payload = {
+    tipo,
+    capacidad:        parseInt(document.getElementById('editar-cap').value)    || 0,
+    operador:         document.getElementById('editar-op').value.trim(),
+    placas:           document.getElementById('editar-placas').value.trim()    || null,
+    dimensiones:      document.getElementById('editar-dim').value.trim()       || null,
+    tipo_carga:       getSelectedCargo('editar-tipo-carga'),
+    tiempo_respuesta: document.getElementById('editar-tiempo').value           || null,
+    precio_dia:       parseFloat(document.getElementById('editar-precio').value) || null,
+    estado:           document.getElementById('editar-estado').value,
+    emoji:            { Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️' }[tipo] || '🚛',
+  };
+
+  const { error } = await sb.from('camiones').update(payload).eq('id', id);
+  if (error) { showToast('Error: ' + (error.message || 'No se pudo actualizar')); return; }
+  closeEditarCamion();
+  await renderAdmin();
+  showToast(`✓ Unidad ${id} actualizada`);
+}
+
+// ── PENDIENTES ────────────────────────────────────────
 
 // Muestra las unidades pendientes del propio admin (no superadmin)
 async function renderMisPendientes() {
@@ -62,7 +204,6 @@ async function renderMisPendientes() {
   if (!data?.length) { section.style.display = 'none'; return; }
 
   section.style.display = 'block';
-  // Sobrescribir el título de la sección
   const titulo = section.querySelector('.section-title');
   if (titulo) titulo.innerHTML = '⏳ Mis unidades en espera de aprobación';
 
@@ -103,11 +244,13 @@ async function renderPendientes() {
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         ${(c.archivos || []).length ? `<button class="btn-edit" onclick="verArchivos('${c.id}')">📎 Archivos</button>` : ''}
-        <button class="btn-edit btn-aprobar" onclick="aprobarUnidad('${c.id}')">✓ Aprobar</button>
+        <button class="btn-edit btn-aprobar"  onclick="aprobarUnidad('${c.id}')">✓ Aprobar</button>
         <button class="btn-edit btn-rechazar" onclick="rechazarUnidad('${c.id}')">✕ Rechazar</button>
       </div>
     </div>`).join('');
 }
+
+// ── APROBACIÓN / ELIMINACIÓN ──────────────────────────
 
 async function aprobarUnidad(id) {
   const { error } = await sb.from('camiones').update({ aprobacion: 'aprobada' }).eq('id', id);
@@ -165,25 +308,20 @@ async function verArchivos(id) {
   }).join('');
 }
 
-async function toggleEstado(id, estadoActual) {
-  const opts = ['disponible', 'ocupado', 'mantenimiento'];
-  const next = opts[(opts.indexOf(estadoActual) + 1) % opts.length];
-  const { error } = await sb.from('camiones').update({ estado: next }).eq('id', id);
-  if (error) { showToast('Error: no tienes permiso para cambiar este camión'); return; }
-  await renderAdmin();
-  showToast(`Estado de ${id} cambiado a: ${next}`);
-}
+// ── AGREGAR CAMIÓN ────────────────────────────────────
 
 async function agregarCamion() {
   const tipo   = document.getElementById('admin-tipo').value;
   const cap    = parseInt(document.getElementById('admin-cap').value) || 0;
   const op     = document.getElementById('admin-op').value.trim();
   const estado = document.getElementById('admin-estado').value;
-  const origen = document.getElementById('admin-origen').value;
-  const rutas  = document.getElementById('admin-rutas').value.trim();
   const precio = parseFloat(document.getElementById('admin-precio').value) || null;
+  const placas = document.getElementById('admin-placas').value.trim() || null;
+  const dim    = document.getElementById('admin-dim').value.trim()    || null;
+  const tiempo = document.getElementById('admin-tiempo').value        || null;
+  const tipoCarga = getSelectedCargo('admin-tipo-carga');
 
-  if (!op || !cap) { alert('Completa todos los campos.'); return; }
+  if (!op || !cap) { alert('Completa los campos obligatorios (operador y capacidad).'); return; }
 
   // Generar ID automático
   const prefijos = { 'Torton': 'T', 'Rabón': 'R', 'Full': 'F', 'Plataforma': 'P' };
@@ -213,8 +351,10 @@ async function agregarCamion() {
     propietario_id: currentUser.id,
     archivos,
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
-    ...(origen    && { origen }),
-    ...(rutas     && { rutas }),
+    ...(placas    && { placas }),
+    ...(dim       && { dimensiones: dim }),
+    ...(tiempo    && { tiempo_respuesta: tiempo }),
+    ...(tipoCarga.length && { tipo_carga: tipoCarga }),
     ...(precio    && { precio_dia: precio }),
   });
   if (error) { alert('Error: ' + (error.message || 'No se pudo agregar.')); return; }
@@ -234,19 +374,18 @@ async function agregarCamion() {
           propietarioNombre: currentUser.nombre
         })
       });
-    } catch (_) { /* El email falla silenciosamente */ }
+    } catch (_) { /* silencioso */ }
   }
 
   // Limpiar formulario
-  document.getElementById('admin-op').value     = '';
-  document.getElementById('admin-cap').value    = '';
-  document.getElementById('admin-origen').value = '';
-  document.getElementById('admin-rutas').value  = '';
-  document.getElementById('admin-precio').value = '';
+  ['admin-op','admin-cap','admin-precio','admin-placas','admin-dim'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
   document.getElementById('admin-fotos').value  = '';
   document.getElementById('admin-docs').value   = '';
   document.getElementById('fotos-label').textContent = 'Seleccionar fotos';
   document.getElementById('docs-label').textContent  = 'Seleccionar documentos (PDF / imagen)';
+  renderCargoChipsSelect('admin-tipo-carga', []);
 
   await renderAdmin();
   showToast(esSuperAdmin

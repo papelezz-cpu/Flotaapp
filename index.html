@@ -137,13 +137,65 @@
 <div id="view-admin" class="view">
   <div class="page">
     <div class="section-title">Panel de Administración</div>
-    <div class="admin-grid">
 
+    <!-- Perfil de empresa -->
+    <div class="admin-card" style="margin-bottom:20px">
+      <h3 style="cursor:pointer" onclick="togglePerfilCard()">
+        🏢 Perfil de empresa
+        <span id="perfil-toggle-icon" style="margin-left:auto;font-size:0.85rem;color:var(--text-muted)">▼ Editar</span>
+      </h3>
+      <div id="perfil-card-body" style="display:none">
+        <div class="admin-grid" style="margin-top:4px">
+          <div class="form-group">
+            <label>Razón social</label>
+            <input type="text" id="pe-razon" placeholder="Ej. Transportes García S.A. de C.V.">
+          </div>
+          <div class="form-group">
+            <label>RFC</label>
+            <input type="text" id="pe-rfc" placeholder="Ej. GARM800101MC1">
+          </div>
+          <div class="form-group">
+            <label>Teléfono de contacto</label>
+            <input type="tel" id="pe-telefono" placeholder="+52 314 000 0000">
+          </div>
+          <div class="form-group">
+            <label>Años en operación</label>
+            <input type="number" id="pe-anos" placeholder="Ej. 10" min="0">
+          </div>
+          <div class="form-group">
+            <label>Número de unidades en flota</label>
+            <input type="number" id="pe-unidades" placeholder="Ej. 5" min="1">
+          </div>
+          <div class="form-group">
+            <label>Permiso SCT</label>
+            <input type="text" id="pe-sct" placeholder="Ej. SCT/TPAF/MZ-0001/2024">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Descripción de la empresa</label>
+            <textarea id="pe-desc" rows="3" placeholder="¿Qué servicios ofrecen? ¿Zonas que cubren? ¿Especialidad?"></textarea>
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Seguros vigentes</label>
+            <div style="display:flex;gap:16px;margin-top:4px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:0.88rem;text-transform:none;letter-spacing:0;font-weight:400">
+                <input type="checkbox" id="pe-rc"> Seguro de Responsabilidad Civil
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:0.88rem;text-transform:none;letter-spacing:0;font-weight:400">
+                <input type="checkbox" id="pe-carga"> Seguro de Carga
+              </label>
+            </div>
+          </div>
+        </div>
+        <button class="btn-add" style="margin-top:8px" onclick="guardarPerfilEmpresa()">💾 Guardar perfil</button>
+      </div>
+    </div>
+
+    <div class="admin-grid">
       <div class="admin-card">
         <h3>➕ Agregar unidad</h3>
         <div class="form-group">
           <label>Tipo</label>
-          <select id="admin-tipo">
+          <select id="admin-tipo" onchange="autoFillDimensiones()">
             <option>Torton</option><option>Rabón</option>
             <option>Full</option><option>Plataforma</option>
           </select>
@@ -157,32 +209,41 @@
           <input type="text" id="admin-op" placeholder="Nombre del operador">
         </div>
         <div class="form-group">
-          <label>Estado</label>
+          <label>Placas</label>
+          <input type="text" id="admin-placas" placeholder="Ej. MNZ-123-A">
+        </div>
+        <div class="form-group">
+          <label>Dimensiones del vehículo</label>
+          <input type="text" id="admin-dim" placeholder="Se llena automáticamente por tipo">
+        </div>
+        <div class="form-group">
+          <label>Tipo de carga que maneja</label>
+          <div class="cargo-chips-select" id="admin-tipo-carga"></div>
+        </div>
+        <div class="form-group">
+          <label>Tiempo de respuesta estimado</label>
+          <select id="admin-tiempo">
+            <option value="">Sin especificar</option>
+            <option value="Menos de 1 hora">Menos de 1 hora</option>
+            <option value="1-2 horas">1-2 horas</option>
+            <option value="2-3 horas">2-3 horas</option>
+            <option value="2-4 horas">2-4 horas</option>
+            <option value="3-4 horas">3-4 horas</option>
+            <option value="3-5 horas">3-5 horas</option>
+            <option value="Mismo día">Mismo día</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Precio por día (MXN)</label>
+          <input type="number" id="admin-precio" placeholder="Ej. 8500" min="0">
+        </div>
+        <div class="form-group">
+          <label>Estado inicial</label>
           <select id="admin-estado">
             <option value="disponible">Disponible</option>
             <option value="ocupado">Ocupado</option>
             <option value="mantenimiento">Mantenimiento</option>
           </select>
-        </div>
-        <div class="form-group">
-          <label>Puerto / Origen principal</label>
-          <select id="admin-origen">
-            <option value="">Sin especificar</option>
-            <option value="Veracruz">Veracruz</option>
-            <option value="Manzanillo">Manzanillo</option>
-            <option value="Lázaro Cárdenas">Lázaro Cárdenas</option>
-            <option value="Altamira">Altamira</option>
-            <option value="Ensenada">Ensenada</option>
-            <option value="Otro">Otro</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Rutas / Destinos que cubre</label>
-          <input type="text" id="admin-rutas" placeholder="Ej. Veracruz - CDMX, Puebla">
-        </div>
-        <div class="form-group">
-          <label>Precio por día (MXN)</label>
-          <input type="number" id="admin-precio" placeholder="Ej. 8500" min="0">
         </div>
         <div class="form-group">
           <label>Fotos de la unidad</label>
@@ -331,6 +392,71 @@
     <button class="btn-avanzar" id="tracking-btn-avanzar" onclick="avanzarTracking()"></button>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn-confirm" onclick="closeTracking()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL EDITAR CAMIÓN ═════════════════════════════ -->
+<div class="modal-overlay" id="modal-editar">
+  <div class="modal">
+    <h2>✏ Editar unidad</h2>
+    <p class="sub" id="editar-subtitulo">Modificar datos de la unidad</p>
+    <input type="hidden" id="editar-id">
+    <div class="form-group">
+      <label>Tipo</label>
+      <select id="editar-tipo" onchange="autoFillDimensiones('editar')">
+        <option>Torton</option><option>Rabón</option>
+        <option>Full</option><option>Plataforma</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Capacidad (toneladas)</label>
+      <input type="number" id="editar-cap" placeholder="Ej. 22">
+    </div>
+    <div class="form-group">
+      <label>Operador</label>
+      <input type="text" id="editar-op" placeholder="Nombre del operador">
+    </div>
+    <div class="form-group">
+      <label>Placas</label>
+      <input type="text" id="editar-placas" placeholder="Ej. MNZ-123-A">
+    </div>
+    <div class="form-group">
+      <label>Dimensiones del vehículo</label>
+      <input type="text" id="editar-dim" placeholder="Ej. 8.5m × 2.4m × 2.5m">
+    </div>
+    <div class="form-group">
+      <label>Tipo de carga que maneja</label>
+      <div class="cargo-chips-select" id="editar-tipo-carga"></div>
+    </div>
+    <div class="form-group">
+      <label>Tiempo de respuesta estimado</label>
+      <select id="editar-tiempo">
+        <option value="">Sin especificar</option>
+        <option value="Menos de 1 hora">Menos de 1 hora</option>
+        <option value="1-2 horas">1-2 horas</option>
+        <option value="2-3 horas">2-3 horas</option>
+        <option value="2-4 horas">2-4 horas</option>
+        <option value="3-4 horas">3-4 horas</option>
+        <option value="3-5 horas">3-5 horas</option>
+        <option value="Mismo día">Mismo día</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Precio por día (MXN)</label>
+      <input type="number" id="editar-precio" placeholder="Ej. 8500" min="0">
+    </div>
+    <div class="form-group">
+      <label>Estado</label>
+      <select id="editar-estado">
+        <option value="disponible">Disponible</option>
+        <option value="ocupado">Ocupado</option>
+        <option value="mantenimiento">Mantenimiento</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeEditarCamion()">Cancelar</button>
+      <button class="btn-confirm" onclick="guardarEdicion()">💾 Guardar cambios</button>
     </div>
   </div>
 </div>

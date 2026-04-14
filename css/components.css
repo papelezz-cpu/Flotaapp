@@ -291,6 +291,38 @@
 .archivo-link   { color: var(--accent); font-size: 0.85rem; text-decoration: none; }
 .archivo-link:hover { text-decoration: underline; }
 
+/* ── CARGO CHIP TOGGLES (admin form) ────────────────── */
+.cargo-chips-select {
+  display: flex; flex-wrap: wrap; gap: 7px; margin-top: 4px;
+}
+.cargo-chip-toggle {
+  padding: 5px 12px; border-radius: 20px; cursor: pointer;
+  font-size: 0.75rem; font-weight: 600;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(78,142,247,0.25);
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+.cargo-chip-toggle:hover {
+  border-color: rgba(78,142,247,0.5);
+  color: var(--text-main);
+}
+.cargo-chip-toggle.selected {
+  background: rgba(78,142,247,0.18);
+  border-color: rgba(78,142,247,0.55);
+  color: var(--accent);
+}
+body.light .cargo-chip-toggle {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(37,99,235,0.25);
+  color: #64748b;
+}
+body.light .cargo-chip-toggle.selected {
+  background: rgba(37,99,235,0.1);
+  border-color: rgba(37,99,235,0.5);
+  color: #2563eb;
+}
+
 /* ── ADMIN LIST ──────────────────────────────────────── */
 .truck-list-admin { display: flex; flex-direction: column; gap: 8px; }
 .truck-list-item {
