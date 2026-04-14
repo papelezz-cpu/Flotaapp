@@ -6,9 +6,15 @@ function toggleTheme() {
   localStorage.setItem('flotapro-theme', isLight ? 'light' : 'dark');
 }
 
-// Aplicar tema guardado inmediatamente al cargar
+// Aplicar tema guardado; default = claro
 (function () {
-  if (localStorage.getItem('flotapro-theme') === 'light') {
+  const saved = localStorage.getItem('flotapro-theme');
+  if (saved !== 'dark') {
     document.body.classList.add('light');
   }
+  // Sincronizar ícono en cuanto el DOM esté listo
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('btn-theme');
+    if (btn) btn.textContent = document.body.classList.contains('light') ? '☀️' : '🌙';
+  });
 })();

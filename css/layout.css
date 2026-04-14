@@ -46,7 +46,7 @@ header {
 /* ── HEADER RIGHT (usuario + tema) ──────────────────── */
 .header-right { display: flex; align-items: center; gap: 8px; }
 .user-chip {
-  display: flex; align-items: center; gap: 6px;
+  align-items: center; gap: 6px;
   background: rgba(78,142,247,0.1);
   border: 1px solid rgba(78,142,247,0.22);
   border-radius: 20px; padding: 4px 10px 4px 8px;
