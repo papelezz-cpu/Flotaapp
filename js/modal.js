@@ -6,6 +6,15 @@ function openReserva(id) {
   selectedTruck = allCamiones.find(c => c.id === id);
   document.getElementById('modal-truck-name').textContent =
     `${selectedTruck.tipo} ${selectedTruck.id} · ${selectedTruck.capacidad} ton`;
+
+  // Auto-llenar con datos del usuario autenticado
+  if (currentUser.id) {
+    const nombreInput = document.getElementById('res-nombre');
+    const emailInput  = document.getElementById('res-email');
+    if (!nombreInput.value) nombreInput.value = currentUser.nombre || '';
+    if (!emailInput.value)  emailInput.value  = currentUser.email  || '';
+  }
+
   document.getElementById('modal-reserva').classList.add('open');
 }
 

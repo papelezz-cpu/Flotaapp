@@ -27,6 +27,7 @@ async function checkExistingSession() {
 
   currentUser = {
     id:     session.user.id,
+    email:  session.user.email,
     nombre: perfil?.nombre || session.user.email,
     rol:    perfil?.rol    || 'cliente',
   };
@@ -57,6 +58,7 @@ async function doLogin() {
 
   currentUser = {
     id:     data.user.id,
+    email:  data.user.email,
     nombre: perfil?.nombre || email,
     rol:    perfil?.rol    || 'cliente',
   };

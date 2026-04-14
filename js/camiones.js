@@ -2,7 +2,7 @@
 
 let allCamiones = [];
 
-async function renderCamiones(filtroTipo = '', filtroOrigen = '') {
+async function renderCamiones(filtroTipo = '') {
   const grid  = document.getElementById('truck-grid');
   const stats = document.getElementById('stats-row');
   const count = document.getElementById('count-label');
@@ -11,8 +11,7 @@ async function renderCamiones(filtroTipo = '', filtroOrigen = '') {
   grid.innerHTML = skeletonGrid(6);
 
   let query = sb.from('camiones').select('*').eq('aprobacion', 'aprobada').order('id');
-  if (filtroTipo)   query = query.eq('tipo', filtroTipo);
-  if (filtroOrigen) query = query.eq('origen', filtroOrigen);
+  if (filtroTipo) query = query.eq('tipo', filtroTipo);
   const { data, error } = await query;
   if (error) {
     grid.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar datos.</div>`;
@@ -68,7 +67,7 @@ async function renderCamiones(filtroTipo = '', filtroOrigen = '') {
           <div class="spec-item"><div class="spec-label">Capacidad</div><div class="spec-value">${esc(String(c.capacidad))} ton</div></div>
           <div class="spec-item"><div class="spec-label">Tipo</div><div class="spec-value">${esc(c.tipo)}</div></div>
           <div class="spec-item"><div class="spec-label">Operador</div><div class="spec-value">${esc(c.operador)}</div></div>
-          <div class="spec-item"><div class="spec-label">Puerto / Origen</div><div class="spec-value">${esc(c.origen || '—')}</div></div>
+          <div class="spec-item"><div class="spec-label">Unidad</div><div class="spec-value">${esc(c.id)}</div></div>
         </div>
         ${formatPrecio(c.precio_dia) ? `<div class="truck-precio">${esc(formatPrecio(c.precio_dia))}</div>` : ''}
         <div class="truck-footer">
@@ -89,10 +88,7 @@ function renderStars(rating) {
 }
 
 function filtrarCamiones() {
-  renderCamiones(
-    document.getElementById('filtro-tipo').value,
-    document.getElementById('filtro-origen').value
-  );
+  renderCamiones(document.getElementById('filtro-tipo').value);
 }
 
 function openDetail(id) {
