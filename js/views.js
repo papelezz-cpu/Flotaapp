@@ -10,6 +10,7 @@ function showView(v, btn) {
   // Cerrar menú hamburguesa al navegar
   document.getElementById('btn-hamburger')?.classList.remove('open');
   document.querySelector('.nav-tabs')?.classList.remove('open');
+  document.getElementById('menu-backdrop')?.classList.remove('open');
 
   if (v === 'cliente')       renderCamiones();
   if (v === 'reservaciones') renderReserv();
@@ -20,4 +21,5 @@ function showView(v, btn) {
 function toggleMenu() {
   document.getElementById('btn-hamburger').classList.toggle('open');
   document.querySelector('.nav-tabs').classList.toggle('open');
+  document.getElementById('menu-backdrop').classList.toggle('open');
 }
