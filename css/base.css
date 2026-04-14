@@ -56,6 +56,16 @@ body::before {
 /* ── ROLE VISIBILITY ─────────────────────────────────── */
 .admin-only      { display: none; }
 .superadmin-only { display: none; }
+.logged-in-only  { display: none; }
 body.role-admin      .admin-only      { display: inline-block; }
 body.role-superadmin .admin-only      { display: inline-block; }
 body.role-superadmin .superadmin-only { display: inline-block; }
+body.logged-in   .logged-in-only     { display: inline-block; }
+
+/* User chip & logout: hidden until logged in */
+.user-chip   { display: none; }
+body.logged-in .user-chip { display: flex; }
+
+/* Entrar button: visible until logged in */
+.btn-entrar { display: inline-flex; }
+body.logged-in .btn-entrar { display: none; }

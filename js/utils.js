@@ -66,3 +66,9 @@ function skeletonList(n = 4) {
     </div>`;
   return Array(n).fill(item).join('');
 }
+
+// Formatear precio en MXN
+function formatPrecio(num) {
+  if (!num) return null;
+  return '$' + Number(num).toLocaleString('es-MX', { minimumFractionDigits: 0 }) + ' MXN/día';
+}

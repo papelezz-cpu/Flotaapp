@@ -179,6 +179,9 @@ async function agregarCamion() {
   const cap    = parseInt(document.getElementById('admin-cap').value) || 0;
   const op     = document.getElementById('admin-op').value.trim();
   const estado = document.getElementById('admin-estado').value;
+  const origen = document.getElementById('admin-origen').value;
+  const rutas  = document.getElementById('admin-rutas').value.trim();
+  const precio = parseFloat(document.getElementById('admin-precio').value) || null;
 
   if (!op || !cap) { alert('Completa todos los campos.'); return; }
 
@@ -209,7 +212,10 @@ async function agregarCamion() {
     emoji: emojis[tipo] || '🚛',
     propietario_id: currentUser.id,
     archivos,
-    aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente'
+    aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
+    ...(origen    && { origen }),
+    ...(rutas     && { rutas }),
+    ...(precio    && { precio_dia: precio }),
   });
   if (error) { alert('Error: ' + (error.message || 'No se pudo agregar.')); return; }
 
@@ -232,10 +238,13 @@ async function agregarCamion() {
   }
 
   // Limpiar formulario
-  document.getElementById('admin-op').value    = '';
-  document.getElementById('admin-cap').value   = '';
-  document.getElementById('admin-fotos').value = '';
-  document.getElementById('admin-docs').value  = '';
+  document.getElementById('admin-op').value     = '';
+  document.getElementById('admin-cap').value    = '';
+  document.getElementById('admin-origen').value = '';
+  document.getElementById('admin-rutas').value  = '';
+  document.getElementById('admin-precio').value = '';
+  document.getElementById('admin-fotos').value  = '';
+  document.getElementById('admin-docs').value   = '';
   document.getElementById('fotos-label').textContent = 'Seleccionar fotos';
   document.getElementById('docs-label').textContent  = 'Seleccionar documentos (PDF / imagen)';
 

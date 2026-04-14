@@ -54,6 +54,7 @@
     </div>
     <div class="header-right">
       <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
+      <button class="btn-entrar" onclick="showLoginOverlay()">Entrar</button>
       <div class="user-chip">
         <span>👤</span>
         <strong id="user-label">—</strong>
@@ -87,11 +88,23 @@
           <div class="search-group" style="flex:1">
             <label>Tipo de camión</label>
             <select id="filtro-tipo">
-              <option value="">Todos</option>
+              <option value="">Todos los tipos</option>
               <option value="Torton">Torton</option>
               <option value="Rabón">Rabón</option>
               <option value="Full">Full</option>
               <option value="Plataforma">Plataforma</option>
+            </select>
+          </div>
+          <div class="search-group" style="flex:1">
+            <label>Puerto / Origen</label>
+            <select id="filtro-origen">
+              <option value="">Todos los puertos</option>
+              <option value="Veracruz">Veracruz</option>
+              <option value="Manzanillo">Manzanillo</option>
+              <option value="Lázaro Cárdenas">Lázaro Cárdenas</option>
+              <option value="Altamira">Altamira</option>
+              <option value="Ensenada">Ensenada</option>
+              <option value="Otro">Otro</option>
             </select>
           </div>
           <button class="btn-search" onclick="filtrarCamiones()">Buscar</button>
@@ -147,6 +160,26 @@
             <option value="ocupado">Ocupado</option>
             <option value="mantenimiento">Mantenimiento</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label>Puerto / Origen principal</label>
+          <select id="admin-origen">
+            <option value="">Sin especificar</option>
+            <option value="Veracruz">Veracruz</option>
+            <option value="Manzanillo">Manzanillo</option>
+            <option value="Lázaro Cárdenas">Lázaro Cárdenas</option>
+            <option value="Altamira">Altamira</option>
+            <option value="Ensenada">Ensenada</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Rutas / Destinos que cubre</label>
+          <input type="text" id="admin-rutas" placeholder="Ej. Veracruz - CDMX, Puebla">
+        </div>
+        <div class="form-group">
+          <label>Precio por día (MXN)</label>
+          <input type="number" id="admin-precio" placeholder="Ej. 8500" min="0">
         </div>
         <div class="form-group">
           <label>Fotos de la unidad</label>
@@ -282,7 +315,7 @@
 <div class="toast" id="toast"></div>
 
 <!-- ══ LOGIN ════════════════════════════════════════════ -->
-<div id="login-overlay">
+<div id="login-overlay" onclick="if(event.target===this)hideLoginOverlay()">
   <div class="login-box">
     <div class="login-logo">
       <div class="logo-icon">🚛</div>

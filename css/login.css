@@ -2,8 +2,9 @@
 #login-overlay {
   position: fixed; inset: 0; z-index: 500;
   background: var(--navy);
-  display: flex; align-items: center; justify-content: center;
+  display: none; align-items: center; justify-content: center;
 }
+#login-overlay.show { display: flex; }
 #login-overlay::before {
   content: '';
   position: absolute; inset: 0;

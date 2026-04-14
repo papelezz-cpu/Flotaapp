@@ -2,6 +2,45 @@
 
 let currentUser = { id: null, nombre: null, rol: null };
 
+// Aplica clases de rol y estado en el body
+function applyUserUI() {
+  document.body.classList.remove('role-admin', 'role-superadmin', 'logged-in');
+  document.getElementById('user-label').textContent = currentUser.nombre || '—';
+  if (currentUser.rol === 'admin')      document.body.classList.add('role-admin', 'logged-in');
+  if (currentUser.rol === 'superadmin') document.body.classList.add('role-superadmin', 'logged-in');
+  if (currentUser.rol === 'cliente')    document.body.classList.add('logged-in');
+  // Sincronizar ícono del tema
+  const isLight = document.body.classList.contains('light');
+  const btnTheme = document.getElementById('btn-theme');
+  if (btnTheme) btnTheme.textContent = isLight ? '☀️' : '🌙';
+}
+
+// Restaura la sesión guardada (si existe) sin forzar login
+async function checkExistingSession() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return; // usuario no autenticado — modo público
+
+  const { data: perfil } = await sb.from('perfiles')
+    .select('nombre, rol')
+    .eq('user_id', session.user.id)
+    .single();
+
+  currentUser = {
+    id:     session.user.id,
+    nombre: perfil?.nombre || session.user.email,
+    rol:    perfil?.rol    || 'cliente',
+  };
+  applyUserUI();
+}
+
+function showLoginOverlay() {
+  document.getElementById('login-overlay').classList.add('show');
+}
+
+function hideLoginOverlay() {
+  document.getElementById('login-overlay').classList.remove('show');
+}
+
 async function doLogin() {
   const email = document.getElementById('login-user').value.trim();
   const pass  = document.getElementById('login-pass').value;
@@ -22,17 +61,8 @@ async function doLogin() {
     rol:    perfil?.rol    || 'cliente',
   };
 
-  document.getElementById('user-label').textContent = currentUser.nombre;
-  document.getElementById('login-overlay').style.display = 'none';
-
-  document.body.classList.remove('role-admin', 'role-superadmin');
-  if (currentUser.rol === 'admin')      document.body.classList.add('role-admin');
-  if (currentUser.rol === 'superadmin') document.body.classList.add('role-superadmin');
-
-  // Sincronizar ícono del tema tras login
-  const isLight = document.body.classList.contains('light');
-  document.getElementById('btn-theme').textContent = isLight ? '☀️' : '🌙';
-
+  hideLoginOverlay();
+  applyUserUI();
   init();
 }
 
@@ -55,14 +85,15 @@ async function forgotPassword() {
 async function logout() {
   await sb.auth.signOut();
   currentUser = { id: null, nombre: null, rol: null };
-  document.body.classList.remove('role-admin', 'role-superadmin');
+  document.body.classList.remove('role-admin', 'role-superadmin', 'logged-in');
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
   document.getElementById('login-error').textContent = 'Correo o contraseña incorrectos';
-  document.getElementById('login-overlay').style.display = 'flex';
 
+  // Volver a vista pública
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
   document.getElementById('view-cliente').classList.add('active');
   document.querySelector('.nav-tab').classList.add('active');
+  renderCamiones();
 }
