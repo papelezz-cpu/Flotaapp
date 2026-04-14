@@ -45,3 +45,10 @@
   cursor: pointer; transition: background 0.2s; margin-top: 6px;
 }
 .btn-login:hover { background: var(--accent-bright); }
+
+.btn-forgot {
+  width: 100%; padding: 8px; background: none; border: none;
+  color: var(--text-muted); cursor: pointer; font-size: 0.82rem;
+  margin-top: 4px; transition: color 0.2s;
+}
+.btn-forgot:hover { color: var(--accent); }

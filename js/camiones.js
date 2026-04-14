@@ -1,23 +1,15 @@
 // ── FLOTA / CAMIONES ──────────────────────────────────
 
-function renderStars(rating) {
-  const full  = Math.floor(rating);
-  const empty = 5 - full;
-  return '<span class="stars">' +
-    '★'.repeat(full) + '<span class="stars-empty">' + '★'.repeat(empty) + '</span>' +
-    ` <span class="stars-num">${rating}</span>` +
-    '</span>';
-}
-
 let allCamiones = [];
 
 async function renderCamiones(filtroTipo = '') {
   const grid  = document.getElementById('truck-grid');
   const stats = document.getElementById('stats-row');
   const count = document.getElementById('count-label');
-  grid.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
 
-  // Camiones
+  // #6 — Skeleton loader
+  grid.innerHTML = skeletonGrid(6);
+
   let query = sb.from('camiones').select('*').eq('aprobacion', 'aprobada').order('id');
   if (filtroTipo) query = query.eq('tipo', filtroTipo);
   const { data, error } = await query;
@@ -26,13 +18,10 @@ async function renderCamiones(filtroTipo = '') {
     return;
   }
 
-  // Obtener nombres de propietarios en una sola consulta
   const ownerIds = [...new Set(data.map(c => c.propietario_id).filter(Boolean))];
   let ownerMap = {};
   if (ownerIds.length) {
-    const { data: perfiles } = await sb.from('perfiles')
-      .select('user_id, nombre')
-      .in('user_id', ownerIds);
+    const { data: perfiles } = await sb.from('perfiles').select('user_id, nombre').in('user_id', ownerIds);
     (perfiles || []).forEach(p => { ownerMap[p.user_id] = p.nombre; });
   }
 
@@ -55,6 +44,7 @@ async function renderCamiones(filtroTipo = '') {
     return;
   }
 
+  // #1 — XSS: usar esc() en todos los campos de usuario
   grid.innerHTML = allCamiones.map(c => {
     const badgeClass = c.estado === 'disponible' ? 'badge-avail' : c.estado === 'ocupado' ? 'badge-busy' : 'badge-maint';
     const label      = c.estado === 'disponible' ? '✓ Disponible' : c.estado === 'ocupado' ? '⏳ En servicio' : '🔧 Mantenimiento';
@@ -65,26 +55,35 @@ async function renderCamiones(filtroTipo = '') {
       <div class="truck-card">
         <div class="truck-header">
           <div>
-            <div class="truck-id">${c.id}</div>
-            <div class="truck-type">${c.tipo}</div>
-            <div class="truck-empresa">🏢 ${c.empresaNombre}</div>
+            <div class="truck-id">${esc(c.id)}</div>
+            <div class="truck-type">${esc(c.tipo)}</div>
+            <div class="truck-empresa">🏢 ${esc(c.empresaNombre)}</div>
             ${stars ? `<div class="truck-stars">${stars}</div>` : ''}
           </div>
           <div class="badge ${badgeClass}">${label}</div>
         </div>
-        <div class="truck-img-area">${c.emoji}</div>
+        <div class="truck-img-area">${esc(c.emoji)}</div>
         <div class="truck-specs">
-          <div class="spec-item"><div class="spec-label">Capacidad</div><div class="spec-value">${c.capacidad} ton</div></div>
-          <div class="spec-item"><div class="spec-label">Tipo</div><div class="spec-value">${c.tipo}</div></div>
-          <div class="spec-item"><div class="spec-label">Operador</div><div class="spec-value">${c.operador}</div></div>
-          <div class="spec-item"><div class="spec-label">Unidad</div><div class="spec-value">${c.id}</div></div>
+          <div class="spec-item"><div class="spec-label">Capacidad</div><div class="spec-value">${esc(String(c.capacidad))} ton</div></div>
+          <div class="spec-item"><div class="spec-label">Tipo</div><div class="spec-value">${esc(c.tipo)}</div></div>
+          <div class="spec-item"><div class="spec-label">Operador</div><div class="spec-value">${esc(c.operador)}</div></div>
+          <div class="spec-item"><div class="spec-label">Unidad</div><div class="spec-value">${esc(c.id)}</div></div>
         </div>
         <div class="truck-footer">
-          <button class="btn-detail" onclick="openDetail('${c.id}')">Ver detalle</button>
-          <button class="btn-reservar" ${disabled} onclick="openReserva('${c.id}')">Agendar</button>
+          <button class="btn-detail" onclick="openDetail('${esc(c.id)}')">Ver detalle</button>
+          <button class="btn-reservar" ${disabled} onclick="openReserva('${esc(c.id)}')">Agendar</button>
         </div>
       </div>`;
   }).join('');
+}
+
+function renderStars(rating) {
+  const full  = Math.floor(rating);
+  const empty = 5 - full;
+  return '<span class="stars">' +
+    '★'.repeat(full) + '<span class="stars-empty">' + '★'.repeat(empty) + '</span>' +
+    ` <span class="stars-num">${rating}</span>` +
+    '</span>';
 }
 
 function filtrarCamiones() {

@@ -1,6 +1,5 @@
 // ── AUTENTICACIÓN ─────────────────────────────────────
 
-// Estado del usuario actual (accesible por todos los módulos)
 let currentUser = { id: null, nombre: null, rol: null };
 
 async function doLogin() {
@@ -12,7 +11,6 @@ async function doLogin() {
   const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
   if (error || !data.user) { err.classList.add('show'); return; }
 
-  // Obtener perfil y rol desde la tabla perfiles
   const { data: perfil } = await sb.from('perfiles')
     .select('nombre, rol')
     .eq('user_id', data.user.id)
@@ -31,7 +29,27 @@ async function doLogin() {
   if (currentUser.rol === 'admin')      document.body.classList.add('role-admin');
   if (currentUser.rol === 'superadmin') document.body.classList.add('role-superadmin');
 
+  // Sincronizar ícono del tema tras login
+  const isLight = document.body.classList.contains('light');
+  document.getElementById('btn-theme').textContent = isLight ? '☀️' : '🌙';
+
   init();
+}
+
+// #3 — Olvidé mi contraseña
+async function forgotPassword() {
+  const email = document.getElementById('login-user').value.trim();
+  if (!email) {
+    document.getElementById('login-error').textContent = 'Ingresa tu correo primero.';
+    document.getElementById('login-error').classList.add('show');
+    return;
+  }
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname
+  });
+  document.getElementById('login-error').classList.remove('show');
+  if (error) { alert('Error: ' + error.message); return; }
+  showToast('✓ Revisa tu correo para restablecer tu contraseña');
 }
 
 async function logout() {
@@ -40,6 +58,7 @@ async function logout() {
   document.body.classList.remove('role-admin', 'role-superadmin');
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').textContent = 'Correo o contraseña incorrectos';
   document.getElementById('login-overlay').style.display = 'flex';
 
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
