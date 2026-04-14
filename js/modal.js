@@ -58,7 +58,8 @@ async function confirmarReserva() {
   const { error: errRes } = await sb.from('reservaciones').insert({
     unidad: selectedTruck.id, cliente: nombre, cliente_email: email,
     telefono: tel, fecha_ini: ini, fecha_fin: fin, descripcion: desc,
-    estado: 'Pendiente'   // La empresa debe aceptar primero
+    estado: 'Pendiente',
+    cliente_user_id: currentUser.id || null
   });
   if (errRes) { alert('Error al guardar la reserva.'); return; }
 
@@ -81,13 +82,13 @@ async function confirmarReserva() {
           reserva: { cliente: nombre, email, telefono: tel, fecha_ini: ini, fecha_fin: fin, descripcion: desc }
         })
       });
-      // Email de acuse al cliente
+      // Acuse de recibo al cliente (con CC al superadmin)
       if (email) {
         fetch(fnBase, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({
-            tipo: 'confirmacion_cliente',
+            tipo: 'solicitud_recibida',
             clienteEmail: email,
             clienteNombre: nombre,
             camion: { id: selectedTruck.id, tipo: selectedTruck.tipo, empresa: selectedTruck.empresaNombre },

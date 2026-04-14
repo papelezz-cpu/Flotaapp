@@ -212,6 +212,11 @@
   border-bottom: 1px solid rgba(78,142,247,0.08);
   font-size: 0.85rem; transition: background 0.15s;
 }
+/* Vista cliente: 5 columnas (sin columna "Cliente") */
+.reserv-row.reserv-row-cli,
+#reserv-header.cli {
+  grid-template-columns: 80px 1fr 100px 100px 110px;
+}
 .reserv-row:last-child { border-bottom: none; }
 .reserv-row:hover { background: rgba(78,142,247,0.05); }
 .reserv-row.header {

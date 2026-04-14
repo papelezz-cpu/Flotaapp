@@ -37,7 +37,7 @@ function init() {
   // Restaurar sesión guardada si el usuario ya había iniciado sesión
   await checkExistingSession();
 
-  // Cargar notificaciones si hay sesión
+  // Cargar notificaciones si hay sesión (el canal Realtime lo inicia auth.js)
   if (currentUser.id) loadNotificaciones();
 
   // #5 — Realtime: actualizar vistas cuando cambia la BD
@@ -48,10 +48,6 @@ function init() {
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'reservaciones' }, () => {
       if (document.getElementById('view-reservaciones').classList.contains('active')) renderReserv();
-    })
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificaciones',
-        filter: currentUser.id ? `user_id=eq.${currentUser.id}` : undefined }, () => {
-      loadNotificaciones();
     })
     .subscribe();
 })();

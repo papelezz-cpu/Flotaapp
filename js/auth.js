@@ -32,6 +32,13 @@ async function checkExistingSession() {
     rol:    perfil?.rol    || 'cliente',
   };
   applyUserUI();
+  // Realtime de notificaciones para esta sesión restaurada
+  sb.channel('notif-' + currentUser.id)
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'notificaciones',
+      filter: `user_id=eq.${currentUser.id}`
+    }, () => loadNotificaciones())
+    .subscribe();
 }
 
 function showLoginOverlay() {
@@ -66,6 +73,13 @@ async function doLogin() {
   hideLoginOverlay();
   applyUserUI();
   loadNotificaciones();
+  // Realtime para notificaciones de este usuario
+  sb.channel('notif-' + currentUser.id)
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'notificaciones',
+      filter: `user_id=eq.${currentUser.id}`
+    }, () => loadNotificaciones())
+    .subscribe();
   init();
 }
 
