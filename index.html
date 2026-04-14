@@ -613,10 +613,11 @@
   <div class="modal" style="max-width:460px">
     <h2>💼 Hacer oferta</h2>
     <p class="sub" id="ho-pedido-info">Propón tu precio y el recurso que asignarás.</p>
+    <div id="ho-sin-recursos" style="display:none;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:12px 14px;font-size:0.83rem;color:#f87171;margin-bottom:4px"></div>
     <div class="form-group">
-      <label>Camión que asignas</label>
+      <label id="ho-recurso-label">Recurso que asignas</label>
       <select id="ho-camion">
-        <option value="">Sin asignar camión específico aún</option>
+        <option value="">Sin asignar aún</option>
       </select>
     </div>
     <div class="form-group">
@@ -629,7 +630,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeHacerOferta()">Cancelar</button>
-      <button class="btn-confirm" onclick="enviarOferta()">Enviar oferta</button>
+      <button class="btn-confirm" id="btn-enviar-oferta" onclick="enviarOferta()">Enviar oferta</button>
     </div>
   </div>
 </div>

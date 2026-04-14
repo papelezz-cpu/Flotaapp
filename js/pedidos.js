@@ -423,23 +423,89 @@ async function enviarContraoferta(ofertaId) {
 
 // ── HACER OFERTA (admin) ───────────────────────────────
 
-function openHacerOferta(pedidoId) {
+async function openHacerOferta(pedidoId) {
   if (!currentUser.id) { showLoginOverlay(); return; }
   pedidoParaOfertar = pedidoId;
 
-  // Populate camiones del admin (solo disponibles)
   const select = document.getElementById('ho-camion');
-  select.innerHTML = `<option value="">Sin asignar camión específico aún</option>`;
-  const misCamiones = allCamiones.filter(c =>
-    (currentUser.rol === 'superadmin' || c.propietario_id === currentUser.id) &&
-    c.estado === 'disponible'
-  );
-  misCamiones.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value       = c.id;
-    opt.textContent = `${c.emoji} ${c.id} — ${c.tipo} (${c.capacidad} ton)`;
-    select.appendChild(opt);
-  });
+  const label  = document.getElementById('ho-recurso-label');
+  const warn   = document.getElementById('ho-sin-recursos');
+  const btnEnv = document.getElementById('btn-enviar-oferta');
+
+  select.innerHTML = '<option value="">Cargando…</option>';
+  if (warn)   { warn.style.display = 'none'; warn.textContent = ''; }
+  if (btnEnv) btnEnv.disabled = false;
+
+  // Leer el pedido para saber qué tipo de recurso se solicita
+  const { data: pedido } = await sb.from('pedidos').select('tipo_camion').eq('id', pedidoId).single();
+  const tipo = pedido?.tipo_camion || '';
+
+  const esCustodio = tipo.startsWith('Custodio') || tipo === 'Supervisión remota';
+  const esPatio    = tipo.startsWith('Patio')    || tipo === 'Bodega';
+
+  let recursos = [];
+  let sinRecursosMsg = '';
+
+  if (esCustodio) {
+    if (label) label.textContent = 'Custodio que asignas *';
+    let q = sb.from('custodios').select('*').eq('estado', 'disponible');
+    if (currentUser.rol !== 'superadmin') q = q.eq('propietario_id', currentUser.id);
+    const { data } = await q;
+    recursos = data || [];
+    sinRecursosMsg = '⚠ No tienes custodios disponibles registrados. Agrega uno en el panel Admin → Custodios antes de ofertar.';
+
+    select.innerHTML = recursos.length
+      ? `<option value="">— Selecciona un custodio —</option>`
+      : `<option value="">Sin custodios disponibles</option>`;
+    recursos.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value       = c.id;
+      opt.textContent = `${CUSTODIO_EMOJI[c.tipo] || '👮'} ${c.id} — ${c.nombre} (${c.tipo})`;
+      select.appendChild(opt);
+    });
+
+  } else if (esPatio) {
+    if (label) label.textContent = 'Patio que asignas *';
+    let q = sb.from('patios').select('*').eq('estado', 'disponible');
+    if (currentUser.rol !== 'superadmin') q = q.eq('propietario_id', currentUser.id);
+    const { data } = await q;
+    recursos = data || [];
+    sinRecursosMsg = '⚠ No tienes patios disponibles registrados. Agrega uno en el panel Admin → Patios antes de ofertar.';
+
+    select.innerHTML = recursos.length
+      ? `<option value="">— Selecciona un patio —</option>`
+      : `<option value="">Sin patios disponibles</option>`;
+    recursos.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value       = p.id;
+      opt.textContent = `${PATIO_EMOJI[p.tipo] || '🏭'} ${p.id} — ${p.nombre} (${p.tipo})`;
+      select.appendChild(opt);
+    });
+
+  } else {
+    // Camión (comportamiento original)
+    if (label) label.textContent = 'Camión que asignas';
+    const misCamiones = allCamiones.filter(c =>
+      (currentUser.rol === 'superadmin' || c.propietario_id === currentUser.id) &&
+      c.estado === 'disponible'
+    );
+    recursos = misCamiones;
+    sinRecursosMsg = '⚠ No tienes camiones disponibles. Verifica el estado de tus unidades en el panel Admin.';
+
+    select.innerHTML = `<option value="">Sin asignar camión aún</option>`;
+    misCamiones.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value       = c.id;
+      opt.textContent = `${c.emoji} ${c.id} — ${c.tipo} (${c.capacidad} ton)`;
+      select.appendChild(opt);
+    });
+  }
+
+  // Si no hay recursos del tipo requerido, mostrar advertencia y bloquear envío
+  if ((esCustodio || esPatio) && !recursos.length) {
+    if (warn)   { warn.textContent = sinRecursosMsg; warn.style.display = 'block'; }
+    if (btnEnv) btnEnv.disabled = true;
+  }
 
   document.getElementById('ho-precio').value  = '';
   document.getElementById('ho-mensaje').value = '';
