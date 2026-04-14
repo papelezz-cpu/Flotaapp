@@ -9,9 +9,9 @@ function showToast(msg, tipo = 'ok') {
 }
 
 // ── INICIALIZACIÓN (llamada tras login) ───────────────
-// Solo refresca la vista de camiones; el resto ya cargó en el arranque público
+// Solo refresca la vista activa; el resto ya cargó en el arranque público
 function init() {
-  renderCamiones();
+  filtrarRecursos();
 }
 
 // ── ARRANQUE PÚBLICO ──────────────────────────────────
@@ -31,8 +31,8 @@ function init() {
     }
   });
 
-  // Cargar camiones públicamente (anon key con política RLS pública)
-  renderCamiones();
+  // Cargar recursos públicamente (anon key con política RLS pública)
+  filtrarRecursos();
 
   // Restaurar sesión guardada si el usuario ya había iniciado sesión
   await checkExistingSession();
@@ -41,10 +41,21 @@ function init() {
   if (currentUser.id) loadNotificaciones();
 
   // #5 — Realtime: actualizar vistas cuando cambia la BD
+  const clienteActivo = () => document.getElementById('view-cliente').classList.contains('active');
+  const adminActivo   = () => document.getElementById('view-admin').classList.contains('active');
+
   sb.channel('flotapro-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'camiones' }, () => {
-      if (document.getElementById('view-cliente').classList.contains('active'))       renderCamiones();
-      if (document.getElementById('view-admin').classList.contains('active'))         renderAdmin();
+      if (clienteActivo()) filtrarRecursos();
+      if (adminActivo())   renderAdmin();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'custodios' }, () => {
+      if (clienteActivo() && currentRecursoTipo === 'custodio') renderCustodios();
+      if (adminActivo())   renderAdminCustodios();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'patios' }, () => {
+      if (clienteActivo() && currentRecursoTipo === 'patio') renderPatios();
+      if (adminActivo())   renderAdminPatios();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'reservaciones' }, () => {
       if (document.getElementById('view-reservaciones').classList.contains('active')) renderReserv();

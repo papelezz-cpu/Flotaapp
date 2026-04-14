@@ -12,7 +12,7 @@ function showView(v, btn) {
   document.querySelector('.nav-tabs')?.classList.remove('open');
   document.getElementById('menu-backdrop')?.classList.remove('open');
 
-  if (v === 'cliente')       renderCamiones();
+  if (v === 'cliente')       filtrarRecursos();
   if (v === 'reservaciones') renderReserv();
   if (v === 'admin')         renderAdmin();
   if (v === 'pedidos')       renderPedidos();

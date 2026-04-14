@@ -6,6 +6,18 @@ let pedidoParaOfertar  = null;   // pedido sobre el que el admin ofertará
 
 const TIPO_EMOJI = { Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️', Cualquiera:'🚛' };
 
+// Tiempo restante antes de que expire una oferta
+function fmtTiempoRestante(isoStr) {
+  if (!isoStr) return '';
+  const diff = new Date(isoStr) - Date.now();
+  if (diff <= 0) return 'Expirada';
+  const hrs = Math.floor(diff / 3600000);
+  if (hrs < 1) return `Expira en ${Math.max(1, Math.floor(diff / 60000))} min`;
+  if (hrs < 24) return `Expira en ${hrs} h`;
+  const days = Math.floor(hrs / 24);
+  return `Expira en ${days} día${days > 1 ? 's' : ''}`;
+}
+
 // ── RENDER PRINCIPAL ───────────────────────────────────
 
 async function renderPedidos() {
@@ -35,6 +47,15 @@ async function renderPedidos() {
     if (!ofertasMap[o.pedido_id]) ofertasMap[o.pedido_id] = [];
     ofertasMap[o.pedido_id].push(o);
   });
+
+  // Expiración lazy: marcar como rechazadas ofertas vencidas (fire-and-forget)
+  const expiradas = (todasOfertas || []).filter(o =>
+    o.estado === 'enviada' && o.expira_en && new Date(o.expira_en) < new Date()
+  );
+  if (expiradas.length) {
+    sb.from('ofertas').update({ estado: 'rechazada' })
+      .in('id', expiradas.map(o => o.id)).then(() => {});
+  }
 
   let html = '';
 
@@ -158,6 +179,11 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
         : ''}`;
   }
 
+  // Superadmin puede eliminar cualquier pedido
+  const btnEliminar = currentUser.rol === 'superadmin'
+    ? `<button class="btn-edit btn-rechazar" style="font-size:0.72rem" onclick="eliminarPedido('${p.id}')">🗑 Eliminar</button>`
+    : '';
+
   return `
     <div class="pedido-card" id="ped-${p.id}">
       <div class="pedido-top">
@@ -179,12 +205,22 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           ${acciones}
+          ${btnEliminar}
         </div>
       </div>
     </div>`;
 }
 
 // ── CREAR PEDIDO ───────────────────────────────────────
+
+function actualizarSubtipoPedido() {
+  const val = document.getElementById('np-tipo')?.value || '';
+  const esCamion = !val.startsWith('Custodio') && !val.startsWith('Patio') && val !== 'Supervisión remota' && val !== 'Bodega';
+  ['np-cap-group','np-carga-group'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = esCamion ? '' : 'none';
+  });
+}
 
 function openNuevoPedido() {
   if (!currentUser.id) { showLoginOverlay(); return; }
@@ -266,20 +302,26 @@ function closePedidoDetalle() {
 // ── HTML DE OFERTA INDIVIDUAL ──────────────────────────
 
 function ofertaItemHTML(o) {
+  const expirada = o.estado === 'enviada' && o.expira_en && new Date(o.expira_en) < new Date();
   const estadoCls = o.estado === 'aceptada' ? 'badge-avail'
-                  : o.estado === 'rechazada' ? 'badge-maint'
+                  : (o.estado === 'rechazada' || expirada) ? 'badge-maint'
                   : 'badge-busy';
-  const estadoLbl = {
+  const estadoLbl = expirada ? 'Expirada'
+                  : {
     enviada:       'Oferta enviada',
     contra_oferta: 'Tu contraoferta pendiente',
     aceptada:      '✓ Aceptada',
     rechazada:     'Rechazada',
   }[o.estado] || o.estado;
 
+  const tiempoRestante = (!expirada && o.estado === 'enviada' && o.expira_en)
+    ? `<span style="font-size:0.7rem;color:var(--text-muted);display:block;margin-top:3px">${fmtTiempoRestante(o.expira_en)}</span>`
+    : '';
+
   const fmt = num => `$${Number(num).toLocaleString('es-MX')} MXN`;
 
   let acciones = '';
-  if (o.estado === 'enviada') {
+  if (o.estado === 'enviada' && !expirada) {
     acciones = `
       <div class="oferta-acciones">
         <button class="btn-edit btn-aprobar" onclick="responderOferta('${o.id}','aceptar')">
@@ -302,6 +344,7 @@ function ofertaItemHTML(o) {
         <div style="text-align:right">
           <div class="oferta-precio">${fmt(o.precio_oferta)}</div>
           <span class="badge ${estadoCls}" style="font-size:0.7rem;margin-top:4px;display:inline-block">${estadoLbl}</span>
+          ${tiempoRestante}
         </div>
       </div>
       ${o.mensaje ? `<div class="oferta-msg">"${esc(o.mensaje)}"</div>` : ''}
@@ -512,4 +555,16 @@ async function cancelarPedido(pedidoId) {
   await sb.from('pedidos').update({ estado: 'cancelado' }).eq('id', pedidoId);
   await renderPedidos();
   showToast('Pedido cancelado');
+}
+
+// ── ELIMINAR PEDIDO (superadmin) ───────────────────────
+
+async function eliminarPedido(pedidoId) {
+  if (!confirm('¿Eliminar este pedido permanentemente? Esta acción no se puede deshacer.')) return;
+  // Eliminar ofertas asociadas primero (si RLS lo requiere)
+  await sb.from('ofertas').delete().eq('pedido_id', pedidoId);
+  const { error } = await sb.from('pedidos').delete().eq('id', pedidoId);
+  if (error) { showToast('Error al eliminar: ' + (error.message || '')); return; }
+  document.getElementById(`ped-${pedidoId}`)?.remove();
+  showToast('🗑 Pedido eliminado');
 }

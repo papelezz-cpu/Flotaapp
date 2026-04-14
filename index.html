@@ -87,10 +87,16 @@
 <div id="view-cliente" class="view active">
   <div class="page">
     <div class="hero">
-      <h1>Disponibilidad de Flota</h1>
-      <p>Consulta y agenda camiones disponibles para tu carga</p>
+      <h1>¿Qué servicio necesitas?</h1>
+      <p>Consulta disponibilidad de camiones, custodios y patios de almacenamiento</p>
+      <!-- Selector de tipo de recurso -->
+      <div class="recurso-tabs">
+        <button class="recurso-tab active" id="tab-camion"   onclick="cambiarTipoRecurso('camion')">🚛 Camiones</button>
+        <button class="recurso-tab"        id="tab-custodio" onclick="cambiarTipoRecurso('custodio')">👮 Custodios</button>
+        <button class="recurso-tab"        id="tab-patio"    onclick="cambiarTipoRecurso('patio')">🏭 Patios</button>
+      </div>
       <div class="search-bar">
-        <div class="search-dates">
+        <div class="search-dates" id="search-dates-row">
           <div class="search-group">
             <label>Fecha de inicio</label>
             <input type="date" id="fecha-inicio">
@@ -102,7 +108,7 @@
         </div>
         <div class="search-bottom">
           <div class="search-group" style="flex:1">
-            <label>Tipo de camión</label>
+            <label id="filtro-tipo-label">Tipo de camión</label>
             <select id="filtro-tipo">
               <option value="">Todos los tipos</option>
               <option value="Torton">Torton</option>
@@ -111,12 +117,12 @@
               <option value="Plataforma">Plataforma</option>
             </select>
           </div>
-          <button class="btn-search" onclick="filtrarCamiones()">Buscar</button>
+          <button class="btn-search" onclick="filtrarRecursos()">Buscar disponibilidad</button>
         </div>
       </div>
     </div>
     <div class="stats-row" id="stats-row"></div>
-    <div class="section-title">Unidades disponibles <span id="count-label"></span></div>
+    <div class="section-title" id="recursos-titulo">🚛 Camiones disponibles <span id="count-label"></span></div>
     <div class="truck-grid" id="truck-grid"></div>
   </div>
 </div>
@@ -204,6 +210,15 @@
       </div>
     </div>
 
+    <!-- Tabs de tipo de recurso -->
+    <div class="recurso-tabs" style="margin-bottom:24px">
+      <button class="recurso-tab active" id="admin-tab-camion"   onclick="cambiarAdminTab('camion')">🚛 Camiones</button>
+      <button class="recurso-tab"        id="admin-tab-custodio" onclick="cambiarAdminTab('custodio')">👮 Custodios</button>
+      <button class="recurso-tab"        id="admin-tab-patio"    onclick="cambiarAdminTab('patio')">🏭 Patios</button>
+    </div>
+
+    <!-- ── TAB: CAMIONES ── -->
+    <div id="admin-content-camion">
     <div class="admin-grid">
       <div class="admin-card">
         <h3>➕ Agregar unidad</h3>
@@ -286,6 +301,105 @@
       </div>
 
     </div>
+
+    </div><!-- /admin-content-camion -->
+
+    <!-- ── TAB: CUSTODIOS ── -->
+    <div id="admin-content-custodio" style="display:none">
+    <div class="admin-grid">
+      <div class="admin-card">
+        <h3>➕ Agregar custodio</h3>
+        <div class="form-group">
+          <label>Nombre / descripción corta</label>
+          <input type="text" id="ac-nombre" placeholder="Ej. Custodio Armado A2">
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="ac-tipo">
+            <option value="Armado">Armado</option>
+            <option value="Sin arma">Sin arma</option>
+            <option value="Motorizado">Motorizado</option>
+            <option value="K9">K9</option>
+            <option value="Supervisión remota">Supervisión remota</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Descripción</label>
+          <textarea id="ac-desc" rows="3" placeholder="Experiencia, equipamiento, zonas que cubre..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Certificaciones <span style="font-weight:400;color:var(--text-muted)">(separadas por coma)</span></label>
+          <input type="text" id="ac-certs" placeholder="Ej. Portación de arma, Primeros auxilios">
+        </div>
+        <div class="form-group">
+          <label>Disponibilidad</label>
+          <select id="ac-disp">
+            <option value="24/7">24/7</option>
+            <option value="Días hábiles">Días hábiles</option>
+            <option value="Fines de semana">Fines de semana</option>
+            <option value="Bajo demanda">Bajo demanda</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Precio por día (MXN)</label>
+          <input type="number" id="ac-precio" placeholder="Ej. 1800">
+        </div>
+        <button class="btn-add" onclick="agregarCustodio()">➕ Agregar custodio</button>
+      </div>
+      <div class="admin-card">
+        <h3>👮 Custodios registrados</h3>
+        <div class="truck-list-admin" id="admin-custodios-list"></div>
+      </div>
+    </div>
+    </div><!-- /admin-content-custodio -->
+
+    <!-- ── TAB: PATIOS ── -->
+    <div id="admin-content-patio" style="display:none">
+    <div class="admin-grid">
+      <div class="admin-card">
+        <h3>➕ Agregar patio</h3>
+        <div class="form-group">
+          <label>Nombre del patio</label>
+          <input type="text" id="ap-nombre" placeholder="Ej. Patio Techado Norte">
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="ap-tipo">
+            <option value="Techado">Techado</option>
+            <option value="Abierto">Abierto</option>
+            <option value="Refrigerado">Refrigerado</option>
+            <option value="Especializado">Especializado</option>
+            <option value="Bodega">Bodega</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Ubicación</label>
+          <input type="text" id="ap-ubic" placeholder="Ej. Blvd. Costero Norte Km 4, Manzanillo">
+        </div>
+        <div class="form-group">
+          <label>Área (m²)</label>
+          <input type="number" id="ap-area" placeholder="Ej. 4200">
+        </div>
+        <div class="form-group">
+          <label>Capacidad de vehículos</label>
+          <input type="number" id="ap-cap" placeholder="Ej. 18">
+        </div>
+        <div class="form-group">
+          <label>Servicios <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
+          <input type="text" id="ap-svcs" placeholder="Ej. Vigilancia 24/7, Rampa de carga, Báscula">
+        </div>
+        <div class="form-group">
+          <label>Precio por día (MXN)</label>
+          <input type="number" id="ap-precio" placeholder="Ej. 3500">
+        </div>
+        <button class="btn-add" onclick="agregarPatio()">➕ Agregar patio</button>
+      </div>
+      <div class="admin-card">
+        <h3>🏭 Patios registrados</h3>
+        <div class="truck-list-admin" id="admin-patios-list"></div>
+      </div>
+    </div>
+    </div><!-- /admin-content-patio -->
 
     <!-- Pendientes de aprobación — solo superadmin -->
     <div id="pendientes-section" style="display:none; margin-top:24px">
@@ -416,21 +530,37 @@
     <h2>📋 Nuevo pedido de servicio</h2>
     <p class="sub">Describe lo que necesitas y los proveedores te enviarán su mejor oferta.</p>
     <div class="form-group">
-      <label>Tipo de camión requerido</label>
-      <select id="np-tipo">
-        <option value="Cualquiera">Cualquiera</option>
-        <option value="Torton">Torton</option>
-        <option value="Rabón">Rabón</option>
-        <option value="Full">Full</option>
-        <option value="Plataforma">Plataforma</option>
+      <label>Tipo de servicio requerido</label>
+      <select id="np-tipo" onchange="actualizarSubtipoPedido()">
+        <optgroup label="🚛 Camiones">
+          <option value="Cualquiera">Cualquier camión</option>
+          <option value="Torton">Torton</option>
+          <option value="Rabón">Rabón</option>
+          <option value="Full">Full</option>
+          <option value="Plataforma">Plataforma</option>
+        </optgroup>
+        <optgroup label="👮 Custodios">
+          <option value="Custodio Armado">Custodio Armado</option>
+          <option value="Custodio Sin arma">Custodio Sin arma</option>
+          <option value="Custodio Motorizado">Custodio Motorizado</option>
+          <option value="Custodio K9">Custodio K9</option>
+          <option value="Supervisión remota">Supervisión remota</option>
+        </optgroup>
+        <optgroup label="🏭 Patios">
+          <option value="Patio Techado">Patio Techado</option>
+          <option value="Patio Abierto">Patio Abierto</option>
+          <option value="Patio Refrigerado">Patio Refrigerado</option>
+          <option value="Patio Especializado">Patio Especializado</option>
+          <option value="Bodega">Bodega</option>
+        </optgroup>
       </select>
     </div>
     <div class="admin-grid" style="gap:12px">
-      <div class="form-group">
+      <div class="form-group" id="np-cap-group">
         <label>Capacidad mínima (ton)</label>
         <input type="number" id="np-cap" placeholder="Ej. 20">
       </div>
-      <div class="form-group">
+      <div class="form-group" id="np-carga-group">
         <label>Tipo de carga</label>
         <input type="text" id="np-carga" placeholder="Ej. Electrónicos, Maquinaria">
       </div>
@@ -595,6 +725,115 @@
   </div>
 </div>
 
+<!-- ══ MODAL EDITAR CUSTODIO ══════════════════════════ -->
+<div class="modal-overlay" id="modal-editar-custodio">
+  <div class="modal" style="max-width:480px">
+    <h2>✏ Editar custodio</h2>
+    <input type="hidden" id="ec-id">
+    <div class="form-group">
+      <label>Nombre</label>
+      <input type="text" id="ec-nombre">
+    </div>
+    <div class="form-group">
+      <label>Tipo</label>
+      <select id="ec-tipo">
+        <option value="Armado">Armado</option>
+        <option value="Sin arma">Sin arma</option>
+        <option value="Motorizado">Motorizado</option>
+        <option value="K9">K9</option>
+        <option value="Supervisión remota">Supervisión remota</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Descripción</label>
+      <textarea id="ec-desc" rows="3"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Certificaciones <span style="font-weight:400;color:var(--text-muted)">(separadas por coma)</span></label>
+      <input type="text" id="ec-certs">
+    </div>
+    <div class="form-group">
+      <label>Disponibilidad</label>
+      <select id="ec-disp">
+        <option value="24/7">24/7</option>
+        <option value="Días hábiles">Días hábiles</option>
+        <option value="Fines de semana">Fines de semana</option>
+        <option value="Bajo demanda">Bajo demanda</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Precio por día (MXN)</label>
+      <input type="number" id="ec-precio">
+    </div>
+    <div class="form-group">
+      <label>Estado</label>
+      <select id="ec-estado">
+        <option value="disponible">Disponible</option>
+        <option value="ocupado">Ocupado</option>
+        <option value="no_disponible">No disponible</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeEditarCustodio()">Cancelar</button>
+      <button class="btn-confirm" onclick="guardarEdicionCustodio()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL EDITAR PATIO ════════════════════════════ -->
+<div class="modal-overlay" id="modal-editar-patio">
+  <div class="modal" style="max-width:480px">
+    <h2>✏ Editar patio</h2>
+    <input type="hidden" id="ep-id">
+    <div class="form-group">
+      <label>Nombre</label>
+      <input type="text" id="ep-nombre">
+    </div>
+    <div class="form-group">
+      <label>Tipo</label>
+      <select id="ep-tipo">
+        <option value="Techado">Techado</option>
+        <option value="Abierto">Abierto</option>
+        <option value="Refrigerado">Refrigerado</option>
+        <option value="Especializado">Especializado</option>
+        <option value="Bodega">Bodega</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Ubicación</label>
+      <input type="text" id="ep-ubic">
+    </div>
+    <div class="form-group">
+      <label>Área (m²)</label>
+      <input type="number" id="ep-area">
+    </div>
+    <div class="form-group">
+      <label>Capacidad de vehículos</label>
+      <input type="number" id="ep-cap">
+    </div>
+    <div class="form-group">
+      <label>Servicios <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
+      <input type="text" id="ep-svcs">
+    </div>
+    <div class="form-group">
+      <label>Precio por día (MXN)</label>
+      <input type="number" id="ep-precio">
+    </div>
+    <div class="form-group">
+      <label>Estado</label>
+      <select id="ep-estado">
+        <option value="disponible">Disponible</option>
+        <option value="ocupado">Ocupado</option>
+        <option value="mantenimiento">Mantenimiento</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeEditarPatio()">Cancelar</button>
+      <button class="btn-confirm" onclick="guardarEdicionPatio()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ BACKDROP MENÚ MÓVIL ══════════════════════════════ -->
 <div class="menu-backdrop" id="menu-backdrop" onclick="toggleMenu()"></div>
 
@@ -635,6 +874,7 @@
 <script src="js/theme.js"></script>
 <script src="js/views.js"></script>
 <script src="js/camiones.js"></script>
+<script src="js/recursos.js"></script>
 <script src="js/reservaciones.js"></script>
 <script src="js/modal.js"></script>
 <script src="js/pedidos.js"></script>

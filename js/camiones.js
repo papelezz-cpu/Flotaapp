@@ -1,11 +1,56 @@
 // ── FLOTA / CAMIONES ──────────────────────────────────
 
 let allCamiones = [];
+let currentRecursoTipo = 'camion'; // 'camion' | 'custodio' | 'patio'
+
+const RECURSO_FILTRO_OPTS = {
+  camion:   [['','Todos los tipos'],['Torton','Torton'],['Rabón','Rabón'],['Full','Full'],['Plataforma','Plataforma']],
+  custodio: [['','Todos los tipos'],['Armado','Armado'],['Sin arma','Sin arma'],['Motorizado','Motorizado'],['K9','K9'],['Supervisión remota','Supervisión remota']],
+  patio:    [['','Todos los tipos'],['Techado','Techado'],['Abierto','Abierto'],['Refrigerado','Refrigerado'],['Especializado','Especializado'],['Bodega','Bodega']],
+};
+
+const RECURSO_LABELS = {
+  camion:   { filtro: 'Tipo de camión',    titulo: '🚛 Camiones disponibles' },
+  custodio: { filtro: 'Tipo de custodio',  titulo: '👮 Custodios disponibles' },
+  patio:    { filtro: 'Tipo de patio',     titulo: '🏭 Patios disponibles' },
+};
+
+function cambiarTipoRecurso(tipo) {
+  currentRecursoTipo = tipo;
+
+  ['camion','custodio','patio'].forEach(t => {
+    document.getElementById(`tab-${t}`)?.classList.toggle('active', t === tipo);
+  });
+
+  const meta = RECURSO_LABELS[tipo];
+  const lbl  = document.getElementById('filtro-tipo-label');
+  const sel  = document.getElementById('filtro-tipo');
+  if (lbl) lbl.textContent = meta.filtro;
+  if (sel) sel.innerHTML   = (RECURSO_FILTRO_OPTS[tipo] || []).map(([v,t]) =>
+    `<option value="${v}">${t}</option>`).join('');
+
+  const title = document.getElementById('recursos-titulo');
+  if (title) title.innerHTML = `${meta.titulo} <span id="count-label"></span>`;
+
+  // Show/hide dates row (only relevant for camiones)
+  const datesRow = document.getElementById('search-dates-row');
+  if (datesRow) datesRow.style.display = tipo === 'camion' ? '' : 'none';
+
+  filtrarRecursos();
+}
+
+function filtrarRecursos() {
+  const tipo     = document.getElementById('filtro-tipo').value;
+  const fechaIni = document.getElementById('fecha-inicio').value;
+  const fechaFin = document.getElementById('fecha-fin').value;
+  if (currentRecursoTipo === 'custodio') renderCustodios(tipo);
+  else if (currentRecursoTipo === 'patio') renderPatios(tipo);
+  else renderCamiones(tipo, fechaIni, fechaFin);
+}
 
 async function renderCamiones(filtroTipo = '', fechaIni = '', fechaFin = '') {
   const grid  = document.getElementById('truck-grid');
   const stats = document.getElementById('stats-row');
-  const count = document.getElementById('count-label');
 
   grid.innerHTML = skeletonGrid(6);
 
@@ -53,7 +98,8 @@ async function renderCamiones(filtroTipo = '', fechaIni = '', fechaFin = '') {
   const disponibles = buscarPorFecha
     ? allCamiones.filter(c => c.estado !== 'mantenimiento' && !busyIds.has(c.id)).length
     : disp;
-  count.textContent = buscarPorFecha
+  const countEl = document.getElementById('count-label');
+  if (countEl) countEl.textContent = buscarPorFecha
     ? `— ${disponibles} disponibles para esas fechas`
     : `— ${disp} de ${data.length}`;
 
@@ -114,11 +160,7 @@ function renderStars(rating) {
     '</span>';
 }
 
-function filtrarCamiones() {
-  const tipo     = document.getElementById('filtro-tipo').value;
-  const fechaIni = document.getElementById('fecha-inicio').value;
-  const fechaFin = document.getElementById('fecha-fin').value;
-  renderCamiones(tipo, fechaIni, fechaFin);
-}
+// Alias de compatibilidad
+function filtrarCamiones() { filtrarRecursos(); }
 
 // openDetail() está definido en detalle.js

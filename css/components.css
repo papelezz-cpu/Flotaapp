@@ -323,6 +323,59 @@ body.light .cargo-chip-toggle.selected {
   color: #2563eb;
 }
 
+/* ── TABS DE TIPO DE RECURSO ─────────────────────────── */
+.recurso-tabs {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.recurso-tab {
+  padding: 9px 20px; border-radius: 50px; cursor: pointer;
+  font-size: 0.85rem; font-weight: 600; letter-spacing: 0.02em;
+  border: 1.5px solid rgba(78,142,247,0.25);
+  background: transparent; color: var(--text-muted);
+  transition: all 0.18s;
+}
+.recurso-tab:hover {
+  border-color: rgba(78,142,247,0.5);
+  color: var(--text-main);
+  background: rgba(78,142,247,0.06);
+}
+.recurso-tab.active {
+  background: rgba(78,142,247,0.16);
+  border-color: rgba(78,142,247,0.6);
+  color: var(--accent);
+}
+body.light .recurso-tab {
+  border-color: rgba(37,99,235,0.2);
+  color: #64748b;
+}
+body.light .recurso-tab.active {
+  background: rgba(37,99,235,0.1);
+  border-color: rgba(37,99,235,0.5);
+  color: #2563eb;
+}
+.hero .recurso-tabs { justify-content: center; margin-bottom: 18px; }
+
+/* ── CHIPS DE RECURSO (custodios/patios) ─────────────── */
+.recurso-desc {
+  font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;
+  margin: 8px 0; padding: 0 2px;
+}
+.recurso-chips {
+  display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0;
+}
+.cargo-chip {
+  padding: 3px 9px; border-radius: 20px; font-size: 0.7rem; font-weight: 600;
+  background: rgba(78,142,247,0.1);
+  border: 1px solid rgba(78,142,247,0.25);
+  color: var(--accent);
+}
+body.light .cargo-chip {
+  background: rgba(37,99,235,0.08);
+  border-color: rgba(37,99,235,0.25);
+  color: #2563eb;
+}
+
 /* ── PEDIDOS ─────────────────────────────────────────── */
 .pedido-card {
   background: var(--navy-mid);

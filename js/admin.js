@@ -2,6 +2,8 @@
 
 const CARGO_TIPOS = ['General','Refrigerado','Peligroso','Frágil','Granel','Maquinaria','Automóviles','Contenedor'];
 
+let currentAdminTab = 'camion';
+
 const DIM_DEFAULTS = {
   'Torton':     '8.5m × 2.4m × 2.5m',
   'Rabón':      '5.5m × 2.4m × 2.4m',
@@ -62,6 +64,24 @@ async function renderAdmin() {
 
   renderPendientes();
   if (currentUser.rol !== 'superadmin') renderMisPendientes();
+
+  // Render the currently active admin tab
+  if (currentAdminTab === 'custodio') renderAdminCustodios();
+  else if (currentAdminTab === 'patio') renderAdminPatios();
+}
+
+// ── TABS ADMIN ────────────────────────────────────────
+
+function cambiarAdminTab(tab) {
+  currentAdminTab = tab;
+  ['camion','custodio','patio'].forEach(t => {
+    document.getElementById(`admin-tab-${t}`)?.classList.toggle('active', t === tab);
+    const el = document.getElementById(`admin-content-${t}`);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  if (tab === 'custodio') renderAdminCustodios();
+  else if (tab === 'patio') renderAdminPatios();
+  else renderAdmin();
 }
 
 // ── PERFIL DE EMPRESA ─────────────────────────────────
@@ -391,6 +411,223 @@ async function agregarCamion() {
   showToast(esSuperAdmin
     ? `✓ Unidad ${id} agregada`
     : `✓ Unidad ${id} enviada — recibirás confirmación por correo`);
+}
+
+// ── CUSTODIOS (ADMIN) ─────────────────────────────────
+
+async function renderAdminCustodios() {
+  const list = document.getElementById('admin-custodios-list');
+  if (!list) return;
+  list.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
+
+  let query = sb.from('custodios').select('*').order('id');
+  if (currentUser.rol !== 'superadmin') query = query.eq('propietario_id', currentUser.id);
+  const { data, error } = await query;
+  if (error || !data?.length) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">👮</div>Sin custodios registrados.</div>`;
+    return;
+  }
+  list.innerHTML = data.map(c => {
+    const badgeCls = c.estado === 'disponible' ? 'badge-avail' : c.estado === 'ocupado' ? 'badge-busy' : 'badge-maint';
+    return `
+      <div class="truck-list-item">
+        <div class="truck-list-item-info">
+          <div class="truck-list-item-name">${CUSTODIO_EMOJI[c.tipo] || '👮'} ${c.id} — ${esc(c.nombre)}</div>
+          <div class="truck-list-item-sub">
+            ${esc(c.tipo)} · ${esc(c.disponibilidad || '—')} ·
+            <span class="badge ${badgeCls}" style="font-size:0.68rem">${c.estado}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-edit" onclick="editarCustodio('${c.id}')">✏ Editar</button>
+          <button class="btn-edit btn-rechazar" onclick="eliminarCustodio('${c.id}')">🗑</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function agregarCustodio() {
+  const nombre = document.getElementById('ac-nombre').value.trim();
+  const tipo   = document.getElementById('ac-tipo').value;
+  const desc   = document.getElementById('ac-desc').value.trim();
+  const disp   = document.getElementById('ac-disp').value;
+  const precio = parseFloat(document.getElementById('ac-precio').value) || null;
+  const certs  = document.getElementById('ac-certs').value.trim();
+  if (!nombre || !tipo) { alert('Completa nombre y tipo.'); return; }
+
+  const { data: existentes } = await sb.from('custodios').select('id').like('id','CUS-%');
+  const maxNum = (existentes || []).reduce((max, c) => {
+    const n = parseInt(c.id.split('-')[1]) || 0; return Math.max(max, n);
+  }, 0);
+  const id = `CUS-${String(maxNum + 1).padStart(3,'0')}`;
+
+  const { error } = await sb.from('custodios').insert({
+    id, nombre, tipo, descripcion: desc || null,
+    disponibilidad: disp,
+    precio_dia: precio,
+    propietario_id: currentUser.id,
+    certificaciones: certs ? certs.split(',').map(s => s.trim()).filter(Boolean) : [],
+  });
+  if (error) { showToast('Error: ' + (error.message || '')); return; }
+
+  ['ac-nombre','ac-desc','ac-precio','ac-certs'].forEach(i => {
+    const el = document.getElementById(i); if (el) el.value = '';
+  });
+  await renderAdminCustodios();
+  showToast(`✓ Custodio ${id} agregado`);
+}
+
+async function editarCustodio(id) {
+  const { data: c } = await sb.from('custodios').select('*').eq('id', id).single();
+  if (!c) return;
+  document.getElementById('ec-id').value     = c.id;
+  document.getElementById('ec-nombre').value = c.nombre;
+  document.getElementById('ec-tipo').value   = c.tipo;
+  document.getElementById('ec-desc').value   = c.descripcion || '';
+  document.getElementById('ec-disp').value   = c.disponibilidad || '24/7';
+  document.getElementById('ec-precio').value = c.precio_dia || '';
+  document.getElementById('ec-certs').value  = (c.certificaciones || []).join(', ');
+  document.getElementById('ec-estado').value = c.estado;
+  document.getElementById('modal-editar-custodio').classList.add('open');
+}
+
+function closeEditarCustodio() {
+  document.getElementById('modal-editar-custodio').classList.remove('open');
+}
+
+async function guardarEdicionCustodio() {
+  const id = document.getElementById('ec-id').value;
+  const certs = document.getElementById('ec-certs').value.trim();
+  const { error } = await sb.from('custodios').update({
+    nombre:          document.getElementById('ec-nombre').value.trim(),
+    tipo:            document.getElementById('ec-tipo').value,
+    descripcion:     document.getElementById('ec-desc').value.trim() || null,
+    disponibilidad:  document.getElementById('ec-disp').value,
+    precio_dia:      parseFloat(document.getElementById('ec-precio').value) || null,
+    certificaciones: certs ? certs.split(',').map(s => s.trim()).filter(Boolean) : [],
+    estado:          document.getElementById('ec-estado').value,
+  }).eq('id', id);
+  if (error) { showToast('Error: ' + (error.message || '')); return; }
+  closeEditarCustodio();
+  await renderAdminCustodios();
+  showToast(`✓ Custodio ${id} actualizado`);
+}
+
+async function eliminarCustodio(id) {
+  if (!confirm(`¿Eliminar custodio ${id}?`)) return;
+  await sb.from('custodios').delete().eq('id', id);
+  await renderAdminCustodios();
+  showToast(`Custodio ${id} eliminado`);
+}
+
+// ── PATIOS (ADMIN) ─────────────────────────────────────
+
+async function renderAdminPatios() {
+  const list = document.getElementById('admin-patios-list');
+  if (!list) return;
+  list.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
+
+  let query = sb.from('patios').select('*').order('id');
+  if (currentUser.rol !== 'superadmin') query = query.eq('propietario_id', currentUser.id);
+  const { data, error } = await query;
+  if (error || !data?.length) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">🏭</div>Sin patios registrados.</div>`;
+    return;
+  }
+  list.innerHTML = data.map(p => {
+    const badgeCls = p.estado === 'disponible' ? 'badge-avail' : p.estado === 'ocupado' ? 'badge-busy' : 'badge-maint';
+    return `
+      <div class="truck-list-item">
+        <div class="truck-list-item-info">
+          <div class="truck-list-item-name">${PATIO_EMOJI[p.tipo] || '🏭'} ${p.id} — ${esc(p.nombre)}</div>
+          <div class="truck-list-item-sub">
+            ${esc(p.tipo)} · ${p.area_m2 ? p.area_m2 + ' m²' : '—'} ·
+            <span class="badge ${badgeCls}" style="font-size:0.68rem">${p.estado}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-edit" onclick="editarPatio('${p.id}')">✏ Editar</button>
+          <button class="btn-edit btn-rechazar" onclick="eliminarPatio('${p.id}')">🗑</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function agregarPatio() {
+  const nombre   = document.getElementById('ap-nombre').value.trim();
+  const tipo     = document.getElementById('ap-tipo').value;
+  const ubic     = document.getElementById('ap-ubic').value.trim();
+  const area     = parseFloat(document.getElementById('ap-area').value) || null;
+  const capVeh   = parseInt(document.getElementById('ap-cap').value)    || null;
+  const precio   = parseFloat(document.getElementById('ap-precio').value) || null;
+  const svcsRaw  = document.getElementById('ap-svcs').value.trim();
+  if (!nombre || !tipo) { alert('Completa nombre y tipo.'); return; }
+
+  const { data: existentes } = await sb.from('patios').select('id').like('id','PAT-%');
+  const maxNum = (existentes || []).reduce((max, p) => {
+    const n = parseInt(p.id.split('-')[1]) || 0; return Math.max(max, n);
+  }, 0);
+  const id = `PAT-${String(maxNum + 1).padStart(3,'0')}`;
+
+  const { error } = await sb.from('patios').insert({
+    id, nombre, tipo,
+    ubicacion: ubic || null,
+    area_m2: area, capacidad_vehiculos: capVeh, precio_dia: precio,
+    propietario_id: currentUser.id,
+    servicios: svcsRaw ? svcsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+  });
+  if (error) { showToast('Error: ' + (error.message || '')); return; }
+
+  ['ap-nombre','ap-ubic','ap-area','ap-cap','ap-precio','ap-svcs'].forEach(i => {
+    const el = document.getElementById(i); if (el) el.value = '';
+  });
+  await renderAdminPatios();
+  showToast(`✓ Patio ${id} agregado`);
+}
+
+async function editarPatio(id) {
+  const { data: p } = await sb.from('patios').select('*').eq('id', id).single();
+  if (!p) return;
+  document.getElementById('ep-id').value     = p.id;
+  document.getElementById('ep-nombre').value = p.nombre;
+  document.getElementById('ep-tipo').value   = p.tipo;
+  document.getElementById('ep-ubic').value   = p.ubicacion || '';
+  document.getElementById('ep-area').value   = p.area_m2 || '';
+  document.getElementById('ep-cap').value    = p.capacidad_vehiculos || '';
+  document.getElementById('ep-precio').value = p.precio_dia || '';
+  document.getElementById('ep-svcs').value   = (p.servicios || []).join(', ');
+  document.getElementById('ep-estado').value = p.estado;
+  document.getElementById('modal-editar-patio').classList.add('open');
+}
+
+function closeEditarPatio() {
+  document.getElementById('modal-editar-patio').classList.remove('open');
+}
+
+async function guardarEdicionPatio() {
+  const id = document.getElementById('ep-id').value;
+  const svcsRaw = document.getElementById('ep-svcs').value.trim();
+  const { error } = await sb.from('patios').update({
+    nombre:              document.getElementById('ep-nombre').value.trim(),
+    tipo:                document.getElementById('ep-tipo').value,
+    ubicacion:           document.getElementById('ep-ubic').value.trim()   || null,
+    area_m2:             parseFloat(document.getElementById('ep-area').value)  || null,
+    capacidad_vehiculos: parseInt(document.getElementById('ep-cap').value)     || null,
+    precio_dia:          parseFloat(document.getElementById('ep-precio').value) || null,
+    servicios:           svcsRaw ? svcsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+    estado:              document.getElementById('ep-estado').value,
+  }).eq('id', id);
+  if (error) { showToast('Error: ' + (error.message || '')); return; }
+  closeEditarPatio();
+  await renderAdminPatios();
+  showToast(`✓ Patio ${id} actualizado`);
+}
+
+async function eliminarPatio(id) {
+  if (!confirm(`¿Eliminar patio ${id}?`)) return;
+  await sb.from('patios').delete().eq('id', id);
+  await renderAdminPatios();
+  showToast(`Patio ${id} eliminado`);
 }
 
 function updateFileLabel(inputId, labelId) {
