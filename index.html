@@ -90,47 +90,27 @@
   </div>
 </header>
 
-<!-- ══ VISTA: DISPONIBILIDAD ═══════════════════════════ -->
+<!-- ══ VISTA: CATÁLOGO DE EMPRESAS ══════════════════════ -->
 <div id="view-cliente" class="view">
   <div class="page">
-    <div class="hero">
-      <h1>¿Qué servicio necesitas?</h1>
-      <p>Consulta disponibilidad de camiones, custodios y patios de almacenamiento</p>
-      <!-- Selector de tipo de recurso -->
-      <div class="recurso-tabs">
-        <button class="recurso-tab active" id="tab-camion"   onclick="cambiarTipoRecurso('camion')">🚛 Camiones</button>
-        <button class="recurso-tab"        id="tab-custodio" onclick="cambiarTipoRecurso('custodio')">👮 Custodios</button>
-        <button class="recurso-tab"        id="tab-patio"    onclick="cambiarTipoRecurso('patio')">🏭 Patios</button>
-      </div>
-      <div class="search-bar">
-        <div class="search-dates" id="search-dates-row">
-          <div class="search-group">
-            <label>Fecha de inicio</label>
-            <input type="date" id="fecha-inicio">
-          </div>
-          <div class="search-group">
-            <label>Fecha de fin</label>
-            <input type="date" id="fecha-fin">
-          </div>
-        </div>
-        <div class="search-bottom">
-          <div class="search-group" style="flex:1">
-            <label id="filtro-tipo-label">Tipo de camión</label>
-            <select id="filtro-tipo">
-              <option value="">Todos los tipos</option>
-              <option value="Torton">Torton</option>
-              <option value="Rabón">Rabón</option>
-              <option value="Full">Full</option>
-              <option value="Plataforma">Plataforma</option>
-            </select>
-          </div>
-          <button class="btn-search" onclick="filtrarRecursos()">Buscar disponibilidad</button>
-        </div>
+    <div class="cat-header">
+      <h1 class="cat-titulo">Directorio de Proveedores</h1>
+      <p class="cat-sub">Empresas verificadas que pueden atender tus solicitudes de transporte, custodia y almacenamiento</p>
+      <div class="cat-pills">
+        <button class="cat-pill active" data-filter="todos"    onclick="filtrarEmpresas('todos')">Todos</button>
+        <button class="cat-pill"        data-filter="camion"   onclick="filtrarEmpresas('camion')">🚛 Camiones</button>
+        <button class="cat-pill"        data-filter="custodio" onclick="filtrarEmpresas('custodio')">👮 Custodia</button>
+        <button class="cat-pill"        data-filter="patio"    onclick="filtrarEmpresas('patio')">🏭 Patios</button>
       </div>
     </div>
-    <div class="stats-row" id="stats-row"></div>
-    <div class="section-title" id="recursos-titulo">🚛 Camiones disponibles <span id="count-label"></span></div>
-    <div class="truck-grid" id="truck-grid"></div>
+    <div class="empresa-grid" id="empresa-grid"></div>
+    <!-- Elementos ocultos referenciados por JS legacy -->
+    <div id="stats-row"   style="display:none"></div>
+    <div id="truck-grid"  style="display:none"></div>
+    <span id="count-label" style="display:none"></span>
+    <input id="fecha-inicio" type="date" style="display:none">
+    <input id="fecha-fin"    type="date" style="display:none">
+    <select id="filtro-tipo" style="display:none"></select>
   </div>
 </div>
 
@@ -992,6 +972,7 @@
 <script src="js/admin.js"></script>
 <script src="js/usuarios.js"></script>
 <script src="js/chat.js"></script>
+<script src="js/catalogo.js"></script>
 <script src="js/main.js"></script>
 
 <!-- ══ PANEL DE CHAT ════════════════════════════════════ -->

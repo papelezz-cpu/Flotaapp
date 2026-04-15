@@ -107,10 +107,10 @@ async function logout() {
   document.getElementById('login-pass').value = '';
   document.getElementById('login-error').textContent = 'Correo o contraseña incorrectos';
 
-  // Volver a vista pública
+  // Volver a vista pública (Solicitudes)
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
-  document.getElementById('view-cliente').classList.add('active');
+  document.getElementById('view-pedidos').classList.add('active');
   document.querySelector('.nav-tab').classList.add('active');
-  renderCamiones();
+  renderPedidos();
 }

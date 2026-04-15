@@ -50,15 +50,15 @@ function init() {
 
   sb.channel('flotapro-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'camiones' }, () => {
-      if (clienteActivo()) filtrarRecursos();
+      if (clienteActivo()) renderCatalogo();
       if (adminActivo())   renderAdmin();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'custodios' }, () => {
-      if (clienteActivo() && currentRecursoTipo === 'custodio') renderCustodios();
+      if (clienteActivo()) renderCatalogo();
       if (adminActivo())   renderAdminCustodios();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'patios' }, () => {
-      if (clienteActivo() && currentRecursoTipo === 'patio') renderPatios();
+      if (clienteActivo()) renderCatalogo();
       if (adminActivo())   renderAdminPatios();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'reservaciones' }, () => {

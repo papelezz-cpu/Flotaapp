@@ -595,3 +595,150 @@ body.light .np-check:hover { background: rgba(0,0,0,0.08); }
 
 /* Chips en tarjeta de pedido */
 .pedido-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+
+/* ── CATÁLOGO DE EMPRESAS ────────────────────────────── */
+.cat-header {
+  text-align: center; padding: 32px 0 28px;
+}
+.cat-titulo {
+  font-family: 'Syne', sans-serif; font-size: 1.9rem; font-weight: 800;
+  background: linear-gradient(135deg, var(--white), var(--accent-bright));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin-bottom: 8px;
+}
+.cat-sub { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 22px; }
+
+.cat-pills {
+  display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;
+}
+.cat-pill {
+  padding: 7px 18px; border-radius: 22px; font-size: 0.83rem; font-weight: 600;
+  border: 1px solid rgba(78,142,247,0.25); background: rgba(78,142,247,0.07);
+  color: var(--text-muted); cursor: pointer; transition: all 0.18s;
+}
+.cat-pill:hover { background: rgba(78,142,247,0.15); color: var(--text-main); }
+.cat-pill.active {
+  background: var(--accent); border-color: var(--accent);
+  color: #fff; box-shadow: 0 4px 14px rgba(78,142,247,0.35);
+}
+
+/* ── EMPRESA GRID ────────────────────────────────────── */
+.empresa-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 18px; padding-bottom: 40px;
+}
+
+/* ── EMPRESA CARD ────────────────────────────────────── */
+.empresa-card {
+  background: var(--navy-mid);
+  border: 1px solid rgba(78,142,247,0.15);
+  border-radius: 18px; overflow: hidden;
+  display: flex; flex-direction: column;
+  transition: transform 0.22s, box-shadow 0.22s, border-color 0.22s;
+}
+.empresa-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(78,142,247,0.4);
+  box-shadow: 0 16px 40px rgba(78,142,247,0.1);
+}
+
+.empresa-card-top {
+  display: flex; align-items: center; gap: 14px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid rgba(78,142,247,0.1);
+}
+
+/* Avatar con color dinámico */
+.empresa-avatar {
+  width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0;
+  background: var(--av-color, var(--accent));
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--av-color, var(--accent)) 40%, transparent);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 800;
+  color: #fff;
+}
+
+.empresa-header-info { flex: 1; min-width: 0; }
+.empresa-nombre {
+  font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem;
+  color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.emp-status { font-size: 0.75rem; font-weight: 600; display: block; margin-bottom: 6px; }
+.emp-status-ok   { color: var(--green); }
+.emp-status-busy { color: var(--amber); }
+
+.empresa-serv-icons { display: flex; gap: 4px; }
+.emp-icon-badge {
+  font-size: 0.88rem;
+  background: rgba(255,255,255,0.07);
+  border-radius: 6px; padding: 2px 6px;
+}
+
+/* ── RECURSOS LIST ───────────────────────────────────── */
+.empresa-recursos-list {
+  display: flex; flex-direction: column; gap: 0; flex: 1;
+}
+
+.emp-rec-bloque {
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(78,142,247,0.07);
+}
+.emp-rec-bloque:last-child { border-bottom: none; }
+
+.emp-rec-top {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.emp-rec-icon  { font-size: 1rem; }
+.emp-rec-titulo {
+  flex: 1; font-size: 0.8rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);
+}
+.emp-rec-count { font-size: 0.78rem; font-weight: 700; }
+
+/* Barra de disponibilidad */
+.emp-avail-bar {
+  height: 4px; background: rgba(255,255,255,0.07);
+  border-radius: 4px; overflow: hidden; margin-bottom: 8px;
+}
+.emp-avail-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+
+.emp-rec-tipos { display: flex; flex-wrap: wrap; gap: 5px; }
+
+/* Chip pequeño */
+.cargo-chip-sm {
+  font-size: 0.7rem; padding: 2px 8px; border-radius: 10px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-muted);
+}
+
+/* ── CARD FOOTER ─────────────────────────────────────── */
+.empresa-card-footer {
+  padding: 14px 20px 18px;
+  border-top: 1px solid rgba(78,142,247,0.1);
+}
+.btn-emp-solicitar {
+  width: 100%; padding: 10px; border: none; border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), #6ba3fa);
+  color: #fff; font-family: 'Syne', sans-serif; font-weight: 700;
+  font-size: 0.88rem; cursor: pointer; transition: opacity 0.2s, transform 0.15s;
+}
+.btn-emp-solicitar:hover { opacity: 0.9; transform: translateY(-1px); }
+
+/* Light mode */
+body.light .empresa-card { background: #fff; border-color: rgba(37,99,235,0.12); }
+body.light .empresa-card:hover { border-color: rgba(37,99,235,0.3); }
+body.light .empresa-card-top { border-color: rgba(37,99,235,0.1); }
+body.light .emp-rec-bloque { border-color: rgba(37,99,235,0.07); }
+body.light .emp-avail-bar { background: rgba(0,0,0,0.07); }
+body.light .cargo-chip-sm { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); }
+body.light .emp-icon-badge { background: rgba(0,0,0,0.05); }
+body.light .empresa-card-footer { border-color: rgba(37,99,235,0.1); }
+body.light .cat-pill { background: rgba(37,99,235,0.06); border-color: rgba(37,99,235,0.2); }
+
+@media (max-width: 520px) {
+  .empresa-grid { grid-template-columns: 1fr; }
+  .cat-titulo { font-size: 1.45rem; }
+}
