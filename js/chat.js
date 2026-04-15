@@ -167,12 +167,84 @@ function closeChat() {
   }
 }
 
-// ─── Toggle desde ícono de navbar ──────────────────────
-function toggleChatList() {
-  // Si el panel está abierto, cerrarlo; si no, no hay lista global —
-  // el chat siempre se abre desde una reserva u oferta.
-  if (chatState.open) { closeChat(); return; }
-  showToast('Abre un chat desde una reservación u oferta');
+// ─── Panel de conversaciones pendientes (globo 💬) ──────
+let _chatBubblePanelOpen = false;
+
+async function toggleChatList() {
+  const panel = document.getElementById('chat-bubble-panel');
+  if (!panel) return;
+  _chatBubblePanelOpen = !_chatBubblePanelOpen;
+  if (_chatBubblePanelOpen) {
+    await _renderChatBubblePanel();
+    panel.classList.add('open');
+  } else {
+    panel.classList.remove('open');
+  }
+}
+
+async function _renderChatBubblePanel() {
+  const list = document.getElementById('chat-bubble-list');
+  if (!list || !currentUser.id) return;
+  list.innerHTML = `<div class="notif-empty">Cargando…</div>`;
+
+  // Mensajes no leídos dirigidos a mí
+  const { data: msgs } = await sb.from('mensajes')
+    .select('*')
+    .eq('leido', false)
+    .neq('de_user_id', currentUser.id)
+    .contains('participantes', [currentUser.id])
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (!msgs?.length) {
+    list.innerHTML = `<div class="notif-empty">Sin mensajes nuevos</div>`;
+    return;
+  }
+
+  // Agrupar por hilo (reserva_id o pedido_id + de_user_id)
+  const hilos = {};
+  msgs.forEach(m => {
+    const key = (m.reserva_id || m.pedido_id) + '_' + m.de_user_id;
+    if (!hilos[key]) hilos[key] = { ...m, count: 0 };
+    hilos[key].count++;
+  });
+
+  list.innerHTML = Object.values(hilos).map(h => {
+    const ctx     = h.reserva_id ? '💬 Reservación' : '💬 Solicitud';
+    const ctxId   = h.reserva_id || h.pedido_id;
+    const ctxTipo = h.reserva_id ? 'reserva' : 'pedido';
+    const preview = h.texto.length > 55 ? h.texto.slice(0, 55) + '…' : h.texto;
+    return `
+      <div class="notif-item" onclick="_abrirDesdeGlobo('${ctxTipo}','${ctxId}','${h.de_user_id}','${esc(h.de_nombre)}')">
+        <div class="notif-dot"></div>
+        <div class="notif-content">
+          <div class="notif-titulo">${esc(h.de_nombre)} <span style="font-weight:400;color:var(--text-muted)">${ctx}</span></div>
+          <div class="notif-msg">${esc(preview)}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+            <span class="notif-time">${fmtTimeAgo(h.created_at)}</span>
+            ${h.count > 1 ? `<span style="background:var(--accent);color:#fff;border-radius:10px;padding:1px 7px;font-size:0.68rem;font-weight:700">${h.count} nuevos</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function _abrirDesdeGlobo(ctxTipo, ctxId, deUserId, deNombre) {
+  // Cerrar el panel del globo
+  document.getElementById('chat-bubble-panel')?.classList.remove('open');
+  _chatBubblePanelOpen = false;
+
+  // Navegar a la vista correcta y abrir el chat
+  const tabs = document.querySelectorAll('.nav-tab');
+  if (ctxTipo === 'reserva') {
+    const tab = [...tabs].find(t => t.textContent.trim() === 'Reservaciones');
+    if (tab) showView('reservaciones', tab);
+    setTimeout(() => openChatReserva(ctxId, deUserId, deNombre), 200);
+  } else {
+    const tab = [...tabs].find(t => t.textContent.trim() === 'Solicitudes');
+    if (tab) showView('pedidos', tab);
+    setTimeout(() => openChatPedido(ctxId, deUserId, deNombre), 200);
+  }
 }
 
 // ─── Badge global de mensajes no leídos ────────────────
@@ -201,11 +273,20 @@ async function actualizarBadgeChat() {
 
 // ─── Cerrar al hacer click fuera ───────────────────────
 document.addEventListener('click', e => {
+  // Cerrar panel del globo
+  if (_chatBubblePanelOpen) {
+    const bubblePanel = document.getElementById('chat-bubble-panel');
+    const btnChat     = document.getElementById('btn-chat');
+    if (!bubblePanel?.contains(e.target) && !btnChat?.contains(e.target)) {
+      bubblePanel?.classList.remove('open');
+      _chatBubblePanelOpen = false;
+    }
+  }
+  // Cerrar panel de chat
   if (!chatState.open) return;
-  const panel  = document.getElementById('chat-panel');
+  const panel   = document.getElementById('chat-panel');
   const btnChat = document.getElementById('btn-chat');
   if (panel.contains(e.target) || btnChat?.contains(e.target)) return;
-  // Permitir clicks en botones que abren el chat
   if (e.target.closest('.btn-chat-hilo')) return;
   closeChat();
 });

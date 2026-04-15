@@ -16,7 +16,9 @@ async function loadNotificaciones() {
     .limit(20);
 
   const notifs = data || [];
-  const unread = notifs.filter(n => !n.leido).length;
+  // Los mensajes van al globo 💬, no a la campana
+  const sinMensajes = notifs.filter(n => n.tipo !== 'nuevo_mensaje');
+  const unread = sinMensajes.filter(n => !n.leido).length;
   const badge  = document.getElementById('notif-badge');
 
   if (unread > 0) {
@@ -26,8 +28,8 @@ async function loadNotificaciones() {
     badge.style.display = 'none';
   }
 
-  // Guardar para el panel
-  notifPanel = notifs;
+  // Guardar solo notifs que no son mensajes para el panel de campana
+  notifPanel = sinMensajes;
 }
 
 function toggleNotifPanel() {

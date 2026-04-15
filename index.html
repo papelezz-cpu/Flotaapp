@@ -56,12 +56,18 @@
     </div>
     <div class="header-right">
       <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
-      <!-- Chat (solo logueados) -->
+      <!-- Globo de mensajes (solo logueados) -->
       <div class="notif-wrap logged-in-only" style="position:relative">
         <button class="btn-notif" id="btn-chat" onclick="toggleChatList()" title="Mensajes">
           💬
           <span class="notif-badge" id="chat-badge" style="display:none">0</span>
         </button>
+        <div class="notif-panel" id="chat-bubble-panel">
+          <div class="notif-panel-header">
+            <span>Mensajes nuevos</span>
+          </div>
+          <div id="chat-bubble-list"></div>
+        </div>
       </div>
       <!-- Campana de notificaciones (solo logueados) -->
       <div class="notif-wrap logged-in-only" style="position:relative">
