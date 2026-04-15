@@ -11,7 +11,7 @@ function showToast(msg, tipo = 'ok') {
 // ── INICIALIZACIÓN (llamada tras login) ───────────────
 // Solo refresca la vista activa; el resto ya cargó en el arranque público
 function init() {
-  filtrarRecursos();
+  renderPedidos();
   actualizarBadgeChat();
 }
 
@@ -32,8 +32,8 @@ function init() {
     }
   });
 
-  // Cargar recursos públicamente (anon key con política RLS pública)
-  filtrarRecursos();
+  // Cargar solicitudes públicamente como vista principal
+  renderPedidos();
 
   // Restaurar sesión guardada si el usuario ya había iniciado sesión
   await checkExistingSession();

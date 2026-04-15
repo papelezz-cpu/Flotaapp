@@ -43,15 +43,15 @@
 <!-- ══ HEADER ══════════════════════════════════════════ -->
 <header>
   <div class="header-inner">
-    <div class="logo" onclick="showView('cliente', document.querySelectorAll('.nav-tab')[0])" style="cursor:pointer">
+    <div class="logo" onclick="showView('pedidos', document.querySelectorAll('.nav-tab')[0])" style="cursor:pointer">
       <div class="logo-icon">🚛</div>
       FlotaPro
     </div>
     <div class="nav-tabs">
-      <button class="nav-tab active"        onclick="showView('cliente', this)">Disponibilidad</button>
-      <button class="nav-tab"               onclick="showView('reservaciones', this)">Reservaciones</button>
-      <button class="nav-tab"               onclick="showView('pedidos', this)">Solicitudes</button>
-      <button class="nav-tab admin-only"    onclick="showView('admin', this)">Admin</button>
+      <button class="nav-tab active"          onclick="showView('pedidos', this)">Solicitudes</button>
+      <button class="nav-tab"                 onclick="showView('reservaciones', this)">Reservaciones</button>
+      <button class="nav-tab"                 onclick="showView('cliente', this)">Catálogo</button>
+      <button class="nav-tab admin-only"      onclick="showView('admin', this)">Admin</button>
       <button class="nav-tab superadmin-only" onclick="showView('usuarios', this)">Usuarios</button>
     </div>
     <div class="header-right">
@@ -91,7 +91,7 @@
 </header>
 
 <!-- ══ VISTA: DISPONIBILIDAD ═══════════════════════════ -->
-<div id="view-cliente" class="view active">
+<div id="view-cliente" class="view">
   <div class="page">
     <div class="hero">
       <h1>¿Qué servicio necesitas?</h1>
@@ -148,7 +148,7 @@
 </div>
 
 <!-- ══ VISTA: PEDIDOS ══════════════════════════════════ -->
-<div id="view-pedidos" class="view">
+<div id="view-pedidos" class="view active">
   <div class="page">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
       <div class="section-title" style="margin:0">📋 Solicitudes de servicio</div>
@@ -533,11 +533,13 @@
 
 <!-- ══ MODAL NUEVO PEDIDO ══════════════════════════════ -->
 <div class="modal-overlay" id="modal-nuevo-pedido">
-  <div class="modal" style="max-width:560px">
+  <div class="modal" style="max-width:620px;max-height:90vh;overflow-y:auto">
     <h2>📋 Nueva solicitud de servicio</h2>
-    <p class="sub">Describe lo que necesitas y los proveedores te enviarán su mejor oferta.</p>
+    <p class="sub">Completa los datos para que los proveedores puedan evaluarte y enviarte su mejor oferta.</p>
+
+    <!-- Tipo de servicio -->
     <div class="form-group">
-      <label>Tipo de servicio requerido</label>
+      <label>Tipo de servicio *</label>
       <select id="np-tipo" onchange="actualizarSubtipoPedido()">
         <optgroup label="🚛 Camiones">
           <option value="Cualquiera">Cualquier camión</option>
@@ -562,40 +564,141 @@
         </optgroup>
       </select>
     </div>
-    <div class="admin-grid" style="gap:12px">
-      <div class="form-group" id="np-cap-group">
-        <label>Capacidad mínima (ton)</label>
-        <input type="number" id="np-cap" placeholder="Ej. 20">
+
+    <!-- ══ CAMPOS CAMIÓN ═══════════════════════════════ -->
+    <div id="np-group-camion">
+      <div class="np-section-title">📦 Información de la carga</div>
+      <div class="admin-grid" style="gap:12px">
+        <div class="form-group" id="np-cap-group">
+          <label>Capacidad mínima requerida (ton)</label>
+          <input type="number" id="np-cap" min="0" placeholder="Ej. 20">
+        </div>
+        <div class="form-group" id="np-carga-group">
+          <label>Tipo de carga *</label>
+          <input type="text" id="np-carga" placeholder="Ej. Electrónicos, Maquinaria pesada">
+        </div>
+        <div class="form-group">
+          <label>Peso real de la carga (ton)</label>
+          <input type="number" id="np-peso" min="0" step="0.1" placeholder="Ej. 15.5">
+        </div>
+        <div class="form-group">
+          <label>Número de bultos / pallets</label>
+          <input type="number" id="np-bultos" min="0" placeholder="Ej. 48">
+        </div>
       </div>
-      <div class="form-group" id="np-carga-group">
-        <label>Tipo de carga</label>
-        <input type="text" id="np-carga" placeholder="Ej. Electrónicos, Maquinaria">
+      <div class="np-check-row">
+        <label class="np-check"><input type="checkbox" id="np-peligrosa"> Carga peligrosa / materiales peligrosos</label>
+        <label class="np-check"><input type="checkbox" id="np-temp"> Requiere temperatura controlada</label>
+        <label class="np-check"><input type="checkbox" id="np-seguro"> Requiere seguro de carga</label>
+        <label class="np-check"><input type="checkbox" id="np-factura"> Requiere factura</label>
       </div>
-      <div class="form-group">
-        <label>Origen *</label>
-        <input type="text" id="np-origen" placeholder="Ej. Puerto de Manzanillo">
+
+      <div class="np-section-title">🗺️ Ruta</div>
+      <div class="admin-grid" style="gap:12px">
+        <div class="form-group">
+          <label>Origen — ciudad y dirección *</label>
+          <input type="text" id="np-origen" placeholder="Ej. Guadalajara, Av. Industria 450">
+        </div>
+        <div class="form-group">
+          <label>Destino — ciudad y dirección *</label>
+          <input type="text" id="np-destino" placeholder="Ej. CDMX, Bodega Industrial Norte">
+        </div>
+        <div class="form-group">
+          <label>Fecha de carga *</label>
+          <input type="date" id="np-fecha-ini">
+        </div>
+        <div class="form-group">
+          <label>Hora estimada de carga</label>
+          <input type="time" id="np-hora">
+        </div>
+        <div class="form-group">
+          <label>Fecha de entrega estimada</label>
+          <input type="date" id="np-fecha-fin">
+        </div>
       </div>
-      <div class="form-group">
-        <label>Destino *</label>
-        <input type="text" id="np-destino" placeholder="Ej. Bodega Industrial Norte">
-      </div>
-      <div class="form-group">
-        <label>Fecha de inicio *</label>
-        <input type="date" id="np-fecha-ini">
-      </div>
-      <div class="form-group">
-        <label>Fecha de fin</label>
-        <input type="date" id="np-fecha-fin">
+
+      <div class="np-section-title">📞 Contacto en origen</div>
+      <div class="admin-grid" style="gap:12px">
+        <div class="form-group">
+          <label>Nombre del contacto</label>
+          <input type="text" id="np-contacto-nombre" placeholder="Ej. Juan Pérez">
+        </div>
+        <div class="form-group">
+          <label>Teléfono del contacto</label>
+          <input type="tel" id="np-contacto-tel" placeholder="Ej. 33 1234 5678">
+        </div>
       </div>
     </div>
+
+    <!-- ══ CAMPOS CUSTODIO ════════════════════════════════ -->
+    <div id="np-group-custodio" style="display:none">
+      <div class="np-section-title">👮 Detalles del servicio de custodia</div>
+      <div class="admin-grid" style="gap:12px">
+        <div class="form-group">
+          <label>Número de custodios requeridos *</label>
+          <input type="number" id="np-num-custodios" min="1" placeholder="Ej. 2">
+        </div>
+        <div class="form-group">
+          <label>Zona / lugar de cobertura *</label>
+          <input type="text" id="np-zona" placeholder="Ej. Ruta Guadalajara–CDMX">
+        </div>
+        <div class="form-group">
+          <label>Fecha de inicio *</label>
+          <input type="date" id="np-fecha-ini-cust">
+        </div>
+        <div class="form-group">
+          <label>Fecha de fin</label>
+          <input type="date" id="np-fecha-fin-cust">
+        </div>
+        <div class="form-group" style="grid-column:span 2">
+          <label>Horario de servicio</label>
+          <input type="text" id="np-horario" placeholder="Ej. Lunes a Viernes 08:00–20:00">
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ CAMPOS PATIO ═══════════════════════════════════ -->
+    <div id="np-group-patio" style="display:none">
+      <div class="np-section-title">🏭 Detalles del patio requerido</div>
+      <div class="admin-grid" style="gap:12px">
+        <div class="form-group">
+          <label>Número de vehículos a resguardar</label>
+          <input type="number" id="np-num-vehiculos" min="1" placeholder="Ej. 5">
+        </div>
+        <div class="form-group">
+          <label>Tipo de vehículos</label>
+          <input type="text" id="np-tipo-vehiculos" placeholder="Ej. Tractocamiones, Remolques">
+        </div>
+        <div class="form-group">
+          <label>Área aproximada necesaria (m²)</label>
+          <input type="number" id="np-area" min="0" placeholder="Ej. 500">
+        </div>
+        <div class="form-group">
+          <label>Ubicación preferida</label>
+          <input type="text" id="np-origen" placeholder="Ej. Zona industrial Tlaquepaque">
+        </div>
+        <div class="form-group">
+          <label>Fecha de entrada *</label>
+          <input type="date" id="np-fecha-ini-patio">
+        </div>
+        <div class="form-group">
+          <label>Fecha de salida estimada</label>
+          <input type="date" id="np-fecha-fin-patio">
+        </div>
+      </div>
+    </div>
+
+    <!-- Campos comunes al final -->
+    <div class="np-section-title">💬 Información adicional</div>
     <div class="form-group">
-      <label>Descripción de la carga</label>
-      <textarea id="np-desc" rows="3" placeholder="Tipo de mercancía, peso aproximado, requisitos especiales..."></textarea>
+      <label>Descripción / instrucciones especiales</label>
+      <textarea id="np-desc" rows="3" placeholder="Detalles adicionales que ayuden al proveedor a cotizar mejor…"></textarea>
     </div>
     <div class="form-group">
-      <label>Precio que ofreces (MXN) <span style="font-weight:400;color:var(--text-muted)">— puede quedar abierto</span></label>
+      <label>Tu presupuesto (MXN) <span style="font-weight:400;color:var(--text-muted)">— opcional, puede quedar abierto</span></label>
       <input type="number" id="np-precio" placeholder="Ej. 8000">
     </div>
+
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeNuevoPedido()">Cancelar</button>
       <button class="btn-confirm" onclick="crearPedido()">📋 Publicar solicitud</button>

@@ -188,18 +188,43 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
     ? `<button class="btn-edit btn-rechazar" style="font-size:0.72rem" onclick="eliminarPedido('${p.id}')">🗑 Eliminar</button>`
     : '';
 
+  // Chips de detalles extra según tipo
+  const esCamion   = !p.tipo_camion?.startsWith('Custodio') && !p.tipo_camion?.startsWith('Patio') && p.tipo_camion !== 'Supervisión remota' && p.tipo_camion !== 'Bodega';
+  const esCustodio = p.tipo_camion?.startsWith('Custodio') || p.tipo_camion === 'Supervisión remota';
+
+  const chips = [];
+  if (esCamion) {
+    if (p.tipo_carga)    chips.push(`📦 ${esc(p.tipo_carga)}`);
+    if (p.peso_carga)    chips.push(`⚖️ ${p.peso_carga} ton`);
+    if (p.capacidad_min) chips.push(`🚛 Mín ${p.capacidad_min} ton`);
+    if (p.carga_peligrosa)  chips.push('⚠️ Peligrosa');
+    if (p.temp_controlada)  chips.push('❄️ Temp. controlada');
+    if (p.requiere_seguro)  chips.push('🛡️ Seguro');
+    if (p.requiere_factura) chips.push('🧾 Factura');
+  } else if (esCustodio) {
+    if (p.num_custodios)    chips.push(`👮 x${p.num_custodios}`);
+    if (p.zona_cobertura)   chips.push(`📍 ${esc(p.zona_cobertura)}`);
+    if (p.horario_servicio) chips.push(`🕐 ${esc(p.horario_servicio)}`);
+  } else {
+    if (p.num_vehiculos)  chips.push(`🚗 ${p.num_vehiculos} vehículos`);
+    if (p.area_necesaria) chips.push(`📐 ${p.area_necesaria} m²`);
+    if (p.tipo_vehiculos) chips.push(esc(p.tipo_vehiculos));
+  }
+  const chipsHTML = chips.length
+    ? `<div class="pedido-chips">${chips.map(c => `<span class="cargo-chip">${c}</span>`).join('')}</div>` : '';
+
   return `
     <div class="pedido-card" id="ped-${p.id}">
       <div class="pedido-top">
         <div class="pedido-info">
-          <div class="pedido-tipo">${TIPO_EMOJI[p.tipo_camion] || '🚛'} ${esc(p.tipo_camion)}${p.capacidad_min ? ` · mín ${p.capacidad_min} ton` : ''}</div>
+          <div class="pedido-tipo">${TIPO_EMOJI[p.tipo_camion] || '🚛'} ${esc(p.tipo_camion)}</div>
           ${p.origen || p.destino
-            ? `<div class="pedido-ruta">📍 ${esc(p.origen || '—')} → ${esc(p.destino || '—')}</div>` : ''}
+            ? `<div class="pedido-ruta">📍 ${esc(p.origen || '—')}${p.destino ? ' → ' + esc(p.destino) : ''}</div>` : ''}
           ${fechasTxt ? `<div class="pedido-fecha">${fechasTxt}</div>` : ''}
-          ${p.tipo_carga ? `<div class="pedido-carga">📦 ${esc(p.tipo_carga)}</div>` : ''}
         </div>
         <span class="badge ${badgeCls}">${estadoLabel}</span>
       </div>
+      ${chipsHTML}
       ${p.descripcion ? `<div class="pedido-desc">${esc(p.descripcion)}</div>` : ''}
       <div class="pedido-footer">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -219,11 +244,14 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
 
 function actualizarSubtipoPedido() {
   const val = document.getElementById('np-tipo')?.value || '';
-  const esCamion = !val.startsWith('Custodio') && !val.startsWith('Patio') && val !== 'Supervisión remota' && val !== 'Bodega';
-  ['np-cap-group','np-carga-group'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = esCamion ? '' : 'none';
-  });
+  const esCamion   = !val.startsWith('Custodio') && !val.startsWith('Patio') && val !== 'Supervisión remota' && val !== 'Bodega';
+  const esCustodio = val.startsWith('Custodio') || val === 'Supervisión remota';
+  const esPatio    = val.startsWith('Patio') || val === 'Bodega';
+
+  const g = id => document.getElementById(id);
+  if (g('np-group-camion'))   g('np-group-camion').style.display   = esCamion   ? '' : 'none';
+  if (g('np-group-custodio')) g('np-group-custodio').style.display = esCustodio ? '' : 'none';
+  if (g('np-group-patio'))    g('np-group-patio').style.display    = esPatio    ? '' : 'none';
 }
 
 function openNuevoPedido() {
@@ -235,41 +263,81 @@ function closeNuevoPedido() {
 }
 
 async function crearPedido() {
-  const tipo      = document.getElementById('np-tipo').value;
-  const capacidad = parseInt(document.getElementById('np-cap').value)     || null;
-  const tipoCarga = document.getElementById('np-carga').value.trim();
-  const origen    = document.getElementById('np-origen').value.trim();
-  const destino   = document.getElementById('np-destino').value.trim();
-  const fechaIni  = document.getElementById('np-fecha-ini').value;
-  const fechaFin  = document.getElementById('np-fecha-fin').value;
-  const desc      = document.getElementById('np-desc').value.trim();
-  const precio    = parseFloat(document.getElementById('np-precio').value) || null;
+  const v    = id => document.getElementById(id)?.value?.trim() || '';
+  const vb   = id => document.getElementById(id)?.checked || false;
+  const vn   = id => parseFloat(document.getElementById(id)?.value) || null;
+  const vi   = id => parseInt(document.getElementById(id)?.value) || null;
 
-  if (!origen || !destino || !fechaIni) {
-    alert('Por favor completa origen, destino y fecha de inicio.'); return;
+  const tipo = document.getElementById('np-tipo').value;
+  const esCamion   = !tipo.startsWith('Custodio') && !tipo.startsWith('Patio') && tipo !== 'Supervisión remota' && tipo !== 'Bodega';
+  const esCustodio = tipo.startsWith('Custodio') || tipo === 'Supervisión remota';
+  const esPatio    = tipo.startsWith('Patio') || tipo === 'Bodega';
+
+  // Validaciones por tipo
+  if (esCamion) {
+    if (!v('np-origen') || !v('np-carga') || !v('np-fecha-ini')) {
+      alert('Por favor completa: tipo de carga, origen y fecha de carga.'); return;
+    }
+  } else if (esCustodio) {
+    if (!v('np-zona') || !v('np-fecha-ini-cust')) {
+      alert('Por favor completa: zona de cobertura y fecha de inicio.'); return;
+    }
+  } else if (esPatio) {
+    if (!v('np-fecha-ini-patio')) {
+      alert('Por favor completa la fecha de entrada.'); return;
+    }
   }
 
-  const { error } = await sb.from('pedidos').insert({
+  // Fechas por tipo
+  const fechaIni = esCamion ? v('np-fecha-ini') : esCustodio ? v('np-fecha-ini-cust') : v('np-fecha-ini-patio');
+  const fechaFin = esCamion ? v('np-fecha-fin') : esCustodio ? v('np-fecha-fin-cust') : v('np-fecha-fin-patio');
+
+  const payload = {
     cliente_id:     currentUser.id,
     cliente_nombre: currentUser.nombre,
     cliente_email:  currentUser.email,
     tipo_camion:    tipo,
-    capacidad_min:  capacidad,
-    tipo_carga:     tipoCarga  || null,
-    origen, destino,
-    fecha_ini:      fechaIni,
-    fecha_fin:      fechaFin  || null,
-    descripcion:    desc      || null,
-    precio_cliente: precio,
-  });
-  if (error) { showToast('Error al publicar pedido'); return; }
+    descripcion:    v('np-desc')   || null,
+    precio_cliente: vn('np-precio'),
+    fecha_ini:      fechaIni       || null,
+    fecha_fin:      fechaFin       || null,
+    // Camión
+    origen:           esCamion ? v('np-origen')  : esPatio ? v('np-origen') : null,
+    destino:          esCamion ? v('np-destino') : null,
+    capacidad_min:    esCamion ? vi('np-cap')    : null,
+    tipo_carga:       esCamion ? v('np-carga')   : null,
+    peso_carga:       esCamion ? vn('np-peso')   : null,
+    num_bultos:       esCamion ? vi('np-bultos') : null,
+    hora_carga:       esCamion ? v('np-hora')    : null,
+    contacto_nombre:  esCamion ? v('np-contacto-nombre') : null,
+    contacto_tel:     esCamion ? v('np-contacto-tel')    : null,
+    carga_peligrosa:  esCamion ? vb('np-peligrosa')      : false,
+    temp_controlada:  esCamion ? vb('np-temp')           : false,
+    requiere_seguro:  esCamion ? vb('np-seguro')         : false,
+    requiere_factura: esCamion ? vb('np-factura')        : false,
+    // Custodio
+    num_custodios:   esCustodio ? vi('np-num-custodios') : null,
+    zona_cobertura:  esCustodio ? v('np-zona')           : null,
+    horario_servicio:esCustodio ? v('np-horario')        : null,
+    // Patio
+    num_vehiculos:   esPatio ? vi('np-num-vehiculos')  : null,
+    tipo_vehiculos:  esPatio ? v('np-tipo-vehiculos')  : null,
+    area_necesaria:  esPatio ? vn('np-area')           : null,
+  };
+
+  const { error } = await sb.from('pedidos').insert(payload);
+  if (error) { showToast('Error al publicar: ' + (error.message || '')); return; }
 
   closeNuevoPedido();
-  ['np-cap','np-carga','np-origen','np-destino','np-fecha-ini','np-fecha-fin','np-desc','np-precio']
-    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  // Limpiar todos los campos del formulario
+  document.getElementById('modal-nuevo-pedido').querySelectorAll('input, textarea, select').forEach(el => {
+    if (el.type === 'checkbox') el.checked = false;
+    else if (el.tagName !== 'SELECT') el.value = '';
+  });
+  actualizarSubtipoPedido();
 
   await renderPedidos();
-  showToast('✓ Pedido publicado — los proveedores ya pueden ver tu solicitud');
+  showToast('✓ Solicitud publicada — los proveedores ya pueden verte');
 }
 
 // ── DETALLE PEDIDO (cliente ve y responde ofertas) ─────

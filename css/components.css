@@ -491,17 +491,17 @@ body.light .badge-acordado  { background: rgba(37,99,235,0.1); }
 /* ── CHAT PANEL ──────────────────────────────────────── */
 .chat-panel {
   position: fixed; right: -420px; top: 0; width: 380px; height: 100dvh;
-  background: var(--surface); border-left: 1px solid var(--border);
+  background: var(--navy-mid, #112240); border-left: 1px solid rgba(78,142,247,0.2);
   display: flex; flex-direction: column; z-index: 1100;
   transition: right 0.28s cubic-bezier(.4,0,.2,1);
-  box-shadow: -4px 0 24px rgba(0,0,0,0.3);
+  box-shadow: -4px 0 32px rgba(0,0,0,0.5);
 }
 .chat-panel.open { right: 0; }
 
 .chat-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; border-bottom: 1px solid var(--border);
-  background: var(--surface); flex-shrink: 0;
+  padding: 14px 16px; border-bottom: 1px solid rgba(78,142,247,0.2);
+  background: var(--navy-mid, #112240); flex-shrink: 0;
 }
 .chat-titulo { font-weight: 600; font-size: 0.9rem; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-close-btn {
@@ -536,8 +536,8 @@ body.light .badge-acordado  { background: rgba(37,99,235,0.1); }
 .chat-msg-time { font-size: 0.68rem; color: var(--text-muted); padding: 2px 4px; }
 
 .chat-footer {
-  display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border);
-  flex-shrink: 0; background: var(--surface);
+  display: flex; gap: 8px; padding: 12px; border-top: 1px solid rgba(78,142,247,0.2);
+  flex-shrink: 0; background: var(--navy-mid, #112240);
 }
 .chat-input-field {
   flex: 1; background: rgba(255,255,255,0.07); border: 1px solid var(--border);
@@ -564,8 +564,34 @@ body.light .badge-acordado  { background: rgba(37,99,235,0.1); }
 }
 
 /* Light mode */
-body.light .chat-panel    { box-shadow: -4px 0 24px rgba(0,0,0,0.12); }
+body.light .chat-panel    { background: #f0f4ff; box-shadow: -4px 0 24px rgba(0,0,0,0.12); }
+body.light .chat-header   { background: #e8eeff; border-color: rgba(37,99,235,0.2); }
+body.light .chat-footer   { background: #e8eeff; border-color: rgba(37,99,235,0.2); }
 body.light .chat-msg-otro .chat-bubble { background: rgba(0,0,0,0.06); }
 body.light .chat-input-field { background: #fff; }
 body.light .btn-chat-hilo { background: rgba(0,0,0,0.05); }
 body.light .btn-chat-hilo:hover { background: rgba(0,0,0,0.1); }
+
+/* ── FORMULARIO SOLICITUD (nueva pedido) ─────────────── */
+.np-section-title {
+  font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--accent-bright);
+  margin: 18px 0 10px; padding-bottom: 6px;
+  border-bottom: 1px solid rgba(78,142,247,0.15);
+}
+.np-check-row {
+  display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 4px;
+}
+.np-check {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 0.82rem; color: var(--text-muted); cursor: pointer;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; padding: 6px 10px;
+}
+.np-check input[type=checkbox] { accent-color: var(--accent); width:14px; height:14px; }
+.np-check:hover { color: var(--text-main); background: rgba(255,255,255,0.07); }
+body.light .np-check { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); }
+body.light .np-check:hover { background: rgba(0,0,0,0.08); }
+
+/* Chips en tarjeta de pedido */
+.pedido-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }

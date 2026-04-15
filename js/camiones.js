@@ -145,7 +145,10 @@ async function renderCamiones(filtroTipo = '', fechaIni = '', fechaFin = '') {
         ${formatPrecio(c.precio_dia) ? `<div class="truck-precio">${esc(formatPrecio(c.precio_dia))}</div>` : ''}
         <div class="truck-footer">
           <button class="btn-detail" onclick="openDetail('${esc(c.id)}')">Ver detalle</button>
-          <button class="btn-reservar" ${disabled} onclick="openReserva('${esc(c.id)}')">Agendar</button>
+          ${currentUser.rol === 'cliente' || !currentUser.id
+            ? `<button class="btn-reservar" onclick="openNuevoPedido()" title="Publica una solicitud y los transportistas te harán ofertas">📋 Solicitar</button>`
+            : `<button class="btn-reservar" ${disabled} onclick="openReserva('${esc(c.id)}')">Agendar</button>`
+          }
         </div>
       </div>`;
   }).join('');
