@@ -64,11 +64,31 @@ function renderNotifPanel() {
 async function onNotifClick(id, tipo) {
   // Marcar como leída
   await sb.from('notificaciones').update({ leido: true }).eq('id', id);
+  const notif = (notifPanel || []).find(n => n.id === id);
   notifPanel = (notifPanel || []).map(n => n.id === id ? { ...n, leido: true } : n);
   loadNotificaciones();
+  toggleNotifPanel();
 
   // Navegar a la vista correspondiente
   const tabs = document.querySelectorAll('.nav-tab');
+
+  if (tipo === 'nuevo_mensaje' && notif?.meta) {
+    // Abrir el chat directamente en el hilo correspondiente
+    const meta = notif.meta;
+    const deUserId = meta.de_user_id;
+    const deNombre = meta.de_nombre || '';
+    if (meta.ctx_tipo === 'reserva') {
+      const tab = [...tabs].find(t => t.textContent.trim() === 'Reservaciones');
+      if (tab) showView('reservaciones', tab);
+      setTimeout(() => openChatReserva(meta.ctx_id, deUserId, deNombre), 200);
+    } else {
+      const tab = [...tabs].find(t => t.textContent.trim() === 'Solicitudes');
+      if (tab) showView('pedidos', tab);
+      setTimeout(() => openChatPedido(meta.ctx_id, deUserId, deNombre), 200);
+    }
+    return;
+  }
+
   if (tipo === 'reserva_pendiente' || tipo === 'reserva_aceptada' || tipo === 'reserva_rechazada') {
     const tab = [...tabs].find(t => t.textContent.trim() === 'Reservaciones');
     if (tab) showView('reservaciones', tab);
@@ -76,7 +96,6 @@ async function onNotifClick(id, tipo) {
     const tab = [...tabs].find(t => t.textContent.trim() === 'Solicitudes');
     if (tab) showView('pedidos', tab);
   }
-  toggleNotifPanel();
 }
 
 async function markAllRead() {
