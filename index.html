@@ -103,10 +103,10 @@
       <h1 class="cat-titulo">Directorio de Proveedores</h1>
       <p class="cat-sub">Empresas verificadas que pueden atender tus solicitudes de transporte, custodia y almacenamiento</p>
       <div class="cat-pills">
-        <button class="cat-pill active" data-filter="todos"    onclick="filtrarEmpresas('todos')">Todos</button>
-        <button class="cat-pill"        data-filter="camion"   onclick="filtrarEmpresas('camion')">🚛 Camiones</button>
+        <button class="cat-pill active" data-filter="camion"   onclick="filtrarEmpresas('camion')">🚛 Camiones</button>
         <button class="cat-pill"        data-filter="custodio" onclick="filtrarEmpresas('custodio')">👮 Custodia</button>
         <button class="cat-pill"        data-filter="patio"    onclick="filtrarEmpresas('patio')">🏭 Patios</button>
+        <button class="cat-pill"        data-filter="lavado"   onclick="filtrarEmpresas('lavado')">🚿 Lavado</button>
       </div>
     </div>
     <div class="empresa-grid" id="empresa-grid"></div>
@@ -208,6 +208,7 @@
       <button class="recurso-tab active" id="admin-tab-camion"   onclick="cambiarAdminTab('camion')">🚛 Camiones</button>
       <button class="recurso-tab"        id="admin-tab-custodio" onclick="cambiarAdminTab('custodio')">👮 Custodios</button>
       <button class="recurso-tab"        id="admin-tab-patio"    onclick="cambiarAdminTab('patio')">🏭 Patios</button>
+      <button class="recurso-tab"        id="admin-tab-lavado"   onclick="cambiarAdminTab('lavado')">🚿 Lavado</button>
     </div>
 
     <!-- ── TAB: CAMIONES ── -->
@@ -394,6 +395,52 @@
     </div>
     </div><!-- /admin-content-patio -->
 
+    <!-- ── TAB: LAVADO ── -->
+    <div id="admin-content-lavado" style="display:none">
+    <div class="admin-grid">
+      <div class="admin-card">
+        <h3>➕ Agregar servicio de lavado</h3>
+        <div class="form-group">
+          <label>Nombre del servicio</label>
+          <input type="text" id="al-nombre" placeholder="Ej. Lavado Express Norte">
+        </div>
+        <div class="form-group">
+          <label>Tipos de vehículo que lavan <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
+          <input type="text" id="al-tipos-vehiculo" placeholder="Ej. Tractocamión, Remolque, Contenedor, Pick-up">
+        </div>
+        <div class="form-group">
+          <label>Tipos de lavado que ofrecen <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
+          <input type="text" id="al-tipos-lavado" placeholder="Ej. Lavado exterior, Lavado interior, Lavado de motor, Desinfección">
+        </div>
+        <div class="form-group">
+          <label>Capacidad simultánea de vehículos</label>
+          <input type="number" id="al-capacidad" placeholder="Ej. 4" min="1">
+        </div>
+        <div class="form-group">
+          <label>Ubicación</label>
+          <input type="text" id="al-ubic" placeholder="Ej. Blvd. Miguel de la Madrid Km 8, Manzanillo">
+        </div>
+        <div class="form-group">
+          <label>Horario de atención</label>
+          <input type="text" id="al-horario" placeholder="Ej. Lun–Sáb 07:00–19:00">
+        </div>
+        <div class="form-group">
+          <label>Precio base por lavado (MXN)</label>
+          <input type="number" id="al-precio" placeholder="Ej. 800" min="0">
+        </div>
+        <div class="form-group">
+          <label>Descripción / servicios adicionales</label>
+          <textarea id="al-desc" rows="2" placeholder="Detalles adicionales del servicio..."></textarea>
+        </div>
+        <button class="btn-add" onclick="agregarLavado()">➕ Agregar servicio</button>
+      </div>
+      <div class="admin-card">
+        <h3>🚿 Servicios de lavado registrados</h3>
+        <div class="truck-list-admin" id="admin-lavados-list"></div>
+      </div>
+    </div>
+    </div><!-- /admin-content-lavado -->
+
     <!-- Pendientes de aprobación — solo superadmin -->
     <div id="pendientes-section" style="display:none; margin-top:24px">
       <div class="section-title">⏳ Unidades pendientes de aprobación</div>
@@ -548,6 +595,14 @@
           <option value="Patio Especializado">Patio Especializado</option>
           <option value="Bodega">Bodega</option>
         </optgroup>
+        <optgroup label="🚿 Lavado">
+          <option value="Lavado Exterior">Lavado Exterior</option>
+          <option value="Lavado Interior">Lavado Interior</option>
+          <option value="Lavado Completo">Lavado Completo</option>
+          <option value="Lavado de Motor">Lavado de Motor</option>
+          <option value="Desinfección">Desinfección</option>
+          <option value="Lavado Contenedor">Lavado Contenedor</option>
+        </optgroup>
       </select>
     </div>
 
@@ -670,6 +725,33 @@
         <div class="form-group">
           <label>Fecha de salida estimada</label>
           <input type="date" id="np-fecha-fin-patio">
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ CAMPOS LAVADO ═══════════════════════════════════ -->
+    <div id="np-group-lavado" style="display:none">
+      <div class="np-section-title">🚿 Detalles del servicio de lavado</div>
+      <div class="admin-grid" style="gap:12px">
+        <div class="form-group">
+          <label>Tipo de vehículo a lavar *</label>
+          <input type="text" id="np-vehiculo-lavar" placeholder="Ej. Tractocamión, Remolque, Contenedor">
+        </div>
+        <div class="form-group">
+          <label>Número de vehículos</label>
+          <input type="number" id="np-num-vehiculos-lav" min="1" placeholder="Ej. 3">
+        </div>
+        <div class="form-group">
+          <label>Ubicación del vehículo *</label>
+          <input type="text" id="np-ubic-lav" placeholder="Ej. Zona industrial Manzanillo">
+        </div>
+        <div class="form-group">
+          <label>Fecha requerida *</label>
+          <input type="date" id="np-fecha-ini-lav">
+        </div>
+        <div class="form-group" style="grid-column:span 2">
+          <label>Horario preferido</label>
+          <input type="text" id="np-horario-lav" placeholder="Ej. Mañana antes de las 10:00">
         </div>
       </div>
     </div>
@@ -806,6 +888,54 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeEditarCamion()">Cancelar</button>
       <button class="btn-confirm" onclick="guardarEdicion()">💾 Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL EDITAR LAVADO ═══════════════════════════ -->
+<div class="modal-overlay" id="modal-editar-lavado">
+  <div class="modal" style="max-width:480px">
+    <h2>✏ Editar servicio de lavado</h2>
+    <input type="hidden" id="elav-id">
+    <div class="form-group">
+      <label>Nombre</label>
+      <input type="text" id="elav-nombre">
+    </div>
+    <div class="form-group">
+      <label>Tipos de vehículo <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
+      <input type="text" id="elav-tipos-vehiculo">
+    </div>
+    <div class="form-group">
+      <label>Tipos de lavado <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
+      <input type="text" id="elav-tipos-lavado">
+    </div>
+    <div class="form-group">
+      <label>Capacidad simultánea</label>
+      <input type="number" id="elav-capacidad" min="1">
+    </div>
+    <div class="form-group">
+      <label>Ubicación</label>
+      <input type="text" id="elav-ubic">
+    </div>
+    <div class="form-group">
+      <label>Horario</label>
+      <input type="text" id="elav-horario">
+    </div>
+    <div class="form-group">
+      <label>Precio base (MXN)</label>
+      <input type="number" id="elav-precio" min="0">
+    </div>
+    <div class="form-group">
+      <label>Estado</label>
+      <select id="elav-estado">
+        <option value="disponible">Disponible</option>
+        <option value="ocupado">Ocupado</option>
+        <option value="no_disponible">No disponible</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeEditarLavado()">Cancelar</button>
+      <button class="btn-confirm" onclick="guardarEdicionLavado()">💾 Guardar</button>
     </div>
   </div>
 </div>

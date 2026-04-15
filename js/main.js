@@ -61,6 +61,10 @@ function init() {
       if (clienteActivo()) renderCatalogo();
       if (adminActivo())   renderAdminPatios();
     })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'lavados' }, () => {
+      if (clienteActivo()) renderCatalogo();
+      if (adminActivo())   renderAdminLavados();
+    })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'reservaciones' }, () => {
       if (document.getElementById('view-reservaciones').classList.contains('active')) renderReserv();
     })

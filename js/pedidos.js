@@ -4,7 +4,11 @@ let pedidoDetalle      = null;   // pedido abierto en modal
 let ofertaDetalleId    = null;   // oferta en modal responder-contra
 let pedidoParaOfertar  = null;   // pedido sobre el que el admin ofertará
 
-const TIPO_EMOJI = { Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️', Cualquiera:'🚛' };
+const TIPO_EMOJI = {
+  Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️', Cualquiera:'🚛',
+  'Lavado Exterior':'🚿', 'Lavado Interior':'🚿', 'Lavado Completo':'🚿',
+  'Lavado de Motor':'🚿', 'Desinfección':'🧴', 'Lavado Contenedor':'🚿',
+};
 
 // Tiempo restante antes de que expire una oferta
 function fmtTiempoRestante(isoStr) {
@@ -189,11 +193,13 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
     : '';
 
   // Chips de detalles extra según tipo
-  const esCamion   = !p.tipo_camion?.startsWith('Custodio') && !p.tipo_camion?.startsWith('Patio') && p.tipo_camion !== 'Supervisión remota' && p.tipo_camion !== 'Bodega';
-  const esCustodio = p.tipo_camion?.startsWith('Custodio') || p.tipo_camion === 'Supervisión remota';
+  const esLavadoCard   = p.tipo_camion?.startsWith('Lavado') || p.tipo_camion === 'Desinfección';
+  const esCustodioCard = p.tipo_camion?.startsWith('Custodio') || p.tipo_camion === 'Supervisión remota';
+  const esPatioCard    = p.tipo_camion?.startsWith('Patio') || p.tipo_camion === 'Bodega';
+  const esCamionCard   = !esLavadoCard && !esCustodioCard && !esPatioCard;
 
   const chips = [];
-  if (esCamion) {
+  if (esCamionCard) {
     if (p.tipo_carga)    chips.push(`📦 ${esc(p.tipo_carga)}`);
     if (p.peso_carga)    chips.push(`⚖️ ${p.peso_carga} ton`);
     if (p.capacidad_min) chips.push(`🚛 Mín ${p.capacidad_min} ton`);
@@ -201,9 +207,14 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
     if (p.temp_controlada)  chips.push('❄️ Temp. controlada');
     if (p.requiere_seguro)  chips.push('🛡️ Seguro');
     if (p.requiere_factura) chips.push('🧾 Factura');
-  } else if (esCustodio) {
+  } else if (esCustodioCard) {
     if (p.num_custodios)    chips.push(`👮 x${p.num_custodios}`);
     if (p.zona_cobertura)   chips.push(`📍 ${esc(p.zona_cobertura)}`);
+    if (p.horario_servicio) chips.push(`🕐 ${esc(p.horario_servicio)}`);
+  } else if (esLavadoCard) {
+    if (p.tipo_vehiculos)   chips.push(`🚛 ${esc(p.tipo_vehiculos)}`);
+    if (p.num_vehiculos)    chips.push(`x${p.num_vehiculos} vehículos`);
+    if (p.origen)           chips.push(`📍 ${esc(p.origen)}`);
     if (p.horario_servicio) chips.push(`🕐 ${esc(p.horario_servicio)}`);
   } else {
     if (p.num_vehiculos)  chips.push(`🚗 ${p.num_vehiculos} vehículos`);
@@ -244,14 +255,16 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
 
 function actualizarSubtipoPedido() {
   const val = document.getElementById('np-tipo')?.value || '';
-  const esCamion   = !val.startsWith('Custodio') && !val.startsWith('Patio') && val !== 'Supervisión remota' && val !== 'Bodega';
+  const esLavado   = val.startsWith('Lavado') || val === 'Desinfección';
   const esCustodio = val.startsWith('Custodio') || val === 'Supervisión remota';
   const esPatio    = val.startsWith('Patio') || val === 'Bodega';
+  const esCamion   = !esLavado && !esCustodio && !esPatio;
 
   const g = id => document.getElementById(id);
   if (g('np-group-camion'))   g('np-group-camion').style.display   = esCamion   ? '' : 'none';
   if (g('np-group-custodio')) g('np-group-custodio').style.display = esCustodio ? '' : 'none';
   if (g('np-group-patio'))    g('np-group-patio').style.display    = esPatio    ? '' : 'none';
+  if (g('np-group-lavado'))   g('np-group-lavado').style.display   = esLavado   ? '' : 'none';
 }
 
 function openNuevoPedido() {
@@ -269,9 +282,10 @@ async function crearPedido() {
   const vi   = id => parseInt(document.getElementById(id)?.value) || null;
 
   const tipo = document.getElementById('np-tipo').value;
-  const esCamion   = !tipo.startsWith('Custodio') && !tipo.startsWith('Patio') && tipo !== 'Supervisión remota' && tipo !== 'Bodega';
+  const esLavado   = tipo.startsWith('Lavado') || tipo === 'Desinfección';
   const esCustodio = tipo.startsWith('Custodio') || tipo === 'Supervisión remota';
   const esPatio    = tipo.startsWith('Patio') || tipo === 'Bodega';
+  const esCamion   = !esLavado && !esCustodio && !esPatio;
 
   // Validaciones por tipo
   if (esCamion) {
@@ -286,11 +300,21 @@ async function crearPedido() {
     if (!v('np-fecha-ini-patio')) {
       alert('Por favor completa la fecha de entrada.'); return;
     }
+  } else if (esLavado) {
+    if (!v('np-vehiculo-lavar') || !v('np-ubic-lav') || !v('np-fecha-ini-lav')) {
+      alert('Por favor completa: tipo de vehículo, ubicación y fecha requerida.'); return;
+    }
   }
 
   // Fechas por tipo
-  const fechaIni = esCamion ? v('np-fecha-ini') : esCustodio ? v('np-fecha-ini-cust') : v('np-fecha-ini-patio');
-  const fechaFin = esCamion ? v('np-fecha-fin') : esCustodio ? v('np-fecha-fin-cust') : v('np-fecha-fin-patio');
+  const fechaIni = esCamion ? v('np-fecha-ini')
+    : esCustodio ? v('np-fecha-ini-cust')
+    : esPatio    ? v('np-fecha-ini-patio')
+    :              v('np-fecha-ini-lav');
+  const fechaFin = esCamion ? v('np-fecha-fin')
+    : esCustodio ? v('np-fecha-fin-cust')
+    : esPatio    ? v('np-fecha-fin-patio')
+    :              null;
 
   const payload = {
     cliente_id:     currentUser.id,
@@ -302,7 +326,7 @@ async function crearPedido() {
     fecha_ini:      fechaIni       || null,
     fecha_fin:      fechaFin       || null,
     // Camión
-    origen:           esCamion ? v('np-origen')  : esPatio ? v('np-origen') : null,
+    origen:           esCamion ? v('np-origen')  : esPatio ? v('np-origen') : esLavado ? v('np-ubic-lav') : null,
     destino:          esCamion ? v('np-destino') : null,
     capacidad_min:    esCamion ? vi('np-cap')    : null,
     tipo_carga:       esCamion ? v('np-carga')   : null,
@@ -316,12 +340,12 @@ async function crearPedido() {
     requiere_seguro:  esCamion ? vb('np-seguro')         : false,
     requiere_factura: esCamion ? vb('np-factura')        : false,
     // Custodio
-    num_custodios:   esCustodio ? vi('np-num-custodios') : null,
-    zona_cobertura:  esCustodio ? v('np-zona')           : null,
-    horario_servicio:esCustodio ? v('np-horario')        : null,
+    num_custodios:    esCustodio ? vi('np-num-custodios') : null,
+    zona_cobertura:   esCustodio ? v('np-zona')           : null,
+    horario_servicio: esCustodio ? v('np-horario') : esLavado ? v('np-horario-lav') : null,
     // Patio
-    num_vehiculos:   esPatio ? vi('np-num-vehiculos')  : null,
-    tipo_vehiculos:  esPatio ? v('np-tipo-vehiculos')  : null,
+    num_vehiculos:   esPatio ? vi('np-num-vehiculos')  : esLavado ? vi('np-num-vehiculos-lav') : null,
+    tipo_vehiculos:  esPatio ? v('np-tipo-vehiculos')  : esLavado ? v('np-vehiculo-lavar')     : null,
     area_necesaria:  esPatio ? vn('np-area')           : null,
   };
 

@@ -68,19 +68,21 @@ async function renderAdmin() {
   // Render the currently active admin tab
   if (currentAdminTab === 'custodio') renderAdminCustodios();
   else if (currentAdminTab === 'patio') renderAdminPatios();
+  else if (currentAdminTab === 'lavado') renderAdminLavados();
 }
 
 // ── TABS ADMIN ────────────────────────────────────────
 
 function cambiarAdminTab(tab) {
   currentAdminTab = tab;
-  ['camion','custodio','patio'].forEach(t => {
+  ['camion','custodio','patio','lavado'].forEach(t => {
     document.getElementById(`admin-tab-${t}`)?.classList.toggle('active', t === tab);
     const el = document.getElementById(`admin-content-${t}`);
     if (el) el.style.display = t === tab ? '' : 'none';
   });
   if (tab === 'custodio') renderAdminCustodios();
   else if (tab === 'patio') renderAdminPatios();
+  else if (tab === 'lavado') renderAdminLavados();
   else renderAdmin();
 }
 
@@ -628,6 +630,121 @@ async function eliminarPatio(id) {
   await sb.from('patios').delete().eq('id', id);
   await renderAdminPatios();
   showToast(`Patio ${id} eliminado`);
+}
+
+// ── LAVADOS (ADMIN) ────────────────────────────────────
+
+async function renderAdminLavados() {
+  const list = document.getElementById('admin-lavados-list');
+  if (!list) return;
+  list.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
+
+  let query = sb.from('lavados').select('*').order('id');
+  if (currentUser.rol !== 'superadmin') query = query.eq('propietario_id', currentUser.id);
+  const { data, error } = await query;
+  if (error || !data?.length) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">🚿</div>Sin servicios de lavado registrados.</div>`;
+    return;
+  }
+  list.innerHTML = data.map(l => {
+    const badgeCls = l.estado === 'disponible' ? 'badge-avail' : l.estado === 'ocupado' ? 'badge-busy' : 'badge-maint';
+    const vehiculos = (l.tipos_vehiculo || []).join(', ') || '—';
+    return `
+      <div class="truck-list-item">
+        <div class="truck-list-item-info">
+          <div class="truck-list-item-name">🚿 ${l.id} — ${esc(l.nombre)}</div>
+          <div class="truck-list-item-sub">
+            ${esc(vehiculos)} ·
+            <span class="badge ${badgeCls}" style="font-size:0.68rem">${l.estado}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-edit" onclick="editarLavado('${l.id}')">✏ Editar</button>
+          <button class="btn-edit btn-rechazar" onclick="eliminarLavado('${l.id}')">🗑</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function agregarLavado() {
+  const nombre      = document.getElementById('al-nombre').value.trim();
+  const tiposVehRaw = document.getElementById('al-tipos-vehiculo').value.trim();
+  const tiposLavRaw = document.getElementById('al-tipos-lavado').value.trim();
+  const capacidad   = parseInt(document.getElementById('al-capacidad').value) || null;
+  const ubic        = document.getElementById('al-ubic').value.trim();
+  const horario     = document.getElementById('al-horario').value.trim();
+  const precio      = parseFloat(document.getElementById('al-precio').value) || null;
+  const desc        = document.getElementById('al-desc').value.trim();
+
+  if (!nombre) { alert('Escribe un nombre para el servicio.'); return; }
+
+  const { data: existentes } = await sb.from('lavados').select('id').like('id','LAV-%');
+  const maxNum = (existentes || []).reduce((max, l) => {
+    const n = parseInt(l.id.split('-')[1]) || 0; return Math.max(max, n);
+  }, 0);
+  const id = `LAV-${String(maxNum + 1).padStart(3,'0')}`;
+
+  const { error } = await sb.from('lavados').insert({
+    id, nombre,
+    tipos_vehiculo: tiposVehRaw ? tiposVehRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+    tipos_lavado:   tiposLavRaw ? tiposLavRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+    capacidad, ubicacion: ubic || null, horario: horario || null,
+    precio_lavado: precio, descripcion: desc || null,
+    propietario_id: currentUser.id,
+    aprobacion: 'aprobada',
+  });
+  if (error) { showToast('Error: ' + (error.message || '')); return; }
+
+  ['al-nombre','al-tipos-vehiculo','al-tipos-lavado','al-capacidad','al-ubic','al-horario','al-precio','al-desc']
+    .forEach(i => { const el = document.getElementById(i); if (el) el.value = ''; });
+  await renderAdminLavados();
+  showToast(`✓ Servicio ${id} agregado`);
+}
+
+async function editarLavado(id) {
+  const { data: l } = await sb.from('lavados').select('*').eq('id', id).single();
+  if (!l) return;
+  document.getElementById('elav-id').value             = l.id;
+  document.getElementById('elav-nombre').value         = l.nombre;
+  document.getElementById('elav-tipos-vehiculo').value = (l.tipos_vehiculo || []).join(', ');
+  document.getElementById('elav-tipos-lavado').value   = (l.tipos_lavado   || []).join(', ');
+  document.getElementById('elav-capacidad').value      = l.capacidad || '';
+  document.getElementById('elav-ubic').value           = l.ubicacion || '';
+  document.getElementById('elav-horario').value        = l.horario   || '';
+  document.getElementById('elav-precio').value         = l.precio_lavado || '';
+  document.getElementById('elav-estado').value         = l.estado;
+  document.getElementById('modal-editar-lavado').classList.add('open');
+}
+
+function closeEditarLavado() {
+  document.getElementById('modal-editar-lavado').classList.remove('open');
+}
+
+async function guardarEdicionLavado() {
+  const id = document.getElementById('elav-id').value;
+  const tiposVehRaw = document.getElementById('elav-tipos-vehiculo').value.trim();
+  const tiposLavRaw = document.getElementById('elav-tipos-lavado').value.trim();
+  const { error } = await sb.from('lavados').update({
+    nombre:         document.getElementById('elav-nombre').value.trim(),
+    tipos_vehiculo: tiposVehRaw ? tiposVehRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+    tipos_lavado:   tiposLavRaw ? tiposLavRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+    capacidad:      parseInt(document.getElementById('elav-capacidad').value)    || null,
+    ubicacion:      document.getElementById('elav-ubic').value.trim()            || null,
+    horario:        document.getElementById('elav-horario').value.trim()         || null,
+    precio_lavado:  parseFloat(document.getElementById('elav-precio').value)     || null,
+    estado:         document.getElementById('elav-estado').value,
+  }).eq('id', id);
+  if (error) { showToast('Error: ' + (error.message || '')); return; }
+  closeEditarLavado();
+  await renderAdminLavados();
+  showToast(`✓ Servicio ${id} actualizado`);
+}
+
+async function eliminarLavado(id) {
+  if (!confirm(`¿Eliminar servicio de lavado ${id}?`)) return;
+  await sb.from('lavados').delete().eq('id', id);
+  await renderAdminLavados();
+  showToast(`Servicio ${id} eliminado`);
 }
 
 function updateFileLabel(inputId, labelId) {
