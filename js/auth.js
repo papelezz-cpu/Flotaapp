@@ -15,10 +15,14 @@ function applyUserUI() {
   if (btnTheme) btnTheme.textContent = isLight ? '☀️' : '🌙';
 }
 
-// Restaura la sesión guardada (si existe) sin forzar login
+// Restaura la sesión guardada (si existe); si no, muestra el login como pantalla completa
 async function checkExistingSession() {
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) return; // usuario no autenticado — modo público
+  if (!session) {
+    // Sin sesión → login obligatorio, no hay vista pública
+    showLoginOverlay();
+    return;
+  }
 
   const { data: perfil } = await sb.from('perfiles')
     .select('nombre, rol')
@@ -46,7 +50,22 @@ function showLoginOverlay() {
 }
 
 function hideLoginOverlay() {
+  // Solo se puede cerrar si ya hay sesión activa
+  if (!currentUser.id) return;
   document.getElementById('login-overlay').classList.remove('show');
+}
+
+// ── TABS DEL LOGIN ─────────────────────────────────────
+function switchLoginTab(tab) {
+  const esLogin = tab === 'login';
+  document.getElementById('tab-login').classList.toggle('active', esLogin);
+  document.getElementById('tab-registro').classList.toggle('active', !esLogin);
+  document.getElementById('login-panel').classList.toggle('hide', !esLogin);
+  document.getElementById('registro-panel').classList.toggle('show', !esLogin);
+  // Limpiar errores al cambiar
+  document.getElementById('login-error').classList.remove('show');
+  document.getElementById('registro-error').classList.remove('show');
+  document.getElementById('registro-success').classList.remove('show');
 }
 
 async function doLogin() {
@@ -83,6 +102,66 @@ async function doLogin() {
   init();
 }
 
+// ── REGISTRO DE NUEVOS CLIENTES ────────────────────────
+async function doRegistro() {
+  const nombre = document.getElementById('reg-nombre').value.trim();
+  const email  = document.getElementById('reg-email').value.trim();
+  const pass   = document.getElementById('reg-pass').value;
+  const errEl  = document.getElementById('registro-error');
+  const okEl   = document.getElementById('registro-success');
+
+  errEl.classList.remove('show');
+  okEl.classList.remove('show');
+
+  if (!nombre || !email || !pass) {
+    errEl.textContent = 'Completa todos los campos.';
+    errEl.classList.add('show'); return;
+  }
+  if (pass.length < 6) {
+    errEl.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+    errEl.classList.add('show'); return;
+  }
+
+  const { data, error } = await sb.auth.signUp({ email, password: pass });
+  if (error || !data.user) {
+    errEl.textContent = error?.message || 'Error al crear la cuenta.';
+    errEl.classList.add('show'); return;
+  }
+
+  // Crear perfil con rol cliente
+  await sb.from('perfiles').upsert({
+    user_id: data.user.id,
+    nombre,
+    rol: 'cliente',
+  });
+
+  // Si Supabase no requiere confirmación de email, iniciar sesión directo
+  if (data.session) {
+    currentUser = {
+      id:     data.user.id,
+      email:  data.user.email,
+      nombre,
+      rol:    'cliente',
+    };
+    hideLoginOverlay();
+    applyUserUI();
+    loadNotificaciones();
+    sb.channel('notif-' + currentUser.id)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'notificaciones',
+        filter: `user_id=eq.${currentUser.id}`
+      }, () => loadNotificaciones())
+      .subscribe();
+    init();
+  } else {
+    // Supabase envió email de confirmación
+    okEl.classList.add('show');
+    document.getElementById('reg-nombre').value = '';
+    document.getElementById('reg-email').value  = '';
+    document.getElementById('reg-pass').value   = '';
+  }
+}
+
 // #3 — Olvidé mi contraseña
 async function forgotPassword() {
   const email = document.getElementById('login-user').value.trim();
@@ -106,11 +185,9 @@ async function logout() {
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
   document.getElementById('login-error').textContent = 'Correo o contraseña incorrectos';
+  document.getElementById('login-error').classList.remove('show');
 
-  // Volver a vista pública (Solicitudes)
-  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
-  document.getElementById('view-pedidos').classList.add('active');
-  document.querySelector('.nav-tab').classList.add('active');
-  renderPedidos();
+  // Volver al tab de login y mostrar overlay
+  switchLoginTab('login');
+  showLoginOverlay();
 }

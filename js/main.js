@@ -15,8 +15,8 @@ function init() {
   actualizarBadgeChat();
 }
 
-// ── ARRANQUE PÚBLICO ──────────────────────────────────
-// Carga camiones sin requerir login, luego restaura sesión si existe
+// ── ARRANQUE ──────────────────────────────────────────
+// Primero verifica sesión; si no hay, muestra login y no carga nada
 (async () => {
   const hoy    = today();
   const manana = new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -32,17 +32,16 @@ function init() {
     }
   });
 
-  // Cargar solicitudes públicamente como vista principal
-  renderPedidos();
-
-  // Restaurar sesión guardada si el usuario ya había iniciado sesión
+  // Restaurar sesión — si no hay sesión, checkExistingSession() muestra el login
   await checkExistingSession();
 
-  // Cargar notificaciones y badge de chat si hay sesión
-  if (currentUser.id) {
-    loadNotificaciones();
-    actualizarBadgeChat();
-  }
+  // Solo continuar si hay sesión activa
+  if (!currentUser.id) return;
+
+  // Cargar vista principal y notificaciones
+  renderPedidos();
+  loadNotificaciones();
+  actualizarBadgeChat();
 
   // #5 — Realtime: actualizar vistas cuando cambia la BD
   const clienteActivo = () => document.getElementById('view-cliente').classList.contains('active');

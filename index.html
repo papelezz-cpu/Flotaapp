@@ -83,7 +83,7 @@
           <div id="notif-list"></div>
         </div>
       </div>
-      <button class="btn-entrar" onclick="showLoginOverlay()">Entrar</button>
+      <!-- btn-entrar eliminado: login es obligatorio al entrar -->
       <div class="user-chip">
         <span>👤</span>
         <strong id="user-label">—</strong>
@@ -1068,26 +1068,58 @@
 <div class="toast" id="toast"></div>
 
 <!-- ══ LOGIN ════════════════════════════════════════════ -->
-<div id="login-overlay" onclick="if(event.target===this)hideLoginOverlay()">
+<div id="login-overlay">
   <div class="login-box">
     <div class="login-logo">
       <div class="logo-icon">🚛</div>
       FlotaPro
     </div>
-    <p class="login-sub">Inicia sesión para continuar</p>
-    <div class="login-error" id="login-error">Correo o contraseña incorrectos</div>
-    <div class="form-group">
-      <label>Correo electrónico</label>
-      <input type="email" id="login-user" placeholder="correo@empresa.com"
-             autocomplete="username" onkeydown="if(event.key==='Enter') doLogin()">
+
+    <!-- Tabs -->
+    <div class="login-tabs">
+      <button class="login-tab active" id="tab-login"    onclick="switchLoginTab('login')">Iniciar sesión</button>
+      <button class="login-tab"        id="tab-registro" onclick="switchLoginTab('registro')">Crear cuenta</button>
     </div>
-    <div class="form-group">
-      <label>Contraseña</label>
-      <input type="password" id="login-pass" placeholder="••••••••"
-             autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
+
+    <!-- Panel login -->
+    <div id="login-panel">
+      <div class="login-error" id="login-error">Correo o contraseña incorrectos</div>
+      <div class="form-group">
+        <label>Correo electrónico</label>
+        <input type="email" id="login-user" placeholder="correo@empresa.com"
+               autocomplete="username" onkeydown="if(event.key==='Enter') doLogin()">
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" id="login-pass" placeholder="••••••••"
+               autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
+      </div>
+      <button class="btn-login" onclick="doLogin()">Entrar</button>
+      <button class="btn-forgot" onclick="forgotPassword()">¿Olvidaste tu contraseña?</button>
     </div>
-    <button class="btn-login" onclick="doLogin()">Entrar</button>
-    <button class="btn-forgot" onclick="forgotPassword()">¿Olvidaste tu contraseña?</button>
+
+    <!-- Panel registro -->
+    <div id="registro-panel">
+      <div class="login-error"   id="registro-error"></div>
+      <div class="login-success" id="registro-success">¡Cuenta creada! Revisa tu correo para confirmar.</div>
+      <div class="form-group">
+        <label>Nombre completo</label>
+        <input type="text" id="reg-nombre" placeholder="Ej. María López"
+               onkeydown="if(event.key==='Enter') doRegistro()">
+      </div>
+      <div class="form-group">
+        <label>Correo electrónico</label>
+        <input type="email" id="reg-email" placeholder="correo@empresa.com"
+               onkeydown="if(event.key==='Enter') doRegistro()">
+      </div>
+      <div class="form-group">
+        <label>Contraseña <span style="font-weight:400;color:var(--text-muted)">(mínimo 6 caracteres)</span></label>
+        <input type="password" id="reg-pass" placeholder="••••••••"
+               onkeydown="if(event.key==='Enter') doRegistro()">
+      </div>
+      <button class="btn-login" onclick="doRegistro()">Crear cuenta</button>
+    </div>
+
   </div>
 </div>
 
