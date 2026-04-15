@@ -85,12 +85,7 @@ function _empresaCardHTML(e) {
     e.lavados.length   ? 'lavado'   : null,
   ].filter(Boolean);
 
-  const totalDisp = [...e.camiones, ...e.custodios, ...e.patios, ...e.lavados]
-    .filter(r => r.estado === 'disponible').length;
-
-  const statusTxt = totalDisp > 0
-    ? `<span class="emp-status emp-status-ok">● ${totalDisp} disponible${totalDisp !== 1 ? 's' : ''}</span>`
-    : `<span class="emp-status emp-status-busy">◐ Sin disponibilidad hoy</span>`;
+  // statusTxt eliminado — la disponibilidad se muestra en cada bloque de servicio
 
   const SERV_ICONS = { camion:'🚛', custodio:'👮', patio:'🏭', lavado:'🚿' };
   const iconBadges = servicios.map(s =>
@@ -109,7 +104,6 @@ function _empresaCardHTML(e) {
         <div class="empresa-avatar" style="--av-color:${color}">${inicial}</div>
         <div class="empresa-header-info">
           <div class="empresa-nombre">${esc(e.nombre)}</div>
-          ${statusTxt}
           <div class="empresa-serv-icons">${iconBadges}</div>
         </div>
       </div>

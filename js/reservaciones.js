@@ -33,27 +33,39 @@ async function renderReserv() {
     const recursoNombreMap = {};
     const ownerIdMap = {};  // recurso id → propietario_id (para chat)
 
-    if (camionIds.length) {
-      const { data: cams } = await sb.from('camiones').select('id, propietario_id, propietario:perfiles(nombre)').in('id', camionIds);
-      (cams || []).forEach(c => {
-        empresaMap[c.id] = c.propietario?.nombre || '—';
-        ownerIdMap[c.id] = c.propietario_id;
-      });
-    }
-    if (custodioIds.length) {
-      const { data: custs } = await sb.from('custodios').select('id, nombre, propietario_id, perfiles:perfiles(nombre)').in('id', custodioIds);
-      (custs || []).forEach(c => {
-        empresaMap[c.id] = c.perfiles?.nombre || '—';
-        recursoNombreMap[c.id] = `👮 ${c.nombre}`;
-        ownerIdMap[c.id] = c.propietario_id;
-      });
-    }
-    if (patioIds.length) {
-      const { data: pats } = await sb.from('patios').select('id, nombre, propietario_id, perfiles:perfiles(nombre)').in('id', patioIds);
-      (pats || []).forEach(p => {
-        empresaMap[p.id] = p.perfiles?.nombre || '—';
-        recursoNombreMap[p.id] = `🏭 ${p.nombre}`;
-        ownerIdMap[p.id] = p.propietario_id;
+    // Recopilar propietario_ids de cada tipo, luego query perfiles por separado
+    const propIdMap = {};  // recurso_id → propietario_id
+
+    const fetches = [];
+    if (camionIds.length) fetches.push(
+      sb.from('camiones').select('id, propietario_id').in('id', camionIds)
+        .then(({ data: d }) => (d || []).forEach(c => { propIdMap[c.id] = c.propietario_id; }))
+    );
+    if (custodioIds.length) fetches.push(
+      sb.from('custodios').select('id, nombre, propietario_id').in('id', custodioIds)
+        .then(({ data: d }) => (d || []).forEach(c => {
+          propIdMap[c.id] = c.propietario_id;
+          recursoNombreMap[c.id] = `👮 ${c.nombre}`;
+        }))
+    );
+    if (patioIds.length) fetches.push(
+      sb.from('patios').select('id, nombre, propietario_id').in('id', patioIds)
+        .then(({ data: d }) => (d || []).forEach(p => {
+          propIdMap[p.id] = p.propietario_id;
+          recursoNombreMap[p.id] = `🏭 ${p.nombre}`;
+        }))
+    );
+    await Promise.all(fetches);
+
+    // Query directa a perfiles por user_id (evita problemas de RLS con joins)
+    const uniquePropIds = [...new Set(Object.values(propIdMap).filter(Boolean))];
+    if (uniquePropIds.length) {
+      const { data: perfs } = await sb.from('perfiles').select('user_id, nombre').in('user_id', uniquePropIds);
+      const perfMap = {};
+      (perfs || []).forEach(p => { perfMap[p.user_id] = p.nombre; });
+      Object.entries(propIdMap).forEach(([recursoId, propId]) => {
+        empresaMap[recursoId] = perfMap[propId] || '—';
+        ownerIdMap[recursoId] = propId;
       });
     }
 
@@ -124,32 +136,44 @@ async function renderReserv() {
   const empresaMap      = {};
   const ownerMap        = {};
   const recursoLabelMap = {};
+  const propIdMap2      = {};  // recurso_id → propietario_id
 
   const fetches = [];
   if (camionIds.length) fetches.push(
-    sb.from('camiones').select('id, propietario_id, propietario:perfiles(nombre)').in('id', camionIds)
+    sb.from('camiones').select('id, propietario_id').in('id', camionIds)
       .then(({ data: d }) => (d || []).forEach(c => {
-        empresaMap[c.id] = c.propietario?.nombre || '—';
+        propIdMap2[c.id] = c.propietario_id;
         ownerMap[c.id]   = c.propietario_id;
       }))
   );
   if (custodioIds.length) fetches.push(
-    sb.from('custodios').select('id, nombre, propietario_id, perfiles:perfiles(nombre)').in('id', custodioIds)
+    sb.from('custodios').select('id, nombre, propietario_id').in('id', custodioIds)
       .then(({ data: d }) => (d || []).forEach(c => {
-        empresaMap[c.id]      = c.perfiles?.nombre || '—';
+        propIdMap2[c.id]      = c.propietario_id;
         ownerMap[c.id]        = c.propietario_id;
         recursoLabelMap[c.id] = `👮 ${c.nombre}`;
       }))
   );
   if (patioIds.length) fetches.push(
-    sb.from('patios').select('id, nombre, propietario_id, perfiles:perfiles(nombre)').in('id', patioIds)
+    sb.from('patios').select('id, nombre, propietario_id').in('id', patioIds)
       .then(({ data: d }) => (d || []).forEach(p => {
-        empresaMap[p.id]      = p.perfiles?.nombre || '—';
+        propIdMap2[p.id]      = p.propietario_id;
         ownerMap[p.id]        = p.propietario_id;
         recursoLabelMap[p.id] = `🏭 ${p.nombre}`;
       }))
   );
   await Promise.all(fetches);
+
+  // Query directa a perfiles
+  const uniquePropIds2 = [...new Set(Object.values(propIdMap2).filter(Boolean))];
+  if (uniquePropIds2.length) {
+    const { data: perfs } = await sb.from('perfiles').select('user_id, nombre').in('user_id', uniquePropIds2);
+    const perfMap2 = {};
+    (perfs || []).forEach(p => { perfMap2[p.user_id] = p.nombre; });
+    Object.entries(propIdMap2).forEach(([recursoId, propId]) => {
+      empresaMap[recursoId] = perfMap2[propId] || '—';
+    });
+  }
 
   body.innerHTML = data.map(r => {
     const esCancelada = r.estado === 'Cancelada';
@@ -180,6 +204,10 @@ async function renderReserv() {
     const chatBtn = (esDueno && r.cliente_user_id && !inactiva)
       ? `<button class="btn-chat-hilo" onclick="openChatReserva('${r.id}','${r.cliente_user_id}','${esc(r.cliente||'')}')">💬</button>`
       : '';
+    // Eliminar (mover a histórico) — solo superadmin
+    const elimBtn = currentUser.rol === 'superadmin'
+      ? `<button class="btn-edit btn-rechazar" style="font-size:0.72rem" onclick="eliminarReserva('${r.id}')">🗑</button>`
+      : '';
     return `
     <div class="reserv-row ${inactiva ? 'reserv-cancelada' : ''}">
       <div class="reserv-id">${unidadLabel}</div>
@@ -191,6 +219,7 @@ async function renderReserv() {
         <span class="badge ${badgeCls}">${esc(r.estado)}</span>
         ${acciones}
         ${chatBtn}
+        ${elimBtn}
       </div>
     </div>`;
   }).join('');
@@ -263,6 +292,41 @@ async function cancelarReserva(reservaId, unidad) {
   }
   await renderReserv();
   showToast('Reserva cancelada — recurso disponible de nuevo');
+}
+
+// ── ELIMINAR RESERVA (superadmin) → mover a histórico ──
+async function eliminarReserva(reservaId) {
+  if (!confirm('¿Archivar esta reservación? Se moverá al historial y desaparecerá de la lista activa.')) return;
+
+  // 1. Obtener la reservación completa
+  const { data: r, error: fetchErr } = await sb.from('reservaciones').select('*').eq('id', reservaId).single();
+  if (fetchErr || !r) { showToast('Error al obtener la reservación'); return; }
+
+  // 2. Insertar en histórico
+  const { error: insertErr } = await sb.from('reservaciones_historico').insert({
+    id:              r.id,
+    unidad:          r.unidad,
+    recurso_tipo:    r.recurso_tipo,
+    cliente:         r.cliente,
+    cliente_email:   r.cliente_email,
+    cliente_user_id: r.cliente_user_id,
+    empresa:         r.empresa || null,
+    fecha_ini:       r.fecha_ini,
+    fecha_fin:       r.fecha_fin,
+    descripcion:     r.descripcion,
+    estado:          r.estado,
+    tracking_estado: r.tracking_estado,
+    created_at:      r.created_at,
+    archivado_por:   currentUser.id,
+  });
+  if (insertErr) { showToast('Error al archivar: ' + (insertErr.message || '')); return; }
+
+  // 3. Eliminar de la tabla activa
+  const { error: delErr } = await sb.from('reservaciones').delete().eq('id', reservaId);
+  if (delErr) { showToast('Error al eliminar: ' + (delErr.message || '')); return; }
+
+  await renderReserv();
+  showToast('✓ Reservación archivada en el historial');
 }
 
 // Helper: envía email via edge function (fire-and-forget)
