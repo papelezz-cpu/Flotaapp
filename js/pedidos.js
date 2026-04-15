@@ -28,10 +28,10 @@ async function renderPedidos() {
   const container = document.getElementById('pedidos-list');
   container.innerHTML = skeletonList(3);
 
-  // Botón crear pedido: solo para clientes logueados
-  const btnNuevo = document.getElementById('btn-nuevo-pedido');
-  if (btnNuevo) {
-    btnNuevo.style.display = (currentUser.id && currentUser.rol === 'cliente') ? 'inline-flex' : 'none';
+  // Botones de servicio: solo para clientes logueados
+  const btnServ = document.getElementById('ped-serv-btns');
+  if (btnServ) {
+    btnServ.style.display = (currentUser.id && currentUser.rol === 'cliente') ? 'grid' : 'none';
   }
 
   // Fetch pedidos + ofertas en paralelo
@@ -267,8 +267,22 @@ function actualizarSubtipoPedido() {
   if (g('np-group-lavado'))   g('np-group-lavado').style.display   = esLavado   ? '' : 'none';
 }
 
-function openNuevoPedido() {
+function openNuevoPedido(servicio) {
   if (!currentUser.id) { showLoginOverlay(); return; }
+
+  // Pre-seleccionar el tipo según el botón pulsado
+  const select = document.getElementById('np-tipo');
+  if (select && servicio) {
+    const mapPrimero = {
+      camion:   'Cualquiera',
+      custodio: 'Custodio Armado',
+      patio:    'Patio Techado',
+      lavado:   'Lavado Exterior',
+    };
+    if (mapPrimero[servicio]) select.value = mapPrimero[servicio];
+    actualizarSubtipoPedido();
+  }
+
   document.getElementById('modal-nuevo-pedido').classList.add('open');
 }
 function closeNuevoPedido() {

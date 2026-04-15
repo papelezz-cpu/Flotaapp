@@ -136,12 +136,28 @@
 <!-- ══ VISTA: PEDIDOS ══════════════════════════════════ -->
 <div id="view-pedidos" class="view active">
   <div class="page">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
-      <div class="section-title" style="margin:0">📋 Solicitudes de servicio</div>
-      <button class="btn-add" id="btn-nuevo-pedido"
-              style="width:auto;padding:10px 20px;display:none"
-              onclick="openNuevoPedido()">+ Nueva solicitud</button>
+    <div class="section-title">📋 Solicitudes de servicio</div>
+
+    <!-- Botones de servicio — solo clientes logueados -->
+    <div class="ped-serv-grid logged-in-only" id="ped-serv-btns" style="display:none">
+      <button class="ped-serv-btn" onclick="openNuevoPedido('camion')">
+        <span class="ped-serv-icon">🚛</span>
+        <span class="ped-serv-label">Necesito un camión</span>
+      </button>
+      <button class="ped-serv-btn" onclick="openNuevoPedido('custodio')">
+        <span class="ped-serv-icon">👮</span>
+        <span class="ped-serv-label">Necesito custodia</span>
+      </button>
+      <button class="ped-serv-btn" onclick="openNuevoPedido('patio')">
+        <span class="ped-serv-icon">🏭</span>
+        <span class="ped-serv-label">Necesito un patio</span>
+      </button>
+      <button class="ped-serv-btn" onclick="openNuevoPedido('lavado')">
+        <span class="ped-serv-icon">🚿</span>
+        <span class="ped-serv-label">Servicio de lavado</span>
+      </button>
     </div>
+
     <div id="pedidos-list"></div>
   </div>
 </div>
