@@ -12,6 +12,7 @@ function showToast(msg, tipo = 'ok') {
 // Solo refresca la vista activa; el resto ya cargó en el arranque público
 function init() {
   filtrarRecursos();
+  actualizarBadgeChat();
 }
 
 // ── ARRANQUE PÚBLICO ──────────────────────────────────
@@ -37,8 +38,11 @@ function init() {
   // Restaurar sesión guardada si el usuario ya había iniciado sesión
   await checkExistingSession();
 
-  // Cargar notificaciones si hay sesión (el canal Realtime lo inicia auth.js)
-  if (currentUser.id) loadNotificaciones();
+  // Cargar notificaciones y badge de chat si hay sesión
+  if (currentUser.id) {
+    loadNotificaciones();
+    actualizarBadgeChat();
+  }
 
   // #5 — Realtime: actualizar vistas cuando cambia la BD
   const clienteActivo = () => document.getElementById('view-cliente').classList.contains('active');
@@ -59,6 +63,14 @@ function init() {
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'reservaciones' }, () => {
       if (document.getElementById('view-reservaciones').classList.contains('active')) renderReserv();
+    })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
+      // Actualizar badge si el mensaje va dirigido a mí y no está abierto su chat
+      const m = payload.new;
+      if (currentUser.id && m.de_user_id !== currentUser.id &&
+          (m.participantes || []).includes(currentUser.id)) {
+        actualizarBadgeChat();
+      }
     })
     .subscribe();
 })();

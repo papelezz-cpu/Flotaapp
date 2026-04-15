@@ -31,16 +31,21 @@ async function renderReserv() {
 
     const empresaMap = {};
     const recursoNombreMap = {};
+    const ownerIdMap = {};  // recurso id → propietario_id (para chat)
 
     if (camionIds.length) {
-      const { data: cams } = await sb.from('camiones').select('id, propietario:perfiles(nombre)').in('id', camionIds);
-      (cams || []).forEach(c => { empresaMap[c.id] = c.propietario?.nombre || '—'; });
+      const { data: cams } = await sb.from('camiones').select('id, propietario_id, propietario:perfiles(nombre)').in('id', camionIds);
+      (cams || []).forEach(c => {
+        empresaMap[c.id] = c.propietario?.nombre || '—';
+        ownerIdMap[c.id] = c.propietario_id;
+      });
     }
     if (custodioIds.length) {
       const { data: custs } = await sb.from('custodios').select('id, nombre, propietario_id, perfiles:perfiles(nombre)').in('id', custodioIds);
       (custs || []).forEach(c => {
         empresaMap[c.id] = c.perfiles?.nombre || '—';
         recursoNombreMap[c.id] = `👮 ${c.nombre}`;
+        ownerIdMap[c.id] = c.propietario_id;
       });
     }
     if (patioIds.length) {
@@ -48,6 +53,7 @@ async function renderReserv() {
       (pats || []).forEach(p => {
         empresaMap[p.id] = p.perfiles?.nombre || '—';
         recursoNombreMap[p.id] = `🏭 ${p.nombre}`;
+        ownerIdMap[p.id] = p.propietario_id;
       });
     }
 
@@ -59,6 +65,10 @@ async function renderReserv() {
         ? `<button class="btn-edit" onclick="openTracking('${r.id}')" style="font-size:0.7rem">📍 ${esc(r.tracking_estado || 'Confirmado')}</button>`
         : '';
       const unidadLabel = recursoNombreMap[r.unidad] || esc(r.unidad) || '—';
+      const propId = ownerIdMap[r.unidad] || '';
+      const chatBtn = propId
+        ? `<button class="btn-chat-hilo" onclick="openChatReserva('${r.id}','${propId}','${esc(empresaMap[r.unidad]||'')}')">💬</button>`
+        : '';
       return `
       <div class="reserv-row reserv-row-cli">
         <div class="reserv-id">${unidadLabel}</div>
@@ -68,6 +78,7 @@ async function renderReserv() {
         <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
           <span class="badge ${badgeCls}">${esc(r.estado)}</span>
           ${trackBtn}
+          ${chatBtn}
         </div>
       </div>`;
     }).join('');
@@ -165,6 +176,10 @@ async function renderReserv() {
     }
 
     const unidadLabel = recursoLabelMap[r.unidad] || esc(r.unidad) || '—';
+    // Chat con el cliente (solo si hay cliente_user_id y la reserva está activa/pendiente)
+    const chatBtn = (esDueno && r.cliente_user_id && !inactiva)
+      ? `<button class="btn-chat-hilo" onclick="openChatReserva('${r.id}','${r.cliente_user_id}','${esc(r.cliente||'')}')">💬</button>`
+      : '';
     return `
     <div class="reserv-row ${inactiva ? 'reserv-cancelada' : ''}">
       <div class="reserv-id">${unidadLabel}</div>
@@ -175,6 +190,7 @@ async function renderReserv() {
       <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
         <span class="badge ${badgeCls}">${esc(r.estado)}</span>
         ${acciones}
+        ${chatBtn}
       </div>
     </div>`;
   }).join('');

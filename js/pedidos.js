@@ -172,11 +172,15 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
               : st === 'aceptada'      ? '✓ Aceptada'
               : 'Rechazada';
     const bdg = st === 'aceptada' ? 'badge-avail' : st === 'rechazada' ? 'badge-maint' : 'badge-busy';
+    const chatAdminBtn = (p.cliente_id && st !== 'rechazada')
+      ? `<button class="btn-chat-hilo" onclick="openChatPedido('${p.id}','${p.cliente_id}','${esc(p.cliente_nombre||'')}')">💬 Chat</button>`
+      : '';
     acciones = `
       <span class="badge ${bdg}" style="font-size:0.72rem">${etq}</span>
       ${st === 'contra_oferta'
         ? `<button class="btn-ofertar" onclick="openResponderContra('${miOferta.id}')">Responder</button>`
-        : ''}`;
+        : ''}
+      ${chatAdminBtn}`;
   }
 
   // Superadmin puede eliminar cualquier pedido
@@ -320,6 +324,11 @@ function ofertaItemHTML(o) {
 
   const fmt = num => `$${Number(num).toLocaleString('es-MX')} MXN`;
 
+  // Botón de chat con el admin que ofertó (solo cliente)
+  const chatOfertaBtn = (currentUser.rol === 'cliente' && o.admin_id && o.estado !== 'rechazada')
+    ? `<button class="btn-chat-hilo" onclick="openChatPedido('${o.pedido_id}','${o.admin_id}','${esc(o.admin_nombre||'')}')">💬 Chat</button>`
+    : '';
+
   let acciones = '';
   if (o.estado === 'enviada' && !expirada) {
     acciones = `
@@ -329,9 +338,10 @@ function ofertaItemHTML(o) {
         </button>
         <button class="btn-edit" onclick="abrirContraoferta('${o.id}')">↩ Contraofertar</button>
         <button class="btn-edit btn-rechazar" onclick="responderOferta('${o.id}','rechazar')">✕ Rechazar</button>
+        ${chatOfertaBtn}
       </div>`;
   } else if (o.estado === 'contra_oferta') {
-    acciones = `<div class="oferta-acciones"><span style="font-size:0.78rem;color:var(--text-muted)">Esperando respuesta del proveedor…</span></div>`;
+    acciones = `<div class="oferta-acciones"><span style="font-size:0.78rem;color:var(--text-muted)">Esperando respuesta del proveedor…</span>${chatOfertaBtn}</div>`;
   }
 
   return `

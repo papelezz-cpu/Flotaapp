@@ -56,6 +56,13 @@
     </div>
     <div class="header-right">
       <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
+      <!-- Chat (solo logueados) -->
+      <div class="notif-wrap logged-in-only" style="position:relative">
+        <button class="btn-notif" id="btn-chat" onclick="toggleChatList()" title="Mensajes">
+          💬
+          <span class="notif-badge" id="chat-badge" style="display:none">0</span>
+        </button>
+      </div>
       <!-- Campana de notificaciones (solo logueados) -->
       <div class="notif-wrap logged-in-only" style="position:relative">
         <button class="btn-notif" id="btn-notif" onclick="toggleNotifPanel()" title="Notificaciones">
@@ -881,7 +888,23 @@
 <script src="js/pedidos.js"></script>
 <script src="js/admin.js"></script>
 <script src="js/usuarios.js"></script>
+<script src="js/chat.js"></script>
 <script src="js/main.js"></script>
+
+<!-- ══ PANEL DE CHAT ════════════════════════════════════ -->
+<div id="chat-panel" class="chat-panel">
+  <div class="chat-header">
+    <span id="chat-titulo" class="chat-titulo">Chat</span>
+    <button class="chat-close-btn" onclick="closeChat()">✕</button>
+  </div>
+  <div id="chat-msgs" class="chat-msgs"></div>
+  <div class="chat-footer">
+    <input type="text" id="chat-input" class="chat-input-field"
+           placeholder="Escribe un mensaje…"
+           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMensaje()}">
+    <button class="chat-send-btn" onclick="enviarMensaje()">➤</button>
+  </div>
+</div>
 
 </body>
 </html>
