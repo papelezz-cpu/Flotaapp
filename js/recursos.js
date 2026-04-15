@@ -87,7 +87,7 @@ async function renderCustodios(filtroTipo = '') {
         ${precio}
         <div class="truck-footer">
           <button class="btn-reservar" ${disabled}
-            onclick="openReservaRecurso('custodio','${esc(c.id)}','${esc(c.nombre)}')">Solicitar</button>
+            onclick="openReservaRecurso('custodio','${esc(c.id)}','${esc(c.nombre)}','${c.propietario_id||''}')">Solicitar</button>
         </div>
       </div>`;
   }).join('');
@@ -163,20 +163,10 @@ async function renderPatios(filtroTipo = '') {
         ${precio}
         <div class="truck-footer">
           <button class="btn-reservar" ${disabled}
-            onclick="openReservaRecurso('patio','${esc(p.id)}','${esc(p.nombre)}')">Solicitar</button>
+            onclick="openReservaRecurso('patio','${esc(p.id)}','${esc(p.nombre)}','${p.propietario_id||''}')">Solicitar</button>
         </div>
       </div>`;
   }).join('');
 }
 
-// ── SOLICITAR RECURSO (reutiliza modal reserva) ────────
-
-function openReservaRecurso(tipo, id, nombre) {
-  currentTruck = id;
-  const iconos = { custodio: '👮', patio: '🏭' };
-  document.getElementById('modal-truck-name').textContent =
-    `${iconos[tipo] || ''} ${nombre} (${id})`;
-  if (currentUser.nombre) document.getElementById('res-nombre').value = currentUser.nombre;
-  if (currentUser.email)  document.getElementById('res-email').value  = currentUser.email;
-  document.getElementById('modal-reserva').classList.add('open');
-}
+// openReservaRecurso() está definido en modal.js

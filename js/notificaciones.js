@@ -72,7 +72,7 @@ async function onNotifClick(id, tipo) {
   if (tipo === 'reserva_pendiente' || tipo === 'reserva_aceptada' || tipo === 'reserva_rechazada') {
     const tab = [...tabs].find(t => t.textContent.trim() === 'Reservaciones');
     if (tab) showView('reservaciones', tab);
-  } else if (['nueva_oferta','respuesta_oferta','respuesta_contra_oferta'].includes(tipo)) {
+  } else if (['nueva_oferta','respuesta_oferta','respuesta_contra_oferta','oferta_no_seleccionada'].includes(tipo)) {
     const tab = [...tabs].find(t => t.textContent.trim() === 'Solicitudes');
     if (tab) showView('pedidos', tab);
   }

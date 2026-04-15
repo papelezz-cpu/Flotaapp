@@ -24,11 +24,32 @@ async function renderReserv() {
     if (error) { body.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar.</div>`; return; }
     if (!data?.length) { body.innerHTML = `<div class="empty-state"><div class="icon">📋</div>Aún no tienes reservaciones.</div>`; return; }
 
-    const unidades = [...new Set(data.map(r => r.unidad))];
-    const { data: camiones } = await sb.from('camiones')
-      .select('id, propietario:perfiles(nombre)').in('id', unidades);
+    // Obtener empresa según tipo de recurso
+    const camionIds   = data.filter(r => !r.recurso_tipo || r.recurso_tipo === 'camion').map(r => r.unidad).filter(Boolean);
+    const custodioIds = data.filter(r => r.recurso_tipo === 'custodio').map(r => r.unidad).filter(Boolean);
+    const patioIds    = data.filter(r => r.recurso_tipo === 'patio').map(r => r.unidad).filter(Boolean);
+
     const empresaMap = {};
-    (camiones || []).forEach(c => { empresaMap[c.id] = c.propietario?.nombre || '—'; });
+    const recursoNombreMap = {};
+
+    if (camionIds.length) {
+      const { data: cams } = await sb.from('camiones').select('id, propietario:perfiles(nombre)').in('id', camionIds);
+      (cams || []).forEach(c => { empresaMap[c.id] = c.propietario?.nombre || '—'; });
+    }
+    if (custodioIds.length) {
+      const { data: custs } = await sb.from('custodios').select('id, nombre, propietario_id, perfiles:perfiles(nombre)').in('id', custodioIds);
+      (custs || []).forEach(c => {
+        empresaMap[c.id] = c.perfiles?.nombre || '—';
+        recursoNombreMap[c.id] = `👮 ${c.nombre}`;
+      });
+    }
+    if (patioIds.length) {
+      const { data: pats } = await sb.from('patios').select('id, nombre, propietario_id, perfiles:perfiles(nombre)').in('id', patioIds);
+      (pats || []).forEach(p => {
+        empresaMap[p.id] = p.perfiles?.nombre || '—';
+        recursoNombreMap[p.id] = `🏭 ${p.nombre}`;
+      });
+    }
 
     body.innerHTML = data.map(r => {
       const badgeCls = r.estado === 'Pendiente'  ? 'badge-busy'
@@ -37,9 +58,10 @@ async function renderReserv() {
       const trackBtn = r.estado === 'Activa'
         ? `<button class="btn-edit" onclick="openTracking('${r.id}')" style="font-size:0.7rem">📍 ${esc(r.tracking_estado || 'Confirmado')}</button>`
         : '';
+      const unidadLabel = recursoNombreMap[r.unidad] || esc(r.unidad) || '—';
       return `
       <div class="reserv-row reserv-row-cli">
-        <div class="reserv-id">${esc(r.unidad)}</div>
+        <div class="reserv-id">${unidadLabel}</div>
         <div class="reserv-empresa">${esc(empresaMap[r.unidad] || '—')}</div>
         <div>${fmtFecha(r.fecha_ini)}</div>
         <div>${fmtFecha(r.fecha_fin)}</div>
@@ -61,28 +83,62 @@ async function renderReserv() {
     .order('created_at', { ascending: false });
 
   if (currentUser.rol !== 'superadmin') {
-    const { data: misCamiones } = await sb.from('camiones')
-      .select('id').eq('propietario_id', currentUser.id);
-    if (!misCamiones?.length) {
-      body.innerHTML = `<div class="empty-state"><div class="icon">🚛</div>No tienes unidades registradas.</div>`;
+    // Obtener IDs de todos los recursos propios (camiones + custodios + patios)
+    const [{ data: misCamiones }, { data: misCustodios }, { data: misPatios }] = await Promise.all([
+      sb.from('camiones').select('id').eq('propietario_id', currentUser.id),
+      sb.from('custodios').select('id').eq('propietario_id', currentUser.id),
+      sb.from('patios').select('id').eq('propietario_id', currentUser.id),
+    ]);
+    const misIds = [
+      ...(misCamiones  || []).map(c => c.id),
+      ...(misCustodios || []).map(c => c.id),
+      ...(misPatios    || []).map(p => p.id),
+    ];
+    if (!misIds.length) {
+      body.innerHTML = `<div class="empty-state"><div class="icon">🚛</div>No tienes recursos registrados.</div>`;
       return;
     }
-    reservQuery = reservQuery.in('unidad', misCamiones.map(c => c.id));
+    reservQuery = reservQuery.in('unidad', misIds);
   }
 
   const { data, error } = await reservQuery;
   if (error) { body.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar.</div>`; return; }
   if (!data.length) { body.innerHTML = `<div class="empty-state"><div class="icon">📋</div>No hay reservaciones registradas.</div>`; return; }
 
-  const unidades = [...new Set(data.map(r => r.unidad))];
-  const { data: camiones } = await sb.from('camiones')
-    .select('id, propietario_id, propietario:perfiles(nombre)').in('id', unidades);
-  const empresaMap = {};
-  const ownerMap  = {};
-  (camiones || []).forEach(c => {
-    empresaMap[c.id] = c.propietario?.nombre || '—';
-    ownerMap[c.id]   = c.propietario_id;
-  });
+  // Construir mapa de empresa y etiqueta por tipo de recurso
+  const camionIds   = [...new Set(data.filter(r => !r.recurso_tipo || r.recurso_tipo === 'camion').map(r => r.unidad).filter(Boolean))];
+  const custodioIds = [...new Set(data.filter(r => r.recurso_tipo === 'custodio').map(r => r.unidad).filter(Boolean))];
+  const patioIds    = [...new Set(data.filter(r => r.recurso_tipo === 'patio').map(r => r.unidad).filter(Boolean))];
+
+  const empresaMap      = {};
+  const ownerMap        = {};
+  const recursoLabelMap = {};
+
+  const fetches = [];
+  if (camionIds.length) fetches.push(
+    sb.from('camiones').select('id, propietario_id, propietario:perfiles(nombre)').in('id', camionIds)
+      .then(({ data: d }) => (d || []).forEach(c => {
+        empresaMap[c.id] = c.propietario?.nombre || '—';
+        ownerMap[c.id]   = c.propietario_id;
+      }))
+  );
+  if (custodioIds.length) fetches.push(
+    sb.from('custodios').select('id, nombre, propietario_id, perfiles:perfiles(nombre)').in('id', custodioIds)
+      .then(({ data: d }) => (d || []).forEach(c => {
+        empresaMap[c.id]      = c.perfiles?.nombre || '—';
+        ownerMap[c.id]        = c.propietario_id;
+        recursoLabelMap[c.id] = `👮 ${c.nombre}`;
+      }))
+  );
+  if (patioIds.length) fetches.push(
+    sb.from('patios').select('id, nombre, propietario_id, perfiles:perfiles(nombre)').in('id', patioIds)
+      .then(({ data: d }) => (d || []).forEach(p => {
+        empresaMap[p.id]      = p.perfiles?.nombre || '—';
+        ownerMap[p.id]        = p.propietario_id;
+        recursoLabelMap[p.id] = `🏭 ${p.nombre}`;
+      }))
+  );
+  await Promise.all(fetches);
 
   body.innerHTML = data.map(r => {
     const esCancelada = r.estado === 'Cancelada';
@@ -99,7 +155,7 @@ async function renderReserv() {
     let acciones = '';
     if (esDueno && esPendiente) {
       acciones = `
-        <button class="btn-aceptar-reserva"  onclick="aceptarReserva('${r.id}','${esc(r.unidad)}')">✓ Aceptar</button>
+        <button class="btn-aceptar-reserva"  onclick="aceptarReserva('${r.id}','${esc(r.unidad)}','${r.recurso_tipo||'camion'}')">✓ Aceptar</button>
         <button class="btn-rechazar-reserva" onclick="rechazarReserva('${r.id}','${esc(r.unidad)}')">✕ Rechazar</button>`;
     } else if (esDueno && esActiva) {
       const trackStep = r.tracking_estado || 'Confirmado';
@@ -108,9 +164,10 @@ async function renderReserv() {
         <button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${esc(r.unidad)}')">Cancelar</button>`;
     }
 
+    const unidadLabel = recursoLabelMap[r.unidad] || esc(r.unidad) || '—';
     return `
     <div class="reserv-row ${inactiva ? 'reserv-cancelada' : ''}">
-      <div class="reserv-id">${esc(r.unidad)}</div>
+      <div class="reserv-id">${unidadLabel}</div>
       <div class="reserv-empresa">${esc(empresaMap[r.unidad] || '—')}</div>
       <div>${esc(r.cliente)}</div>
       <div>${fmtFecha(r.fecha_ini)}</div>
@@ -125,15 +182,20 @@ async function renderReserv() {
 
 // ── ACCIONES ───────────────────────────────────────────
 
-async function aceptarReserva(reservaId, unidad) {
+async function aceptarReserva(reservaId, unidad, recurso_tipo) {
   // Obtener datos antes de actualizar para el email
   const { data: r } = await sb.from('reservaciones').select('*').eq('id', reservaId).single();
+  const tipoFinal = recurso_tipo || r?.recurso_tipo || 'camion';
   await sb.from('reservaciones').update({ estado: 'Activa' }).eq('id', reservaId);
 
-  // Marcar ocupado solo si la reserva ya inició; si es futura, el camión sigue disponible hoy
+  // Marcar recurso como ocupado solo si ya inició y es un camión
   const fechaIni = r?.fecha_ini ? r.fecha_ini.split('T')[0] : null;
-  if (fechaIni && fechaIni <= today()) {
+  if (tipoFinal === 'camion' && fechaIni && fechaIni <= today()) {
     await sb.from('camiones').update({ estado: 'ocupado' }).eq('id', unidad);
+  } else if (tipoFinal === 'custodio' && fechaIni && fechaIni <= today()) {
+    await sb.from('custodios').update({ estado: 'ocupado' }).eq('id', unidad);
+  } else if (tipoFinal === 'patio' && fechaIni && fechaIni <= today()) {
+    await sb.from('patios').update({ estado: 'ocupado' }).eq('id', unidad);
   }
 
   // Email al cliente: reserva aceptada (con CC al superadmin)
@@ -148,9 +210,10 @@ async function aceptarReserva(reservaId, unidad) {
 
   await renderReserv();
   await loadNotificaciones();
+  const recursoLabel = tipoFinal === 'custodio' ? 'custodio' : tipoFinal === 'patio' ? 'patio' : 'camión';
   const toastMsg = fechaIni && fechaIni <= today()
-    ? '✓ Reserva aceptada — camión marcado como en servicio'
-    : '✓ Reserva aceptada — el camión quedará en servicio a partir del ' + fmtFecha(fechaIni);
+    ? `✓ Reserva aceptada — ${recursoLabel} marcado como en servicio`
+    : `✓ Reserva aceptada — el ${recursoLabel} quedará en servicio a partir del ` + fmtFecha(fechaIni);
   showToast(toastMsg);
 }
 
@@ -174,11 +237,16 @@ async function rechazarReserva(reservaId, unidad) {
 }
 
 async function cancelarReserva(reservaId, unidad) {
-  if (!confirm('¿Cancelar esta reserva? El camión volverá a estar disponible.')) return;
+  if (!confirm('¿Cancelar esta reserva? El recurso volverá a estar disponible.')) return;
+  const { data: r } = await sb.from('reservaciones').select('recurso_tipo').eq('id', reservaId).single();
+  const tipoFinal = r?.recurso_tipo || 'camion';
   await sb.from('reservaciones').update({ estado: 'Cancelada' }).eq('id', reservaId);
-  await sb.from('camiones').update({ estado: 'disponible' }).eq('id', unidad);
+  if (unidad) {
+    const tabla = tipoFinal === 'custodio' ? 'custodios' : tipoFinal === 'patio' ? 'patios' : 'camiones';
+    await sb.from(tabla).update({ estado: 'disponible' }).eq('id', unidad);
+  }
   await renderReserv();
-  showToast('Reserva cancelada — camión disponible de nuevo');
+  showToast('Reserva cancelada — recurso disponible de nuevo');
 }
 
 // Helper: envía email via edge function (fire-and-forget)

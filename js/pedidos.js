@@ -584,32 +584,58 @@ async function responderContra(accion) {
 // ── CERRAR ACUERDO → CREAR RESERVACIÓN ────────────────
 
 async function cerrarAcuerdo(oferta, pedido) {
-  // Rechazar todas las demás ofertas pendientes del pedido
-  await sb.from('ofertas')
-    .update({ estado: 'rechazada' })
+  // Obtener las otras ofertas activas ANTES de rechazarlas (para notificar)
+  const { data: otrasOfertas } = await sb.from('ofertas')
+    .select('id, admin_id, admin_nombre')
     .eq('pedido_id', pedido.id)
     .neq('id', oferta.id)
     .in('estado', ['enviada','contra_oferta']);
 
+  // Rechazar todas las demás ofertas pendientes del pedido
+  if (otrasOfertas?.length) {
+    await sb.from('ofertas')
+      .update({ estado: 'rechazada' })
+      .in('id', otrasOfertas.map(o => o.id));
+
+    // Notificar a cada admin cuya oferta quedó rechazada
+    const notifs = otrasOfertas.map(o => ({
+      user_id: o.admin_id,
+      tipo:    'oferta_no_seleccionada',
+      titulo:  'Tu oferta no fue seleccionada',
+      mensaje: `El cliente eligió otro proveedor para su solicitud de ${esc(pedido.tipo_camion || 'servicio')} (${esc(pedido.origen || '')}${pedido.destino ? ' → ' + esc(pedido.destino) : ''}). Gracias por participar.`,
+      leido:   false,
+    }));
+    await sb.from('notificaciones').insert(notifs);
+  }
+
   // Marcar pedido como acordado
   await sb.from('pedidos').update({ estado: 'acordado' }).eq('id', pedido.id);
 
+  // Detectar tipo de recurso del pedido para guardarlo en la reservación
+  const tipoPedido = pedido.tipo_camion || '';
+  const recursoTipo = tipoPedido.startsWith('Custodio') || tipoPedido === 'Supervisión remota'
+    ? 'custodio'
+    : tipoPedido.startsWith('Patio') || tipoPedido === 'Bodega'
+      ? 'patio'
+      : 'camion';
+
   // Crear reservación automáticamente
   const { error } = await sb.from('reservaciones').insert({
-    unidad:           oferta.camion_id || null,
-    cliente:          pedido.cliente_nombre,
-    cliente_email:    pedido.cliente_email,
-    cliente_user_id:  pedido.cliente_id,
-    fecha_ini:        pedido.fecha_ini,
-    fecha_fin:        pedido.fecha_fin || pedido.fecha_ini,
-    descripcion:      pedido.descripcion,
-    estado:           'Activa',
-    precio_acordado:  oferta.precio_oferta,
+    unidad:          oferta.camion_id || null,
+    recurso_tipo:    recursoTipo,
+    cliente:         pedido.cliente_nombre,
+    cliente_email:   pedido.cliente_email,
+    cliente_user_id: pedido.cliente_id,
+    fecha_ini:       pedido.fecha_ini,
+    fecha_fin:       pedido.fecha_fin || pedido.fecha_ini,
+    descripcion:     pedido.descripcion,
+    estado:          'Activa',
+    precio_acordado: oferta.precio_oferta,
   });
   if (error) console.error('Error creando reservación desde pedido:', error);
 
-  // Marcar camión como ocupado solo si la reserva ya inició
-  if (oferta.camion_id && pedido.fecha_ini <= today()) {
+  // Marcar camión como ocupado solo si la reserva ya inició (solo aplica a camiones)
+  if (recursoTipo === 'camion' && oferta.camion_id && pedido.fecha_ini <= today()) {
     await sb.from('camiones').update({ estado: 'ocupado' }).eq('id', oferta.camion_id);
   }
 }
