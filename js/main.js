@@ -47,7 +47,7 @@ function init() {
   const clienteActivo = () => document.getElementById('view-cliente').classList.contains('active');
   const adminActivo   = () => document.getElementById('view-admin').classList.contains('active');
 
-  sb.channel('flotapro-changes')
+  sb.channel('portgo-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'camiones' }, () => {
       if (clienteActivo()) renderCatalogo();
       if (adminActivo())   renderAdmin();

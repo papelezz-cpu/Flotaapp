@@ -1,7 +1,7 @@
 {
-  "name": "FlotaPro",
-  "short_name": "FlotaPro",
-  "description": "Disponibilidad y reservas de flota de camiones",
+  "name": "PortGo",
+  "short_name": "PortGo",
+  "description": "Plataforma de logística y conexión de servicios portuarios",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

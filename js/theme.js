@@ -3,12 +3,12 @@
 function toggleTheme() {
   const isLight = document.body.classList.toggle('light');
   document.getElementById('btn-theme').textContent = isLight ? '☀️' : '🌙';
-  localStorage.setItem('flotapro-theme', isLight ? 'light' : 'dark');
+  localStorage.setItem('portgo-theme', isLight ? 'light' : 'dark');
 }
 
 // Aplicar tema guardado; default = claro
 (function () {
-  const saved = localStorage.getItem('flotapro-theme');
+  const saved = localStorage.getItem('portgo-theme');
   if (saved !== 'dark') {
     document.body.classList.add('light');
   }
