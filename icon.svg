@@ -1,4 +1,84 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#4e8ef7"/>
-  <text x="256" y="390" font-size="300" text-anchor="middle" dominant-baseline="auto">🚛</text>
+  <defs>
+    <radialGradient id="hubG" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7eb3ff"/>
+      <stop offset="100%" stop-color="#4e8ef7"/>
+    </radialGradient>
+    <radialGradient id="nodeG" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#1d3461"/>
+      <stop offset="100%" stop-color="#112240"/>
+    </radialGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softglow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Fondo -->
+  <rect width="512" height="512" rx="110" fill="#0a1628"/>
+
+  <!-- Anillo exterior punteado — sugiere alcance de red -->
+  <circle cx="256" cy="256" r="168" fill="none"
+          stroke="#4e8ef7" stroke-width="4" opacity="0.12"
+          stroke-dasharray="18 14"/>
+
+  <!-- Líneas de conexión al centro -->
+  <line x1="256" y1="256" x2="256" y2="100"
+        stroke="#4e8ef7" stroke-width="13" stroke-linecap="round" opacity="0.55"/>
+  <line x1="256" y1="256" x2="412" y2="256"
+        stroke="#4e8ef7" stroke-width="13" stroke-linecap="round" opacity="0.55"/>
+  <line x1="256" y1="256" x2="256" y2="412"
+        stroke="#4e8ef7" stroke-width="13" stroke-linecap="round" opacity="0.55"/>
+  <line x1="256" y1="256" x2="100" y2="256"
+        stroke="#4e8ef7" stroke-width="13" stroke-linecap="round" opacity="0.55"/>
+
+  <!-- Líneas diagonales secundarias (más tenues) -->
+  <line x1="256" y1="256" x2="152" y2="152"
+        stroke="#4e8ef7" stroke-width="7" stroke-linecap="round" opacity="0.22"/>
+  <line x1="256" y1="256" x2="360" y2="152"
+        stroke="#4e8ef7" stroke-width="7" stroke-linecap="round" opacity="0.22"/>
+  <line x1="256" y1="256" x2="360" y2="360"
+        stroke="#4e8ef7" stroke-width="7" stroke-linecap="round" opacity="0.22"/>
+  <line x1="256" y1="256" x2="152" y2="360"
+        stroke="#4e8ef7" stroke-width="7" stroke-linecap="round" opacity="0.22"/>
+
+  <!-- Nodos secundarios diagonales (pequeños) -->
+  <circle cx="152" cy="152" r="16" fill="url(#nodeG)" stroke="#4e8ef7" stroke-width="5" opacity="0.7"/>
+  <circle cx="360" cy="152" r="16" fill="url(#nodeG)" stroke="#4e8ef7" stroke-width="5" opacity="0.7"/>
+  <circle cx="360" cy="360" r="16" fill="url(#nodeG)" stroke="#4e8ef7" stroke-width="5" opacity="0.7"/>
+  <circle cx="152" cy="360" r="16" fill="url(#nodeG)" stroke="#4e8ef7" stroke-width="5" opacity="0.7"/>
+
+  <!-- Puntos medios en líneas principales -->
+  <circle cx="256" cy="178" r="9" fill="#4e8ef7" opacity="0.45"/>
+  <circle cx="334" cy="256" r="9" fill="#4e8ef7" opacity="0.45"/>
+  <circle cx="256" cy="334" r="9" fill="#4e8ef7" opacity="0.45"/>
+  <circle cx="178" cy="256" r="9" fill="#4e8ef7" opacity="0.45"/>
+
+  <!-- Nodos principales (cardinales) -->
+  <circle cx="256" cy="100" r="32" fill="url(#nodeG)" stroke="#4e8ef7" stroke-width="10" filter="url(#glow)"/>
+  <circle cx="412" cy="256" r="32" fill="url(#nodeG)" stroke="#4e8ef7" stroke-width="10" filter="url(#glow)"/>
+  <circle cx="256" cy="412" r="32" fill="url(#nodeG)" stroke="#4e8ef7" stroke-width="10" filter="url(#glow)"/>
+  <circle cx="100" cy="256" r="32" fill="url(#nodeG)" stroke="#4e8ef7" stroke-width="10" filter="url(#glow)"/>
+
+  <!-- Hub central — brillo suave detrás -->
+  <circle cx="256" cy="256" r="66" fill="#4e8ef7" opacity="0.18" filter="url(#softglow)"/>
+
+  <!-- Hub central — cuerpo -->
+  <circle cx="256" cy="256" r="54" fill="url(#hubG)" filter="url(#glow)"/>
+
+  <!-- Anillo interior del hub -->
+  <circle cx="256" cy="256" r="30" fill="none" stroke="#fff" stroke-width="4" opacity="0.25"/>
+
+  <!-- Punto central -->
+  <circle cx="256" cy="256" r="12" fill="#fff" opacity="0.9"/>
 </svg>
