@@ -582,9 +582,17 @@
 
 <!-- ══ MODAL NUEVO PEDIDO ══════════════════════════════ -->
 <div class="modal-overlay" id="modal-nuevo-pedido">
-  <div class="modal" style="max-width:620px;max-height:90vh;overflow-y:auto">
-    <h2>📋 Nueva solicitud de servicio</h2>
-    <p class="sub">Completa los datos para que los proveedores puedan evaluarte y enviarte su mejor oferta.</p>
+  <div class="modal modal-np">
+    <!-- Cabecera fija con X -->
+    <div class="modal-np-header">
+      <div>
+        <h2 style="margin:0">📋 Nueva solicitud</h2>
+        <p class="sub" style="margin:4px 0 0">Completa los datos para que los proveedores puedan enviarte su mejor oferta.</p>
+      </div>
+      <button class="modal-close-x" onclick="closeNuevoPedido()" title="Cerrar">✕</button>
+    </div>
+    <!-- Cuerpo scrolleable -->
+    <div class="modal-np-body">
 
     <!-- Tipo de servicio -->
     <div class="form-group">
@@ -784,9 +792,9 @@
     </div>
 
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeNuevoPedido()">Cancelar</button>
       <button class="btn-confirm" onclick="crearPedido()">📋 Publicar solicitud</button>
     </div>
+    </div><!-- /modal-np-body -->
   </div>
 </div>
 
