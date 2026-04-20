@@ -849,7 +849,9 @@ async function cerrarAcuerdo(oferta, pedido) {
     ? 'custodio'
     : tipoPedido.startsWith('Patio') || tipoPedido === 'Bodega'
       ? 'patio'
-      : 'camion';
+      : tipoPedido.startsWith('Lavado') || tipoPedido === 'Desinfección' || tipoPedido === 'Lavado Contenedor'
+        ? 'lavado'
+        : 'camion';
 
   // Crear reservación automáticamente
   const { error } = await sb.from('reservaciones').insert({
