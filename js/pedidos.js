@@ -557,19 +557,24 @@ async function responderOferta(ofertaId, accion) {
 }
 
 function _openDetallesServicio(oferta, pedido) {
-  _pendingOferta = oferta;
-  _pendingPedido = pedido;
-  // Cerrar el modal de detalle (mismo z-index) antes de abrir el nuevo
-  document.getElementById('modal-pedido-detalle').classList.remove('open');
-  const fmt = n => `$${Number(n).toLocaleString('es-MX')} MXN`;
-  document.getElementById('ds-resumen').innerHTML =
-    `Acuerdo con <strong>${esc(oferta.admin_nombre)}</strong> · <strong>${fmt(oferta.precio_oferta)}</strong> · ${esc(pedido.tipo_camion)}`;
-  document.getElementById('ds-fecha').value           = (pedido.fecha_ini || '').split('T')[0];
-  document.getElementById('ds-hora').value            = pedido.hora_carga || '';
-  document.getElementById('ds-lugar').value           = pedido.detalles_lugar || pedido.origen || '';
-  document.getElementById('ds-contacto-nombre').value = pedido.detalles_contacto_nombre || pedido.contacto_nombre || '';
-  document.getElementById('ds-contacto-tel').value    = pedido.detalles_contacto_tel || pedido.contacto_tel || '';
-  document.getElementById('modal-detalles-servicio').classList.add('open');
+  try {
+    _pendingOferta = oferta;
+    _pendingPedido = pedido;
+    // Cerrar el modal de detalle (mismo z-index) antes de abrir el nuevo
+    document.getElementById('modal-pedido-detalle').classList.remove('open');
+    const fmt = n => `$${Number(n).toLocaleString('es-MX')} MXN`;
+    document.getElementById('ds-resumen').textContent =
+      `Acuerdo con ${oferta.admin_nombre} · ${fmt(oferta.precio_oferta)} · ${pedido.tipo_camion}`;
+    document.getElementById('ds-fecha').value           = (pedido.fecha_ini || '').split('T')[0];
+    document.getElementById('ds-hora').value            = pedido.hora_carga || '';
+    document.getElementById('ds-lugar').value           = pedido.detalles_lugar || pedido.origen || '';
+    document.getElementById('ds-contacto-nombre').value = pedido.detalles_contacto_nombre || pedido.contacto_nombre || '';
+    document.getElementById('ds-contacto-tel').value    = pedido.detalles_contacto_tel || pedido.contacto_tel || '';
+    document.getElementById('modal-detalles-servicio').classList.add('open');
+  } catch (e) {
+    console.error('_openDetallesServicio error:', e);
+    showToast('Error al abrir el formulario de detalles: ' + e.message, 'error');
+  }
 }
 
 function closeDetallesServicio() {

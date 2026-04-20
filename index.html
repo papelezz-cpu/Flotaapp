@@ -866,37 +866,32 @@
 
 <!-- ══ MODAL DETALLES DEL SERVICIO (post-acuerdo) ══════ -->
 <div class="modal-overlay" id="modal-detalles-servicio">
-  <div class="modal modal-np" style="max-width:500px;padding:0">
-    <div class="modal-np-header">
-      <span>📋 Confirmar detalles del servicio</span>
-      <button class="modal-close-x" onclick="closeDetallesServicio()">✕</button>
+  <div class="modal" style="max-width:500px">
+    <h2>📋 Confirmar detalles</h2>
+    <p id="ds-resumen" class="sub"></p>
+    <div class="form-group">
+      <label>Fecha del servicio *</label>
+      <input type="date" id="ds-fecha">
     </div>
-    <div class="modal-np-body">
-      <p id="ds-resumen" class="sub" style="margin-bottom:18px;padding:12px 14px;background:rgba(78,142,247,0.08);border-radius:10px;border:1px solid rgba(78,142,247,0.2)"></p>
-      <div class="form-group">
-        <label>Fecha del servicio *</label>
-        <input type="date" id="ds-fecha">
-      </div>
-      <div class="form-group">
-        <label>Hora aproximada</label>
-        <input type="time" id="ds-hora">
-      </div>
-      <div class="form-group">
-        <label>Dirección exacta / punto de encuentro *</label>
-        <input type="text" id="ds-lugar" placeholder="Ej. Terminal Lázaro Cárdenas, Patio 3…">
-      </div>
-      <div class="form-group">
-        <label>Nombre del contacto en sitio</label>
-        <input type="text" id="ds-contacto-nombre" placeholder="Quien recibirá al proveedor">
-      </div>
-      <div class="form-group">
-        <label>Teléfono de contacto</label>
-        <input type="tel" id="ds-contacto-tel" placeholder="Ej. 314 123 4567">
-      </div>
-      <div class="modal-actions" style="padding:0 0 4px">
-        <button class="btn-cancel" onclick="closeDetallesServicio()">Cancelar</button>
-        <button class="btn-confirm" onclick="confirmarDetallesServicio()">✓ Confirmar acuerdo</button>
-      </div>
+    <div class="form-group">
+      <label>Hora aproximada</label>
+      <input type="time" id="ds-hora">
+    </div>
+    <div class="form-group">
+      <label>Dirección exacta / punto de encuentro *</label>
+      <input type="text" id="ds-lugar" placeholder="Ej. Terminal Lázaro Cárdenas, Patio 3…">
+    </div>
+    <div class="form-group">
+      <label>Nombre del contacto en sitio</label>
+      <input type="text" id="ds-contacto-nombre" placeholder="Quien recibirá al proveedor">
+    </div>
+    <div class="form-group">
+      <label>Teléfono de contacto</label>
+      <input type="tel" id="ds-contacto-tel" placeholder="Ej. 314 123 4567">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeDetallesServicio()">Cancelar</button>
+      <button class="btn-confirm" onclick="confirmarDetallesServicio()">✓ Confirmar acuerdo</button>
     </div>
   </div>
 </div>
