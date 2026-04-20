@@ -42,10 +42,10 @@ async function renderPedidos() {
   if (filtrosBar) filtrosBar.style.display = currentUser.id ? '' : 'none';
 
   // Fetch pedidos + ofertas en paralelo
-  // Para clientes excluir acordado/cancelado directo en la query
+  // Clientes solo ven pedidos activos (nunca acordado/cancelado)
   const esCliente = currentUser.id && currentUser.rol === 'cliente';
   let pedidosQ = sb.from('pedidos').select('*').order('created_at', { ascending: false });
-  if (esCliente) pedidosQ = pedidosQ.not('estado', 'in', '("acordado","cancelado")');
+  if (esCliente) pedidosQ = pedidosQ.in('estado', ['abierto', 'en_negociacion']);
 
   const [{ data: pedidos, error }, { data: todasOfertas }] = await Promise.all([
     pedidosQ,
@@ -97,8 +97,11 @@ async function renderPedidos() {
 
   // ── CLIENTE ────────────────────────────────────────
   if (currentUser.id && currentUser.rol === 'cliente') {
-    // Acordado y cancelado se mueven a reservaciones; no mostrar aquí
-    const misPedidos   = _filtrar((pedidos || []).filter(p => p.cliente_id === currentUser.id && !['acordado','cancelado'].includes(p.estado)));
+    // Solo abierto/en_negociacion — acordado/cancelado viven en Reservaciones
+    const misPedidos   = _filtrar((pedidos || []).filter(p =>
+      p.cliente_id === currentUser.id &&
+      p.estado !== 'acordado' && p.estado !== 'cancelado'
+    ));
     const otrosPedidos = _filtrar((pedidos || []).filter(p => p.cliente_id !== currentUser.id && p.estado === 'abierto'));
 
     if (misPedidos.length) {
