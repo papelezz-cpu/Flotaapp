@@ -6,7 +6,6 @@ let pedidoParaOfertar  = null;   // pedido sobre el que el admin ofertará
 let _pendingOferta     = null;   // oferta en espera de confirmar detalles
 let _pendingPedido     = null;   // pedido en espera de confirmar detalles
 let _filtroTipo        = 'todos';
-let _filtroBusqueda    = '';
 
 const TIPO_EMOJI = {
   Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️', Cualquiera:'🚛',
@@ -84,11 +83,6 @@ async function renderPedidos() {
         if (_filtroTipo === 'lavado')   return t.startsWith('Lavado') || t === 'Desinfección';
         return true;
       });
-    }
-    if (_filtroBusqueda) {
-      const q = _filtroBusqueda;
-      r = r.filter(p => [p.tipo_camion, p.origen, p.destino, p.descripcion, p.cliente_nombre, p.tipo_carga]
-        .some(v => v && v.toLowerCase().includes(q)));
     }
     return r;
   };
@@ -964,7 +958,3 @@ function filtrarPedidosTipo(tipo) {
   renderPedidos();
 }
 
-function buscarPedidos() {
-  _filtroBusqueda = (document.getElementById('ped-search')?.value || '').toLowerCase().trim();
-  renderPedidos();
-}

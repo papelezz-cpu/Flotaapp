@@ -161,16 +161,14 @@
       </button>
     </div>
 
-    <!-- Búsqueda y filtros — solo usuarios logueados -->
+    <!-- Filtros — solo usuarios logueados -->
     <div class="ped-filtros-bar" id="ped-filtros-bar" style="display:none">
-      <input type="search" id="ped-search" class="ped-search-input"
-             placeholder="Buscar solicitud…" oninput="buscarPedidos()">
       <div class="ped-filtro-pills">
         <button class="ped-filtro-pill active" data-tipo="todos"     onclick="filtrarPedidosTipo('todos')">Todos</button>
-        <button class="ped-filtro-pill"        data-tipo="camion"    onclick="filtrarPedidosTipo('camion')">🚛 Camión</button>
-        <button class="ped-filtro-pill"        data-tipo="custodio"  onclick="filtrarPedidosTipo('custodio')">👮 Custodia</button>
-        <button class="ped-filtro-pill"        data-tipo="patio"     onclick="filtrarPedidosTipo('patio')">🏭 Patio</button>
-        <button class="ped-filtro-pill"        data-tipo="lavado"    onclick="filtrarPedidosTipo('lavado')">🚿 Lavado</button>
+        <button class="ped-filtro-pill"        data-tipo="camion"    onclick="filtrarPedidosTipo('camion')"><span class="pill-icon">🚛</span>Camión</button>
+        <button class="ped-filtro-pill"        data-tipo="custodio"  onclick="filtrarPedidosTipo('custodio')"><span class="pill-icon">👮</span>Custodia</button>
+        <button class="ped-filtro-pill"        data-tipo="patio"     onclick="filtrarPedidosTipo('patio')"><span class="pill-icon">🏭</span>Patio</button>
+        <button class="ped-filtro-pill"        data-tipo="lavado"    onclick="filtrarPedidosTipo('lavado')"><span class="pill-icon">🚿</span>Lavado</button>
       </div>
     </div>
 
