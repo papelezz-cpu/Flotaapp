@@ -710,26 +710,28 @@ async function openHacerOferta(pedidoId) {
     });
 
   } else {
-    // Camión (comportamiento original)
+    // Camión — query directo igual que custodios/patios
     if (label) label.textContent = 'Camión que asignas';
-    const misCamiones = allCamiones.filter(c =>
-      (currentUser.rol === 'superadmin' || c.propietario_id === currentUser.id) &&
-      c.estado === 'disponible'
-    );
-    recursos = misCamiones;
+    let q = sb.from('camiones').select('*').eq('estado', 'disponible');
+    if (currentUser.rol !== 'superadmin') q = q.eq('propietario_id', currentUser.id);
+    const { data: camionesData } = await q;
+    recursos = camionesData || [];
     sinRecursosMsg = '⚠ No tienes camiones disponibles. Verifica el estado de tus unidades en el panel Admin.';
 
-    select.innerHTML = `<option value="">Sin asignar camión aún</option>`;
-    misCamiones.forEach(c => {
+    const CAMION_EMOJI = { Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️' };
+    select.innerHTML = recursos.length
+      ? `<option value="">— Selecciona un camión —</option>`
+      : `<option value="">Sin camiones disponibles</option>`;
+    recursos.forEach(c => {
       const opt = document.createElement('option');
       opt.value       = c.id;
-      opt.textContent = `${c.emoji} ${c.id} — ${c.tipo} (${c.capacidad} ton)`;
+      opt.textContent = `${CAMION_EMOJI[c.tipo] || '🚛'} ${c.id} — ${c.tipo} (${c.capacidad} ton)`;
       select.appendChild(opt);
     });
   }
 
   // Si no hay recursos del tipo requerido, mostrar advertencia y bloquear envío
-  if ((esCustodio || esPatio) && !recursos.length) {
+  if (!recursos.length && sinRecursosMsg) {
     if (warn)   { warn.textContent = sinRecursosMsg; warn.style.display = 'block'; }
     if (btnEnv) btnEnv.disabled = true;
   }
