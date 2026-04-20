@@ -92,7 +92,8 @@ async function renderPedidos() {
 
   // ── CLIENTE ────────────────────────────────────────
   if (currentUser.id && currentUser.rol === 'cliente') {
-    const misPedidos   = _filtrar((pedidos || []).filter(p => p.cliente_id === currentUser.id));
+    // Acordado y cancelado se mueven a reservaciones; no mostrar aquí
+    const misPedidos   = _filtrar((pedidos || []).filter(p => p.cliente_id === currentUser.id && !['acordado','cancelado'].includes(p.estado)));
     const otrosPedidos = _filtrar((pedidos || []).filter(p => p.cliente_id !== currentUser.id && p.estado === 'abierto'));
 
     if (misPedidos.length) {
@@ -558,19 +559,23 @@ async function responderOferta(ofertaId, accion) {
 function _openDetallesServicio(oferta, pedido) {
   _pendingOferta = oferta;
   _pendingPedido = pedido;
+  // Cerrar el modal de detalle (mismo z-index) antes de abrir el nuevo
+  document.getElementById('modal-pedido-detalle').classList.remove('open');
   const fmt = n => `$${Number(n).toLocaleString('es-MX')} MXN`;
   document.getElementById('ds-resumen').innerHTML =
     `Acuerdo con <strong>${esc(oferta.admin_nombre)}</strong> · <strong>${fmt(oferta.precio_oferta)}</strong> · ${esc(pedido.tipo_camion)}`;
-  document.getElementById('ds-fecha').value             = pedido.fecha_ini || '';
-  document.getElementById('ds-hora').value              = pedido.hora_carga || '';
-  document.getElementById('ds-lugar').value             = pedido.origen || pedido.detalles_lugar || '';
-  document.getElementById('ds-contacto-nombre').value   = pedido.contacto_nombre || pedido.detalles_contacto_nombre || '';
-  document.getElementById('ds-contacto-tel').value      = pedido.contacto_tel || pedido.detalles_contacto_tel || '';
+  document.getElementById('ds-fecha').value           = (pedido.fecha_ini || '').split('T')[0];
+  document.getElementById('ds-hora').value            = pedido.hora_carga || '';
+  document.getElementById('ds-lugar').value           = pedido.detalles_lugar || pedido.origen || '';
+  document.getElementById('ds-contacto-nombre').value = pedido.detalles_contacto_nombre || pedido.contacto_nombre || '';
+  document.getElementById('ds-contacto-tel').value    = pedido.detalles_contacto_tel || pedido.contacto_tel || '';
   document.getElementById('modal-detalles-servicio').classList.add('open');
 }
 
 function closeDetallesServicio() {
   document.getElementById('modal-detalles-servicio').classList.remove('open');
+  // Reabrir el detalle del pedido si el usuario canceló
+  if (_pendingPedido) openPedidoDetalle(_pendingPedido.id);
   _pendingOferta = null;
   _pendingPedido = null;
 }
@@ -598,7 +603,11 @@ async function confirmarDetallesServicio() {
   // Marcar oferta como aceptada
   await sb.from('ofertas').update({ estado: 'aceptada' }).eq('id', oferta.id);
 
-  closeDetallesServicio();
+  // Limpiar pendientes antes de cerrar para que closeDetallesServicio no reabra
+  _pendingOferta = null;
+  _pendingPedido = null;
+  document.getElementById('modal-detalles-servicio').classList.remove('open');
+
   await cerrarAcuerdo(oferta, { ...pedido, fecha_ini: fecha });
   await loadNotificaciones();
   closePedidoDetalle();
