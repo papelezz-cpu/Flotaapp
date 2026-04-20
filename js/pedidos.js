@@ -42,8 +42,13 @@ async function renderPedidos() {
   if (filtrosBar) filtrosBar.style.display = currentUser.id ? '' : 'none';
 
   // Fetch pedidos + ofertas en paralelo
+  // Para clientes excluir acordado/cancelado directo en la query
+  const esCliente = currentUser.id && currentUser.rol === 'cliente';
+  let pedidosQ = sb.from('pedidos').select('*').order('created_at', { ascending: false });
+  if (esCliente) pedidosQ = pedidosQ.not('estado', 'in', '("acordado","cancelado")');
+
   const [{ data: pedidos, error }, { data: todasOfertas }] = await Promise.all([
-    sb.from('pedidos').select('*').order('created_at', { ascending: false }),
+    pedidosQ,
     sb.from('ofertas').select('*').order('created_at', { ascending: true })
   ]);
 
