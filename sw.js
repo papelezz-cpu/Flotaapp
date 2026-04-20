@@ -44,23 +44,36 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Fetch: network-first para API, cache-first para assets
+// Fetch: network-first para JS/CSS (siempre frescos), cache-first para imágenes
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
   // Supabase y CDN siempre desde red
-  if (url.hostname.includes('supabase') || url.hostname.includes('googleapis') || url.hostname.includes('jsdelivr')) {
-    return;
-  }
+  if (url.hostname !== location.hostname) return;
 
-  // Assets locales: cache-first, fallback a red
-  e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
-      if (res.ok) {
-        const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
-      }
-      return res;
-    }))
-  );
+  const esScript = url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.html');
+
+  if (esScript) {
+    // Network-first: si falla la red, usar cache como fallback
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+  } else {
+    // Imágenes y otros assets: cache-first
+    e.respondWith(
+      caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }))
+    );
+  }
 });
