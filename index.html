@@ -158,6 +158,19 @@
       </button>
     </div>
 
+    <!-- Búsqueda y filtros — solo usuarios logueados -->
+    <div class="ped-filtros-bar" id="ped-filtros-bar" style="display:none">
+      <input type="search" id="ped-search" class="ped-search-input"
+             placeholder="Buscar solicitud…" oninput="buscarPedidos()">
+      <div class="ped-filtro-pills">
+        <button class="ped-filtro-pill active" data-tipo="todos"     onclick="filtrarPedidosTipo('todos')">Todos</button>
+        <button class="ped-filtro-pill"        data-tipo="camion"    onclick="filtrarPedidosTipo('camion')">🚛 Camión</button>
+        <button class="ped-filtro-pill"        data-tipo="custodio"  onclick="filtrarPedidosTipo('custodio')">👮 Custodia</button>
+        <button class="ped-filtro-pill"        data-tipo="patio"     onclick="filtrarPedidosTipo('patio')">🏭 Patio</button>
+        <button class="ped-filtro-pill"        data-tipo="lavado"    onclick="filtrarPedidosTipo('lavado')">🚿 Lavado</button>
+      </div>
+    </div>
+
     <div id="pedidos-list"></div>
   </div>
 </div>
@@ -847,6 +860,82 @@
       <button class="btn-cancel" onclick="closeResponderContra()">Cancelar</button>
       <button class="btn-edit btn-rechazar" style="flex:1;padding:10px;font-size:0.85rem" onclick="responderContra('rechazar')">✕ Rechazar</button>
       <button class="btn-confirm" onclick="responderContra('aceptar')">✓ Aceptar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL DETALLES DEL SERVICIO (post-acuerdo) ══════ -->
+<div class="modal-overlay" id="modal-detalles-servicio">
+  <div class="modal modal-np" style="max-width:500px;padding:0">
+    <div class="modal-np-header">
+      <span>📋 Confirmar detalles del servicio</span>
+      <button class="modal-close-x" onclick="closeDetallesServicio()">✕</button>
+    </div>
+    <div class="modal-np-body">
+      <p id="ds-resumen" class="sub" style="margin-bottom:18px;padding:12px 14px;background:rgba(78,142,247,0.08);border-radius:10px;border:1px solid rgba(78,142,247,0.2)"></p>
+      <div class="form-group">
+        <label>Fecha del servicio *</label>
+        <input type="date" id="ds-fecha">
+      </div>
+      <div class="form-group">
+        <label>Hora aproximada</label>
+        <input type="time" id="ds-hora">
+      </div>
+      <div class="form-group">
+        <label>Dirección exacta / punto de encuentro *</label>
+        <input type="text" id="ds-lugar" placeholder="Ej. Terminal Lázaro Cárdenas, Patio 3…">
+      </div>
+      <div class="form-group">
+        <label>Nombre del contacto en sitio</label>
+        <input type="text" id="ds-contacto-nombre" placeholder="Quien recibirá al proveedor">
+      </div>
+      <div class="form-group">
+        <label>Teléfono de contacto</label>
+        <input type="tel" id="ds-contacto-tel" placeholder="Ej. 314 123 4567">
+      </div>
+      <div class="modal-actions" style="padding:0 0 4px">
+        <button class="btn-cancel" onclick="closeDetallesServicio()">Cancelar</button>
+        <button class="btn-confirm" onclick="confirmarDetallesServicio()">✓ Confirmar acuerdo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL PERFIL DE EMPRESA ════════════════════════ -->
+<div class="modal-overlay" id="modal-empresa-perfil">
+  <div class="modal" style="max-width:440px">
+    <h2 id="ep-titulo">Empresa</h2>
+    <div id="ep-body" style="max-height:50vh;overflow-y:auto"></div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn-confirm" onclick="closeEmpresaPerfil()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL CALIFICAR SERVICIO ════════════════════════ -->
+<div class="modal-overlay" id="modal-calificar">
+  <div class="modal" style="max-width:400px">
+    <h2>⭐ Calificar servicio</h2>
+    <p id="cal-subtitulo" class="sub"></p>
+    <input type="hidden" id="cal-reservacion-id">
+    <input type="hidden" id="cal-admin-id">
+    <div class="form-group" style="text-align:center;margin-bottom:0">
+      <div class="star-rating" id="cal-stars">
+        <span class="star" data-val="1" onclick="seleccionarEstrella(1)">★</span>
+        <span class="star" data-val="2" onclick="seleccionarEstrella(2)">★</span>
+        <span class="star" data-val="3" onclick="seleccionarEstrella(3)">★</span>
+        <span class="star" data-val="4" onclick="seleccionarEstrella(4)">★</span>
+        <span class="star" data-val="5" onclick="seleccionarEstrella(5)">★</span>
+      </div>
+      <div id="cal-rating-label" style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">Excelente</div>
+    </div>
+    <div class="form-group">
+      <label>Comentario <span style="font-weight:400;color:var(--text-muted)">(opcional)</span></label>
+      <textarea id="cal-comentario" rows="2" placeholder="¿Cómo fue el servicio?"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeCalificar()">Cancelar</button>
+      <button class="btn-confirm" onclick="enviarCalificacion()">⭐ Enviar calificación</button>
     </div>
   </div>
 </div>

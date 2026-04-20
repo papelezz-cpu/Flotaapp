@@ -70,16 +70,20 @@ async function renderReserv() {
     }
 
     body.innerHTML = data.map(r => {
-      const badgeCls = r.estado === 'Pendiente'  ? 'badge-busy'
-                     : r.estado === 'Activa'     ? 'badge-avail'
+      const badgeCls = r.estado === 'Pendiente'   ? 'badge-busy'
+                     : r.estado === 'Activa'      ? 'badge-avail'
+                     : r.estado === 'Completada'  ? 'badge-completado'
                      : 'badge-maint';
       const trackBtn = r.estado === 'Activa'
         ? `<button class="btn-edit" onclick="openTracking('${r.id}')" style="font-size:0.7rem">📍 ${esc(r.tracking_estado || 'Confirmado')}</button>`
         : '';
       const unidadLabel = recursoNombreMap[r.unidad] || esc(r.unidad) || '—';
-      const propId = ownerIdMap[r.unidad] || '';
+      const propId = ownerIdMap[r.unidad] || r.propietario_id || '';
       const chatBtn = propId
         ? `<button class="btn-chat-hilo" onclick="openChatReserva('${r.id}','${propId}','${esc(empresaMap[r.unidad]||'')}')">💬</button>`
+        : '';
+      const calBtn = (r.estado === 'Completada' && !r.calificado && propId)
+        ? `<button class="btn-calificar" onclick="openCalificar('${r.id}','${propId}','${esc(empresaMap[r.unidad]||'')}')">⭐ Calificar</button>`
         : '';
       return `
       <div class="reserv-row reserv-row-cli">
@@ -91,6 +95,7 @@ async function renderReserv() {
           <span class="badge ${badgeCls}">${esc(r.estado)}</span>
           ${trackBtn}
           ${chatBtn}
+          ${calBtn}
         </div>
       </div>`;
     }).join('');
@@ -182,11 +187,13 @@ async function renderReserv() {
     const esActiva    = r.estado === 'Activa';
     const inactiva    = esCancelada || esRechazada;
 
-    const badgeCls = esPendiente ? 'badge-busy'
-                   : esActiva    ? 'badge-avail'
+    const esCompletada = r.estado === 'Completada';
+    const badgeCls = esPendiente  ? 'badge-busy'
+                   : esActiva     ? 'badge-avail'
+                   : esCompletada ? 'badge-acordado'
                    : 'badge-maint';
 
-    const esDueno = currentUser.rol === 'superadmin' || ownerMap[r.unidad] === currentUser.id;
+    const esDueno = currentUser.rol === 'superadmin' || ownerMap[r.unidad] === currentUser.id || r.propietario_id === currentUser.id;
     let acciones = '';
     if (esDueno && esPendiente) {
       acciones = `
@@ -196,6 +203,7 @@ async function renderReserv() {
       const trackStep = r.tracking_estado || 'Confirmado';
       acciones = `
         <button class="btn-edit" onclick="openTracking('${r.id}')" title="Ver seguimiento">📍 ${esc(trackStep)}</button>
+        <button class="btn-completar-reserva" onclick="marcarCompletado('${r.id}')">✓ Completar</button>
         <button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${esc(r.unidad)}')">Cancelar</button>`;
     }
 
@@ -327,6 +335,76 @@ async function eliminarReserva(reservaId) {
 
   await renderReserv();
   showToast('✓ Reservación archivada en el historial');
+}
+
+// ── COMPLETAR SERVICIO (admin) ─────────────────────────
+
+async function marcarCompletado(reservaId) {
+  if (!confirm('¿Marcar este servicio como completado? El cliente podrá calificarlo.')) return;
+  const { data: r } = await sb.from('reservaciones').select('unidad, recurso_tipo').eq('id', reservaId).single();
+  await sb.from('reservaciones').update({
+    estado:       'Completada',
+    completado_en: new Date().toISOString(),
+  }).eq('id', reservaId);
+
+  // Liberar recurso
+  if (r?.unidad) {
+    const tabla = r.recurso_tipo === 'custodio' ? 'custodios' : r.recurso_tipo === 'patio' ? 'patios' : 'camiones';
+    await sb.from(tabla).update({ estado: 'disponible' }).eq('id', r.unidad);
+  }
+  await renderReserv();
+  showToast('✓ Servicio marcado como completado');
+}
+
+// ── CALIFICAR SERVICIO (cliente) ───────────────────────
+
+let _calReservaId = null;
+let _calAdminId   = null;
+let _calRating    = 5;
+
+function openCalificar(reservaId, adminId, adminNombre) {
+  _calReservaId = reservaId;
+  _calAdminId   = adminId;
+  _calRating    = 5;
+  document.getElementById('cal-reservacion-id').value = reservaId;
+  document.getElementById('cal-admin-id').value       = adminId;
+  document.getElementById('cal-subtitulo').textContent = adminNombre ? `Califica a ${adminNombre}` : '';
+  seleccionarEstrella(5);
+  document.getElementById('cal-comentario').value = '';
+  document.getElementById('modal-calificar').classList.add('open');
+}
+
+function closeCalificar() {
+  document.getElementById('modal-calificar').classList.remove('open');
+  _calReservaId = null;
+  _calAdminId   = null;
+}
+
+function seleccionarEstrella(val) {
+  _calRating = val;
+  const labels = ['', 'Malo', 'Regular', 'Bueno', 'Muy bueno', 'Excelente'];
+  document.querySelectorAll('#cal-stars .star').forEach((el, i) => {
+    el.classList.toggle('star-on', i < val);
+  });
+  const lbl = document.getElementById('cal-rating-label');
+  if (lbl) lbl.textContent = labels[val] || '';
+}
+
+async function enviarCalificacion() {
+  if (!_calReservaId || !_calAdminId) return;
+  const comentario = document.getElementById('cal-comentario')?.value?.trim() || null;
+  const { error } = await sb.from('calificaciones').insert({
+    reservacion_id: _calReservaId,
+    admin_id:       _calAdminId,
+    cliente_id:     currentUser.id,
+    rating:         _calRating,
+    comentario,
+  });
+  if (error) { showToast('Error al enviar calificación'); return; }
+  await sb.from('reservaciones').update({ calificado: true }).eq('id', _calReservaId);
+  closeCalificar();
+  await renderReserv();
+  showToast('⭐ ¡Gracias por tu calificación!');
 }
 
 // Helper: envía email via edge function (fire-and-forget)

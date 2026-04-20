@@ -3,6 +3,10 @@
 let pedidoDetalle      = null;   // pedido abierto en modal
 let ofertaDetalleId    = null;   // oferta en modal responder-contra
 let pedidoParaOfertar  = null;   // pedido sobre el que el admin ofertará
+let _pendingOferta     = null;   // oferta en espera de confirmar detalles
+let _pendingPedido     = null;   // pedido en espera de confirmar detalles
+let _filtroTipo        = 'todos';
+let _filtroBusqueda    = '';
 
 const TIPO_EMOJI = {
   Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️', Cualquiera:'🚛',
@@ -33,6 +37,9 @@ async function renderPedidos() {
   if (btnServ) {
     btnServ.style.display = (currentUser.id && currentUser.rol === 'cliente') ? 'grid' : 'none';
   }
+  // Barra de filtros: para cualquier usuario logueado
+  const filtrosBar = document.getElementById('ped-filtros-bar');
+  if (filtrosBar) filtrosBar.style.display = currentUser.id ? '' : 'none';
 
   // Fetch pedidos + ofertas en paralelo
   const [{ data: pedidos, error }, { data: todasOfertas }] = await Promise.all([
@@ -61,12 +68,32 @@ async function renderPedidos() {
       .in('id', expiradas.map(o => o.id)).then(() => {});
   }
 
+  const _filtrar = lista => {
+    let r = lista;
+    if (_filtroTipo !== 'todos') {
+      r = r.filter(p => {
+        const t = p.tipo_camion || '';
+        if (_filtroTipo === 'camion')   return !t.startsWith('Lavado') && t !== 'Desinfección' && !t.startsWith('Custodio') && t !== 'Supervisión remota' && !t.startsWith('Patio') && t !== 'Bodega';
+        if (_filtroTipo === 'custodio') return t.startsWith('Custodio') || t === 'Supervisión remota';
+        if (_filtroTipo === 'patio')    return t.startsWith('Patio') || t === 'Bodega';
+        if (_filtroTipo === 'lavado')   return t.startsWith('Lavado') || t === 'Desinfección';
+        return true;
+      });
+    }
+    if (_filtroBusqueda) {
+      const q = _filtroBusqueda;
+      r = r.filter(p => [p.tipo_camion, p.origen, p.destino, p.descripcion, p.cliente_nombre, p.tipo_carga]
+        .some(v => v && v.toLowerCase().includes(q)));
+    }
+    return r;
+  };
+
   let html = '';
 
   // ── CLIENTE ────────────────────────────────────────
   if (currentUser.id && currentUser.rol === 'cliente') {
-    const misPedidos   = (pedidos || []).filter(p => p.cliente_id === currentUser.id);
-    const otrosPedidos = (pedidos || []).filter(p => p.cliente_id !== currentUser.id && p.estado === 'abierto');
+    const misPedidos   = _filtrar((pedidos || []).filter(p => p.cliente_id === currentUser.id));
+    const otrosPedidos = _filtrar((pedidos || []).filter(p => p.cliente_id !== currentUser.id && p.estado === 'abierto'));
 
     if (misPedidos.length) {
       html += `<div class="ped-seccion-title">Mis solicitudes</div>`;
@@ -87,15 +114,15 @@ async function renderPedidos() {
     );
 
     // Pedidos donde tengo oferta activa (enviada o contra_oferta)
-    const misNegociaciones = (pedidos || []).filter(p =>
+    const misNegociaciones = _filtrar((pedidos || []).filter(p =>
       (ofertasMap[p.id] || []).some(o => o.admin_id === currentUser.id && ['enviada','contra_oferta'].includes(o.estado))
-    );
+    ));
     const misNegIds = new Set(misNegociaciones.map(p => p.id));
 
     // Pedidos abiertos donde aún no he ofertado
-    const disponibles = (pedidos || []).filter(p =>
+    const disponibles = _filtrar((pedidos || []).filter(p =>
       p.estado === 'abierto' && !misOfertaIds.has(p.id)
-    );
+    ));
 
     if (misNegociaciones.length) {
       html += `<div class="ped-seccion-title">Mis negociaciones</div>`;
@@ -136,14 +163,15 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
     cancelado:       'badge-maint',
   }[p.estado] || 'badge-maint';
 
-  const estadoLabel = {
-    abierto:        'Buscando ofertas',
-    en_negociacion: 'En negociación',
-    acordado:       '✓ Acordado',
-    cancelado:      'Cancelado',
-  }[p.estado] || p.estado;
+  const ofertasVivaz   = ofertas.filter(o => o.estado !== 'rechazada');
+  const estadoLabel = p.estado === 'abierto'
+    ? (ofertasVivaz.length ? `${ofertasVivaz.length} oferta${ofertasVivaz.length > 1 ? 's' : ''}` : 'Sin ofertas aún')
+    : p.estado === 'en_negociacion' ? 'En negociación'
+    : p.estado === 'acordado'       ? '✓ Acordado'
+    : p.estado === 'cancelado'      ? 'Cancelado'
+    : p.estado;
 
-  const ofertasVivas  = ofertas.filter(o => o.estado !== 'rechazada');
+  const ofertasVivas  = ofertasVivaz;
   const numOfertas    = ofertasVivas.length;
   const pendientes    = ofertas.filter(o => ['enviada','contra_oferta'].includes(o.estado));
 
@@ -366,6 +394,18 @@ async function crearPedido() {
   const { error } = await sb.from('pedidos').insert(payload);
   if (error) { showToast('Error al publicar: ' + (error.message || '')); return; }
 
+  // Notificar a todos los admins de la nueva solicitud
+  const { data: admins } = await sb.from('perfiles').select('user_id').in('rol', ['admin', 'superadmin']);
+  if (admins?.length) {
+    await sb.from('notificaciones').insert(admins.map(a => ({
+      user_id: a.user_id,
+      tipo:    'nueva_solicitud',
+      titulo:  'Nueva solicitud publicada',
+      mensaje: `Un cliente publicó una solicitud de ${tipo}. Revisa las solicitudes disponibles.`,
+      leido:   false,
+    })));
+  }
+
   closeNuevoPedido();
   // Limpiar todos los campos del formulario
   document.getElementById('modal-nuevo-pedido').querySelectorAll('input, textarea, select').forEach(el => {
@@ -454,7 +494,9 @@ function ofertaItemHTML(o) {
     <div class="oferta-item" id="of-${o.id}">
       <div class="oferta-top">
         <div>
-          <div class="oferta-empresa">${esc(o.admin_nombre)}</div>
+          <div class="oferta-empresa oferta-empresa-link" onclick="openEmpresaPerfil('${esc(o.admin_id||'')}','${esc(o.admin_nombre||'')}')">
+            ${esc(o.admin_nombre)}<span class="oferta-ver-link"> Ver →</span>
+          </div>
           ${o.camion_id ? `<div class="oferta-camion">🚛 ${esc(o.camion_id)}</div>` : ''}
         </div>
         <div style="text-align:right">
@@ -497,21 +539,71 @@ function cerrarContraoferta(ofertaId) {
 }
 
 async function responderOferta(ofertaId, accion) {
-  const nuevo = accion === 'aceptar' ? 'aceptada' : 'rechazada';
-  if (accion === 'aceptar' && !confirm('¿Confirmas aceptar esta oferta? Se creará la reservación.')) return;
-
-  const { data: oferta } = await sb.from('ofertas').select('*').eq('id', ofertaId).single();
-  const { error } = await sb.from('ofertas').update({ estado: nuevo }).eq('id', ofertaId);
-  if (error) { showToast('Error al procesar'); return; }
-
-  if (accion === 'aceptar' && oferta && pedidoDetalle) {
-    await cerrarAcuerdo(oferta, pedidoDetalle);
+  if (accion === 'aceptar') {
+    // Abrir modal de detalles del servicio antes de cerrar el acuerdo
+    const { data: oferta } = await sb.from('ofertas').select('*').eq('id', ofertaId).single();
+    if (!oferta || !pedidoDetalle) { showToast('Error al cargar la oferta'); return; }
+    _openDetallesServicio(oferta, pedidoDetalle);
+    return;
   }
-
+  // Rechazar
+  const { error } = await sb.from('ofertas').update({ estado: 'rechazada' }).eq('id', ofertaId);
+  if (error) { showToast('Error al procesar'); return; }
   await loadNotificaciones();
   if (pedidoDetalle) await openPedidoDetalle(pedidoDetalle.id);
   await renderPedidos();
-  showToast(accion === 'aceptar' ? '✓ ¡Acuerdo cerrado! Reservación creada' : 'Oferta declinada');
+  showToast('Oferta declinada');
+}
+
+function _openDetallesServicio(oferta, pedido) {
+  _pendingOferta = oferta;
+  _pendingPedido = pedido;
+  const fmt = n => `$${Number(n).toLocaleString('es-MX')} MXN`;
+  document.getElementById('ds-resumen').innerHTML =
+    `Acuerdo con <strong>${esc(oferta.admin_nombre)}</strong> · <strong>${fmt(oferta.precio_oferta)}</strong> · ${esc(pedido.tipo_camion)}`;
+  document.getElementById('ds-fecha').value             = pedido.fecha_ini || '';
+  document.getElementById('ds-hora').value              = pedido.hora_carga || '';
+  document.getElementById('ds-lugar').value             = pedido.origen || pedido.detalles_lugar || '';
+  document.getElementById('ds-contacto-nombre').value   = pedido.contacto_nombre || pedido.detalles_contacto_nombre || '';
+  document.getElementById('ds-contacto-tel').value      = pedido.contacto_tel || pedido.detalles_contacto_tel || '';
+  document.getElementById('modal-detalles-servicio').classList.add('open');
+}
+
+function closeDetallesServicio() {
+  document.getElementById('modal-detalles-servicio').classList.remove('open');
+  _pendingOferta = null;
+  _pendingPedido = null;
+}
+
+async function confirmarDetallesServicio() {
+  if (!_pendingOferta || !_pendingPedido) return;
+  const v = id => document.getElementById(id)?.value?.trim() || '';
+  const fecha = v('ds-fecha');
+  const lugar = v('ds-lugar');
+  if (!fecha || !lugar) { alert('Por favor completa la fecha y la dirección del servicio.'); return; }
+
+  const oferta = _pendingOferta;
+  const pedido = _pendingPedido;
+
+  // Guardar detalles en el pedido
+  await sb.from('pedidos').update({
+    detalles_lugar:           lugar,
+    detalles_hora:            v('ds-hora') || null,
+    detalles_contacto_nombre: v('ds-contacto-nombre') || null,
+    detalles_contacto_tel:    v('ds-contacto-tel') || null,
+    detalles_completados:     true,
+    fecha_ini:                fecha,
+  }).eq('id', pedido.id);
+
+  // Marcar oferta como aceptada
+  await sb.from('ofertas').update({ estado: 'aceptada' }).eq('id', oferta.id);
+
+  closeDetallesServicio();
+  await cerrarAcuerdo(oferta, { ...pedido, fecha_ini: fecha });
+  await loadNotificaciones();
+  closePedidoDetalle();
+  await renderPedidos();
+  showToast('✓ ¡Acuerdo cerrado! Reservación creada');
 }
 
 async function enviarContraoferta(ofertaId) {
@@ -742,6 +834,7 @@ async function cerrarAcuerdo(oferta, pedido) {
     cliente:         pedido.cliente_nombre,
     cliente_email:   pedido.cliente_email,
     cliente_user_id: pedido.cliente_id,
+    propietario_id:  oferta.admin_id,
     fecha_ini:       pedido.fecha_ini,
     fecha_fin:       pedido.fecha_fin || pedido.fecha_ini,
     descripcion:     pedido.descripcion,
@@ -775,4 +868,77 @@ async function eliminarPedido(pedidoId) {
   if (error) { showToast('Error al eliminar: ' + (error.message || '')); return; }
   document.getElementById(`ped-${pedidoId}`)?.remove();
   showToast('🗑 Pedido eliminado');
+}
+
+// ── PERFIL DE EMPRESA (desde oferta) ──────────────────
+
+async function openEmpresaPerfil(adminId, adminNombre) {
+  if (!adminId) return;
+  const titulo = document.getElementById('ep-titulo');
+  const body   = document.getElementById('ep-body');
+  if (titulo) titulo.textContent = adminNombre || 'Empresa';
+  if (body)   body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">Cargando…</div>';
+  document.getElementById('modal-empresa-perfil').classList.add('open');
+
+  const [
+    { data: perfil },
+    { data: camiones },
+    { data: custodios },
+    { data: patios },
+    { data: lavados },
+    { data: cals }
+  ] = await Promise.all([
+    sb.from('perfiles').select('descripcion, nombre').eq('user_id', adminId).single(),
+    sb.from('camiones').select('id, estado').eq('propietario_id', adminId),
+    sb.from('custodios').select('id, estado').eq('propietario_id', adminId),
+    sb.from('patios').select('id, estado').eq('propietario_id', adminId),
+    sb.from('lavados').select('id').eq('propietario_id', adminId),
+    sb.from('calificaciones').select('rating').eq('admin_id', adminId),
+  ]);
+
+  const avgRating = cals?.length
+    ? (cals.reduce((s, c) => s + c.rating, 0) / cals.length).toFixed(1)
+    : null;
+
+  const starsHTML = avgRating
+    ? `<div class="ep-stars">
+        <span style="color:#f59e0b;font-size:1.1rem">${'★'.repeat(Math.round(+avgRating))}${'☆'.repeat(5 - Math.round(+avgRating))}</span>
+        <span style="color:var(--text-muted);font-size:0.8rem"> ${avgRating} · ${cals.length} reseña${cals.length !== 1 ? 's' : ''}</span>
+       </div>`
+    : '<div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">Sin calificaciones aún</div>';
+
+  const recursos = [];
+  const disp = arr => arr?.filter(x => x.estado === 'disponible').length ?? 0;
+  if (camiones?.length)  recursos.push(`🚛 ${camiones.length} camión${camiones.length > 1 ? 'es' : ''} — ${disp(camiones)} disponible${disp(camiones) !== 1 ? 's' : ''}`);
+  if (custodios?.length) recursos.push(`👮 ${custodios.length} custodio${custodios.length > 1 ? 's' : ''} — ${disp(custodios)} disponible${disp(custodios) !== 1 ? 's' : ''}`);
+  if (patios?.length)    recursos.push(`🏭 ${patios.length} patio${patios.length > 1 ? 's' : ''} — ${disp(patios)} disponible${disp(patios) !== 1 ? 's' : ''}`);
+  if (lavados?.length)   recursos.push(`🚿 ${lavados.length} servicio${lavados.length > 1 ? 's' : ''} de lavado`);
+
+  if (body) body.innerHTML = `
+    <div style="padding:4px 0">
+      ${starsHTML}
+      ${perfil?.descripcion ? `<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:14px">${esc(perfil.descripcion)}</p>` : ''}
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${recursos.map(r => `<div class="ep-recurso-row">${r}</div>`).join('')}
+        ${!recursos.length ? '<div style="color:var(--text-muted);font-size:0.85rem">Sin recursos registrados aún</div>' : ''}
+      </div>
+    </div>`;
+}
+
+function closeEmpresaPerfil() {
+  document.getElementById('modal-empresa-perfil').classList.remove('open');
+}
+
+// ── FILTROS SOLICITUDES ────────────────────────────────
+
+function filtrarPedidosTipo(tipo) {
+  _filtroTipo = tipo;
+  document.querySelectorAll('.ped-filtro-pill').forEach(el =>
+    el.classList.toggle('active', el.dataset.tipo === tipo));
+  renderPedidos();
+}
+
+function buscarPedidos() {
+  _filtroBusqueda = (document.getElementById('ped-search')?.value || '').toLowerCase().trim();
+  renderPedidos();
 }
