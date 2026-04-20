@@ -1,10 +1,11 @@
-// ── SERVICE WORKER — FlotaPro ──────────────────────────
-const CACHE = 'flotapro-v1';
+// ── SERVICE WORKER — PortGo ────────────────────────────
+const CACHE = 'portgo-v8';
 const SHELL = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icon.svg',
+  '/icon-light.svg',
   '/css/base.css',
   '/css/layout.css',
   '/css/components.css',
@@ -16,10 +17,14 @@ const SHELL = [
   '/js/theme.js',
   '/js/views.js',
   '/js/camiones.js',
+  '/js/recursos.js',
   '/js/reservaciones.js',
   '/js/modal.js',
+  '/js/pedidos.js',
   '/js/admin.js',
   '/js/usuarios.js',
+  '/js/chat.js',
+  '/js/catalogo.js',
   '/js/main.js'
 ];
 
