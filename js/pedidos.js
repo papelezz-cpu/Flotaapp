@@ -307,28 +307,83 @@ function actualizarSubtipoPedido() {
   if (g('np-group-lavado'))   g('np-group-lavado').style.display   = esLavado   ? '' : 'none';
 }
 
+const NP_OPCIONES = {
+  camion: {
+    icon: '🚛', titulo: 'Transporte de carga',
+    desc: 'Solicita un camión para mover tu carga. Elige el tipo, origen, destino y fechas.',
+    opciones: [
+      { value: 'Cualquiera', label: 'Cualquier camión' },
+      { value: 'Torton',     label: 'Torton' },
+      { value: 'Rabón',      label: 'Rabón' },
+      { value: 'Full',       label: 'Full' },
+      { value: 'Plataforma', label: 'Plataforma' },
+    ],
+  },
+  custodio: {
+    icon: '👮', titulo: 'Servicio de custodia',
+    desc: 'Agrega seguridad a tu operación. Define zona, horario y número de elementos.',
+    opciones: [
+      { value: 'Custodio Armado',     label: 'Custodio Armado' },
+      { value: 'Custodio Sin arma',   label: 'Custodio Sin arma' },
+      { value: 'Custodio Motorizado', label: 'Custodio Motorizado' },
+      { value: 'Custodio K9',         label: 'Custodio K9' },
+      { value: 'Supervisión remota',  label: 'Supervisión remota' },
+    ],
+  },
+  patio: {
+    icon: '🏭', titulo: 'Almacenamiento en patio',
+    desc: 'Guarda tus vehículos o carga en un patio seguro. Indica fechas y área requerida.',
+    opciones: [
+      { value: 'Patio Techado',      label: 'Patio Techado' },
+      { value: 'Patio Abierto',      label: 'Patio Abierto' },
+      { value: 'Patio Refrigerado',  label: 'Patio Refrigerado' },
+      { value: 'Patio Especializado',label: 'Patio Especializado' },
+      { value: 'Bodega',             label: 'Bodega' },
+    ],
+  },
+  lavado: {
+    icon: '🚿', titulo: 'Lavado de unidades',
+    desc: 'Programa el lavado de tu flota. Elige el tipo de servicio y la ubicación.',
+    opciones: [
+      { value: 'Lavado Exterior',   label: 'Lavado Exterior' },
+      { value: 'Lavado Interior',   label: 'Lavado Interior' },
+      { value: 'Lavado Completo',   label: 'Lavado Completo' },
+      { value: 'Lavado de Motor',   label: 'Lavado de Motor' },
+      { value: 'Desinfección',      label: 'Desinfección' },
+      { value: 'Lavado Contenedor', label: 'Lavado Contenedor' },
+    ],
+  },
+};
+
 function openNuevoPedido(servicio) {
   if (!currentUser.id) { showLoginOverlay(); return; }
 
-  const CAT_INFO = {
-    camion:   { icon: '🚛', titulo: 'Transporte de carga',     desc: 'Solicita un camión para mover tu carga. Elige el tipo, origen, destino y fechas.', primer: 'Cualquiera' },
-    custodio: { icon: '👮', titulo: 'Servicio de custodia',    desc: 'Agrega seguridad a tu operación. Define zona, horario y número de elementos.',       primer: 'Custodio Armado' },
-    patio:    { icon: '🏭', titulo: 'Almacenamiento en patio', desc: 'Guarda tus vehículos o carga en un patio seguro. Indica fechas y área requerida.',    primer: 'Patio Techado' },
-    lavado:   { icon: '🚿', titulo: 'Lavado de unidades',      desc: 'Programa el lavado de tu flota. Elige el tipo de servicio y la ubicación.',           primer: 'Lavado Exterior' },
-  };
-
   const banner = document.getElementById('np-categoria-banner');
   const select = document.getElementById('np-tipo');
+  const cat    = NP_OPCIONES[servicio];
 
-  if (servicio && CAT_INFO[servicio]) {
-    const cat = CAT_INFO[servicio];
+  if (cat) {
+    // Mostrar banner descriptivo
     if (banner) {
       banner.innerHTML = `<span class="np-cat-icon">${cat.icon}</span><div><div class="np-cat-titulo">${cat.titulo}</div><div class="np-cat-desc">${cat.desc}</div></div>`;
       banner.style.display = 'flex';
     }
-    if (select) { select.value = cat.primer; actualizarSubtipoPedido(); }
+    // Poblar select solo con las opciones del servicio elegido
+    if (select) {
+      select.innerHTML = cat.opciones.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+      select.value = cat.opciones[0].value;
+      actualizarSubtipoPedido();
+    }
   } else {
+    // Sin servicio pre-elegido: mostrar todo
     if (banner) banner.style.display = 'none';
+    if (select) {
+      select.innerHTML = Object.entries(NP_OPCIONES).map(([, c]) =>
+        `<optgroup label="${c.icon} ${c.titulo}">${c.opciones.map(o => `<option value="${o.value}">${o.label}</option>`).join('')}</optgroup>`
+      ).join('');
+      select.value = 'Cualquiera';
+      actualizarSubtipoPedido();
+    }
   }
 
   document.getElementById('modal-nuevo-pedido').classList.add('open');
