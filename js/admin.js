@@ -59,8 +59,14 @@ async function renderAdmin() {
   renderCargoChipsSelect('admin-tipo-carga', []);
   autoFillDimensiones('admin');
 
-  // Cargar perfil de empresa
-  await renderPerfilEmpresa();
+  // Perfil de empresa: oculto para superadmin
+  const perfilCard = document.getElementById('perfil-empresa-card');
+  if (perfilCard) perfilCard.style.display = currentUser.rol === 'superadmin' ? 'none' : '';
+  if (currentUser.rol !== 'superadmin') await renderPerfilEmpresa();
+
+  // Dropdowns de empresa para superadmin
+  if (currentUser.rol === 'superadmin') await _cargarEmpresasDropdowns();
+  else document.querySelectorAll('.sa-empresa-row').forEach(el => el.style.display = 'none');
 
   renderPendientes();
   if (currentUser.rol !== 'superadmin') renderMisPendientes();
@@ -84,6 +90,32 @@ function cambiarAdminTab(tab) {
   else if (tab === 'patio') renderAdminPatios();
   else if (tab === 'lavado') renderAdminLavados();
   else renderAdmin();
+}
+
+// ── DROPDOWN EMPRESA (solo superadmin) ───────────────
+
+async function _cargarEmpresasDropdowns() {
+  const { data: empresas } = await sb.from('perfiles')
+    .select('user_id, nombre')
+    .eq('rol', 'admin')
+    .order('nombre');
+
+  const opts = (empresas || []).map(e =>
+    `<option value="${e.user_id}">${esc(e.nombre)}</option>`
+  ).join('');
+
+  ['camion','custodio','patio','lavado'].forEach(tipo => {
+    const sel = document.getElementById(`sa-empresa-${tipo}`);
+    if (sel) sel.innerHTML = `<option value="">— Selecciona empresa —</option>${opts}`;
+  });
+  document.querySelectorAll('.sa-empresa-row').forEach(el => el.style.display = '');
+}
+
+function _getPropietarioId(tipo) {
+  if (currentUser.rol !== 'superadmin') return currentUser.id;
+  const val = document.getElementById(`sa-empresa-${tipo}`)?.value;
+  if (!val) { showToast('Selecciona una empresa propietaria', 'error'); return null; }
+  return val;
 }
 
 // ── PERFIL DE EMPRESA ─────────────────────────────────
@@ -409,11 +441,13 @@ async function agregarCamion() {
   }
 
   const esSuperAdmin = currentUser.rol === 'superadmin';
+  const propietarioId = _getPropietarioId('camion');
+  if (!propietarioId) return;
   const emojis = { 'Torton': '🚛', 'Rabón': '🚚', 'Full': '🚛', 'Plataforma': '🏗️' };
   const { error } = await sb.from('camiones').insert({
     id, tipo, capacidad: cap, operador: op, estado,
     emoji: emojis[tipo] || '🚛',
-    propietario_id: currentUser.id,
+    propietario_id: propietarioId,
     archivos,
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
     ...(placas    && { placas }),
@@ -507,11 +541,13 @@ async function agregarCustodio() {
   const id = `CUS-${String(maxNum + 1).padStart(3,'0')}`;
 
   const esSuperAdmin = currentUser.rol === 'superadmin';
+  const propietarioId = _getPropietarioId('custodio');
+  if (!propietarioId) return;
   const { error } = await sb.from('custodios').insert({
     id, nombre, tipo, descripcion: desc || null,
     disponibilidad: disp,
     precio_dia: precio,
-    propietario_id: currentUser.id,
+    propietario_id: propietarioId,
     certificaciones: certs ? certs.split(',').map(s => s.trim()).filter(Boolean) : [],
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
   });
@@ -618,11 +654,13 @@ async function agregarPatio() {
   const id = `PAT-${String(maxNum + 1).padStart(3,'0')}`;
 
   const esSuperAdmin = currentUser.rol === 'superadmin';
+  const propietarioId = _getPropietarioId('patio');
+  if (!propietarioId) return;
   const { error } = await sb.from('patios').insert({
     id, nombre, tipo,
     ubicacion: ubic || null,
     area_m2: area, capacidad_vehiculos: capVeh, precio_dia: precio,
-    propietario_id: currentUser.id,
+    propietario_id: propietarioId,
     servicios: svcsRaw ? svcsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
   });
@@ -727,6 +765,9 @@ async function agregarLavado() {
 
   if (!nombre) { alert('Escribe un nombre para el servicio.'); return; }
 
+  const propietarioId = _getPropietarioId('lavado');
+  if (!propietarioId) return;
+
   const { data: existentes } = await sb.from('lavados').select('id').like('id','LAV-%');
   const maxNum = (existentes || []).reduce((max, l) => {
     const n = parseInt(l.id.split('-')[1]) || 0; return Math.max(max, n);
@@ -739,7 +780,7 @@ async function agregarLavado() {
     tipos_lavado:   tiposLavRaw ? tiposLavRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
     capacidad, ubicacion: ubic || null, horario: horario || null,
     precio_lavado: precio, descripcion: desc || null,
-    propietario_id: currentUser.id,
+    propietario_id: propietarioId,
     aprobacion: currentUser.rol === 'superadmin' ? 'aprobada' : 'pendiente',
   });
   if (error) { showToast('Error: ' + (error.message || '')); return; }

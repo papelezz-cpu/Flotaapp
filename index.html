@@ -181,8 +181,8 @@
   <div class="page">
     <div class="section-title">Panel de Administración</div>
 
-    <!-- Perfil de empresa -->
-    <div class="admin-card" style="margin-bottom:20px">
+    <!-- Perfil de empresa (oculto para superadmin) -->
+    <div class="admin-card" id="perfil-empresa-card" style="margin-bottom:20px">
       <h3 style="cursor:pointer" onclick="togglePerfilCard()">
         🏢 Perfil de empresa
         <span id="perfil-toggle-icon" style="margin-left:auto;font-size:0.85rem;color:var(--text-muted)">▼ Editar</span>
@@ -316,6 +316,10 @@
           <input type="file" id="admin-docs" multiple accept=".pdf,.jpg,.jpeg,.png" style="display:none"
                  onchange="updateFileLabel('admin-docs','docs-label')">
         </div>
+        <div class="form-group sa-empresa-row" style="display:none">
+          <label>Empresa propietaria</label>
+          <select id="sa-empresa-camion"><option value="">— Selecciona empresa —</option></select>
+        </div>
         <button class="btn-add" onclick="agregarCamion()">Enviar a aprobación</button>
       </div>
 
@@ -368,6 +372,10 @@
           <label>Precio por día (MXN)</label>
           <input type="number" id="ac-precio" placeholder="Ej. 1800">
         </div>
+        <div class="form-group sa-empresa-row" style="display:none">
+          <label>Empresa propietaria</label>
+          <select id="sa-empresa-custodio"><option value="">— Selecciona empresa —</option></select>
+        </div>
         <button class="btn-add" onclick="agregarCustodio()">➕ Agregar custodio</button>
       </div>
       <div class="admin-card">
@@ -416,6 +424,10 @@
           <label>Precio por día (MXN)</label>
           <input type="number" id="ap-precio" placeholder="Ej. 3500">
         </div>
+        <div class="form-group sa-empresa-row" style="display:none">
+          <label>Empresa propietaria</label>
+          <select id="sa-empresa-patio"><option value="">— Selecciona empresa —</option></select>
+        </div>
         <button class="btn-add" onclick="agregarPatio()">➕ Agregar patio</button>
       </div>
       <div class="admin-card">
@@ -461,6 +473,10 @@
         <div class="form-group">
           <label>Descripción / servicios adicionales</label>
           <textarea id="al-desc" rows="2" placeholder="Detalles adicionales del servicio..."></textarea>
+        </div>
+        <div class="form-group sa-empresa-row" style="display:none">
+          <label>Empresa propietaria</label>
+          <select id="sa-empresa-lavado"><option value="">— Selecciona empresa —</option></select>
         </div>
         <button class="btn-add" onclick="agregarLavado()">➕ Agregar servicio</button>
       </div>
