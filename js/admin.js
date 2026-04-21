@@ -59,8 +59,14 @@ async function renderAdmin() {
   renderCargoChipsSelect('admin-tipo-carga', []);
   autoFillDimensiones('admin');
 
-  // Cargar perfil de empresa
-  await renderPerfilEmpresa();
+  // Perfil de empresa: oculto para superadmin
+  const perfilCard = document.getElementById('perfil-empresa-card');
+  if (perfilCard) perfilCard.style.display = currentUser.rol === 'superadmin' ? 'none' : '';
+  if (currentUser.rol !== 'superadmin') await renderPerfilEmpresa();
+
+  // Dropdowns de empresa para superadmin
+  if (currentUser.rol === 'superadmin') await _cargarEmpresasDropdowns();
+  else document.querySelectorAll('.sa-empresa-row').forEach(el => el.style.display = 'none');
 
   renderPendientes();
   if (currentUser.rol !== 'superadmin') renderMisPendientes();
@@ -84,6 +90,32 @@ function cambiarAdminTab(tab) {
   else if (tab === 'patio') renderAdminPatios();
   else if (tab === 'lavado') renderAdminLavados();
   else renderAdmin();
+}
+
+// ── DROPDOWN EMPRESA (solo superadmin) ───────────────
+
+async function _cargarEmpresasDropdowns() {
+  const { data: empresas } = await sb.from('perfiles')
+    .select('user_id, nombre')
+    .eq('rol', 'admin')
+    .order('nombre');
+
+  const opts = (empresas || []).map(e =>
+    `<option value="${e.user_id}">${esc(e.nombre)}</option>`
+  ).join('');
+
+  ['camion','custodio','patio','lavado'].forEach(tipo => {
+    const sel = document.getElementById(`sa-empresa-${tipo}`);
+    if (sel) sel.innerHTML = `<option value="">— Selecciona empresa —</option>${opts}`;
+  });
+  document.querySelectorAll('.sa-empresa-row').forEach(el => el.style.display = '');
+}
+
+function _getPropietarioId(tipo) {
+  if (currentUser.rol !== 'superadmin') return currentUser.id;
+  const val = document.getElementById(`sa-empresa-${tipo}`)?.value;
+  if (!val) { showToast('Selecciona una empresa propietaria', 'error'); return null; }
+  return val;
 }
 
 // ── PERFIL DE EMPRESA ─────────────────────────────────
@@ -214,26 +246,35 @@ async function guardarEdicion() {
 
 // Muestra las unidades pendientes del propio admin (no superadmin)
 async function renderMisPendientes() {
-  const { data } = await sb.from('camiones')
-    .select('*')
-    .eq('propietario_id', currentUser.id)
-    .eq('aprobacion', 'pendiente')
-    .order('created_at', { ascending: false });
+  const uid = currentUser.id;
+  const [{ data: camPend }, { data: cusPend }, { data: patPend }, { data: lavPend }] = await Promise.all([
+    sb.from('camiones' ).select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('custodios').select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('patios'   ).select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('lavados'  ).select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+  ]);
 
   const section = document.getElementById('pendientes-section');
   const list    = document.getElementById('pendientes-list');
 
-  if (!data?.length) { section.style.display = 'none'; return; }
+  const todos = [
+    ...(camPend || []).map(c => ({ tipo: 'camion',   label: `${c.emoji || '🚛'} ${c.id} — ${c.tipo}`, sub: `${c.operador} · ${c.capacidad} ton` })),
+    ...(cusPend || []).map(c => ({ tipo: 'custodio', label: `👮 ${c.id} — ${c.nombre}`, sub: `${c.tipo} · ${c.disponibilidad || ''}` })),
+    ...(patPend || []).map(p => ({ tipo: 'patio',    label: `🏭 ${p.id} — ${p.nombre}`, sub: `${p.tipo}${p.area_m2 ? ' · ' + p.area_m2 + ' m²' : ''}` })),
+    ...(lavPend || []).map(l => ({ tipo: 'lavado',   label: `🚿 ${l.id} — ${l.nombre}`, sub: (l.tipos_vehiculo || []).join(', ') || '—' })),
+  ];
+
+  if (!todos.length) { section.style.display = 'none'; return; }
 
   section.style.display = 'block';
   const titulo = section.querySelector('.section-title');
-  if (titulo) titulo.innerHTML = '⏳ Mis unidades en espera de aprobación';
+  if (titulo) titulo.innerHTML = '⏳ Mis servicios en espera de aprobación';
 
-  list.innerHTML = data.map(c => `
+  list.innerHTML = todos.map(t => `
     <div class="truck-list-item">
       <div class="truck-list-item-info">
-        <div class="truck-list-item-name">${c.emoji} ${c.id} — ${c.tipo}</div>
-        <div class="truck-list-item-sub">${c.operador} · ${c.capacidad} ton</div>
+        <div class="truck-list-item-name">${t.label}</div>
+        <div class="truck-list-item-sub">${t.sub}</div>
       </div>
       <span class="badge badge-busy" style="font-size:0.72rem">⏳ Pendiente</span>
     </div>`).join('');
@@ -247,29 +288,63 @@ async function renderPendientes() {
   const list    = document.getElementById('pendientes-list');
   list.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
 
-  const { data } = await sb.from('camiones')
-    .select('*, propietario:perfiles(nombre)')
-    .eq('aprobacion', 'pendiente')
-    .order('created_at', { ascending: false });
+  const [{ data: camiones }, { data: custodios }, { data: patios }, { data: lavados }] = await Promise.all([
+    sb.from('camiones' ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('custodios').select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('patios'   ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('lavados'  ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+  ]);
 
-  if (!data?.length) { section.style.display = 'none'; return; }
+  const total = (camiones?.length || 0) + (custodios?.length || 0) + (patios?.length || 0) + (lavados?.length || 0);
+  if (!total) { section.style.display = 'none'; return; }
 
   section.style.display = 'block';
-  list.innerHTML = data.map(c => `
+
+  const rowCamion = (c) => `
     <div class="truck-list-item">
       <div class="truck-list-item-info">
-        <div class="truck-list-item-name">${c.emoji} ${c.id} — ${c.tipo}</div>
-        <div class="truck-list-item-sub">
-          ${c.operador} · ${c.capacidad} ton ·
-          <em style="color:var(--text-muted)">${c.propietario?.nombre || '—'}</em>
-        </div>
+        <div class="truck-list-item-name">${c.emoji || '🚛'} ${c.id} — ${c.tipo}</div>
+        <div class="truck-list-item-sub">${c.operador} · ${c.capacidad} ton · <em style="color:var(--text-muted)">${c.propietario?.nombre || '—'}</em></div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         ${(c.archivos || []).length ? `<button class="btn-edit" onclick="verArchivos('${c.id}')">📎 Archivos</button>` : ''}
         <button class="btn-edit btn-aprobar"  onclick="aprobarUnidad('${c.id}')">✓ Aprobar</button>
         <button class="btn-edit btn-rechazar" onclick="rechazarUnidad('${c.id}')">✕ Rechazar</button>
       </div>
-    </div>`).join('');
+    </div>`;
+
+  const rowRecurso = (r, tipo, icon, label, sub) => `
+    <div class="truck-list-item">
+      <div class="truck-list-item-info">
+        <div class="truck-list-item-name">${icon} ${r.id} — ${esc(label)}</div>
+        <div class="truck-list-item-sub">${esc(sub)} · <em style="color:var(--text-muted)">${r.propietario?.nombre || '—'}</em></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="btn-edit btn-aprobar"  onclick="aprobarRecurso('${tipo}','${r.id}')">✓ Aprobar</button>
+        <button class="btn-edit btn-rechazar" onclick="rechazarRecurso('${tipo}','${r.id}')">✕ Rechazar</button>
+      </div>
+    </div>`;
+
+  list.innerHTML = [
+    ...(camiones  || []).map(c => rowCamion(c)),
+    ...(custodios || []).map(c => rowRecurso(c, 'custodios', '👮', c.nombre, `${c.tipo} · ${c.disponibilidad || ''}`)),
+    ...(patios    || []).map(p => rowRecurso(p, 'patios',    '🏭', p.nombre, `${p.tipo}${p.area_m2 ? ' · ' + p.area_m2 + ' m²' : ''}`)),
+    ...(lavados   || []).map(l => rowRecurso(l, 'lavados',   '🚿', l.nombre, (l.tipos_vehiculo || []).join(', ') || '—')),
+  ].join('');
+}
+
+async function aprobarRecurso(tabla, id) {
+  const { error } = await sb.from(tabla).update({ aprobacion: 'aprobada' }).eq('id', id);
+  if (error) { showToast('Error al aprobar'); return; }
+  renderAdmin(); renderPendientes();
+  showToast(`✓ ${id} aprobado y publicado en el catálogo`);
+}
+
+async function rechazarRecurso(tabla, id) {
+  if (!confirm(`¿Rechazar ${id}? Se eliminará del sistema.`)) return;
+  await sb.from(tabla).delete().eq('id', id);
+  renderPendientes();
+  showToast(`${id} rechazado`);
 }
 
 // ── APROBACIÓN / ELIMINACIÓN ──────────────────────────
@@ -277,7 +352,7 @@ async function renderPendientes() {
 async function aprobarUnidad(id) {
   const { error } = await sb.from('camiones').update({ aprobacion: 'aprobada' }).eq('id', id);
   if (error) { showToast('Error al aprobar'); return; }
-  await renderAdmin();
+  renderAdmin(); renderPendientes();
   showToast(`✓ Unidad ${id} aprobada y publicada`);
 }
 
@@ -366,11 +441,13 @@ async function agregarCamion() {
   }
 
   const esSuperAdmin = currentUser.rol === 'superadmin';
+  const propietarioId = _getPropietarioId('camion');
+  if (!propietarioId) return;
   const emojis = { 'Torton': '🚛', 'Rabón': '🚚', 'Full': '🚛', 'Plataforma': '🏗️' };
   const { error } = await sb.from('camiones').insert({
     id, tipo, capacidad: cap, operador: op, estado,
     emoji: emojis[tipo] || '🚛',
-    propietario_id: currentUser.id,
+    propietario_id: propietarioId,
     archivos,
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
     ...(placas    && { placas }),
@@ -422,7 +499,7 @@ async function renderAdminCustodios() {
   if (!list) return;
   list.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
 
-  let query = sb.from('custodios').select('*').order('id');
+  let query = sb.from('custodios').select('*').eq('aprobacion', 'aprobada').order('id');
   if (currentUser.rol !== 'superadmin') query = query.eq('propietario_id', currentUser.id);
   const { data, error } = await query;
   if (error || !data?.length) {
@@ -463,12 +540,16 @@ async function agregarCustodio() {
   }, 0);
   const id = `CUS-${String(maxNum + 1).padStart(3,'0')}`;
 
+  const esSuperAdmin = currentUser.rol === 'superadmin';
+  const propietarioId = _getPropietarioId('custodio');
+  if (!propietarioId) return;
   const { error } = await sb.from('custodios').insert({
     id, nombre, tipo, descripcion: desc || null,
     disponibilidad: disp,
     precio_dia: precio,
-    propietario_id: currentUser.id,
+    propietario_id: propietarioId,
     certificaciones: certs ? certs.split(',').map(s => s.trim()).filter(Boolean) : [],
+    aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
   });
   if (error) { showToast('Error: ' + (error.message || '')); return; }
 
@@ -476,7 +557,8 @@ async function agregarCustodio() {
     const el = document.getElementById(i); if (el) el.value = '';
   });
   await renderAdminCustodios();
-  showToast(`✓ Custodio ${id} agregado`);
+  await renderMisPendientes();
+  showToast(esSuperAdmin ? `✓ Custodio ${id} agregado` : `✓ Custodio ${id} enviado — recibirás confirmación`);
 }
 
 async function editarCustodio(id) {
@@ -529,7 +611,7 @@ async function renderAdminPatios() {
   if (!list) return;
   list.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
 
-  let query = sb.from('patios').select('*').order('id');
+  let query = sb.from('patios').select('*').eq('aprobacion', 'aprobada').order('id');
   if (currentUser.rol !== 'superadmin') query = query.eq('propietario_id', currentUser.id);
   const { data, error } = await query;
   if (error || !data?.length) {
@@ -571,12 +653,16 @@ async function agregarPatio() {
   }, 0);
   const id = `PAT-${String(maxNum + 1).padStart(3,'0')}`;
 
+  const esSuperAdmin = currentUser.rol === 'superadmin';
+  const propietarioId = _getPropietarioId('patio');
+  if (!propietarioId) return;
   const { error } = await sb.from('patios').insert({
     id, nombre, tipo,
     ubicacion: ubic || null,
     area_m2: area, capacidad_vehiculos: capVeh, precio_dia: precio,
-    propietario_id: currentUser.id,
+    propietario_id: propietarioId,
     servicios: svcsRaw ? svcsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+    aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
   });
   if (error) { showToast('Error: ' + (error.message || '')); return; }
 
@@ -584,7 +670,8 @@ async function agregarPatio() {
     const el = document.getElementById(i); if (el) el.value = '';
   });
   await renderAdminPatios();
-  showToast(`✓ Patio ${id} agregado`);
+  await renderMisPendientes();
+  showToast(esSuperAdmin ? `✓ Patio ${id} agregado` : `✓ Patio ${id} enviado — recibirás confirmación`);
 }
 
 async function editarPatio(id) {
@@ -639,7 +726,7 @@ async function renderAdminLavados() {
   if (!list) return;
   list.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
 
-  let query = sb.from('lavados').select('*').order('id');
+  let query = sb.from('lavados').select('*').eq('aprobacion', 'aprobada').order('id');
   if (currentUser.rol !== 'superadmin') query = query.eq('propietario_id', currentUser.id);
   const { data, error } = await query;
   if (error || !data?.length) {
@@ -678,6 +765,9 @@ async function agregarLavado() {
 
   if (!nombre) { alert('Escribe un nombre para el servicio.'); return; }
 
+  const propietarioId = _getPropietarioId('lavado');
+  if (!propietarioId) return;
+
   const { data: existentes } = await sb.from('lavados').select('id').like('id','LAV-%');
   const maxNum = (existentes || []).reduce((max, l) => {
     const n = parseInt(l.id.split('-')[1]) || 0; return Math.max(max, n);
@@ -690,15 +780,16 @@ async function agregarLavado() {
     tipos_lavado:   tiposLavRaw ? tiposLavRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
     capacidad, ubicacion: ubic || null, horario: horario || null,
     precio_lavado: precio, descripcion: desc || null,
-    propietario_id: currentUser.id,
-    aprobacion: 'aprobada',
+    propietario_id: propietarioId,
+    aprobacion: currentUser.rol === 'superadmin' ? 'aprobada' : 'pendiente',
   });
   if (error) { showToast('Error: ' + (error.message || '')); return; }
 
   ['al-nombre','al-tipos-vehiculo','al-tipos-lavado','al-capacidad','al-ubic','al-horario','al-precio','al-desc']
     .forEach(i => { const el = document.getElementById(i); if (el) el.value = ''; });
   await renderAdminLavados();
-  showToast(`✓ Servicio ${id} agregado`);
+  await renderMisPendientes();
+  showToast(currentUser.rol === 'superadmin' ? `✓ Servicio ${id} agregado` : `✓ Servicio ${id} enviado — recibirás confirmación`);
 }
 
 async function editarLavado(id) {

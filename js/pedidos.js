@@ -3,6 +3,9 @@
 let pedidoDetalle      = null;   // pedido abierto en modal
 let ofertaDetalleId    = null;   // oferta en modal responder-contra
 let pedidoParaOfertar  = null;   // pedido sobre el que el admin ofertará
+let _pendingOferta     = null;   // oferta en espera de confirmar detalles
+let _pendingPedido     = null;   // pedido en espera de confirmar detalles
+let _filtroTipo        = 'todos';
 
 const TIPO_EMOJI = {
   Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️', Cualquiera:'🚛',
@@ -33,10 +36,20 @@ async function renderPedidos() {
   if (btnServ) {
     btnServ.style.display = (currentUser.id && currentUser.rol === 'cliente') ? 'grid' : 'none';
   }
+  // Barra de filtros: para cualquier usuario logueado
+  const filtrosBar = document.getElementById('ped-filtros-bar');
+  if (filtrosBar) filtrosBar.style.display = currentUser.id ? '' : 'none';
 
   // Fetch pedidos + ofertas en paralelo
+  // Clientes solo ven pedidos activos (nunca acordado/cancelado)
+  const esCliente = currentUser.id && currentUser.rol === 'cliente';
+  let pedidosQ = sb.from('pedidos').select('*').order('created_at', { ascending: false });
+  // Clientes: ven públicos (abierto/en_negociacion) + los suyos en cualquier estado activo
+  // La RLS ya permite esto: (admin) OR (estado público) OR (cliente_id = auth.uid())
+  if (esCliente) pedidosQ = pedidosQ.in('estado', ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado']);
+
   const [{ data: pedidos, error }, { data: todasOfertas }] = await Promise.all([
-    sb.from('pedidos').select('*').order('created_at', { ascending: false }),
+    pedidosQ,
     sb.from('ofertas').select('*').order('created_at', { ascending: true })
   ]);
 
@@ -61,12 +74,30 @@ async function renderPedidos() {
       .in('id', expiradas.map(o => o.id)).then(() => {});
   }
 
+  const _filtrar = lista => {
+    let r = lista;
+    if (_filtroTipo !== 'todos') {
+      r = r.filter(p => {
+        const t = p.tipo_camion || '';
+        if (_filtroTipo === 'camion')   return !t.startsWith('Lavado') && t !== 'Desinfección' && !t.startsWith('Custodio') && t !== 'Supervisión remota' && !t.startsWith('Patio') && t !== 'Bodega';
+        if (_filtroTipo === 'custodio') return t.startsWith('Custodio') || t === 'Supervisión remota';
+        if (_filtroTipo === 'patio')    return t.startsWith('Patio') || t === 'Bodega';
+        if (_filtroTipo === 'lavado')   return t.startsWith('Lavado') || t === 'Desinfección';
+        return true;
+      });
+    }
+    return r;
+  };
+
   let html = '';
 
   // ── CLIENTE ────────────────────────────────────────
   if (currentUser.id && currentUser.rol === 'cliente') {
-    const misPedidos   = (pedidos || []).filter(p => p.cliente_id === currentUser.id);
-    const otrosPedidos = (pedidos || []).filter(p => p.cliente_id !== currentUser.id && p.estado === 'abierto');
+    const ESTADOS_ACTIVOS = ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado'];
+    const misPedidos   = _filtrar((pedidos || []).filter(p =>
+      p.cliente_id === currentUser.id && ESTADOS_ACTIVOS.includes(p.estado)
+    ));
+    const otrosPedidos = _filtrar((pedidos || []).filter(p => p.cliente_id !== currentUser.id && p.estado === 'abierto'));
 
     if (misPedidos.length) {
       html += `<div class="ped-seccion-title">Mis solicitudes</div>`;
@@ -87,15 +118,15 @@ async function renderPedidos() {
     );
 
     // Pedidos donde tengo oferta activa (enviada o contra_oferta)
-    const misNegociaciones = (pedidos || []).filter(p =>
+    const misNegociaciones = _filtrar((pedidos || []).filter(p =>
       (ofertasMap[p.id] || []).some(o => o.admin_id === currentUser.id && ['enviada','contra_oferta'].includes(o.estado))
-    );
+    ));
     const misNegIds = new Set(misNegociaciones.map(p => p.id));
 
     // Pedidos abiertos donde aún no he ofertado
-    const disponibles = (pedidos || []).filter(p =>
+    const disponibles = _filtrar((pedidos || []).filter(p =>
       p.estado === 'abierto' && !misOfertaIds.has(p.id)
-    );
+    ));
 
     if (misNegociaciones.length) {
       html += `<div class="ped-seccion-title">Mis negociaciones</div>`;
@@ -130,20 +161,27 @@ async function renderPedidos() {
 
 function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
   const badgeCls = {
-    abierto:         'badge-avail',
-    en_negociacion:  'badge-busy',
-    acordado:        'badge-acordado',
-    cancelado:       'badge-maint',
+    abierto:             'badge-avail',
+    en_negociacion:      'badge-busy',
+    acordado:            'badge-acordado',
+    cancelado:           'badge-maint',
+    pendiente_revision:  'badge-revision',
+    pendiente_acuerdo:   'badge-acuerdo-rev',
+    rechazado:           'badge-maint',
   }[p.estado] || 'badge-maint';
 
-  const estadoLabel = {
-    abierto:        'Buscando ofertas',
-    en_negociacion: 'En negociación',
-    acordado:       '✓ Acordado',
-    cancelado:      'Cancelado',
-  }[p.estado] || p.estado;
+  const ofertasVivaz   = ofertas.filter(o => o.estado !== 'rechazada');
+  const estadoLabel = p.estado === 'abierto'
+    ? (ofertasVivaz.length ? `${ofertasVivaz.length} oferta${ofertasVivaz.length > 1 ? 's' : ''}` : 'Sin ofertas aún')
+    : p.estado === 'en_negociacion'     ? 'En negociación'
+    : p.estado === 'acordado'           ? '✓ Acordado'
+    : p.estado === 'cancelado'          ? 'Cancelado'
+    : p.estado === 'pendiente_revision' ? '⏳ En revisión'
+    : p.estado === 'pendiente_acuerdo'  ? '⏳ Acuerdo en revisión'
+    : p.estado === 'rechazado'          ? '✕ No aprobado'
+    : p.estado;
 
-  const ofertasVivas  = ofertas.filter(o => o.estado !== 'rechazada');
+  const ofertasVivas  = ofertasVivaz;
   const numOfertas    = ofertasVivas.length;
   const pendientes    = ofertas.filter(o => ['enviada','contra_oferta'].includes(o.estado));
 
@@ -157,7 +195,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
 
   let acciones = '';
 
-  if (vista === 'cliente' && p.estado !== 'cancelado') {
+  if (vista === 'cliente' && !['cancelado','pendiente_revision','pendiente_acuerdo','rechazado'].includes(p.estado)) {
     acciones = `
       <button class="btn-ver-pedido" onclick="openPedidoDetalle('${p.id}')">
         Ver ofertas${pendientes.length ? `<span class="ped-badge-count">${pendientes.length}</span>` : ''}
@@ -165,6 +203,8 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
       ${p.estado === 'abierto'
         ? `<button class="btn-cancelar-ped" onclick="cancelarPedido('${p.id}')">Cancelar</button>`
         : ''}`;
+  } else if (vista === 'cliente' && p.estado === 'rechazado' && p.rechazo_nota) {
+    acciones = `<div class="apr-rechazo-nota">Motivo: ${esc(p.rechazo_nota)}</div>`;
 
   } else if (vista === 'admin') {
     acciones = `<button class="btn-ofertar" onclick="openHacerOferta('${p.id}')">Hacer oferta</button>`;
@@ -267,26 +307,91 @@ function actualizarSubtipoPedido() {
   if (g('np-group-lavado'))   g('np-group-lavado').style.display   = esLavado   ? '' : 'none';
 }
 
+const NP_OPCIONES = {
+  camion: {
+    icon: '🚛', titulo: 'Transporte de carga',
+    desc: 'Solicita un camión para mover tu carga. Elige el tipo, origen, destino y fechas.',
+    opciones: [
+      { value: 'Cualquiera', label: 'Cualquier camión' },
+      { value: 'Torton',     label: 'Torton' },
+      { value: 'Rabón',      label: 'Rabón' },
+      { value: 'Full',       label: 'Full' },
+      { value: 'Plataforma', label: 'Plataforma' },
+    ],
+  },
+  custodio: {
+    icon: '👮', titulo: 'Servicio de custodia',
+    desc: 'Agrega seguridad a tu operación. Define zona, horario y número de elementos.',
+    opciones: [
+      { value: 'Custodio Armado',     label: 'Custodio Armado' },
+      { value: 'Custodio Sin arma',   label: 'Custodio Sin arma' },
+      { value: 'Custodio Motorizado', label: 'Custodio Motorizado' },
+      { value: 'Custodio K9',         label: 'Custodio K9' },
+      { value: 'Supervisión remota',  label: 'Supervisión remota' },
+    ],
+  },
+  patio: {
+    icon: '🏭', titulo: 'Almacenamiento en patio',
+    desc: 'Guarda tus vehículos o carga en un patio seguro. Indica fechas y área requerida.',
+    opciones: [
+      { value: 'Patio Techado',      label: 'Patio Techado' },
+      { value: 'Patio Abierto',      label: 'Patio Abierto' },
+      { value: 'Patio Refrigerado',  label: 'Patio Refrigerado' },
+      { value: 'Patio Especializado',label: 'Patio Especializado' },
+      { value: 'Bodega',             label: 'Bodega' },
+    ],
+  },
+  lavado: {
+    icon: '🚿', titulo: 'Lavado de unidades',
+    desc: 'Programa el lavado de tu flota. Elige el tipo de servicio y la ubicación.',
+    opciones: [
+      { value: 'Lavado Exterior',   label: 'Lavado Exterior' },
+      { value: 'Lavado Interior',   label: 'Lavado Interior' },
+      { value: 'Lavado Completo',   label: 'Lavado Completo' },
+      { value: 'Lavado de Motor',   label: 'Lavado de Motor' },
+      { value: 'Desinfección',      label: 'Desinfección' },
+      { value: 'Lavado Contenedor', label: 'Lavado Contenedor' },
+    ],
+  },
+};
+
 function openNuevoPedido(servicio) {
   if (!currentUser.id) { showLoginOverlay(); return; }
 
-  // Pre-seleccionar el tipo según el botón pulsado
+  const banner = document.getElementById('np-categoria-banner');
   const select = document.getElementById('np-tipo');
-  if (select && servicio) {
-    const mapPrimero = {
-      camion:   'Cualquiera',
-      custodio: 'Custodio Armado',
-      patio:    'Patio Techado',
-      lavado:   'Lavado Exterior',
-    };
-    if (mapPrimero[servicio]) select.value = mapPrimero[servicio];
-    actualizarSubtipoPedido();
+  const cat    = NP_OPCIONES[servicio];
+
+  if (cat) {
+    // Mostrar banner descriptivo
+    if (banner) {
+      banner.innerHTML = `<span class="np-cat-icon">${cat.icon}</span><div><div class="np-cat-titulo">${cat.titulo}</div><div class="np-cat-desc">${cat.desc}</div></div>`;
+      banner.style.display = 'flex';
+    }
+    // Poblar select solo con las opciones del servicio elegido
+    if (select) {
+      select.innerHTML = cat.opciones.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+      select.value = cat.opciones[0].value;
+      actualizarSubtipoPedido();
+    }
+  } else {
+    // Sin servicio pre-elegido: mostrar todo
+    if (banner) banner.style.display = 'none';
+    if (select) {
+      select.innerHTML = Object.entries(NP_OPCIONES).map(([, c]) =>
+        `<optgroup label="${c.icon} ${c.titulo}">${c.opciones.map(o => `<option value="${o.value}">${o.label}</option>`).join('')}</optgroup>`
+      ).join('');
+      select.value = 'Cualquiera';
+      actualizarSubtipoPedido();
+    }
   }
 
   document.getElementById('modal-nuevo-pedido').classList.add('open');
 }
 function closeNuevoPedido() {
   document.getElementById('modal-nuevo-pedido').classList.remove('open');
+  const banner = document.getElementById('np-categoria-banner');
+  if (banner) banner.style.display = 'none';
 }
 
 async function crearPedido() {
@@ -363,11 +468,25 @@ async function crearPedido() {
     area_necesaria:  esPatio ? vn('np-area')           : null,
   };
 
+  // Estado inicial: pendiente de revisión por superadmin
+  payload.estado = 'pendiente_revision';
+
   const { error } = await sb.from('pedidos').insert(payload);
   if (error) { showToast('Error al publicar: ' + (error.message || '')); return; }
 
+  // Notificar solo a superadmins para revisión
+  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+  if (supers?.length) {
+    await sb.from('notificaciones').insert(supers.map(a => ({
+      user_id: a.user_id,
+      tipo:    'revision_solicitud',
+      titulo:  'Nueva solicitud para revisar',
+      mensaje: `${currentUser.nombre || 'Un cliente'} publicó una solicitud de ${tipo} que requiere tu revisión antes de publicarse.`,
+      leido:   false,
+    })));
+  }
+
   closeNuevoPedido();
-  // Limpiar todos los campos del formulario
   document.getElementById('modal-nuevo-pedido').querySelectorAll('input, textarea, select').forEach(el => {
     if (el.type === 'checkbox') el.checked = false;
     else if (el.tagName !== 'SELECT') el.value = '';
@@ -375,7 +494,7 @@ async function crearPedido() {
   actualizarSubtipoPedido();
 
   await renderPedidos();
-  showToast('✓ Solicitud publicada — los proveedores ya pueden verte');
+  showToast('✓ Solicitud enviada — un administrador la revisará pronto');
 }
 
 // ── DETALLE PEDIDO (cliente ve y responde ofertas) ─────
@@ -454,7 +573,9 @@ function ofertaItemHTML(o) {
     <div class="oferta-item" id="of-${o.id}">
       <div class="oferta-top">
         <div>
-          <div class="oferta-empresa">${esc(o.admin_nombre)}</div>
+          <div class="oferta-empresa oferta-empresa-link" onclick="openEmpresaPerfil('${esc(o.admin_id||'')}','${esc(o.admin_nombre||'')}')">
+            ${esc(o.admin_nombre)}<span class="oferta-ver-link"> Ver →</span>
+          </div>
           ${o.camion_id ? `<div class="oferta-camion">🚛 ${esc(o.camion_id)}</div>` : ''}
         </div>
         <div style="text-align:right">
@@ -497,21 +618,100 @@ function cerrarContraoferta(ofertaId) {
 }
 
 async function responderOferta(ofertaId, accion) {
-  const nuevo = accion === 'aceptar' ? 'aceptada' : 'rechazada';
-  if (accion === 'aceptar' && !confirm('¿Confirmas aceptar esta oferta? Se creará la reservación.')) return;
-
-  const { data: oferta } = await sb.from('ofertas').select('*').eq('id', ofertaId).single();
-  const { error } = await sb.from('ofertas').update({ estado: nuevo }).eq('id', ofertaId);
-  if (error) { showToast('Error al procesar'); return; }
-
-  if (accion === 'aceptar' && oferta && pedidoDetalle) {
-    await cerrarAcuerdo(oferta, pedidoDetalle);
+  if (accion === 'aceptar') {
+    // Abrir modal de detalles del servicio antes de cerrar el acuerdo
+    const { data: oferta } = await sb.from('ofertas').select('*').eq('id', ofertaId).single();
+    if (!oferta || !pedidoDetalle) { showToast('Error al cargar la oferta'); return; }
+    _openDetallesServicio(oferta, pedidoDetalle);
+    return;
   }
-
+  // Rechazar
+  const { error } = await sb.from('ofertas').update({ estado: 'rechazada' }).eq('id', ofertaId);
+  if (error) { showToast('Error al procesar'); return; }
   await loadNotificaciones();
   if (pedidoDetalle) await openPedidoDetalle(pedidoDetalle.id);
   await renderPedidos();
-  showToast(accion === 'aceptar' ? '✓ ¡Acuerdo cerrado! Reservación creada' : 'Oferta declinada');
+  showToast('Oferta declinada');
+}
+
+function _openDetallesServicio(oferta, pedido) {
+  try {
+    _pendingOferta = oferta;
+    _pendingPedido = pedido;
+    // Cerrar el modal de detalle (mismo z-index) antes de abrir el nuevo
+    document.getElementById('modal-pedido-detalle').classList.remove('open');
+    const fmt = n => `$${Number(n).toLocaleString('es-MX')} MXN`;
+    document.getElementById('ds-resumen').textContent =
+      `Acuerdo con ${oferta.admin_nombre} · ${fmt(oferta.precio_oferta)} · ${pedido.tipo_camion}`;
+    document.getElementById('ds-fecha').value           = (pedido.fecha_ini || '').split('T')[0];
+    document.getElementById('ds-hora').value            = pedido.hora_carga || '';
+    document.getElementById('ds-lugar').value           = pedido.detalles_lugar || pedido.origen || '';
+    document.getElementById('ds-contacto-nombre').value = pedido.detalles_contacto_nombre || pedido.contacto_nombre || '';
+    document.getElementById('ds-contacto-tel').value    = pedido.detalles_contacto_tel || pedido.contacto_tel || '';
+    document.getElementById('modal-detalles-servicio').classList.add('open');
+  } catch (e) {
+    console.error('_openDetallesServicio error:', e);
+    showToast('Error al abrir el formulario de detalles: ' + e.message, 'error');
+  }
+}
+
+function closeDetallesServicio() {
+  document.getElementById('modal-detalles-servicio').classList.remove('open');
+  // Reabrir el detalle del pedido si el usuario canceló
+  if (_pendingPedido) openPedidoDetalle(_pendingPedido.id);
+  _pendingOferta = null;
+  _pendingPedido = null;
+}
+
+async function confirmarDetallesServicio() {
+  if (!_pendingOferta || !_pendingPedido) return;
+  const v = id => document.getElementById(id)?.value?.trim() || '';
+  const fecha = v('ds-fecha');
+  const lugar = v('ds-lugar');
+  if (!fecha || !lugar) { alert('Por favor completa la fecha y la dirección del servicio.'); return; }
+
+  const oferta = _pendingOferta;
+  const pedido = _pendingPedido;
+
+  // Guardar detalles en el pedido
+  await sb.from('pedidos').update({
+    detalles_lugar:           lugar,
+    detalles_hora:            v('ds-hora') || null,
+    detalles_contacto_nombre: v('ds-contacto-nombre') || null,
+    detalles_contacto_tel:    v('ds-contacto-tel') || null,
+    detalles_completados:     true,
+    fecha_ini:                fecha,
+  }).eq('id', pedido.id);
+
+  // Marcar oferta como aceptada
+  await sb.from('ofertas').update({ estado: 'aceptada' }).eq('id', oferta.id);
+
+  // Poner pedido en pendiente_acuerdo (superadmin revisa antes de crear reservación)
+  await sb.from('pedidos').update({
+    estado:              'pendiente_acuerdo',
+    oferta_pendiente_id: oferta.id,
+  }).eq('id', pedido.id);
+
+  // Notificar a superadmins para que aprueben el acuerdo
+  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+  if (supers?.length) {
+    await sb.from('notificaciones').insert(supers.map(a => ({
+      user_id: a.user_id,
+      tipo:    'revision_acuerdo',
+      titulo:  'Acuerdo pendiente de aprobación',
+      mensaje: `${esc(pedido.cliente_nombre || 'Un cliente')} aceptó una oferta de ${esc(oferta.admin_nombre || 'un proveedor')} por $${Number(oferta.precio_oferta).toLocaleString('es-MX')} MXN. Revisa y aprueba.`,
+      leido:   false,
+    })));
+  }
+
+  _pendingOferta = null;
+  _pendingPedido = null;
+  document.getElementById('modal-detalles-servicio').classList.remove('open');
+
+  await loadNotificaciones();
+  closePedidoDetalle();
+  await renderPedidos();
+  showToast('✓ Acuerdo enviado a revisión — te notificaremos pronto');
 }
 
 async function enviarContraoferta(ofertaId) {
@@ -599,26 +799,28 @@ async function openHacerOferta(pedidoId) {
     });
 
   } else {
-    // Camión (comportamiento original)
+    // Camión — query directo igual que custodios/patios
     if (label) label.textContent = 'Camión que asignas';
-    const misCamiones = allCamiones.filter(c =>
-      (currentUser.rol === 'superadmin' || c.propietario_id === currentUser.id) &&
-      c.estado === 'disponible'
-    );
-    recursos = misCamiones;
+    let q = sb.from('camiones').select('*').eq('estado', 'disponible');
+    if (currentUser.rol !== 'superadmin') q = q.eq('propietario_id', currentUser.id);
+    const { data: camionesData } = await q;
+    recursos = camionesData || [];
     sinRecursosMsg = '⚠ No tienes camiones disponibles. Verifica el estado de tus unidades en el panel Admin.';
 
-    select.innerHTML = `<option value="">Sin asignar camión aún</option>`;
-    misCamiones.forEach(c => {
+    const CAMION_EMOJI = { Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️' };
+    select.innerHTML = recursos.length
+      ? `<option value="">— Selecciona un camión —</option>`
+      : `<option value="">Sin camiones disponibles</option>`;
+    recursos.forEach(c => {
       const opt = document.createElement('option');
       opt.value       = c.id;
-      opt.textContent = `${c.emoji} ${c.id} — ${c.tipo} (${c.capacidad} ton)`;
+      opt.textContent = `${CAMION_EMOJI[c.tipo] || '🚛'} ${c.id} — ${c.tipo} (${c.capacidad} ton)`;
       select.appendChild(opt);
     });
   }
 
   // Si no hay recursos del tipo requerido, mostrar advertencia y bloquear envío
-  if ((esCustodio || esPatio) && !recursos.length) {
+  if (!recursos.length && sinRecursosMsg) {
     if (warn)   { warn.textContent = sinRecursosMsg; warn.style.display = 'block'; }
     if (btnEnv) btnEnv.disabled = true;
   }
@@ -733,7 +935,9 @@ async function cerrarAcuerdo(oferta, pedido) {
     ? 'custodio'
     : tipoPedido.startsWith('Patio') || tipoPedido === 'Bodega'
       ? 'patio'
-      : 'camion';
+      : tipoPedido.startsWith('Lavado') || tipoPedido === 'Desinfección' || tipoPedido === 'Lavado Contenedor'
+        ? 'lavado'
+        : 'camion';
 
   // Crear reservación automáticamente
   const { error } = await sb.from('reservaciones').insert({
@@ -742,6 +946,7 @@ async function cerrarAcuerdo(oferta, pedido) {
     cliente:         pedido.cliente_nombre,
     cliente_email:   pedido.cliente_email,
     cliente_user_id: pedido.cliente_id,
+    propietario_id:  oferta.admin_id,
     fecha_ini:       pedido.fecha_ini,
     fecha_fin:       pedido.fecha_fin || pedido.fecha_ini,
     descripcion:     pedido.descripcion,
@@ -776,3 +981,72 @@ async function eliminarPedido(pedidoId) {
   document.getElementById(`ped-${pedidoId}`)?.remove();
   showToast('🗑 Pedido eliminado');
 }
+
+// ── PERFIL DE EMPRESA (desde oferta) ──────────────────
+
+async function openEmpresaPerfil(adminId, adminNombre) {
+  if (!adminId) return;
+  const titulo = document.getElementById('ep-titulo');
+  const body   = document.getElementById('ep-body');
+  if (titulo) titulo.textContent = adminNombre || 'Empresa';
+  if (body)   body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">Cargando…</div>';
+  document.getElementById('modal-empresa-perfil').classList.add('open');
+
+  const [
+    { data: perfil },
+    { data: camiones },
+    { data: custodios },
+    { data: patios },
+    { data: lavados },
+    { data: cals }
+  ] = await Promise.all([
+    sb.from('perfiles').select('descripcion, nombre').eq('user_id', adminId).single(),
+    sb.from('camiones').select('id, estado').eq('propietario_id', adminId),
+    sb.from('custodios').select('id, estado').eq('propietario_id', adminId),
+    sb.from('patios').select('id, estado').eq('propietario_id', adminId),
+    sb.from('lavados').select('id').eq('propietario_id', adminId),
+    sb.from('calificaciones').select('rating').eq('admin_id', adminId),
+  ]);
+
+  const avgRating = cals?.length
+    ? (cals.reduce((s, c) => s + c.rating, 0) / cals.length).toFixed(1)
+    : null;
+
+  const starsHTML = avgRating
+    ? `<div class="ep-stars">
+        <span style="color:#f59e0b;font-size:1.1rem">${'★'.repeat(Math.round(+avgRating))}${'☆'.repeat(5 - Math.round(+avgRating))}</span>
+        <span style="color:var(--text-muted);font-size:0.8rem"> ${avgRating} · ${cals.length} reseña${cals.length !== 1 ? 's' : ''}</span>
+       </div>`
+    : '<div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">Sin calificaciones aún</div>';
+
+  const recursos = [];
+  const disp = arr => arr?.filter(x => x.estado === 'disponible').length ?? 0;
+  if (camiones?.length)  recursos.push(`🚛 ${camiones.length} camión${camiones.length > 1 ? 'es' : ''} — ${disp(camiones)} disponible${disp(camiones) !== 1 ? 's' : ''}`);
+  if (custodios?.length) recursos.push(`👮 ${custodios.length} custodio${custodios.length > 1 ? 's' : ''} — ${disp(custodios)} disponible${disp(custodios) !== 1 ? 's' : ''}`);
+  if (patios?.length)    recursos.push(`🏭 ${patios.length} patio${patios.length > 1 ? 's' : ''} — ${disp(patios)} disponible${disp(patios) !== 1 ? 's' : ''}`);
+  if (lavados?.length)   recursos.push(`🚿 ${lavados.length} servicio${lavados.length > 1 ? 's' : ''} de lavado`);
+
+  if (body) body.innerHTML = `
+    <div style="padding:4px 0">
+      ${starsHTML}
+      ${perfil?.descripcion ? `<p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:14px">${esc(perfil.descripcion)}</p>` : ''}
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${recursos.map(r => `<div class="ep-recurso-row">${r}</div>`).join('')}
+        ${!recursos.length ? '<div style="color:var(--text-muted);font-size:0.85rem">Sin recursos registrados aún</div>' : ''}
+      </div>
+    </div>`;
+}
+
+function closeEmpresaPerfil() {
+  document.getElementById('modal-empresa-perfil').classList.remove('open');
+}
+
+// ── FILTROS SOLICITUDES ────────────────────────────────
+
+function filtrarPedidosTipo(tipo) {
+  _filtroTipo = tipo;
+  document.querySelectorAll('.ped-filtro-pill').forEach(el =>
+    el.classList.toggle('active', el.dataset.tipo === tipo));
+  renderPedidos();
+}
+

@@ -75,6 +75,12 @@ function init() {
         actualizarBadgeChat();
       }
     })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificaciones' }, payload => {
+      // Refrescar campanita cuando llega una notificación para mí
+      if (currentUser.id && payload.new?.user_id === currentUser.id) {
+        loadNotificaciones();
+      }
+    })
     .subscribe();
 })();
 

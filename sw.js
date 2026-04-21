@@ -1,10 +1,11 @@
-// ── SERVICE WORKER — FlotaPro ──────────────────────────
-const CACHE = 'flotapro-v1';
+// ── SERVICE WORKER — PortGo ────────────────────────────
+const CACHE = 'portgo-v10';
 const SHELL = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icon.svg',
+  '/icon-light.svg',
   '/css/base.css',
   '/css/layout.css',
   '/css/components.css',
@@ -16,10 +17,16 @@ const SHELL = [
   '/js/theme.js',
   '/js/views.js',
   '/js/camiones.js',
+  '/js/recursos.js',
   '/js/reservaciones.js',
   '/js/modal.js',
+  '/js/pedidos.js',
+  '/js/aprobaciones.js',
   '/js/admin.js',
   '/js/usuarios.js',
+  '/js/chat.js',
+  '/js/catalogo.js',
+  '/js/tracking.js',
   '/js/main.js'
 ];
 
@@ -39,23 +46,36 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Fetch: network-first para API, cache-first para assets
+// Fetch: network-first para JS/CSS (siempre frescos), cache-first para imágenes
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
   // Supabase y CDN siempre desde red
-  if (url.hostname.includes('supabase') || url.hostname.includes('googleapis') || url.hostname.includes('jsdelivr')) {
-    return;
-  }
+  if (url.hostname !== location.hostname) return;
 
-  // Assets locales: cache-first, fallback a red
-  e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
-      if (res.ok) {
-        const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
-      }
-      return res;
-    }))
-  );
+  const esScript = url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.html');
+
+  if (esScript) {
+    // Network-first: si falla la red, usar cache como fallback
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+  } else {
+    // Imágenes y otros assets: cache-first
+    e.respondWith(
+      caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }))
+    );
+  }
 });

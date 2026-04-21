@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0a1628">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>PortGo — Logística Conectada</title>
 
@@ -158,6 +161,17 @@
       </button>
     </div>
 
+    <!-- Filtros — solo usuarios logueados -->
+    <div class="ped-filtros-bar" id="ped-filtros-bar" style="display:none">
+      <div class="ped-filtro-pills">
+        <button class="ped-filtro-pill active" data-tipo="todos"     onclick="filtrarPedidosTipo('todos')">Todos</button>
+        <button class="ped-filtro-pill"        data-tipo="camion"    onclick="filtrarPedidosTipo('camion')"><span class="pill-icon">🚛</span>Camión</button>
+        <button class="ped-filtro-pill"        data-tipo="custodio"  onclick="filtrarPedidosTipo('custodio')"><span class="pill-icon">👮</span>Custodia</button>
+        <button class="ped-filtro-pill"        data-tipo="patio"     onclick="filtrarPedidosTipo('patio')"><span class="pill-icon">🏭</span>Patio</button>
+        <button class="ped-filtro-pill"        data-tipo="lavado"    onclick="filtrarPedidosTipo('lavado')"><span class="pill-icon">🚿</span>Lavado</button>
+      </div>
+    </div>
+
     <div id="pedidos-list"></div>
   </div>
 </div>
@@ -167,8 +181,8 @@
   <div class="page">
     <div class="section-title">Panel de Administración</div>
 
-    <!-- Perfil de empresa -->
-    <div class="admin-card" style="margin-bottom:20px">
+    <!-- Perfil de empresa (oculto para superadmin) -->
+    <div class="admin-card" id="perfil-empresa-card" style="margin-bottom:20px">
       <h3 style="cursor:pointer" onclick="togglePerfilCard()">
         🏢 Perfil de empresa
         <span id="perfil-toggle-icon" style="margin-left:auto;font-size:0.85rem;color:var(--text-muted)">▼ Editar</span>
@@ -302,6 +316,10 @@
           <input type="file" id="admin-docs" multiple accept=".pdf,.jpg,.jpeg,.png" style="display:none"
                  onchange="updateFileLabel('admin-docs','docs-label')">
         </div>
+        <div class="form-group sa-empresa-row" style="display:none">
+          <label>Empresa propietaria</label>
+          <select id="sa-empresa-camion"><option value="">— Selecciona empresa —</option></select>
+        </div>
         <button class="btn-add" onclick="agregarCamion()">Enviar a aprobación</button>
       </div>
 
@@ -354,6 +372,10 @@
           <label>Precio por día (MXN)</label>
           <input type="number" id="ac-precio" placeholder="Ej. 1800">
         </div>
+        <div class="form-group sa-empresa-row" style="display:none">
+          <label>Empresa propietaria</label>
+          <select id="sa-empresa-custodio"><option value="">— Selecciona empresa —</option></select>
+        </div>
         <button class="btn-add" onclick="agregarCustodio()">➕ Agregar custodio</button>
       </div>
       <div class="admin-card">
@@ -402,6 +424,10 @@
           <label>Precio por día (MXN)</label>
           <input type="number" id="ap-precio" placeholder="Ej. 3500">
         </div>
+        <div class="form-group sa-empresa-row" style="display:none">
+          <label>Empresa propietaria</label>
+          <select id="sa-empresa-patio"><option value="">— Selecciona empresa —</option></select>
+        </div>
         <button class="btn-add" onclick="agregarPatio()">➕ Agregar patio</button>
       </div>
       <div class="admin-card">
@@ -448,6 +474,10 @@
           <label>Descripción / servicios adicionales</label>
           <textarea id="al-desc" rows="2" placeholder="Detalles adicionales del servicio..."></textarea>
         </div>
+        <div class="form-group sa-empresa-row" style="display:none">
+          <label>Empresa propietaria</label>
+          <select id="sa-empresa-lavado"><option value="">— Selecciona empresa —</option></select>
+        </div>
         <button class="btn-add" onclick="agregarLavado()">➕ Agregar servicio</button>
       </div>
       <div class="admin-card">
@@ -463,6 +493,12 @@
       <div class="admin-card">
         <div class="truck-list-admin" id="pendientes-list"></div>
       </div>
+    </div>
+
+    <!-- Revisiones de solicitudes y acuerdos — solo superadmin -->
+    <div id="aprobaciones-section" style="display:none; margin-top:32px">
+      <div class="section-title">🔍 Revisiones pendientes</div>
+      <div id="aprobaciones-content"></div>
     </div>
   </div>
 </div>
@@ -594,40 +630,13 @@
     <!-- Cuerpo scrolleable -->
     <div class="modal-np-body">
 
+    <!-- Banner de categoría seleccionada (se muestra al abrir desde botón) -->
+    <div id="np-categoria-banner" style="display:none" class="np-cat-banner"></div>
+
     <!-- Tipo de servicio -->
     <div class="form-group">
       <label>Tipo de servicio *</label>
-      <select id="np-tipo" onchange="actualizarSubtipoPedido()">
-        <optgroup label="🚛 Camiones">
-          <option value="Cualquiera">Cualquier camión</option>
-          <option value="Torton">Torton</option>
-          <option value="Rabón">Rabón</option>
-          <option value="Full">Full</option>
-          <option value="Plataforma">Plataforma</option>
-        </optgroup>
-        <optgroup label="👮 Custodios">
-          <option value="Custodio Armado">Custodio Armado</option>
-          <option value="Custodio Sin arma">Custodio Sin arma</option>
-          <option value="Custodio Motorizado">Custodio Motorizado</option>
-          <option value="Custodio K9">Custodio K9</option>
-          <option value="Supervisión remota">Supervisión remota</option>
-        </optgroup>
-        <optgroup label="🏭 Patios">
-          <option value="Patio Techado">Patio Techado</option>
-          <option value="Patio Abierto">Patio Abierto</option>
-          <option value="Patio Refrigerado">Patio Refrigerado</option>
-          <option value="Patio Especializado">Patio Especializado</option>
-          <option value="Bodega">Bodega</option>
-        </optgroup>
-        <optgroup label="🚿 Lavado">
-          <option value="Lavado Exterior">Lavado Exterior</option>
-          <option value="Lavado Interior">Lavado Interior</option>
-          <option value="Lavado Completo">Lavado Completo</option>
-          <option value="Lavado de Motor">Lavado de Motor</option>
-          <option value="Desinfección">Desinfección</option>
-          <option value="Lavado Contenedor">Lavado Contenedor</option>
-        </optgroup>
-      </select>
+      <select id="np-tipo" onchange="actualizarSubtipoPedido()"></select>
     </div>
 
     <!-- ══ CAMPOS CAMIÓN ═══════════════════════════════ -->
@@ -847,6 +856,77 @@
       <button class="btn-cancel" onclick="closeResponderContra()">Cancelar</button>
       <button class="btn-edit btn-rechazar" style="flex:1;padding:10px;font-size:0.85rem" onclick="responderContra('rechazar')">✕ Rechazar</button>
       <button class="btn-confirm" onclick="responderContra('aceptar')">✓ Aceptar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL DETALLES DEL SERVICIO (post-acuerdo) ══════ -->
+<div class="modal-overlay" id="modal-detalles-servicio">
+  <div class="modal" style="max-width:500px">
+    <h2>📋 Confirmar detalles</h2>
+    <p id="ds-resumen" class="sub"></p>
+    <div class="form-group">
+      <label>Fecha del servicio *</label>
+      <input type="date" id="ds-fecha">
+    </div>
+    <div class="form-group">
+      <label>Hora aproximada</label>
+      <input type="time" id="ds-hora">
+    </div>
+    <div class="form-group">
+      <label>Dirección exacta / punto de encuentro *</label>
+      <input type="text" id="ds-lugar" placeholder="Ej. Terminal Lázaro Cárdenas, Patio 3…">
+    </div>
+    <div class="form-group">
+      <label>Nombre del contacto en sitio</label>
+      <input type="text" id="ds-contacto-nombre" placeholder="Quien recibirá al proveedor">
+    </div>
+    <div class="form-group">
+      <label>Teléfono de contacto</label>
+      <input type="tel" id="ds-contacto-tel" placeholder="Ej. 314 123 4567">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeDetallesServicio()">Cancelar</button>
+      <button class="btn-confirm" onclick="confirmarDetallesServicio()">✓ Confirmar acuerdo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL PERFIL DE EMPRESA ════════════════════════ -->
+<div class="modal-overlay" id="modal-empresa-perfil">
+  <div class="modal" style="max-width:440px">
+    <h2 id="ep-titulo">Empresa</h2>
+    <div id="ep-body" style="max-height:50vh;overflow-y:auto"></div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn-confirm" onclick="closeEmpresaPerfil()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL CALIFICAR SERVICIO ════════════════════════ -->
+<div class="modal-overlay" id="modal-calificar">
+  <div class="modal" style="max-width:400px">
+    <h2>⭐ Calificar servicio</h2>
+    <p id="cal-subtitulo" class="sub"></p>
+    <input type="hidden" id="cal-reservacion-id">
+    <input type="hidden" id="cal-admin-id">
+    <div class="form-group" style="text-align:center;margin-bottom:0">
+      <div class="star-rating" id="cal-stars">
+        <span class="star" data-val="1" onclick="seleccionarEstrella(1)">★</span>
+        <span class="star" data-val="2" onclick="seleccionarEstrella(2)">★</span>
+        <span class="star" data-val="3" onclick="seleccionarEstrella(3)">★</span>
+        <span class="star" data-val="4" onclick="seleccionarEstrella(4)">★</span>
+        <span class="star" data-val="5" onclick="seleccionarEstrella(5)">★</span>
+      </div>
+      <div id="cal-rating-label" style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">Excelente</div>
+    </div>
+    <div class="form-group">
+      <label>Comentario <span style="font-weight:400;color:var(--text-muted)">(opcional)</span></label>
+      <textarea id="cal-comentario" rows="2" placeholder="¿Cómo fue el servicio?"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeCalificar()">Cancelar</button>
+      <button class="btn-confirm" onclick="enviarCalificacion()">⭐ Enviar calificación</button>
     </div>
   </div>
 </div>
@@ -1152,20 +1232,22 @@
 <script src="js/notificaciones.js"></script>
 <script src="js/detalle.js"></script>
 <script src="js/tracking.js"></script>
-<script src="js/config.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/theme.js"></script>
-<script src="js/views.js"></script>
-<script src="js/camiones.js"></script>
-<script src="js/recursos.js"></script>
-<script src="js/reservaciones.js"></script>
-<script src="js/modal.js"></script>
-<script src="js/pedidos.js"></script>
-<script src="js/admin.js"></script>
-<script src="js/usuarios.js"></script>
-<script src="js/chat.js"></script>
-<script src="js/catalogo.js"></script>
-<script src="js/main.js"></script>
+<script src="js/config.js?v=9"></script>
+<script src="js/auth.js?v=9"></script>
+<script src="js/theme.js?v=10"></script>
+<script src="js/views.js?v=10"></script>
+<script src="js/camiones.js?v=10"></script>
+<script src="js/recursos.js?v=10"></script>
+<script src="js/reservaciones.js?v=10"></script>
+<script src="js/modal.js?v=10"></script>
+<script src="js/pedidos.js?v=10"></script>
+<script src="js/aprobaciones.js?v=10"></script>
+<script src="js/admin.js?v=10"></script>
+<script src="js/usuarios.js?v=10"></script>
+<script src="js/chat.js?v=10"></script>
+<script src="js/catalogo.js?v=10"></script>
+<script src="js/tracking.js?v=10"></script>
+<script src="js/main.js?v=10"></script>
 
 <!-- ══ PANEL DE CHAT ════════════════════════════════════ -->
 <div id="chat-panel" class="chat-panel">
