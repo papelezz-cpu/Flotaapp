@@ -486,6 +486,13 @@ async function crearPedido() {
     })));
   }
 
+  // Enviar correo a admins y superadmins
+  fetch(FN_NOTIFICACION, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tipo_camion: tipo, cliente_nombre: currentUser.nombre }),
+  }).catch(() => {});
+
   closeNuevoPedido();
   document.getElementById('modal-nuevo-pedido').querySelectorAll('input, textarea, select').forEach(el => {
     if (el.type === 'checkbox') el.checked = false;

@@ -544,6 +544,41 @@
   </div>
 </div>
 
+<!-- ══ MODAL EDITAR USUARIO ════════════════════════════ -->
+<div class="modal-overlay" id="modal-editar-usuario">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Editar usuario</h2>
+      <button class="modal-close" onclick="cerrarEditarUsuario()">✕</button>
+    </div>
+    <input type="hidden" id="eu-id">
+    <div class="form-group">
+      <label>Nombre completo</label>
+      <input type="text" id="eu-nombre" placeholder="Nombre del usuario">
+    </div>
+    <div class="form-group">
+      <label>Correo electrónico</label>
+      <input type="email" id="eu-email" placeholder="correo@ejemplo.com">
+    </div>
+    <div class="form-group">
+      <label>Nueva contraseña <span style="color:var(--text-muted);font-size:0.8rem">(dejar vacío para no cambiar)</span></label>
+      <input type="password" id="eu-pass" placeholder="Mínimo 6 caracteres">
+    </div>
+    <div class="form-group">
+      <label>Rol</label>
+      <select id="eu-rol">
+        <option value="superadmin">⭐ Superadmin</option>
+        <option value="admin">🔧 Admin</option>
+        <option value="cliente">👤 Cliente</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn-add" style="flex:1" onclick="guardarEdicionUsuario()">Guardar cambios</button>
+      <button class="btn-edit" style="flex:1" onclick="cerrarEditarUsuario()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL RESERVA ═══════════════════════════════════ -->
 <div class="modal-overlay" id="modal-reserva">
   <div class="modal">
@@ -1243,7 +1278,7 @@
 <script src="js/pedidos.js?v=10"></script>
 <script src="js/aprobaciones.js?v=10"></script>
 <script src="js/admin.js?v=10"></script>
-<script src="js/usuarios.js?v=10"></script>
+<script src="js/usuarios.js?v=11"></script>
 <script src="js/chat.js?v=10"></script>
 <script src="js/catalogo.js?v=10"></script>
 <script src="js/tracking.js?v=10"></script>

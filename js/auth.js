@@ -17,6 +17,14 @@ function applyUserUI() {
 
 // Restaura la sesión guardada (si existe); si no, muestra el login como pantalla completa
 async function checkExistingSession() {
+  // Detectar flujo de recovery (link de "olvidé mi contraseña")
+  const hash = new URLSearchParams(window.location.hash.slice(1));
+  if (hash.get('type') === 'recovery') {
+    await sb.auth.getSession(); // Supabase procesa el token del hash automáticamente
+    showPasswordResetModal();
+    return;
+  }
+
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
     // Sin sesión → login obligatorio, no hay vista pública
@@ -176,6 +184,50 @@ async function forgotPassword() {
   document.getElementById('login-error').classList.remove('show');
   if (error) { alert('Error: ' + error.message); return; }
   showToast('✓ Revisa tu correo para restablecer tu contraseña');
+}
+
+function showPasswordResetModal() {
+  const overlay = document.getElementById('login-overlay');
+  overlay.classList.add('show');
+
+  // Reutilizamos el panel de login insertando un formulario temporal
+  const panel = document.getElementById('login-panel');
+  panel.innerHTML = `
+    <h2 style="margin-bottom:16px">Nueva contraseña</h2>
+    <input id="reset-pass-new" type="password" placeholder="Nueva contraseña" style="width:100%;margin-bottom:10px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
+    <input id="reset-pass-confirm" type="password" placeholder="Confirmar contraseña" style="width:100%;margin-bottom:10px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
+    <div id="reset-error" class="login-error" style="display:none;color:var(--danger);margin-bottom:8px"></div>
+    <button onclick="doPasswordReset()" class="btn-login" style="width:100%">Guardar contraseña</button>
+  `;
+}
+
+async function doPasswordReset() {
+  const pass    = document.getElementById('reset-pass-new').value;
+  const confirm = document.getElementById('reset-pass-confirm').value;
+  const errEl   = document.getElementById('reset-error');
+
+  errEl.style.display = 'none';
+
+  if (pass.length < 6) {
+    errEl.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+    errEl.style.display = 'block'; return;
+  }
+  if (pass !== confirm) {
+    errEl.textContent = 'Las contraseñas no coinciden.';
+    errEl.style.display = 'block'; return;
+  }
+
+  const { error } = await sb.auth.updateUser({ password: pass });
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block'; return;
+  }
+
+  // Limpiar hash de la URL y redirigir al login normal
+  history.replaceState(null, '', window.location.pathname);
+  await sb.auth.signOut();
+  showToast('✓ Contraseña actualizada. Inicia sesión.');
+  location.reload();
 }
 
 async function logout() {

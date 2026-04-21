@@ -33,13 +33,12 @@ async function renderUsuarios() {
   list.innerHTML = json.lista.map(u => `
     <div class="truck-list-item">
       <div class="truck-list-item-info">
-        <div class="truck-list-item-name">${u.nombre}</div>
-        <div class="truck-list-item-sub">${u.email} · ${ROL_LABEL[u.rol] || u.rol}</div>
+        <div class="truck-list-item-name">${esc(u.nombre)}</div>
+        <div class="truck-list-item-sub">${esc(u.email)} · ${ROL_LABEL[u.rol] || u.rol}</div>
       </div>
+      <button class="btn-edit" onclick="abrirEditarUsuario('${u.user_id}','${esc(u.nombre)}','${esc(u.email)}','${u.rol}')">✏ Editar</button>
       ${u.rol !== 'superadmin'
-        ? `<button class="btn-edit"
-             style="background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.3);color:var(--red)"
-             onclick="eliminarUsuario('${u.user_id}','${u.nombre}')">Eliminar</button>`
+        ? `<button class="btn-edit btn-rechazar" onclick="eliminarUsuario('${u.user_id}','${esc(u.nombre)}')">🗑</button>`
         : ''}
     </div>`).join('');
 }
@@ -70,6 +69,46 @@ async function crearUsuario() {
   document.getElementById('nu-pass').value   = '';
   await renderUsuarios();
   showToast(`✓ Usuario ${nombre} creado`);
+}
+
+function abrirEditarUsuario(userId, nombre, email, rol) {
+  document.getElementById('eu-id').value     = userId;
+  document.getElementById('eu-nombre').value = nombre;
+  document.getElementById('eu-email').value  = email;
+  document.getElementById('eu-pass').value   = '';
+  document.getElementById('eu-rol').value    = rol;
+  document.getElementById('modal-editar-usuario').classList.add('open');
+}
+
+function cerrarEditarUsuario() {
+  document.getElementById('modal-editar-usuario').classList.remove('open');
+}
+
+async function guardarEdicionUsuario() {
+  const userId = document.getElementById('eu-id').value;
+  const nombre = document.getElementById('eu-nombre').value.trim();
+  const email  = document.getElementById('eu-email').value.trim();
+  const pass   = document.getElementById('eu-pass').value;
+  const rol    = document.getElementById('eu-rol').value;
+
+  if (!nombre || !email) { showToast('Completa nombre y correo.'); return; }
+  if (pass && pass.length < 6) { showToast('La contraseña debe tener al menos 6 caracteres.'); return; }
+
+  const body = { accion: 'editar', user_id: userId, nombre, email, rol };
+  if (pass) body.password = pass;
+
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetch(FN_URL, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const json = await res.json();
+  if (!res.ok) { showToast('Error: ' + (json.error || 'No se pudo guardar.')); return; }
+
+  cerrarEditarUsuario();
+  await renderUsuarios();
+  showToast(`✓ Usuario ${nombre} actualizado`);
 }
 
 async function eliminarUsuario(userId, nombre) {
