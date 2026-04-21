@@ -44,7 +44,9 @@ async function renderPedidos() {
   // Clientes solo ven pedidos activos (nunca acordado/cancelado)
   const esCliente = currentUser.id && currentUser.rol === 'cliente';
   let pedidosQ = sb.from('pedidos').select('*').order('created_at', { ascending: false });
-  if (esCliente) pedidosQ = pedidosQ.in('estado', ['abierto', 'en_negociacion']);
+  // Clientes: ven públicos (abierto/en_negociacion) + los suyos en cualquier estado activo
+  // La RLS ya permite esto: (admin) OR (estado público) OR (cliente_id = auth.uid())
+  if (esCliente) pedidosQ = pedidosQ.in('estado', ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado']);
 
   const [{ data: pedidos, error }, { data: todasOfertas }] = await Promise.all([
     pedidosQ,
@@ -91,10 +93,9 @@ async function renderPedidos() {
 
   // ── CLIENTE ────────────────────────────────────────
   if (currentUser.id && currentUser.rol === 'cliente') {
-    // Solo abierto/en_negociacion — acordado/cancelado viven en Reservaciones
+    const ESTADOS_ACTIVOS = ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado'];
     const misPedidos   = _filtrar((pedidos || []).filter(p =>
-      p.cliente_id === currentUser.id &&
-      p.estado !== 'acordado' && p.estado !== 'cancelado'
+      p.cliente_id === currentUser.id && ESTADOS_ACTIVOS.includes(p.estado)
     ));
     const otrosPedidos = _filtrar((pedidos || []).filter(p => p.cliente_id !== currentUser.id && p.estado === 'abierto'));
 
@@ -160,18 +161,24 @@ async function renderPedidos() {
 
 function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
   const badgeCls = {
-    abierto:         'badge-avail',
-    en_negociacion:  'badge-busy',
-    acordado:        'badge-acordado',
-    cancelado:       'badge-maint',
+    abierto:             'badge-avail',
+    en_negociacion:      'badge-busy',
+    acordado:            'badge-acordado',
+    cancelado:           'badge-maint',
+    pendiente_revision:  'badge-revision',
+    pendiente_acuerdo:   'badge-acuerdo-rev',
+    rechazado:           'badge-maint',
   }[p.estado] || 'badge-maint';
 
   const ofertasVivaz   = ofertas.filter(o => o.estado !== 'rechazada');
   const estadoLabel = p.estado === 'abierto'
     ? (ofertasVivaz.length ? `${ofertasVivaz.length} oferta${ofertasVivaz.length > 1 ? 's' : ''}` : 'Sin ofertas aún')
-    : p.estado === 'en_negociacion' ? 'En negociación'
-    : p.estado === 'acordado'       ? '✓ Acordado'
-    : p.estado === 'cancelado'      ? 'Cancelado'
+    : p.estado === 'en_negociacion'     ? 'En negociación'
+    : p.estado === 'acordado'           ? '✓ Acordado'
+    : p.estado === 'cancelado'          ? 'Cancelado'
+    : p.estado === 'pendiente_revision' ? '⏳ En revisión'
+    : p.estado === 'pendiente_acuerdo'  ? '⏳ Acuerdo en revisión'
+    : p.estado === 'rechazado'          ? '✕ No aprobado'
     : p.estado;
 
   const ofertasVivas  = ofertasVivaz;
@@ -188,7 +195,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
 
   let acciones = '';
 
-  if (vista === 'cliente' && p.estado !== 'cancelado') {
+  if (vista === 'cliente' && !['cancelado','pendiente_revision','pendiente_acuerdo','rechazado'].includes(p.estado)) {
     acciones = `
       <button class="btn-ver-pedido" onclick="openPedidoDetalle('${p.id}')">
         Ver ofertas${pendientes.length ? `<span class="ped-badge-count">${pendientes.length}</span>` : ''}
@@ -196,6 +203,8 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
       ${p.estado === 'abierto'
         ? `<button class="btn-cancelar-ped" onclick="cancelarPedido('${p.id}')">Cancelar</button>`
         : ''}`;
+  } else if (vista === 'cliente' && p.estado === 'rechazado' && p.rechazo_nota) {
+    acciones = `<div class="apr-rechazo-nota">Motivo: ${esc(p.rechazo_nota)}</div>`;
 
   } else if (vista === 'admin') {
     acciones = `<button class="btn-ofertar" onclick="openHacerOferta('${p.id}')">Hacer oferta</button>`;
@@ -394,23 +403,25 @@ async function crearPedido() {
     area_necesaria:  esPatio ? vn('np-area')           : null,
   };
 
+  // Estado inicial: pendiente de revisión por superadmin
+  payload.estado = 'pendiente_revision';
+
   const { error } = await sb.from('pedidos').insert(payload);
   if (error) { showToast('Error al publicar: ' + (error.message || '')); return; }
 
-  // Notificar a todos los admins de la nueva solicitud
-  const { data: admins } = await sb.from('perfiles').select('user_id').in('rol', ['admin', 'superadmin']);
-  if (admins?.length) {
-    await sb.from('notificaciones').insert(admins.map(a => ({
+  // Notificar solo a superadmins para revisión
+  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+  if (supers?.length) {
+    await sb.from('notificaciones').insert(supers.map(a => ({
       user_id: a.user_id,
-      tipo:    'nueva_solicitud',
-      titulo:  'Nueva solicitud publicada',
-      mensaje: `Un cliente publicó una solicitud de ${tipo}. Revisa las solicitudes disponibles.`,
+      tipo:    'revision_solicitud',
+      titulo:  'Nueva solicitud para revisar',
+      mensaje: `${currentUser.nombre || 'Un cliente'} publicó una solicitud de ${tipo} que requiere tu revisión antes de publicarse.`,
       leido:   false,
     })));
   }
 
   closeNuevoPedido();
-  // Limpiar todos los campos del formulario
   document.getElementById('modal-nuevo-pedido').querySelectorAll('input, textarea, select').forEach(el => {
     if (el.type === 'checkbox') el.checked = false;
     else if (el.tagName !== 'SELECT') el.value = '';
@@ -418,7 +429,7 @@ async function crearPedido() {
   actualizarSubtipoPedido();
 
   await renderPedidos();
-  showToast('✓ Solicitud publicada — los proveedores ya pueden verte');
+  showToast('✓ Solicitud enviada — un administrador la revisará pronto');
 }
 
 // ── DETALLE PEDIDO (cliente ve y responde ofertas) ─────
@@ -610,16 +621,32 @@ async function confirmarDetallesServicio() {
   // Marcar oferta como aceptada
   await sb.from('ofertas').update({ estado: 'aceptada' }).eq('id', oferta.id);
 
-  // Limpiar pendientes antes de cerrar para que closeDetallesServicio no reabra
+  // Poner pedido en pendiente_acuerdo (superadmin revisa antes de crear reservación)
+  await sb.from('pedidos').update({
+    estado:              'pendiente_acuerdo',
+    oferta_pendiente_id: oferta.id,
+  }).eq('id', pedido.id);
+
+  // Notificar a superadmins para que aprueben el acuerdo
+  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+  if (supers?.length) {
+    await sb.from('notificaciones').insert(supers.map(a => ({
+      user_id: a.user_id,
+      tipo:    'revision_acuerdo',
+      titulo:  'Acuerdo pendiente de aprobación',
+      mensaje: `${esc(pedido.cliente_nombre || 'Un cliente')} aceptó una oferta de ${esc(oferta.admin_nombre || 'un proveedor')} por $${Number(oferta.precio_oferta).toLocaleString('es-MX')} MXN. Revisa y aprueba.`,
+      leido:   false,
+    })));
+  }
+
   _pendingOferta = null;
   _pendingPedido = null;
   document.getElementById('modal-detalles-servicio').classList.remove('open');
 
-  await cerrarAcuerdo(oferta, { ...pedido, fecha_ini: fecha });
   await loadNotificaciones();
   closePedidoDetalle();
   await renderPedidos();
-  showToast('✓ ¡Acuerdo cerrado! Reservación creada');
+  showToast('✓ Acuerdo enviado a revisión — te notificaremos pronto');
 }
 
 async function enviarContraoferta(ofertaId) {
