@@ -310,23 +310,33 @@ function actualizarSubtipoPedido() {
 function openNuevoPedido(servicio) {
   if (!currentUser.id) { showLoginOverlay(); return; }
 
-  // Pre-seleccionar el tipo según el botón pulsado
+  const CAT_INFO = {
+    camion:   { icon: '🚛', titulo: 'Transporte de carga',     desc: 'Solicita un camión para mover tu carga. Elige el tipo, origen, destino y fechas.', primer: 'Cualquiera' },
+    custodio: { icon: '👮', titulo: 'Servicio de custodia',    desc: 'Agrega seguridad a tu operación. Define zona, horario y número de elementos.',       primer: 'Custodio Armado' },
+    patio:    { icon: '🏭', titulo: 'Almacenamiento en patio', desc: 'Guarda tus vehículos o carga en un patio seguro. Indica fechas y área requerida.',    primer: 'Patio Techado' },
+    lavado:   { icon: '🚿', titulo: 'Lavado de unidades',      desc: 'Programa el lavado de tu flota. Elige el tipo de servicio y la ubicación.',           primer: 'Lavado Exterior' },
+  };
+
+  const banner = document.getElementById('np-categoria-banner');
   const select = document.getElementById('np-tipo');
-  if (select && servicio) {
-    const mapPrimero = {
-      camion:   'Cualquiera',
-      custodio: 'Custodio Armado',
-      patio:    'Patio Techado',
-      lavado:   'Lavado Exterior',
-    };
-    if (mapPrimero[servicio]) select.value = mapPrimero[servicio];
-    actualizarSubtipoPedido();
+
+  if (servicio && CAT_INFO[servicio]) {
+    const cat = CAT_INFO[servicio];
+    if (banner) {
+      banner.innerHTML = `<span class="np-cat-icon">${cat.icon}</span><div><div class="np-cat-titulo">${cat.titulo}</div><div class="np-cat-desc">${cat.desc}</div></div>`;
+      banner.style.display = 'flex';
+    }
+    if (select) { select.value = cat.primer; actualizarSubtipoPedido(); }
+  } else {
+    if (banner) banner.style.display = 'none';
   }
 
   document.getElementById('modal-nuevo-pedido').classList.add('open');
 }
 function closeNuevoPedido() {
   document.getElementById('modal-nuevo-pedido').classList.remove('open');
+  const banner = document.getElementById('np-categoria-banner');
+  if (banner) banner.style.display = 'none';
 }
 
 async function crearPedido() {
