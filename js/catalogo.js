@@ -108,9 +108,10 @@ function _empresaCardHTML(e) {
         </div>
       </div>
       <div class="empresa-recursos-list">${bloques}</div>
+      ${currentUser.rol === 'cliente' || !currentUser.id ? `
       <div class="empresa-card-footer">
         <button class="btn-emp-solicitar" onclick="openNuevoPedido()">📋 Publicar solicitud</button>
-      </div>
+      </div>` : ''}
     </div>`;
 }
 
