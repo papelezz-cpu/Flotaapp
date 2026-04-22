@@ -216,5 +216,5 @@ function closeDetalle() {
 
 function detalleAgendar() {
   closeDetalle();
-  if (detalleCamion) openReserva(detalleCamion.id);
+  openNuevoPedido();
 }

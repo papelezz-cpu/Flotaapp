@@ -241,6 +241,17 @@ async function aceptarReserva(reservaId, unidad, recurso_tipo) {
   const tipoFinal = recurso_tipo || r?.recurso_tipo || 'camion';
   await sb.from('reservaciones').update({ estado: 'Activa' }).eq('id', reservaId);
 
+  // Notificar al cliente que su reservación fue aceptada
+  if (r?.cliente_user_id) {
+    await sb.from('notificaciones').insert({
+      user_id: r.cliente_user_id,
+      tipo:    'reserva_aceptada',
+      titulo:  '✓ Reservación confirmada',
+      mensaje: `${currentUser.nombre} confirmó tu servicio de ${r?.descripcion ? '' : ''}. Revisa tus reservaciones para más detalles.`,
+      leido:   false,
+    });
+  }
+
   // Marcar recurso como ocupado solo si ya inició y es un camión
   const fechaIni = r?.fecha_ini ? r.fecha_ini.split('T')[0] : null;
   if (tipoFinal === 'camion' && fechaIni && fechaIni <= today()) {
@@ -402,6 +413,16 @@ async function enviarCalificacion() {
   });
   if (error) { showToast('Error al enviar calificación'); return; }
   await sb.from('reservaciones').update({ calificado: true }).eq('id', _calReservaId);
+
+  // Notificar al proveedor de la nueva calificación
+  await sb.from('notificaciones').insert({
+    user_id: _calAdminId,
+    tipo:    'nueva_calificacion',
+    titulo:  '⭐ Nueva calificación recibida',
+    mensaje: `${currentUser.nombre || 'Un cliente'} te calificó con ${_calRating} estrella${_calRating !== 1 ? 's' : ''}${comentario ? ': "' + comentario.slice(0, 80) + (comentario.length > 80 ? '…' : '') + '"' : ''}.`,
+    leido:   false,
+  });
+
   closeCalificar();
   await renderReserv();
   showToast('⭐ ¡Gracias por tu calificación!');

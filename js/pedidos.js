@@ -46,7 +46,7 @@ async function renderPedidos() {
   let pedidosQ = sb.from('pedidos').select('*').order('created_at', { ascending: false });
   // Clientes: ven públicos (abierto/en_negociacion) + los suyos en cualquier estado activo
   // La RLS ya permite esto: (admin) OR (estado público) OR (cliente_id = auth.uid())
-  if (esCliente) pedidosQ = pedidosQ.in('estado', ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado']);
+  if (esCliente) pedidosQ = pedidosQ.in('estado', ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado', 'acordado', 'cancelado']);
 
   const [{ data: pedidos, error }, { data: todasOfertas }] = await Promise.all([
     pedidosQ,
@@ -94,8 +94,12 @@ async function renderPedidos() {
   // ── CLIENTE ────────────────────────────────────────
   if (currentUser.id && currentUser.rol === 'cliente') {
     const ESTADOS_ACTIVOS = ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado'];
+    const ESTADOS_HIST    = ['acordado', 'cancelado'];
     const misPedidos   = _filtrar((pedidos || []).filter(p =>
       p.cliente_id === currentUser.id && ESTADOS_ACTIVOS.includes(p.estado)
+    ));
+    const misHistorial = _filtrar((pedidos || []).filter(p =>
+      p.cliente_id === currentUser.id && ESTADOS_HIST.includes(p.estado)
     ));
     const otrosPedidos = _filtrar((pedidos || []).filter(p => p.cliente_id !== currentUser.id && p.estado === 'abierto'));
 
@@ -107,7 +111,11 @@ async function renderPedidos() {
       html += `<div class="ped-seccion-title">Otras solicitudes activas</div>`;
       html += otrosPedidos.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'publico')).join('');
     }
-    if (!misPedidos.length && !otrosPedidos.length) {
+    if (misHistorial.length) {
+      html += `<div class="ped-seccion-title" style="margin-top:24px">Historial</div>`;
+      html += misHistorial.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'historial')).join('');
+    }
+    if (!misPedidos.length && !otrosPedidos.length && !misHistorial.length) {
       html = `<div class="empty-state"><div class="icon">📋</div>Sin solicitudes activas.<br><small style="color:var(--text-muted)">Publica la primera con el botón de arriba.</small></div>`;
     }
 
@@ -670,25 +678,34 @@ function closeDetallesServicio() {
   _pendingPedido = null;
 }
 
+function omitirDetallesServicio() {
+  // Limpiar campos opcionales y confirmar directamente
+  ['ds-fecha','ds-hora','ds-lugar','ds-contacto-nombre','ds-contacto-tel'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  confirmarDetallesServicio();
+}
+
 async function confirmarDetallesServicio() {
   if (!_pendingOferta || !_pendingPedido) return;
   const v = id => document.getElementById(id)?.value?.trim() || '';
   const fecha = v('ds-fecha');
   const lugar = v('ds-lugar');
-  if (!fecha || !lugar) { alert('Por favor completa la fecha y la dirección del servicio.'); return; }
 
   const oferta = _pendingOferta;
   const pedido = _pendingPedido;
 
-  // Guardar detalles en el pedido
-  await sb.from('pedidos').update({
-    detalles_lugar:           lugar,
+  // Guardar detalles en el pedido (solo los que se hayan ingresado)
+  const update = {
+    detalles_completados: true,
+    detalles_lugar:           lugar || null,
     detalles_hora:            v('ds-hora') || null,
     detalles_contacto_nombre: v('ds-contacto-nombre') || null,
     detalles_contacto_tel:    v('ds-contacto-tel') || null,
-    detalles_completados:     true,
-    fecha_ini:                fecha,
-  }).eq('id', pedido.id);
+  };
+  if (fecha) update.fecha_ini = fecha;
+  await sb.from('pedidos').update(update).eq('id', pedido.id);
 
   // Marcar oferta como aceptada
   await sb.from('ofertas').update({ estado: 'aceptada' }).eq('id', oferta.id);
@@ -772,8 +789,8 @@ async function openHacerOferta(pedidoId) {
   if (warn)   { warn.style.display = 'none'; warn.textContent = ''; }
   if (btnEnv) btnEnv.disabled = false;
 
-  // Leer el pedido para saber qué tipo de recurso se solicita
-  const { data: pedido } = await sb.from('pedidos').select('tipo_camion').eq('id', pedidoId).single();
+  // Leer el pedido para saber qué tipo de recurso y fechas
+  const { data: pedido } = await sb.from('pedidos').select('tipo_camion, fecha_ini, fecha_fin').eq('id', pedidoId).single();
   const tipo = pedido?.tipo_camion || '';
 
   const esCustodio = tipo.startsWith('Custodio') || tipo === 'Supervisión remota';
@@ -837,6 +854,40 @@ async function openHacerOferta(pedidoId) {
       opt.textContent = `${CAMION_EMOJI[c.tipo] || '🚛'} ${c.id} — ${c.tipo} (${c.capacidad} ton)`;
       select.appendChild(opt);
     });
+  }
+
+  // Filtrar por disponibilidad real en las fechas del pedido
+  if (recursos.length && pedido?.fecha_ini) {
+    const fechaFin = pedido.fecha_fin || pedido.fecha_ini;
+    const { data: conflictos } = await sb.from('reservaciones')
+      .select('unidad')
+      .in('unidad', recursos.map(r => r.id))
+      .in('estado', ['Pendiente', 'Activa'])
+      .lte('fecha_ini', fechaFin)
+      .gte('fecha_fin', pedido.fecha_ini);
+
+    const bloqueados = new Set((conflictos || []).map(c => c.unidad));
+    if (bloqueados.size) {
+      recursos = recursos.filter(r => !bloqueados.has(r.id));
+      const CAMION_EMOJI2 = { Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️' };
+      select.innerHTML = recursos.length
+        ? `<option value="">— Selecciona —</option>`
+        : `<option value="">Sin disponibilidad en esas fechas</option>`;
+      recursos.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = esCustodio
+          ? `${CUSTODIO_EMOJI[r.tipo] || '👮'} ${r.id} — ${r.nombre} (${r.tipo})`
+          : esPatio
+            ? `${PATIO_EMOJI[r.tipo] || '🏭'} ${r.id} — ${r.nombre} (${r.tipo})`
+            : `${CAMION_EMOJI2[r.tipo] || '🚛'} ${r.id} — ${r.tipo} (${r.capacidad} ton)`;
+        select.appendChild(opt);
+      });
+      if (!recursos.length) {
+        const tipoNombre = esCustodio ? 'custodios' : esPatio ? 'patios' : 'camiones';
+        sinRecursosMsg = `⚠ No tienes ${tipoNombre} disponibles en las fechas del pedido (${fmtFecha(pedido.fecha_ini)}${pedido.fecha_fin && pedido.fecha_fin !== pedido.fecha_ini ? ' al ' + fmtFecha(pedido.fecha_fin) : ''}). Revisa tus reservaciones activas.`;
+      }
+    }
   }
 
   // Si no hay recursos del tipo requerido, mostrar advertencia y bloquear envío

@@ -334,8 +334,21 @@ async function renderPendientes() {
 }
 
 async function aprobarRecurso(tabla, id) {
+  const { data: recurso } = await sb.from(tabla).select('propietario_id, nombre').eq('id', id).single();
   const { error } = await sb.from(tabla).update({ aprobacion: 'aprobada' }).eq('id', id);
   if (error) { showToast('Error al aprobar'); return; }
+
+  if (recurso?.propietario_id) {
+    const tipoLabel = tabla === 'custodios' ? 'custodio' : tabla === 'patios' ? 'patio' : 'servicio de lavado';
+    await sb.from('notificaciones').insert({
+      user_id: recurso.propietario_id,
+      tipo:    'recurso_aprobado',
+      titulo:  '✓ Recurso aprobado',
+      mensaje: `Tu ${tipoLabel} "${esc(recurso.nombre || id)}" fue aprobado y ya está visible en el catálogo.`,
+      leido:   false,
+    });
+  }
+
   renderAdmin(); renderPendientes();
   showToast(`✓ ${id} aprobado y publicado en el catálogo`);
 }
@@ -350,8 +363,20 @@ async function rechazarRecurso(tabla, id) {
 // ── APROBACIÓN / ELIMINACIÓN ──────────────────────────
 
 async function aprobarUnidad(id) {
+  const { data: camion } = await sb.from('camiones').select('propietario_id').eq('id', id).single();
   const { error } = await sb.from('camiones').update({ aprobacion: 'aprobada' }).eq('id', id);
   if (error) { showToast('Error al aprobar'); return; }
+
+  if (camion?.propietario_id) {
+    await sb.from('notificaciones').insert({
+      user_id: camion.propietario_id,
+      tipo:    'recurso_aprobado',
+      titulo:  '✓ Unidad aprobada',
+      mensaje: `Tu unidad ${id} fue aprobada y ya está visible en el catálogo. ¡Ya puedes recibir solicitudes!`,
+      leido:   false,
+    });
+  }
+
   renderAdmin(); renderPendientes();
   showToast(`✓ Unidad ${id} aprobada y publicada`);
 }

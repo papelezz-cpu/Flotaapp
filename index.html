@@ -898,10 +898,11 @@
 <!-- ══ MODAL DETALLES DEL SERVICIO (post-acuerdo) ══════ -->
 <div class="modal-overlay" id="modal-detalles-servicio">
   <div class="modal" style="max-width:500px">
-    <h2>📋 Confirmar detalles</h2>
+    <h2>📋 Datos adicionales del servicio</h2>
     <p id="ds-resumen" class="sub"></p>
+    <p style="font-size:0.82rem;color:var(--text-muted);margin:-4px 0 14px">Estos datos son opcionales — puedes coordinarlos después con el proveedor por el chat.</p>
     <div class="form-group">
-      <label>Fecha del servicio *</label>
+      <label>Fecha del servicio</label>
       <input type="date" id="ds-fecha">
     </div>
     <div class="form-group">
@@ -909,7 +910,7 @@
       <input type="time" id="ds-hora">
     </div>
     <div class="form-group">
-      <label>Dirección exacta / punto de encuentro *</label>
+      <label>Dirección / punto de encuentro</label>
       <input type="text" id="ds-lugar" placeholder="Ej. Terminal Lázaro Cárdenas, Patio 3…">
     </div>
     <div class="form-group">
@@ -921,8 +922,8 @@
       <input type="tel" id="ds-contacto-tel" placeholder="Ej. 314 123 4567">
     </div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeDetallesServicio()">Cancelar</button>
-      <button class="btn-confirm" onclick="confirmarDetallesServicio()">✓ Confirmar acuerdo</button>
+      <button class="btn-cancel" onclick="omitirDetallesServicio()">Omitir</button>
+      <button class="btn-confirm" onclick="confirmarDetallesServicio()">✓ Guardar y confirmar</button>
     </div>
   </div>
 </div>
@@ -1265,7 +1266,7 @@
 <!-- ══ SCRIPTS (orden importante) ══════════════════════ -->
 <script src="js/utils.js"></script>
 <script src="js/notificaciones.js?v=11"></script>
-<script src="js/detalle.js"></script>
+<script src="js/detalle.js?v=12"></script>
 <script src="js/tracking.js"></script>
 <script src="js/config.js?v=9"></script>
 <script src="js/auth.js?v=9"></script>
@@ -1273,11 +1274,11 @@
 <script src="js/views.js?v=10"></script>
 <script src="js/camiones.js?v=10"></script>
 <script src="js/recursos.js?v=10"></script>
-<script src="js/reservaciones.js?v=10"></script>
+<script src="js/reservaciones.js?v=12"></script>
 <script src="js/modal.js?v=10"></script>
-<script src="js/pedidos.js?v=12"></script>
+<script src="js/pedidos.js?v=13"></script>
 <script src="js/aprobaciones.js?v=10"></script>
-<script src="js/admin.js?v=10"></script>
+<script src="js/admin.js?v=12"></script>
 <script src="js/usuarios.js?v=11"></script>
 <script src="js/chat.js?v=10"></script>
 <script src="js/catalogo.js?v=10"></script>
