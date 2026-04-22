@@ -91,7 +91,14 @@ async function onNotifClick(id, tipo) {
     return;
   }
 
-  if (tipo === 'reserva_pendiente' || tipo === 'reserva_aceptada' || tipo === 'reserva_rechazada') {
+  if (tipo === 'revision_solicitud' || tipo === 'revision_acuerdo') {
+    const tab = [...tabs].find(t => t.textContent.trim() === 'Admin' || t.dataset.view === 'admin');
+    if (tab) showView('admin', tab);
+    setTimeout(() => {
+      const sec = document.getElementById('aprobaciones-section');
+      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
+  } else if (tipo === 'reserva_pendiente' || tipo === 'reserva_aceptada' || tipo === 'reserva_rechazada') {
     const tab = [...tabs].find(t => t.textContent.trim() === 'Reservaciones');
     if (tab) showView('reservaciones', tab);
   } else if (['nueva_oferta','respuesta_oferta','respuesta_contra_oferta','oferta_no_seleccionada'].includes(tipo)) {

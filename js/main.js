@@ -79,6 +79,11 @@ function init() {
       // Refrescar campanita cuando llega una notificación para mí
       if (currentUser.id && payload.new?.user_id === currentUser.id) {
         loadNotificaciones();
+        // Si es una notificación de revisión y soy superadmin, refrescar panel de aprobaciones
+        if (currentUser.rol === 'superadmin' &&
+            (payload.new.tipo === 'revision_solicitud' || payload.new.tipo === 'revision_acuerdo')) {
+          renderAprobaciones();
+        }
       }
     })
     .subscribe();
