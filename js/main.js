@@ -11,7 +11,8 @@ function showToast(msg, tipo = 'ok') {
 // ── INICIALIZACIÓN (llamada tras login) ───────────────
 // Solo refresca la vista activa; el resto ya cargó en el arranque público
 function init() {
-  renderPedidos();
+  const tabPedidos = document.querySelectorAll('.nav-tab')[0];
+  showView('pedidos', tabPedidos);
   actualizarBadgeChat();
 }
 
