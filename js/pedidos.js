@@ -711,6 +711,19 @@ async function confirmarDetallesServicio() {
     })));
   }
 
+  // Correo a superadmins: acuerdo pendiente de aprobación
+  fetch(FN_NOTIFICACION, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tipo_evento:    'acuerdo',
+      tipo_camion:    pedido.tipo_camion,
+      cliente_nombre: pedido.cliente_nombre,
+      admin_nombre:   oferta.admin_nombre,
+      precio:         oferta.precio_oferta,
+    }),
+  }).catch(() => {});
+
   _pendingOferta = null;
   _pendingPedido = null;
   document.getElementById('modal-detalles-servicio').classList.remove('open');
@@ -917,6 +930,19 @@ async function responderContra(accion) {
         })));
       }
     }
+
+    // Correo a superadmins: acuerdo pendiente de aprobación
+    fetch(FN_NOTIFICACION, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tipo_evento:    'acuerdo',
+        tipo_camion:    pedido.tipo_camion,
+        cliente_nombre: pedido.cliente_nombre,
+        admin_nombre:   currentUser.nombre,
+        precio:         oferta.contra_precio,
+      }),
+    }).catch(() => {});
 
     closeResponderContra();
     await renderPedidos();
