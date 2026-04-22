@@ -888,22 +888,49 @@ function closeResponderContra() {
 
 async function responderContra(accion) {
   if (!ofertaDetalleId) return;
-  const nuevo = accion === 'aceptar' ? 'aceptada' : 'rechazada';
 
   const { data: oferta } = await sb.from('ofertas').select('*').eq('id', ofertaDetalleId).single();
-  const { error } = await sb.from('ofertas').update({ estado: nuevo }).eq('id', ofertaDetalleId);
-  if (error) { showToast('Error'); return; }
 
   if (accion === 'aceptar' && oferta) {
-    const { data: pedido } = await sb.from('pedidos').select('*').eq('id', oferta.pedido_id).single();
-    // Usar precio de la contraoferta del cliente como precio final
-    if (pedido) await cerrarAcuerdo({ ...oferta, precio_oferta: oferta.contra_precio }, pedido);
-  }
+    // Fijar el precio acordado (contraoferta del cliente) en la oferta
+    await sb.from('ofertas').update({
+      estado:        'aceptada',
+      precio_oferta: oferta.contra_precio,
+    }).eq('id', ofertaDetalleId);
 
-  closeResponderContra();
-  await renderPedidos();
-  await loadNotificaciones();
-  showToast(accion === 'aceptar' ? '✓ Acuerdo confirmado — reservación creada' : 'Contraoferta rechazada');
+    const { data: pedido } = await sb.from('pedidos').select('*').eq('id', oferta.pedido_id).single();
+    if (pedido) {
+      // Enviar a revisión del superadmin (mismo flujo que confirmarDetallesServicio)
+      await sb.from('pedidos').update({
+        estado:              'pendiente_acuerdo',
+        oferta_pendiente_id: oferta.id,
+      }).eq('id', pedido.id);
+
+      const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+      if (supers?.length) {
+        await sb.from('notificaciones').insert(supers.map(a => ({
+          user_id: a.user_id,
+          tipo:    'revision_acuerdo',
+          titulo:  'Acuerdo pendiente de aprobación',
+          mensaje: `${esc(currentUser.nombre)} aceptó una contraoferta de ${esc(pedido.cliente_nombre || 'cliente')} por $${Number(oferta.contra_precio).toLocaleString('es-MX')} MXN. Revisa y aprueba.`,
+          leido:   false,
+        })));
+      }
+    }
+
+    closeResponderContra();
+    await renderPedidos();
+    await loadNotificaciones();
+    showToast('✓ Acuerdo enviado a revisión — el superadmin lo aprobará pronto');
+  } else {
+    // Rechazar contraoferta
+    const { error } = await sb.from('ofertas').update({ estado: 'rechazada' }).eq('id', ofertaDetalleId);
+    if (error) { showToast('Error'); return; }
+    closeResponderContra();
+    await renderPedidos();
+    await loadNotificaciones();
+    showToast('Contraoferta rechazada');
+  }
 }
 
 // ── CERRAR ACUERDO → CREAR RESERVACIÓN ────────────────
