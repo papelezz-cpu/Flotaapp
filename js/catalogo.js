@@ -37,12 +37,21 @@ async function renderCatalogo() {
     { data: custodios },
     { data: patios    },
     { data: lavados   },
+    { data: califs    },
   ] = await Promise.all([
-    sb.from('camiones' ).select('id, tipo, estado, propietario_id').eq('aprobacion','aprobada').in('propietario_id', ids),
-    sb.from('custodios').select('id, tipo, estado, propietario_id').eq('aprobacion','aprobada').in('propietario_id', ids),
-    sb.from('patios'   ).select('id, tipo, estado, propietario_id').eq('aprobacion','aprobada').in('propietario_id', ids),
-    sb.from('lavados'  ).select('id, tipos_vehiculo, tipos_lavado, estado, propietario_id').eq('aprobacion','aprobada').in('propietario_id', ids),
+    sb.from('camiones'      ).select('id, tipo, estado, propietario_id').eq('aprobacion','aprobada').in('propietario_id', ids),
+    sb.from('custodios'     ).select('id, tipo, estado, propietario_id').eq('aprobacion','aprobada').in('propietario_id', ids),
+    sb.from('patios'        ).select('id, tipo, estado, propietario_id').eq('aprobacion','aprobada').in('propietario_id', ids),
+    sb.from('lavados'       ).select('id, tipos_vehiculo, tipos_lavado, estado, propietario_id').eq('aprobacion','aprobada').in('propietario_id', ids),
+    sb.from('calificaciones').select('admin_id, rating, comentario, created_at').in('admin_id', ids).order('created_at', { ascending: false }),
   ]);
+
+  // Agrupar calificaciones por empresa
+  const califMap = {};
+  (califs || []).forEach(c => {
+    if (!califMap[c.admin_id]) califMap[c.admin_id] = [];
+    califMap[c.admin_id].push(c);
+  });
 
   const empresas = perfiles.map(p => ({
     ...p,
@@ -50,6 +59,7 @@ async function renderCatalogo() {
     custodios: (custodios || []).filter(r => r.propietario_id === p.user_id),
     patios:    (patios    || []).filter(r => r.propietario_id === p.user_id),
     lavados:   (lavados   || []).filter(r => r.propietario_id === p.user_id),
+    califs:    califMap[p.user_id] || [],
   })).filter(e =>
     e.camiones.length + e.custodios.length + e.patios.length + e.lavados.length > 0
   );
@@ -85,12 +95,24 @@ function _empresaCardHTML(e) {
     e.lavados.length   ? 'lavado'   : null,
   ].filter(Boolean);
 
-  // statusTxt eliminado — la disponibilidad se muestra en cada bloque de servicio
-
   const SERV_ICONS = { camion:'🚛', custodio:'👮', patio:'🏭', lavado:'🚿' };
   const iconBadges = servicios.map(s =>
     `<span class="emp-icon-badge" title="${s}">${SERV_ICONS[s]}</span>`
   ).join('');
+
+  // Rating promedio
+  const numCal = e.califs.length;
+  const avg    = numCal ? (e.califs.reduce((s, c) => s + c.rating, 0) / numCal) : 0;
+  const avgStr = avg.toFixed(1);
+  const stars  = numCal
+    ? `<div class="emp-rating">
+         <span class="emp-stars">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5 - Math.round(avg))}</span>
+         <span class="emp-rating-num">${avgStr}</span>
+         <button class="emp-btn-resenas" onclick="openVerCalificaciones('${e.user_id}','${esc(e.nombre)}')">
+           Ver ${numCal} reseña${numCal !== 1 ? 's' : ''}
+         </button>
+       </div>`
+    : `<div class="emp-rating emp-sin-rating">Sin reseñas aún</div>`;
 
   let bloques = '';
   if (e.camiones.length)  bloques += _bloqueEstandar ('camion',   '🚛', 'Camiones',  e.camiones);
@@ -107,6 +129,7 @@ function _empresaCardHTML(e) {
           <div class="empresa-serv-icons">${iconBadges}</div>
         </div>
       </div>
+      ${stars}
       <div class="empresa-recursos-list">${bloques}</div>
       ${currentUser.rol === 'cliente' || !currentUser.id ? `
       <div class="empresa-card-footer">
@@ -164,6 +187,51 @@ function _bloqueLavado(lavados) {
         <div class="emp-lav-label" style="margin-top:6px">Servicios:</div>
         <div class="emp-rec-tipos">${chips(tiposLav, 'chip-lav')}</div>` : ''}
     </div>`;
+}
+
+// ─── Modal: ver calificaciones de una empresa ───────────
+
+async function openVerCalificaciones(adminId, adminNombre) {
+  document.getElementById('vcal-titulo').textContent = `⭐ Reseñas de ${adminNombre}`;
+  document.getElementById('vcal-resumen').innerHTML  = '<span style="color:var(--text-muted);font-size:0.85rem">Cargando…</span>';
+  document.getElementById('vcal-lista').innerHTML    = '';
+  document.getElementById('modal-ver-calificaciones').classList.add('open');
+
+  const { data: cals } = await sb.from('calificaciones')
+    .select('rating, comentario, created_at, cliente_id')
+    .eq('admin_id', adminId)
+    .order('created_at', { ascending: false });
+
+  if (!cals?.length) {
+    document.getElementById('vcal-resumen').innerHTML = '';
+    document.getElementById('vcal-lista').innerHTML =
+      '<div style="color:var(--text-muted);font-size:0.88rem;text-align:center;padding:20px">Sin reseñas todavía</div>';
+    return;
+  }
+
+  const avg    = cals.reduce((s, c) => s + c.rating, 0) / cals.length;
+  const avgStr = avg.toFixed(1);
+  document.getElementById('vcal-resumen').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:1.6rem;font-weight:700;color:var(--accent)">${avgStr}</span>
+      <span style="color:#f59e0b;font-size:1.2rem">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5 - Math.round(avg))}</span>
+      <span style="color:var(--text-muted);font-size:0.85rem">${cals.length} reseña${cals.length !== 1 ? 's' : ''}</span>
+    </div>`;
+
+  const labels = ['', 'Malo', 'Regular', 'Bueno', 'Muy bueno', 'Excelente'];
+  document.getElementById('vcal-lista').innerHTML = cals.map(c => `
+    <div class="vcal-item">
+      <div class="vcal-item-top">
+        <span class="vcal-stars">${'★'.repeat(c.rating)}${'☆'.repeat(5 - c.rating)}</span>
+        <span class="vcal-label">${labels[c.rating] || ''}</span>
+        <span class="vcal-fecha">${fmtFecha(c.created_at)}</span>
+      </div>
+      ${c.comentario ? `<div class="vcal-comentario">"${esc(c.comentario)}"</div>` : ''}
+    </div>`).join('');
+}
+
+function cerrarVerCalificaciones() {
+  document.getElementById('modal-ver-calificaciones').classList.remove('open');
 }
 
 // ─── Filtro: muestra empresas y bloques del tipo activo ─

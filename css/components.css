@@ -985,6 +985,39 @@ body.light .chip-lav { background: rgba(6,182,212,0.08); border-color: rgba(6,18
 }
 .btn-emp-solicitar:hover { opacity: 0.9; transform: translateY(-1px); }
 
+/* ── RATING EN CARD ──────────────────────────────────── */
+.emp-rating {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 20px; border-bottom: 1px solid rgba(78,142,247,0.08);
+}
+.emp-stars { color: #f59e0b; font-size: 1rem; letter-spacing: 1px; }
+.emp-rating-num { font-weight: 700; font-size: 0.88rem; color: var(--text); }
+.emp-sin-rating { color: var(--text-muted); font-size: 0.78rem; font-style: italic; }
+.emp-btn-resenas {
+  margin-left: auto; font-size: 0.75rem; padding: 3px 10px;
+  border: 1px solid var(--border); border-radius: 20px; background: transparent;
+  color: var(--accent); cursor: pointer; font-family: 'Syne', sans-serif;
+  transition: background 0.15s, color 0.15s;
+}
+.emp-btn-resenas:hover { background: var(--accent); color: #fff; }
+
+/* ── MODAL VER CALIFICACIONES ────────────────────────── */
+.vcal-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px;
+}
+.vcal-item-top {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px;
+}
+.vcal-stars { color: #f59e0b; font-size: 0.95rem; letter-spacing: 1px; }
+.vcal-label { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
+.vcal-fecha { margin-left: auto; font-size: 0.72rem; color: var(--text-muted); }
+.vcal-comentario {
+  font-size: 0.85rem; color: var(--text); font-style: italic;
+  line-height: 1.45; padding-left: 2px;
+}
+body.light .vcal-item { background: #f8faff; border-color: rgba(37,99,235,0.1); }
+
 /* Light mode */
 body.light .empresa-card { background: #fff; border-color: rgba(37,99,235,0.12); }
 body.light .empresa-card:hover { border-color: rgba(37,99,235,0.3); }
