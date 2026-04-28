@@ -7,6 +7,27 @@ async function _autoIdOperador() {
   return `OP-${String(max + 1).padStart(3, '0')}`;
 }
 
+// Número de trabajador automático, secuencial por empresa
+async function _autoNumTrabajador(propietarioId) {
+  if (!propietarioId) return '';
+  const { data } = await sb.from('operadores')
+    .select('num_trabajador')
+    .eq('propietario_id', propietarioId);
+  const nums = (data || []).map(o => parseInt((o.num_trabajador || '').replace(/\D/g, '')) || 0);
+  const max  = nums.length ? Math.max(...nums) : 0;
+  return String(max + 1).padStart(3, '0');
+}
+
+async function _prefillNumTrabajador() {
+  const propietarioId = currentUser.rol === 'superadmin'
+    ? document.getElementById('sa-empresa-operador')?.value
+    : currentUser.id;
+  const el = document.getElementById('op-num-trabajador');
+  if (!el) return;
+  if (!propietarioId) { el.value = ''; return; }
+  el.value = await _autoNumTrabajador(propietarioId);
+}
+
 // ── CATÁLOGO DE OPERADORES ────────────────────────────
 
 async function renderAdminOperadores() {
@@ -23,12 +44,14 @@ async function renderAdminOperadores() {
     return;
   }
   if (!data?.length) {
-    container.innerHTML = `<div class="empty-state"><div class="icon">👷</div>Sin operadores aprobados.<br><small style="color:var(--text-muted)">Agrega el primero con el botón de arriba.</small></div>`;
-    return;
+    container.innerHTML = `<div class="empty-state"><div class="icon">👷</div>Sin operadores aprobados.<br><small style="color:var(--text-muted)">Completa el formulario y envía a aprobación.</small></div>`;
+  } else {
+    container.innerHTML = data.map(op => _operadorCardHTML(op)).join('');
+    _poblarSelectOperadores(data);
   }
-  container.innerHTML = data.map(op => _operadorCardHTML(op)).join('');
-  // Actualizar selectores de operador en los formularios de camión
-  _poblarSelectOperadores(data);
+
+  // Pre-llenar número de trabajador
+  _prefillNumTrabajador();
 }
 
 function _operadorCardHTML(op) {
@@ -52,7 +75,7 @@ function _operadorCardHTML(op) {
       <div class="op-foto-wrap">${foto}</div>
       <div class="op-info">
         <div class="op-nombre">${esc(nombre)}</div>
-        <div class="op-sub">${esc(op.id)}${op.puesto ? ' · ' + esc(op.puesto) : ''}${op.area ? ' · ' + esc(op.area) : ''}</div>
+        <div class="op-sub">${esc(op.id)}${op.num_trabajador ? ' · #' + esc(op.num_trabajador) : ''}${op.puesto ? ' · ' + esc(op.puesto) : ''}${op.area ? ' · ' + esc(op.area) : ''}</div>
         ${licInfo}${vence}
       </div>
       <div class="op-actions">
@@ -62,22 +85,36 @@ function _operadorCardHTML(op) {
     </div>`;
 }
 
-// ── MODAL AGREGAR OPERADOR ────────────────────────────
+// ── LIMPIAR FORMULARIO ────────────────────────────────
 
-function openAgregarOperador() {
-  if (!currentUser.id) return;
+function _limpiarFormOperador() {
+  const contenedor = document.getElementById('admin-content-operador');
+  if (!contenedor) return;
+  contenedor.querySelectorAll('input:not([type=file])').forEach(el => { el.value = ''; });
+  contenedor.querySelectorAll('select').forEach(el => { el.selectedIndex = 0; });
+  ['op-foto-file', 'op-lic-file'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
   document.getElementById('op-foto-preview').innerHTML = '';
   document.getElementById('op-lic-preview').innerHTML  = '';
-  document.getElementById('modal-agregar-operador').classList.add('open');
 }
 
+// Llamada al cambiar empresa (superadmin)
+async function onCambioEmpresaOperador() {
+  await _prefillNumTrabajador();
+}
+
+// Compatibilidad: openAgregarOperador ya no usa modal, solo limpia y prefill
+function openAgregarOperador() {}
+
 function closeAgregarOperador() {
-  document.getElementById('modal-agregar-operador').classList.remove('open');
-  document.getElementById('modal-agregar-operador')
-    .querySelectorAll('input:not([type=file]), select, textarea')
-    .forEach(el => { el.value = ''; });
-  document.getElementById('op-foto-preview').innerHTML = '';
-  document.getElementById('op-lic-preview').innerHTML  = '';
+  _limpiarFormOperador();
+  _prefillNumTrabajador();
+  // Hacer scroll al inicio del card de lista
+  document.getElementById('admin-operadores-list')
+    ?.closest('.admin-card')
+    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function opFotoPreview(input, previewId) {
@@ -180,11 +217,11 @@ async function agregarOperador() {
   }
 
   restore();
-  closeAgregarOperador();
-  renderAdminOperadores();
+  showToast(`✓ Operador ${id} enviado — pendiente de aprobación`);
+  closeAgregarOperador();          // limpia form y hace scroll al listado
+  await renderAdminOperadores();   // refresca lista y prefill siguiente número
   if (currentUser.rol !== 'superadmin') renderMisPendientes();
   renderAprobaciones();
-  showToast(`✓ Operador ${id} registrado — pendiente de aprobación`);
 }
 
 async function eliminarOperador(id) {
@@ -192,6 +229,7 @@ async function eliminarOperador(id) {
   await sb.from('operadores').delete().eq('id', id);
   document.getElementById(`opcard-${id}`)?.remove();
   _poblarSelectOperadores();
+  _prefillNumTrabajador();
   showToast(`Operador ${id} eliminado`);
 }
 

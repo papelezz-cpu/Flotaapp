@@ -639,7 +639,7 @@
 
         <div class="form-group sa-empresa-row" style="display:none">
           <label>Empresa propietaria</label>
-          <select id="sa-empresa-operador"><option value="">— Selecciona empresa —</option></select>
+          <select id="sa-empresa-operador" onchange="onCambioEmpresaOperador()"><option value="">— Selecciona empresa —</option></select>
         </div>
         <button class="btn-add" onclick="agregarOperador()">Enviar a aprobación</button>
       </div>
@@ -1457,7 +1457,7 @@
 <script src="js/pedidos.js?v=13"></script>
 <script src="js/aprobaciones.js?v=11"></script>
 <script src="js/admin.js?v=13"></script>
-<script src="js/operadores.js?v=2"></script>
+<script src="js/operadores.js?v=3"></script>
 <script src="js/usuarios.js?v=11"></script>
 <script src="js/chat.js?v=10"></script>
 <script src="js/catalogo.js?v=14"></script>
