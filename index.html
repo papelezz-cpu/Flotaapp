@@ -247,30 +247,127 @@
     <div class="admin-grid">
       <div class="admin-card">
         <h3>➕ Agregar unidad</h3>
+
+        <div class="op-form-section-title" style="margin-top:4px">Datos del vehículo</div>
         <div class="form-group">
-          <label>Tipo</label>
+          <label>Tipo de transporte</label>
           <select id="admin-tipo" onchange="autoFillDimensiones()">
             <option>Torton</option><option>Rabón</option>
             <option>Full</option><option>Plataforma</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Capacidad (toneladas)</label>
-          <input type="number" id="admin-cap" placeholder="Ej. 22">
-        </div>
-        <div class="form-group">
-          <label>Operador</label>
-          <select id="admin-op">
-            <option value="">— Sin operador asignado —</option>
+          <label>Marca</label>
+          <select id="admin-marca">
+            <option value="">— Seleccionar —</option>
+            <option>Kenworth</option><option>International</option><option>Freightliner</option>
+            <option>Peterbilt</option><option>Volvo</option><option>Mercedes-Benz</option>
+            <option>Scania</option><option>MAN</option><option>Hino</option><option>Isuzu</option><option>Otra</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Placas</label>
-          <input type="text" id="admin-placas" placeholder="Ej. MNZ-123-A">
+          <label>Versión / Submarca</label>
+          <input type="text" id="admin-version" placeholder="Ej. T800, LT 625">
+        </div>
+        <div class="form-group">
+          <label>Año del modelo</label>
+          <input type="number" id="admin-modelo-anio" placeholder="Ej. 2022" min="1980" max="2035">
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <select id="admin-color">
+            <option value="">— Seleccionar —</option>
+            <option>Blanco</option><option>Negro</option><option>Rojo</option><option>Azul</option>
+            <option>Gris</option><option>Verde</option><option>Amarillo</option><option>Naranja</option>
+            <option>Plata</option><option>Café</option><option>Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Capacidad (toneladas) *</label>
+          <input type="number" id="admin-cap" placeholder="Ej. 22">
         </div>
         <div class="form-group">
           <label>Dimensiones del vehículo</label>
           <input type="text" id="admin-dim" placeholder="Se llena automáticamente por tipo">
+        </div>
+        <div class="form-group">
+          <label>Tipo de combustible</label>
+          <select id="admin-combustible">
+            <option value="">— Seleccionar —</option>
+            <option>Diesel</option><option>Gasolina</option>
+            <option>Gas Natural</option><option>Eléctrico</option><option>Híbrido</option>
+          </select>
+        </div>
+
+        <div class="op-form-section-title" style="margin-top:16px">Identificación del vehículo</div>
+        <div class="form-group">
+          <label>Número de serie (NIV)</label>
+          <input type="text" id="admin-num-serie" placeholder="Ej. 3HKRM4H59KM702456">
+        </div>
+        <div class="form-group">
+          <label>Número de placas</label>
+          <input type="text" id="admin-placas" placeholder="Ej. MNZ-123-A">
+        </div>
+        <div class="form-group">
+          <label>Tipo de placa</label>
+          <select id="admin-tipo-placa">
+            <option value="">— Seleccionar —</option>
+            <option>Federal</option><option>Estatal</option><option>Local</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Número de motor</label>
+          <input type="text" id="admin-num-motor" placeholder="Ej. CAT-123456">
+        </div>
+        <div class="form-group">
+          <label>Número económico</label>
+          <input type="text" id="admin-num-economico" placeholder="Ej. ECO-001">
+        </div>
+
+        <div class="op-form-section-title" style="margin-top:16px">Tarjeta de circulación</div>
+        <div class="form-group">
+          <label>Número de tarjeta de circulación</label>
+          <input type="text" id="admin-tc" placeholder="Núm. de tarjeta">
+        </div>
+        <div class="form-group">
+          <label>Fecha de expedición TC</label>
+          <input type="date" id="admin-fecha-tc">
+        </div>
+        <div class="form-group">
+          <label>Imagen tarjeta de circulación</label>
+          <label class="file-upload-area" for="admin-img-tc">
+            <span class="file-upload-icon">📄</span>
+            <span id="img-tc-label" class="file-upload-text">Adjuntar imagen</span>
+          </label>
+          <input type="file" id="admin-img-tc" accept="image/*,.pdf" style="display:none"
+                 onchange="updateFileLabel('admin-img-tc','img-tc-label')">
+        </div>
+
+        <div class="op-form-section-title" style="margin-top:16px">Registro CAAT</div>
+        <div class="form-group">
+          <label>Número CAAT</label>
+          <input type="text" id="admin-caat" placeholder="Núm. CAAT">
+        </div>
+        <div class="form-group">
+          <label>Vigencia del CAAT</label>
+          <input type="date" id="admin-vigencia-caat">
+        </div>
+        <div class="form-group">
+          <label>Imagen del CAAT</label>
+          <label class="file-upload-area" for="admin-img-caat">
+            <span class="file-upload-icon">📋</span>
+            <span id="img-caat-label" class="file-upload-text">Adjuntar imagen</span>
+          </label>
+          <input type="file" id="admin-img-caat" accept="image/*,.pdf" style="display:none"
+                 onchange="updateFileLabel('admin-img-caat','img-caat-label')">
+        </div>
+
+        <div class="op-form-section-title" style="margin-top:16px">Operación</div>
+        <div class="form-group">
+          <label>Operador asignado</label>
+          <select id="admin-op">
+            <option value="">— Sin operador asignado —</option>
+          </select>
         </div>
         <div class="form-group">
           <label>Tipo de carga que maneja</label>
@@ -301,6 +398,8 @@
             <option value="mantenimiento">Mantenimiento</option>
           </select>
         </div>
+
+        <div class="op-form-section-title" style="margin-top:16px">Fotos y documentos</div>
         <div class="form-group">
           <label>Fotos de la unidad</label>
           <label class="file-upload-area" for="admin-fotos">
@@ -311,14 +410,15 @@
                  onchange="updateFileLabel('admin-fotos','fotos-label')">
         </div>
         <div class="form-group">
-          <label>Documentación del vehículo</label>
+          <label>Documentación adicional (PDF / imagen)</label>
           <label class="file-upload-area" for="admin-docs">
             <span class="file-upload-icon">📄</span>
-            <span id="docs-label" class="file-upload-text">Seleccionar documentos (PDF / imagen)</span>
+            <span id="docs-label" class="file-upload-text">Seleccionar documentos</span>
           </label>
           <input type="file" id="admin-docs" multiple accept=".pdf,.jpg,.jpeg,.png" style="display:none"
                  onchange="updateFileLabel('admin-docs','docs-label')">
         </div>
+
         <div class="form-group sa-empresa-row" style="display:none">
           <label>Empresa propietaria</label>
           <select id="sa-empresa-camion"><option value="">— Selecciona empresa —</option></select>
@@ -332,7 +432,6 @@
       </div>
 
     </div>
-
     </div><!-- /admin-content-camion -->
 
     <!-- ── TAB: CUSTODIOS ── -->
@@ -1203,9 +1302,100 @@
         <option value="mantenimiento">Mantenimiento</option>
       </select>
     </div>
+    <div class="form-group">
+      <label>Tipo de placa</label>
+      <select id="editar-tipo-placa">
+        <option value="">— Seleccionar —</option>
+        <option>Federal</option><option>Estatal</option><option>Local</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Marca</label>
+      <select id="editar-marca">
+        <option value="">— Seleccionar —</option>
+        <option>Kenworth</option><option>International</option><option>Freightliner</option>
+        <option>Peterbilt</option><option>Volvo</option><option>Mercedes-Benz</option>
+        <option>Scania</option><option>MAN</option><option>Hino</option><option>Isuzu</option><option>Otra</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Número de serie (NIV)</label>
+      <input type="text" id="editar-num-serie" placeholder="Ej. 3HKRM4H59KM702456">
+    </div>
+    <div class="form-group">
+      <label>Número de motor</label>
+      <input type="text" id="editar-num-motor" placeholder="Ej. CAT-123456">
+    </div>
+    <div class="form-group">
+      <label>Número económico</label>
+      <input type="text" id="editar-num-economico" placeholder="Ej. ECO-001">
+    </div>
+    <div class="form-group">
+      <label>Tipo de combustible</label>
+      <select id="editar-combustible">
+        <option value="">— Seleccionar —</option>
+        <option>Diesel</option><option>Gasolina</option>
+        <option>Gas Natural</option><option>Eléctrico</option><option>Híbrido</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Tarjeta de circulación</label>
+      <input type="text" id="editar-tc" placeholder="Núm. de tarjeta">
+    </div>
+    <div class="form-group">
+      <label>Fecha expedición TC</label>
+      <input type="date" id="editar-fecha-tc">
+    </div>
+    <div class="form-group">
+      <label>Número CAAT</label>
+      <input type="text" id="editar-caat" placeholder="Núm. CAAT">
+    </div>
+    <div class="form-group">
+      <label>Vigencia del CAAT</label>
+      <input type="date" id="editar-vigencia-caat">
+    </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeEditarCamion()">Cancelar</button>
       <button class="btn-confirm" onclick="guardarEdicion()">💾 Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL RECHAZO OPERADOR ═══════════════════════════ -->
+<div class="modal-overlay" id="modal-rechazar-operador">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <h2>✕ Rechazar con comentarios</h2>
+      <button class="modal-close" onclick="cerrarRechazarOperador()">✕</button>
+    </div>
+    <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:16px">
+      La empresa verá este motivo y podrá corregir sin perder sus datos.
+    </p>
+    <input type="hidden" id="ro-operador-id">
+    <div class="form-group">
+      <label>Campos con problemas</label>
+      <div id="ro-campos" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-top:8px;font-size:0.82rem">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" value="Nombre / Apellidos"> Nombre / Apellidos</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" value="CURP"> CURP</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" value="RFC"> RFC</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" value="NSS"> NSS</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" value="Núm. trabajador"> Núm. trabajador</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" value="Correo / Teléfono"> Correo / Teléfono</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" value="Área / Puesto"> Área / Puesto</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" value="Núm. de licencia"> Núm. de licencia</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" value="Clase / Tipo licencia"> Clase / Tipo licencia</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" value="Fechas de licencia"> Fechas de licencia</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" value="Foto del operador"> Foto del operador</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" value="Foto de licencia"> Foto de licencia</label>
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:14px">
+      <label>Comentario adicional</label>
+      <textarea id="ro-nota" rows="3" placeholder="Explica qué debe corregir la empresa…"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="cerrarRechazarOperador()">Cancelar</button>
+      <button class="btn-confirm" style="background:var(--danger)" onclick="confirmarRechazarOperador()">✕ Rechazar con comentarios</button>
     </div>
   </div>
 </div>
@@ -1455,9 +1645,9 @@
 <script src="js/reservaciones.js?v=12"></script>
 <script src="js/modal.js?v=10"></script>
 <script src="js/pedidos.js?v=13"></script>
-<script src="js/aprobaciones.js?v=11"></script>
-<script src="js/admin.js?v=13"></script>
-<script src="js/operadores.js?v=3"></script>
+<script src="js/aprobaciones.js?v=12"></script>
+<script src="js/admin.js?v=14"></script>
+<script src="js/operadores.js?v=4"></script>
 <script src="js/usuarios.js?v=11"></script>
 <script src="js/chat.js?v=10"></script>
 <script src="js/catalogo.js?v=14"></script>

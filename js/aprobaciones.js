@@ -113,26 +113,53 @@ async function renderAprobaciones() {
     html += (operadores || []).map(op => {
       const nombre = [op.nombre, op.primer_apellido, op.segundo_apellido].filter(Boolean).join(' ');
       const foto   = op.foto_operador
-        ? `<img src="${esc(op.foto_operador)}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid var(--border);flex-shrink:0" alt="foto">`
-        : `<div style="width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;flex-shrink:0">${(op.nombre||'?')[0].toUpperCase()}</div>`;
+        ? `<img src="${esc(op.foto_operador)}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--border);flex-shrink:0" alt="foto">`
+        : `<div style="width:56px;height:56px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700;flex-shrink:0">${(op.nombre||'?')[0].toUpperCase()}</div>`;
+      const venceColor = op.fecha_vencimiento && new Date(op.fecha_vencimiento) < new Date() ? 'var(--danger)' : 'inherit';
       return `
         <div class="apr-card" id="aprop-${op.id}">
           <div class="apr-card-header">
-            <div style="display:flex;align-items:center;gap:12px">
+            <div style="display:flex;align-items:center;gap:14px">
               ${foto}
               <div>
                 <div class="apr-tipo">👷 ${esc(nombre)}</div>
-                <div class="apr-sub">${esc(op.id)}${op.puesto ? ' · ' + esc(op.puesto) : ''}${op.area ? ' · ' + esc(op.area) : ''}</div>
-                <div class="apr-sub">Empresa: <strong>${esc(op.propietario?.nombre || '—')}</strong></div>
+                <div class="apr-sub">${esc(op.id)} · Empresa: <strong>${esc(op.propietario?.nombre || '—')}</strong></div>
               </div>
             </div>
             <span class="badge badge-revision">Pendiente</span>
           </div>
-          ${op.num_licencia ? `<div class="apr-sub" style="margin:6px 0 2px">🪪 ${esc(op.num_licencia)}${op.clase_licencia ? ' · Clase ' + esc(op.clase_licencia) : ''}</div>` : ''}
-          ${op.foto_licencia ? `<button class="btn-edit" style="font-size:0.7rem;margin:6px 0" onclick="window.open('${esc(op.foto_licencia)}','_blank')">🪪 Ver licencia</button>` : ''}
+          <div class="apr-op-detalle">
+            <div class="apr-op-section-title">Datos personales</div>
+            <div class="apr-op-grid">
+              <div class="apr-op-row"><span>CURP</span><strong>${esc(op.curp || '—')}</strong></div>
+              <div class="apr-op-row"><span>RFC</span><strong>${esc(op.rfc || '—')}</strong></div>
+              <div class="apr-op-row"><span>NSS</span><strong>${esc(op.nss || '—')}</strong></div>
+              <div class="apr-op-row"><span>Sexo</span><strong>${esc(op.sexo || '—')}</strong></div>
+              <div class="apr-op-row"><span>Tipo sanguíneo</span><strong>${esc(op.tipo_sanguineo || '—')}</strong></div>
+              <div class="apr-op-row"><span>Correo</span><strong>${esc(op.correo || '—')}</strong></div>
+              <div class="apr-op-row"><span>Teléfono</span><strong>${esc(op.telefono || '—')}</strong></div>
+            </div>
+            <div class="apr-op-section-title">Datos laborales</div>
+            <div class="apr-op-grid">
+              <div class="apr-op-row"><span>Núm. trabajador</span><strong>${esc(op.num_trabajador || '—')}</strong></div>
+              <div class="apr-op-row"><span>Nivel de estudio</span><strong>${esc(op.nivel_estudio || '—')}</strong></div>
+              <div class="apr-op-row"><span>Área</span><strong>${esc(op.area || '—')}</strong></div>
+              <div class="apr-op-row"><span>Puesto</span><strong>${esc(op.puesto || '—')}</strong></div>
+              <div class="apr-op-row"><span>Examen médico</span><strong>${op.fecha_examen_medico ? fmtFecha(op.fecha_examen_medico) : '—'}</strong></div>
+            </div>
+            <div class="apr-op-section-title">Licencia de conducir</div>
+            <div class="apr-op-grid">
+              <div class="apr-op-row"><span>Número</span><strong>${esc(op.num_licencia || '—')}</strong></div>
+              <div class="apr-op-row"><span>Clase</span><strong>${esc(op.clase_licencia || '—')}</strong></div>
+              <div class="apr-op-row"><span>Tipo</span><strong>${esc(op.tipo_licencia || '—')}</strong></div>
+              <div class="apr-op-row"><span>Expedición</span><strong>${op.fecha_expedicion ? fmtFecha(op.fecha_expedicion) : '—'}</strong></div>
+              <div class="apr-op-row"><span>Vencimiento</span><strong style="color:${venceColor}">${op.fecha_vencimiento ? fmtFecha(op.fecha_vencimiento) : '—'}</strong></div>
+            </div>
+            ${op.foto_licencia ? `<a href="${esc(op.foto_licencia)}" target="_blank" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:8px">🪪 Ver foto de licencia</a>` : ''}
+          </div>
           <div class="apr-actions">
             <button class="btn-apr-aprobar"  onclick="aprobarOperador('${op.id}')">✓ Aprobar</button>
-            <button class="btn-apr-rechazar" onclick="rechazarOperador('${op.id}')">✕ Rechazar</button>
+            <button class="btn-apr-rechazar" onclick="rechazarOperador('${op.id}')">✕ Rechazar con comentarios</button>
           </div>
         </div>`;
     }).join('');
@@ -246,6 +273,51 @@ async function aprobarAcuerdo(pedidoId) {
 
 // ── APROBAR / RECHAZAR OPERADOR ──────────────────────────
 
+// ── MODAL RECHAZO OPERADOR ───────────────────────────────
+
+function rechazarOperador(id) {
+  document.getElementById('ro-operador-id').value = id;
+  document.getElementById('ro-nota').value = '';
+  document.querySelectorAll('#ro-campos input[type=checkbox]').forEach(c => { c.checked = false; });
+  document.getElementById('modal-rechazar-operador').classList.add('open');
+}
+
+function cerrarRechazarOperador() {
+  document.getElementById('modal-rechazar-operador').classList.remove('open');
+}
+
+async function confirmarRechazarOperador() {
+  const id     = document.getElementById('ro-operador-id').value;
+  const nota   = document.getElementById('ro-nota').value.trim();
+  const campos = Array.from(document.querySelectorAll('#ro-campos input[type=checkbox]:checked'))
+    .map(c => c.value);
+
+  const { data: op } = await sb.from('operadores').select('propietario_id, nombre').eq('id', id).single();
+  const { error } = await sb.from('operadores').update({
+    aprobacion:      'rechazada',
+    rechazo_nota:    nota   || null,
+    rechazo_campos:  campos.length ? campos : null,
+  }).eq('id', id);
+
+  if (error) { showToast('Error al rechazar', 'error'); return; }
+
+  if (op?.propietario_id) {
+    const camposStr = campos.length ? ` Corregir: ${campos.join(', ')}.` : '';
+    await sb.from('notificaciones').insert({
+      user_id: op.propietario_id,
+      tipo:    'recurso_rechazado',
+      titulo:  '⚠ Operador requiere correcciones',
+      mensaje: `El operador ${esc(op.nombre)} (${id}) necesita ajustes.${camposStr}${nota ? ' Comentario: ' + nota : ''} Entra al tab Operadores para corregir y reenviar.`,
+      leido:   false,
+    });
+  }
+
+  cerrarRechazarOperador();
+  showToast(`Operador ${id} devuelto con comentarios`);
+  renderAprobaciones();
+  renderAdminOperadores();
+}
+
 async function aprobarOperador(id) {
   const { data: op } = await sb.from('operadores').select('propietario_id, nombre, primer_apellido').eq('id', id).single();
   const { error } = await sb.from('operadores').update({ aprobacion: 'aprobada' }).eq('id', id);
@@ -268,25 +340,6 @@ async function aprobarOperador(id) {
   renderAdminOperadores();
 }
 
-async function rechazarOperador(id) {
-  if (!confirm(`¿Rechazar al operador ${id}? Se eliminará del sistema.`)) return;
-  const { data: op } = await sb.from('operadores').select('propietario_id, nombre').eq('id', id).single();
-  await sb.from('operadores').delete().eq('id', id);
-
-  if (op?.propietario_id) {
-    await sb.from('notificaciones').insert({
-      user_id: op.propietario_id,
-      tipo:    'recurso_rechazado',
-      titulo:  '✕ Operador no aprobado',
-      mensaje: `El operador ${op.nombre || id} no fue aprobado. Puedes registrarlo nuevamente con los datos correctos.`,
-      leido:   false,
-    });
-  }
-
-  document.getElementById(`aprop-${id}`)?.remove();
-  showToast(`Operador ${id} rechazado`);
-  renderAprobaciones();
-}
 
 async function rechazarAcuerdo(pedidoId) {
   const nota = prompt('Motivo del rechazo (se notificará a ambas partes):') ?? '';

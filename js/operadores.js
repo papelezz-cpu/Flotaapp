@@ -1,4 +1,5 @@
 // ── MÓDULO DE OPERADORES ───────────────────────────────
+let _operadorEditId = null;
 
 async function _autoIdOperador() {
   const { data } = await sb.from('operadores').select('id').like('id', 'OP-%');
@@ -35,22 +36,38 @@ async function renderAdminOperadores() {
   if (!container) return;
   container.innerHTML = skeletonList(2);
 
-  let q = sb.from('operadores').select('*').eq('aprobacion', 'aprobada').order('id');
-  if (currentUser.rol !== 'superadmin') q = q.eq('propietario_id', currentUser.id);
-  const { data, error } = await q;
+  const baseQ = () => {
+    let q = sb.from('operadores').select('*').order('id');
+    if (currentUser.rol !== 'superadmin') q = q.eq('propietario_id', currentUser.id);
+    return q;
+  };
+
+  const [{ data: aprobados, error }, { data: rechazados }] = await Promise.all([
+    baseQ().eq('aprobacion', 'aprobada'),
+    baseQ().eq('aprobacion', 'rechazada'),
+  ]);
 
   if (error) {
     container.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar operadores.</div>`;
     return;
   }
-  if (!data?.length) {
-    container.innerHTML = `<div class="empty-state"><div class="icon">👷</div>Sin operadores aprobados.<br><small style="color:var(--text-muted)">Completa el formulario y envía a aprobación.</small></div>`;
-  } else {
-    container.innerHTML = data.map(op => _operadorCardHTML(op)).join('');
-    _poblarSelectOperadores(data);
+
+  let html = '';
+
+  if (rechazados?.length) {
+    html += `<div style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--danger);margin-bottom:8px">⚠ Requieren correcciones</div>`;
+    html += rechazados.map(op => _operadorCardRechazadoHTML(op)).join('');
+    html += `<div style="height:1px;background:var(--border);margin:16px 0"></div>`;
   }
 
-  // Pre-llenar número de trabajador
+  if (aprobados?.length) {
+    html += aprobados.map(op => _operadorCardHTML(op)).join('');
+    _poblarSelectOperadores(aprobados);
+  } else if (!rechazados?.length) {
+    html = `<div class="empty-state"><div class="icon">👷</div>Sin operadores registrados.<br><small style="color:var(--text-muted)">Completa el formulario y envía a aprobación.</small></div>`;
+  }
+
+  container.innerHTML = html;
   _prefillNumTrabajador();
 }
 
@@ -85,6 +102,74 @@ function _operadorCardHTML(op) {
     </div>`;
 }
 
+function _operadorCardRechazadoHTML(op) {
+  const nombre = [op.nombre, op.primer_apellido, op.segundo_apellido].filter(Boolean).join(' ');
+  const foto   = op.foto_operador
+    ? `<img src="${esc(op.foto_operador)}" class="op-foto-img" alt="foto">`
+    : `<div class="op-foto-inicial" style="background:var(--danger)">${(op.nombre||'?')[0].toUpperCase()}</div>`;
+
+  const camposHtml = op.rechazo_campos?.length
+    ? op.rechazo_campos.map(c => `<span class="cargo-chip cargo-chip-sm" style="border-color:rgba(239,68,68,0.3);color:var(--danger)">${esc(c)}</span>`).join('')
+    : '';
+
+  return `
+    <div class="operador-card" id="opcard-${op.id}" style="border-color:var(--danger);border-width:1.5px">
+      <div class="op-foto-wrap">${foto}</div>
+      <div class="op-info">
+        <div class="op-nombre">${esc(nombre)}</div>
+        <div class="op-sub" style="color:var(--danger);font-weight:600">⚠ Requiere correcciones</div>
+        ${camposHtml ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">${camposHtml}</div>` : ''}
+        ${op.rechazo_nota ? `<div class="op-sub" style="margin-top:5px;font-style:italic;color:var(--text-muted)">"${esc(op.rechazo_nota)}"</div>` : ''}
+      </div>
+      <div class="op-actions">
+        <button class="btn-edit btn-aprobar" onclick="editarOperadorRechazado('${op.id}')">✏ Corregir</button>
+      </div>
+    </div>`;
+}
+
+async function editarOperadorRechazado(id) {
+  const { data: op, error } = await sb.from('operadores').select('*').eq('id', id).single();
+  if (error || !op) { showToast('Error al cargar operador', 'error'); return; }
+
+  _operadorEditId = id;
+
+  const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val ?? ''; };
+  set('op-nombre',           op.nombre);
+  set('op-apellido1',        op.primer_apellido);
+  set('op-apellido2',        op.segundo_apellido);
+  set('op-curp',             op.curp);
+  set('op-rfc',              op.rfc);
+  set('op-nss',              op.nss);
+  set('op-num-trabajador',   op.num_trabajador);
+  set('op-correo',           op.correo);
+  set('op-telefono',         op.telefono);
+  set('op-area',             op.area);
+  set('op-puesto',           op.puesto);
+  set('op-examen',           op.fecha_examen_medico);
+  set('op-num-licencia',     op.num_licencia);
+  set('op-fecha-expedicion', op.fecha_expedicion);
+  set('op-fecha-vencimiento',op.fecha_vencimiento);
+
+  const selMap = { 'op-sexo': 'sexo', 'op-sangre': 'tipo_sanguineo', 'op-clase-licencia': 'clase_licencia', 'op-tipo-licencia': 'tipo_licencia', 'op-nivel-estudio': 'nivel_estudio' };
+  Object.entries(selMap).forEach(([elId, field]) => {
+    const el = document.getElementById(elId);
+    if (el && op[field]) el.value = op[field];
+  });
+
+  if (op.foto_operador) document.getElementById('op-foto-preview').innerHTML = `<img src="${esc(op.foto_operador)}" class="op-upload-preview" alt="foto actual">`;
+  if (op.foto_licencia) document.getElementById('op-lic-preview').innerHTML  = `<img src="${esc(op.foto_licencia)}"  class="op-upload-preview" alt="licencia actual">`;
+
+  // Mostrar banner con motivo de rechazo
+  const btn = document.querySelector('#admin-content-operador .btn-add');
+  if (btn) btn.textContent = 'Guardar correcciones y reenviar';
+
+  // Scroll al formulario
+  document.querySelector('#admin-content-operador .admin-card')
+    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  showToast('Formulario cargado — corrige los campos y reenvía', 'info');
+}
+
 // ── LIMPIAR FORMULARIO ────────────────────────────────
 
 function _limpiarFormOperador() {
@@ -109,9 +194,11 @@ async function onCambioEmpresaOperador() {
 function openAgregarOperador() {}
 
 function closeAgregarOperador() {
+  _operadorEditId = null;
   _limpiarFormOperador();
   _prefillNumTrabajador();
-  // Hacer scroll al inicio del card de lista
+  const btn = document.querySelector('#admin-content-operador .btn-add');
+  if (btn) btn.textContent = 'Enviar a aprobación';
   document.getElementById('admin-operadores-list')
     ?.closest('.admin-card')
     ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -145,7 +232,8 @@ async function agregarOperador() {
     : currentUser.id;
   if (!propietarioId) { showToast('Selecciona una empresa propietaria', 'error'); restore(); return; }
 
-  const id = await _autoIdOperador();
+  const isEdit = !!_operadorEditId;
+  const id = isEdit ? _operadorEditId : await _autoIdOperador();
 
   // Subir foto del operador
   let fotoOperadorUrl = null;
@@ -201,7 +289,16 @@ async function agregarOperador() {
     aprobacion:           'pendiente',
   };
 
-  const { error } = await sb.from('operadores').insert(payload);
+  let error;
+  if (isEdit) {
+    const { error: e } = await sb.from('operadores').update({
+      ...payload, aprobacion: 'pendiente', rechazo_nota: null, rechazo_campos: null,
+    }).eq('id', id);
+    error = e;
+  } else {
+    const { error: e } = await sb.from('operadores').insert(payload);
+    error = e;
+  }
   if (error) { showToast('Error al guardar: ' + (error.message || ''), 'error'); restore(); return; }
 
   // Notificar a superadmins
@@ -217,7 +314,7 @@ async function agregarOperador() {
   }
 
   restore();
-  showToast(`✓ Operador ${id} enviado — pendiente de aprobación`);
+  showToast(isEdit ? `✓ Correcciones enviadas — ${id} en revisión nuevamente` : `✓ Operador ${id} enviado — pendiente de aprobación`);
   closeAgregarOperador();          // limpia form y hace scroll al listado
   await renderAdminOperadores();   // refresca lista y prefill siguiente número
   if (currentUser.rol !== 'superadmin') renderMisPendientes();

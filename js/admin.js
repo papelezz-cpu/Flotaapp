@@ -205,16 +205,28 @@ async function editarCamion(id) {
   const c = allCamiones.find(x => x.id === id);
   if (!c) return;
 
-  document.getElementById('editar-id').value          = c.id;
+  const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val ?? ''; };
+
+  set('editar-id', c.id);
   document.getElementById('editar-subtitulo').textContent = `Unidad ${c.id} — ${c.tipo}`;
-  document.getElementById('editar-tipo').value         = c.tipo;
-  document.getElementById('editar-cap').value          = c.capacidad;
-  document.getElementById('editar-op').value           = c.operador;
-  document.getElementById('editar-placas').value       = c.placas || '';
-  document.getElementById('editar-dim').value          = c.dimensiones || '';
-  document.getElementById('editar-tiempo').value       = c.tiempo_respuesta || '';
-  document.getElementById('editar-precio').value       = c.precio_dia || '';
-  document.getElementById('editar-estado').value       = c.estado;
+  set('editar-tipo', c.tipo);
+  set('editar-cap', c.capacidad);
+  set('editar-op', c.operador || '');
+  set('editar-placas', c.placas || '');
+  set('editar-tipo-placa', c.tipo_placa || '');
+  set('editar-dim', c.dimensiones || '');
+  set('editar-tiempo', c.tiempo_respuesta || '');
+  set('editar-precio', c.precio_dia || '');
+  set('editar-estado', c.estado);
+  set('editar-marca', c.marca || '');
+  set('editar-num-serie', c.num_serie || '');
+  set('editar-num-motor', c.num_motor || '');
+  set('editar-num-economico', c.num_economico || '');
+  set('editar-combustible', c.tipo_combustible || '');
+  set('editar-tc', c.tarjeta_circulacion || '');
+  set('editar-fecha-tc', c.fecha_expedicion_tc || '');
+  set('editar-caat', c.caat || '');
+  set('editar-vigencia-caat', c.vigencia_caat || '');
 
   renderCargoChipsSelect('editar-tipo-carga', c.tipo_carga || []);
   document.getElementById('modal-editar').classList.add('open');
@@ -225,19 +237,31 @@ function closeEditarCamion() {
 }
 
 async function guardarEdicion() {
-  const id = document.getElementById('editar-id').value;
+  const id   = document.getElementById('editar-id').value;
   const tipo = document.getElementById('editar-tipo').value;
+  const g    = elId => document.getElementById(elId)?.value?.trim() || null;
+
   const payload = {
     tipo,
-    capacidad:        parseInt(document.getElementById('editar-cap').value)    || 0,
-    operador:         document.getElementById('editar-op').value.trim(),
-    placas:           document.getElementById('editar-placas').value.trim()    || null,
-    dimensiones:      document.getElementById('editar-dim').value.trim()       || null,
-    tipo_carga:       getSelectedCargo('editar-tipo-carga'),
-    tiempo_respuesta: document.getElementById('editar-tiempo').value           || null,
-    precio_dia:       parseFloat(document.getElementById('editar-precio').value) || null,
-    estado:           document.getElementById('editar-estado').value,
-    emoji:            { Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️' }[tipo] || '🚛',
+    capacidad:           parseInt(document.getElementById('editar-cap').value)      || 0,
+    operador:            document.getElementById('editar-op').value.trim()          || null,
+    placas:              g('editar-placas'),
+    tipo_placa:          g('editar-tipo-placa'),
+    dimensiones:         g('editar-dim'),
+    tipo_carga:          getSelectedCargo('editar-tipo-carga'),
+    tiempo_respuesta:    document.getElementById('editar-tiempo').value             || null,
+    precio_dia:          parseFloat(document.getElementById('editar-precio').value) || null,
+    estado:              document.getElementById('editar-estado').value,
+    emoji:               { Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️' }[tipo] || '🚛',
+    marca:               g('editar-marca'),
+    num_serie:           g('editar-num-serie'),
+    num_motor:           g('editar-num-motor'),
+    num_economico:       g('editar-num-economico'),
+    tipo_combustible:    g('editar-combustible'),
+    tarjeta_circulacion: g('editar-tc'),
+    fecha_expedicion_tc: g('editar-fecha-tc'),
+    caat:                g('editar-caat'),
+    vigencia_caat:       g('editar-vigencia-caat'),
   };
 
   const { error } = await sb.from('camiones').update(payload).eq('id', id);
@@ -449,10 +473,10 @@ async function agregarCamion() {
   const dim    = document.getElementById('admin-dim').value.trim()    || null;
   const tiempo = document.getElementById('admin-tiempo').value        || null;
   const tipoCarga = getSelectedCargo('admin-tipo-carga');
+  const g = elId => document.getElementById(elId)?.value?.trim() || null;
 
-  if (!op || !cap) { alert('Completa los campos obligatorios (operador y capacidad).'); return; }
+  if (!cap) { alert('La capacidad es obligatoria.'); return; }
 
-  // Generar ID automático
   const prefijos = { 'Torton': 'T', 'Rabón': 'R', 'Full': 'F', 'Plataforma': 'P' };
   const letra = prefijos[tipo] || 'U';
   const { data: existentes } = await sb.from('camiones').select('id').like('id', `${letra}-%`);
@@ -462,66 +486,95 @@ async function agregarCamion() {
   }, 0);
   const id = `${letra}-${String(maxNum + 1).padStart(3, '0')}`;
 
+  const esSuperAdmin  = currentUser.rol === 'superadmin';
+  const propietarioId = _getPropietarioId('camion');
+  if (!propietarioId) return;
+
   // Subir archivos al storage
   const fotosFiles = Array.from(document.getElementById('admin-fotos').files || []);
   const docsFiles  = Array.from(document.getElementById('admin-docs').files  || []);
+  const tcFile     = document.getElementById('admin-img-tc')?.files?.[0];
+  const caatFile   = document.getElementById('admin-img-caat')?.files?.[0];
   const archivos   = [];
+  let   imagenTc = null, imagenCaat = null;
+
   for (const file of [...fotosFiles, ...docsFiles]) {
-    const path = `${currentUser.id}/${id}/${Date.now()}_${file.name}`;
+    const path = `${propietarioId}/${id}/${Date.now()}_${file.name}`;
     const { data: up, error: upErr } = await sb.storage.from('unidades').upload(path, file);
     if (!upErr && up) archivos.push(up.path);
   }
+  if (tcFile) {
+    const path = `${propietarioId}/${id}/tc_${Date.now()}.${tcFile.name.split('.').pop()}`;
+    const { data: up } = await sb.storage.from('unidades').upload(path, tcFile);
+    if (up) { archivos.push(up.path); imagenTc = up.path; }
+  }
+  if (caatFile) {
+    const path = `${propietarioId}/${id}/caat_${Date.now()}.${caatFile.name.split('.').pop()}`;
+    const { data: up } = await sb.storage.from('unidades').upload(path, caatFile);
+    if (up) { archivos.push(up.path); imagenCaat = up.path; }
+  }
 
-  const esSuperAdmin = currentUser.rol === 'superadmin';
-  const propietarioId = _getPropietarioId('camion');
-  if (!propietarioId) return;
   const emojis = { 'Torton': '🚛', 'Rabón': '🚚', 'Full': '🚛', 'Plataforma': '🏗️' };
   const { error } = await sb.from('camiones').insert({
-    id, tipo, capacidad: cap, operador: op, estado,
+    id, tipo, capacidad: cap, operador: op || null, estado,
     emoji: emojis[tipo] || '🚛',
     propietario_id: propietarioId,
     archivos,
-    aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
-    ...(placas    && { placas }),
-    ...(dim       && { dimensiones: dim }),
-    ...(tiempo    && { tiempo_respuesta: tiempo }),
+    aprobacion:          esSuperAdmin ? 'aprobada' : 'pendiente',
+    ...(placas         && { placas }),
+    ...(dim            && { dimensiones: dim }),
+    ...(tiempo         && { tiempo_respuesta: tiempo }),
     ...(tipoCarga.length && { tipo_carga: tipoCarga }),
-    ...(precio    && { precio_dia: precio }),
+    ...(precio         && { precio_dia: precio }),
+    marca:               g('admin-marca'),
+    version:             g('admin-version'),
+    modelo_anio:         parseInt(document.getElementById('admin-modelo-anio')?.value) || null,
+    color:               g('admin-color'),
+    tipo_placa:          g('admin-tipo-placa'),
+    num_serie:           g('admin-num-serie'),
+    num_motor:           g('admin-num-motor'),
+    num_economico:       g('admin-num-economico'),
+    tipo_combustible:    g('admin-combustible'),
+    tarjeta_circulacion: g('admin-tc'),
+    fecha_expedicion_tc: document.getElementById('admin-fecha-tc')?.value  || null,
+    imagen_tc:           imagenTc,
+    caat:                g('admin-caat'),
+    vigencia_caat:       document.getElementById('admin-vigencia-caat')?.value || null,
+    imagen_caat:         imagenCaat,
   });
   if (error) { alert('Error: ' + (error.message || 'No se pudo agregar.')); return; }
 
-  // Notificar al superadmin por email si la unidad queda pendiente
   if (!esSuperAdmin) {
     try {
       const session = (await sb.auth.getSession()).data.session;
       await fetch(`${FN_URL.replace('gestionar-usuario', 'enviar-notificacion')}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          camion: { id, tipo, operador: op, capacidad: cap, estado },
-          propietarioNombre: currentUser.nombre
-        })
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ camion: { id, tipo, operador: op, capacidad: cap, estado }, propietarioNombre: currentUser.nombre })
       });
-    } catch (_) { /* silencioso */ }
+    } catch (_) {}
   }
 
   // Limpiar formulario
-  ['admin-op','admin-cap','admin-precio','admin-placas','admin-dim'].forEach(id => {
-    document.getElementById(id).value = '';
+  ['admin-cap','admin-precio','admin-placas','admin-dim','admin-version','admin-modelo-anio',
+   'admin-num-serie','admin-num-motor','admin-num-economico','admin-tc','admin-fecha-tc',
+   'admin-caat','admin-vigencia-caat'].forEach(fid => {
+    const el = document.getElementById(fid); if (el) el.value = '';
   });
-  document.getElementById('admin-fotos').value  = '';
-  document.getElementById('admin-docs').value   = '';
-  document.getElementById('fotos-label').textContent = 'Seleccionar fotos';
-  document.getElementById('docs-label').textContent  = 'Seleccionar documentos (PDF / imagen)';
+  ['admin-fotos','admin-docs','admin-img-tc','admin-img-caat'].forEach(fid => {
+    const el = document.getElementById(fid); if (el) el.value = '';
+  });
+  document.getElementById('fotos-label').textContent   = 'Seleccionar fotos';
+  document.getElementById('docs-label').textContent    = 'Seleccionar documentos (PDF / imagen)';
+  const tcLbl   = document.getElementById('img-tc-label');   if (tcLbl)   tcLbl.textContent   = 'Adjuntar imagen';
+  const caatLbl = document.getElementById('img-caat-label'); if (caatLbl) caatLbl.textContent = 'Adjuntar imagen';
+  ['admin-marca','admin-color','admin-tipo-placa','admin-combustible'].forEach(fid => {
+    const el = document.getElementById(fid); if (el) el.selectedIndex = 0;
+  });
   renderCargoChipsSelect('admin-tipo-carga', []);
 
   await renderAdmin();
-  showToast(esSuperAdmin
-    ? `✓ Unidad ${id} agregada`
-    : `✓ Unidad ${id} enviada — recibirás confirmación por correo`);
+  showToast(esSuperAdmin ? `✓ Unidad ${id} agregada` : `✓ Unidad ${id} enviada — recibirás confirmación por correo`);
 }
 
 // ── CUSTODIOS (ADMIN) ─────────────────────────────────
@@ -871,12 +924,17 @@ async function eliminarLavado(id) {
 }
 
 function updateFileLabel(inputId, labelId) {
-  const files = document.getElementById(inputId).files;
+  const files = document.getElementById(inputId)?.files;
   const label = document.getElementById(labelId);
-  if (!files.length) {
-    label.textContent = inputId === 'admin-fotos'
-      ? 'Seleccionar fotos'
-      : 'Seleccionar documentos (PDF / imagen)';
+  if (!label) return;
+  const defaults = {
+    'admin-fotos':    'Seleccionar fotos',
+    'admin-docs':     'Seleccionar documentos (PDF / imagen)',
+    'admin-img-tc':   'Adjuntar imagen',
+    'admin-img-caat': 'Adjuntar imagen',
+  };
+  if (!files?.length) {
+    label.textContent = defaults[inputId] || 'Seleccionar archivo';
   } else {
     label.textContent = `${files.length} archivo${files.length > 1 ? 's' : ''} seleccionado${files.length > 1 ? 's' : ''}`;
   }

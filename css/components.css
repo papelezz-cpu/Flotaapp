@@ -1034,6 +1034,27 @@ body.light .cat-pill { background: rgba(37,99,235,0.06); border-color: rgba(37,9
   .cat-titulo { font-size: 1.45rem; }
 }
 
+/* ── DETALLE OPERADOR EN APROBACIONES ────────────────── */
+.apr-op-detalle {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px; margin: 10px 0;
+  font-size: 0.82rem;
+}
+.apr-op-section-title {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent);
+  margin: 10px 0 6px;
+}
+.apr-op-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px;
+}
+.apr-op-row {
+  display: flex; flex-direction: column; gap: 1px;
+}
+.apr-op-row span { font-size: 0.7rem; color: var(--text-muted); }
+.apr-op-row strong { font-size: 0.82rem; color: var(--text); word-break: break-all; }
+body.light .apr-op-detalle { background: #f8faff; border-color: rgba(37,99,235,0.1); }
+
 /* ── OPERADORES ───────────────────────────────────────── */
 .operador-card {
   display: flex; align-items: center; gap: 14px;
