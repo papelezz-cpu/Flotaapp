@@ -92,15 +92,21 @@ function opFotoPreview(input, previewId) {
 }
 
 async function agregarOperador() {
+  const btn = document.querySelector('#admin-content-operador .btn-add');
+  if (btn?.disabled) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+
+  const restore = () => { if (btn) { btn.disabled = false; btn.textContent = 'Enviar a aprobación'; } };
+
   const v = id => document.getElementById(id)?.value?.trim() || '';
 
   const nombre = v('op-nombre');
-  if (!nombre) { alert('El nombre del operador es obligatorio.'); return; }
+  if (!nombre) { alert('El nombre del operador es obligatorio.'); restore(); return; }
 
   const propietarioId = currentUser.rol === 'superadmin'
     ? document.getElementById('sa-empresa-operador')?.value
     : currentUser.id;
-  if (!propietarioId) { showToast('Selecciona una empresa propietaria', 'error'); return; }
+  if (!propietarioId) { showToast('Selecciona una empresa propietaria', 'error'); restore(); return; }
 
   const id = await _autoIdOperador();
 
@@ -159,7 +165,7 @@ async function agregarOperador() {
   };
 
   const { error } = await sb.from('operadores').insert(payload);
-  if (error) { showToast('Error al guardar: ' + (error.message || ''), 'error'); return; }
+  if (error) { showToast('Error al guardar: ' + (error.message || ''), 'error'); restore(); return; }
 
   // Notificar a superadmins
   const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
@@ -173,6 +179,7 @@ async function agregarOperador() {
     })));
   }
 
+  restore();
   closeAgregarOperador();
   renderAdminOperadores();
   if (currentUser.rol !== 'superadmin') renderMisPendientes();
