@@ -75,13 +75,17 @@ async function renderAdmin() {
   if (currentAdminTab === 'custodio') renderAdminCustodios();
   else if (currentAdminTab === 'patio') renderAdminPatios();
   else if (currentAdminTab === 'lavado') renderAdminLavados();
+  else if (currentAdminTab === 'operador') renderAdminOperadores();
+
+  // Populate operator dropdowns in truck forms
+  _poblarSelectOperadores();
 }
 
 // ── TABS ADMIN ────────────────────────────────────────
 
 function cambiarAdminTab(tab) {
   currentAdminTab = tab;
-  ['camion','custodio','patio','lavado'].forEach(t => {
+  ['camion','custodio','patio','lavado','operador'].forEach(t => {
     document.getElementById(`admin-tab-${t}`)?.classList.toggle('active', t === tab);
     const el = document.getElementById(`admin-content-${t}`);
     if (el) el.style.display = t === tab ? '' : 'none';
@@ -89,6 +93,7 @@ function cambiarAdminTab(tab) {
   if (tab === 'custodio') renderAdminCustodios();
   else if (tab === 'patio') renderAdminPatios();
   else if (tab === 'lavado') renderAdminLavados();
+  else if (tab === 'operador') renderAdminOperadores();
   else renderAdmin();
 }
 
@@ -104,7 +109,7 @@ async function _cargarEmpresasDropdowns() {
     `<option value="${e.user_id}">${esc(e.nombre)}</option>`
   ).join('');
 
-  ['camion','custodio','patio','lavado'].forEach(tipo => {
+  ['camion','custodio','patio','lavado','operador'].forEach(tipo => {
     const sel = document.getElementById(`sa-empresa-${tipo}`);
     if (sel) sel.innerHTML = `<option value="">— Selecciona empresa —</option>${opts}`;
   });
@@ -247,21 +252,23 @@ async function guardarEdicion() {
 // Muestra las unidades pendientes del propio admin (no superadmin)
 async function renderMisPendientes() {
   const uid = currentUser.id;
-  const [{ data: camPend }, { data: cusPend }, { data: patPend }, { data: lavPend }] = await Promise.all([
-    sb.from('camiones' ).select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
-    sb.from('custodios').select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
-    sb.from('patios'   ).select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
-    sb.from('lavados'  ).select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+  const [{ data: camPend }, { data: cusPend }, { data: patPend }, { data: lavPend }, { data: opPend }] = await Promise.all([
+    sb.from('camiones'  ).select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('custodios' ).select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('patios'    ).select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('lavados'   ).select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('operadores').select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
   ]);
 
   const section = document.getElementById('pendientes-section');
   const list    = document.getElementById('pendientes-list');
 
   const todos = [
-    ...(camPend || []).map(c => ({ tipo: 'camion',   label: `${c.emoji || '🚛'} ${c.id} — ${c.tipo}`, sub: `${c.operador} · ${c.capacidad} ton` })),
-    ...(cusPend || []).map(c => ({ tipo: 'custodio', label: `👮 ${c.id} — ${c.nombre}`, sub: `${c.tipo} · ${c.disponibilidad || ''}` })),
-    ...(patPend || []).map(p => ({ tipo: 'patio',    label: `🏭 ${p.id} — ${p.nombre}`, sub: `${p.tipo}${p.area_m2 ? ' · ' + p.area_m2 + ' m²' : ''}` })),
-    ...(lavPend || []).map(l => ({ tipo: 'lavado',   label: `🚿 ${l.id} — ${l.nombre}`, sub: (l.tipos_vehiculo || []).join(', ') || '—' })),
+    ...(camPend || []).map(c => ({ label: `${c.emoji || '🚛'} ${c.id} — ${c.tipo}`, sub: `${c.operador} · ${c.capacidad} ton` })),
+    ...(cusPend || []).map(c => ({ label: `👮 ${c.id} — ${c.nombre}`, sub: `${c.tipo} · ${c.disponibilidad || ''}` })),
+    ...(patPend || []).map(p => ({ label: `🏭 ${p.id} — ${p.nombre}`, sub: `${p.tipo}${p.area_m2 ? ' · ' + p.area_m2 + ' m²' : ''}` })),
+    ...(lavPend || []).map(l => ({ label: `🚿 ${l.id} — ${l.nombre}`, sub: (l.tipos_vehiculo || []).join(', ') || '—' })),
+    ...(opPend  || []).map(o => { const n = [o.nombre, o.primer_apellido].filter(Boolean).join(' '); return { label: `👷 ${o.id} — ${n}`, sub: o.puesto || '—' }; }),
   ];
 
   if (!todos.length) { section.style.display = 'none'; return; }

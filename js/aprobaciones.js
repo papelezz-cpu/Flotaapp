@@ -10,9 +10,10 @@ async function renderAprobaciones() {
   if (!content) return;
   content.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted)">Cargando…</div>';
 
-  const [{ data: solicitudes }, { data: acuerdos }] = await Promise.all([
+  const [{ data: solicitudes }, { data: acuerdos }, { data: operadores }] = await Promise.all([
     sb.from('pedidos').select('*').eq('estado', 'pendiente_revision').order('created_at'),
     sb.from('pedidos').select('*').eq('estado', 'pendiente_acuerdo').order('created_at'),
+    sb.from('operadores').select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at'),
   ]);
 
   // Cargar ofertas pendientes para los acuerdos
@@ -98,6 +99,40 @@ async function renderAprobaciones() {
           <div class="apr-actions">
             <button class="btn-apr-aprobar" onclick="aprobarAcuerdo('${p.id}')">✓ Aprobar acuerdo</button>
             <button class="btn-apr-rechazar" onclick="rechazarAcuerdo('${p.id}')">✕ Rechazar</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── OPERADORES POR APROBAR ───────────────────────────
+  html += `<div class="apr-bloque-title" style="margin-top:28px">👷 Operadores por aprobar <span class="apr-count">${(operadores || []).length}</span></div>`;
+
+  if (!operadores?.length) {
+    html += `<div class="apr-empty">Sin operadores pendientes de aprobación</div>`;
+  } else {
+    html += (operadores || []).map(op => {
+      const nombre = [op.nombre, op.primer_apellido, op.segundo_apellido].filter(Boolean).join(' ');
+      const foto   = op.foto_operador
+        ? `<img src="${esc(op.foto_operador)}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid var(--border);flex-shrink:0" alt="foto">`
+        : `<div style="width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;flex-shrink:0">${(op.nombre||'?')[0].toUpperCase()}</div>`;
+      return `
+        <div class="apr-card" id="aprop-${op.id}">
+          <div class="apr-card-header">
+            <div style="display:flex;align-items:center;gap:12px">
+              ${foto}
+              <div>
+                <div class="apr-tipo">👷 ${esc(nombre)}</div>
+                <div class="apr-sub">${esc(op.id)}${op.puesto ? ' · ' + esc(op.puesto) : ''}${op.area ? ' · ' + esc(op.area) : ''}</div>
+                <div class="apr-sub">Empresa: <strong>${esc(op.propietario?.nombre || '—')}</strong></div>
+              </div>
+            </div>
+            <span class="badge badge-revision">Pendiente</span>
+          </div>
+          ${op.num_licencia ? `<div class="apr-sub" style="margin:6px 0 2px">🪪 ${esc(op.num_licencia)}${op.clase_licencia ? ' · Clase ' + esc(op.clase_licencia) : ''}</div>` : ''}
+          ${op.foto_licencia ? `<button class="btn-edit" style="font-size:0.7rem;margin:6px 0" onclick="window.open('${esc(op.foto_licencia)}','_blank')">🪪 Ver licencia</button>` : ''}
+          <div class="apr-actions">
+            <button class="btn-apr-aprobar"  onclick="aprobarOperador('${op.id}')">✓ Aprobar</button>
+            <button class="btn-apr-rechazar" onclick="rechazarOperador('${op.id}')">✕ Rechazar</button>
           </div>
         </div>`;
     }).join('');
@@ -208,6 +243,50 @@ async function aprobarAcuerdo(pedidoId) {
 }
 
 // ── RECHAZAR ACUERDO ─────────────────────────────────────
+
+// ── APROBAR / RECHAZAR OPERADOR ──────────────────────────
+
+async function aprobarOperador(id) {
+  const { data: op } = await sb.from('operadores').select('propietario_id, nombre, primer_apellido').eq('id', id).single();
+  const { error } = await sb.from('operadores').update({ aprobacion: 'aprobada' }).eq('id', id);
+  if (error) { showToast('Error al aprobar operador', 'error'); return; }
+
+  if (op?.propietario_id) {
+    const nombre = [op.nombre, op.primer_apellido].filter(Boolean).join(' ');
+    await sb.from('notificaciones').insert({
+      user_id: op.propietario_id,
+      tipo:    'recurso_aprobado',
+      titulo:  '✓ Operador aprobado',
+      mensaje: `Tu operador ${nombre} (${id}) fue aprobado y ya puede asignarse a unidades.`,
+      leido:   false,
+    });
+  }
+
+  document.getElementById(`aprop-${id}`)?.remove();
+  showToast(`✓ Operador ${id} aprobado`);
+  renderAprobaciones();
+  renderAdminOperadores();
+}
+
+async function rechazarOperador(id) {
+  if (!confirm(`¿Rechazar al operador ${id}? Se eliminará del sistema.`)) return;
+  const { data: op } = await sb.from('operadores').select('propietario_id, nombre').eq('id', id).single();
+  await sb.from('operadores').delete().eq('id', id);
+
+  if (op?.propietario_id) {
+    await sb.from('notificaciones').insert({
+      user_id: op.propietario_id,
+      tipo:    'recurso_rechazado',
+      titulo:  '✕ Operador no aprobado',
+      mensaje: `El operador ${op.nombre || id} no fue aprobado. Puedes registrarlo nuevamente con los datos correctos.`,
+      leido:   false,
+    });
+  }
+
+  document.getElementById(`aprop-${id}`)?.remove();
+  showToast(`Operador ${id} rechazado`);
+  renderAprobaciones();
+}
 
 async function rechazarAcuerdo(pedidoId) {
   const nota = prompt('Motivo del rechazo (se notificará a ambas partes):') ?? '';

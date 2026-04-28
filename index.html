@@ -239,6 +239,7 @@
       <button class="recurso-tab"        id="admin-tab-custodio" onclick="cambiarAdminTab('custodio')">👮 Custodios</button>
       <button class="recurso-tab"        id="admin-tab-patio"    onclick="cambiarAdminTab('patio')">🏭 Patios</button>
       <button class="recurso-tab"        id="admin-tab-lavado"   onclick="cambiarAdminTab('lavado')">🚿 Lavado</button>
+      <button class="recurso-tab"        id="admin-tab-operador" onclick="cambiarAdminTab('operador')">👷 Operadores</button>
     </div>
 
     <!-- ── TAB: CAMIONES ── -->
@@ -259,7 +260,9 @@
         </div>
         <div class="form-group">
           <label>Operador</label>
-          <input type="text" id="admin-op" placeholder="Nombre del operador">
+          <select id="admin-op">
+            <option value="">— Sin operador asignado —</option>
+          </select>
         </div>
         <div class="form-group">
           <label>Placas</label>
@@ -486,6 +489,167 @@
       </div>
     </div>
     </div><!-- /admin-content-lavado -->
+
+    <!-- ── TAB: OPERADORES ── -->
+    <div id="admin-content-operador" style="display:none">
+    <div class="admin-grid">
+      <div class="admin-card">
+        <h3>➕ Agregar operador</h3>
+
+        <div class="op-form-section">
+          <div class="op-form-section-title">Datos personales</div>
+        </div>
+        <div class="form-group">
+          <label>Nombre *</label>
+          <input type="text" id="op-nombre" placeholder="Nombre(s)">
+        </div>
+        <div class="form-group">
+          <label>Primer apellido</label>
+          <input type="text" id="op-apellido1" placeholder="Primer apellido">
+        </div>
+        <div class="form-group">
+          <label>Segundo apellido</label>
+          <input type="text" id="op-apellido2" placeholder="Segundo apellido">
+        </div>
+        <div class="form-group">
+          <label>Sexo</label>
+          <select id="op-sexo">
+            <option value="">— Sin especificar —</option>
+            <option>Masculino</option>
+            <option>Femenino</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>CURP</label>
+          <input type="text" id="op-curp" placeholder="CURP" maxlength="18" style="text-transform:uppercase">
+        </div>
+        <div class="form-group">
+          <label>RFC</label>
+          <input type="text" id="op-rfc" placeholder="RFC" style="text-transform:uppercase">
+        </div>
+        <div class="form-group">
+          <label>NSS</label>
+          <input type="text" id="op-nss" placeholder="Núm. Seguro Social">
+        </div>
+        <div class="form-group">
+          <label>Tipo sanguíneo</label>
+          <select id="op-sangre">
+            <option value="">— Sin especificar —</option>
+            <option>A+</option><option>A-</option>
+            <option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option>
+            <option>O+</option><option>O-</option>
+          </select>
+        </div>
+
+        <div class="op-form-section">
+          <div class="op-form-section-title">Datos laborales</div>
+        </div>
+        <div class="form-group">
+          <label>Número de trabajador</label>
+          <input type="text" id="op-num-trabajador" placeholder="Ej. EMP-001">
+        </div>
+        <div class="form-group">
+          <label>Nivel de estudio</label>
+          <select id="op-nivel-estudio">
+            <option value="">— Sin especificar —</option>
+            <option>Primaria</option>
+            <option>Secundaria</option>
+            <option>Preparatoria</option>
+            <option>Técnico</option>
+            <option>Licenciatura</option>
+            <option>Posgrado</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Área</label>
+          <input type="text" id="op-area" placeholder="Ej. Operaciones">
+        </div>
+        <div class="form-group">
+          <label>Puesto</label>
+          <input type="text" id="op-puesto" placeholder="Ej. Operador de camión">
+        </div>
+        <div class="form-group">
+          <label>Correo electrónico</label>
+          <input type="email" id="op-correo" placeholder="correo@empresa.com">
+        </div>
+        <div class="form-group">
+          <label>Teléfono</label>
+          <input type="tel" id="op-telefono" placeholder="Ej. 612 123 4567">
+        </div>
+        <div class="form-group">
+          <label>Fecha examen médico</label>
+          <input type="date" id="op-examen">
+        </div>
+
+        <div class="op-form-section">
+          <div class="op-form-section-title">Licencia de conducir</div>
+        </div>
+        <div class="form-group">
+          <label>Número de licencia</label>
+          <input type="text" id="op-num-licencia" placeholder="Núm. de licencia">
+        </div>
+        <div class="form-group">
+          <label>Clase de licencia</label>
+          <select id="op-clase-licencia">
+            <option value="">— Sin especificar —</option>
+            <option>A</option><option>B</option><option>C</option>
+            <option>D</option><option>E</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tipo de licencia</label>
+          <select id="op-tipo-licencia">
+            <option value="">— Sin especificar —</option>
+            <option>Federal</option>
+            <option>Estatal</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Fecha de expedición</label>
+          <input type="date" id="op-fecha-expedicion">
+        </div>
+        <div class="form-group">
+          <label>Fecha de vencimiento</label>
+          <input type="date" id="op-fecha-vencimiento">
+        </div>
+        <div class="form-group">
+          <label>Foto de la licencia</label>
+          <label class="file-upload-area" for="op-lic-file">
+            <span class="file-upload-icon">🪪</span>
+            <span class="file-upload-text">Seleccionar imagen</span>
+          </label>
+          <input type="file" id="op-lic-file" accept="image/*,.pdf" style="display:none"
+                 onchange="opFotoPreview(this,'op-lic-preview')">
+          <div id="op-lic-preview"></div>
+        </div>
+
+        <div class="op-form-section">
+          <div class="op-form-section-title">Foto del operador</div>
+        </div>
+        <div class="form-group">
+          <label class="file-upload-area" for="op-foto-file">
+            <span class="file-upload-icon">📷</span>
+            <span class="file-upload-text">Seleccionar foto</span>
+          </label>
+          <input type="file" id="op-foto-file" accept="image/*" style="display:none"
+                 onchange="opFotoPreview(this,'op-foto-preview')">
+          <div id="op-foto-preview"></div>
+        </div>
+
+        <div class="form-group sa-empresa-row" style="display:none">
+          <label>Empresa propietaria</label>
+          <select id="sa-empresa-operador"><option value="">— Selecciona empresa —</option></select>
+        </div>
+        <button class="btn-add" onclick="agregarOperador()">Enviar a aprobación</button>
+      </div>
+
+      <div class="admin-card">
+        <h3>👷 Operadores registrados</h3>
+        <div id="admin-operadores-list"></div>
+      </div>
+    </div>
+    </div><!-- /admin-content-operador -->
 
     <!-- Pendientes de aprobación — solo superadmin -->
     <div id="pendientes-section" style="display:none; margin-top:24px">
@@ -998,7 +1162,9 @@
     </div>
     <div class="form-group">
       <label>Operador</label>
-      <input type="text" id="editar-op" placeholder="Nombre del operador">
+      <select id="editar-op">
+        <option value="">— Sin operador asignado —</option>
+      </select>
     </div>
     <div class="form-group">
       <label>Placas</label>
@@ -1289,8 +1455,9 @@
 <script src="js/reservaciones.js?v=12"></script>
 <script src="js/modal.js?v=10"></script>
 <script src="js/pedidos.js?v=13"></script>
-<script src="js/aprobaciones.js?v=10"></script>
-<script src="js/admin.js?v=12"></script>
+<script src="js/aprobaciones.js?v=11"></script>
+<script src="js/admin.js?v=13"></script>
+<script src="js/operadores.js?v=1"></script>
 <script src="js/usuarios.js?v=11"></script>
 <script src="js/chat.js?v=10"></script>
 <script src="js/catalogo.js?v=14"></script>

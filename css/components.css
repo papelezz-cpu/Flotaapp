@@ -1034,3 +1034,35 @@ body.light .cat-pill { background: rgba(37,99,235,0.06); border-color: rgba(37,9
   .cat-titulo { font-size: 1.45rem; }
 }
 
+/* ── OPERADORES ───────────────────────────────────────── */
+.operador-card {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--surface);
+  margin-bottom: 10px;
+}
+.op-foto-wrap { flex-shrink: 0; }
+.op-foto-img {
+  width: 52px; height: 52px; border-radius: 50%;
+  object-fit: cover; border: 2px solid var(--border);
+}
+.op-foto-inicial {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; font-weight: 700;
+}
+.op-info { flex: 1; min-width: 0; }
+.op-nombre { font-size: 0.95rem; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.op-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 1px; }
+.op-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; align-items: center; }
+.op-upload-preview { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); margin-top: 6px; }
+.op-form-section { margin-top: 18px; margin-bottom: 6px; }
+.op-form-section-title {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted);
+  border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 10px;
+}
+body.light .operador-card { background: #fff; border-color: rgba(37,99,235,0.12); }
+body.light .op-foto-img { border-color: rgba(37,99,235,0.15); }
+
