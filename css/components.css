@@ -1087,3 +1087,30 @@ body.light .apr-op-detalle { background: #f8faff; border-color: rgba(37,99,235,0
 body.light .operador-card { background: #fff; border-color: rgba(37,99,235,0.12); }
 body.light .op-foto-img { border-color: rgba(37,99,235,0.15); }
 
+/* ── Chips de rechazo de operador ────────────────────── */
+.ro-campos-wrap {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;
+}
+.ro-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 13px; border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--card-bg);
+  font-size: 0.8rem; font-weight: 500;
+  color: var(--text-muted); cursor: pointer;
+  user-select: none;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.ro-chip input[type=checkbox] {
+  width: 14px; height: 14px;
+  accent-color: var(--danger, #e53e3e);
+  cursor: pointer; flex-shrink: 0;
+}
+.ro-chip:has(input:checked) {
+  border-color: var(--danger, #e53e3e);
+  background: rgba(229, 62, 62, 0.08);
+  color: var(--danger, #e53e3e);
+}
+body.light .ro-chip { border-color: rgba(0,0,0,0.15); background: #fff; color: #64748b; }
+body.light .ro-chip:has(input:checked) { border-color: #c53030; background: rgba(197,48,48,0.07); color: #c53030; }
+

@@ -11,8 +11,13 @@ function showToast(msg, tipo = 'ok') {
 // ── INICIALIZACIÓN (llamada tras login) ───────────────
 // Solo refresca la vista activa; el resto ya cargó en el arranque público
 function init() {
-  const tabPedidos = document.querySelectorAll('.nav-tab')[0];
-  showView('pedidos', tabPedidos);
+  if (currentUser.rol === 'superadmin') {
+    const tabPendientes = document.querySelector('.nav-tab[onclick*="pendientes"]');
+    showView('pendientes', tabPendientes);
+  } else {
+    const tabPedidos = document.querySelectorAll('.nav-tab')[0];
+    showView('pedidos', tabPedidos);
+  }
   actualizarBadgeChat();
 }
 
@@ -40,13 +45,18 @@ function init() {
   if (!currentUser.id) return;
 
   // Cargar vista principal y notificaciones
-  renderPedidos();
+  if (currentUser.rol === 'superadmin') {
+    renderAprobaciones();
+  } else {
+    renderPedidos();
+  }
   loadNotificaciones();
   actualizarBadgeChat();
 
   // #5 — Realtime: actualizar vistas cuando cambia la BD
-  const clienteActivo = () => document.getElementById('view-cliente').classList.contains('active');
-  const adminActivo   = () => document.getElementById('view-admin').classList.contains('active');
+  const clienteActivo    = () => document.getElementById('view-cliente').classList.contains('active');
+  const adminActivo      = () => document.getElementById('view-admin').classList.contains('active');
+  const pendientesActivo = () => document.getElementById('view-pendientes')?.classList.contains('active');
 
   sb.channel('portgo-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'camiones' }, () => {
@@ -80,9 +90,8 @@ function init() {
       // Refrescar campanita cuando llega una notificación para mí
       if (currentUser.id && payload.new?.user_id === currentUser.id) {
         loadNotificaciones();
-        // Si es una notificación de revisión y soy superadmin, refrescar panel de aprobaciones
-        if (currentUser.rol === 'superadmin' &&
-            (payload.new.tipo === 'revision_solicitud' || payload.new.tipo === 'revision_acuerdo')) {
+        // Si soy superadmin y la vista Pendientes está activa, refrescar
+        if (currentUser.rol === 'superadmin' && pendientesActivo()) {
           renderAprobaciones();
         }
       }

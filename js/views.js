@@ -14,7 +14,8 @@ function showView(v, btn) {
 
   if (v === 'cliente')       renderCatalogo();
   if (v === 'reservaciones') renderReserv();
-  if (v === 'admin')         { renderAdmin(); renderAprobaciones(); }
+  if (v === 'admin')         renderAdmin();
+  if (v === 'pendientes')    renderAprobaciones();
   if (v === 'pedidos')       renderPedidos();
   if (v === 'usuarios')      renderUsuarios();
 }
