@@ -1,7 +1,7 @@
 // ── MÓDULO DE OPERADORES ───────────────────────────────
 
-async function _autoIdOperador(propietarioId) {
-  const { data } = await sb.from('operadores').select('id').eq('propietario_id', propietarioId);
+async function _autoIdOperador() {
+  const { data } = await sb.from('operadores').select('id').like('id', 'OP-%');
   const nums = (data || []).map(o => parseInt((o.id || '').replace('OP-', '')) || 0);
   const max  = nums.length ? Math.max(...nums) : 0;
   return `OP-${String(max + 1).padStart(3, '0')}`;
@@ -102,7 +102,7 @@ async function agregarOperador() {
     : currentUser.id;
   if (!propietarioId) { showToast('Selecciona una empresa propietaria', 'error'); return; }
 
-  const id = await _autoIdOperador(propietarioId);
+  const id = await _autoIdOperador();
 
   // Subir foto del operador
   let fotoOperadorUrl = null;
