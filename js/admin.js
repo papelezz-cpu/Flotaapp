@@ -28,6 +28,16 @@ const DIM_DEFAULTS = {
   'HAZMAT':                             'Según unidad/permiso',
 };
 
+// Deshabilita un botón y devuelve función que lo restaura
+function _btnLoading(id) {
+  const btn = document.getElementById(id);
+  if (!btn || btn.disabled) return () => {};
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Guardando...';
+  return (texto) => { btn.disabled = false; btn.textContent = texto ?? orig; };
+}
+
 function _dbError(error) {
   const msg = (error?.message || '').toLowerCase();
   if (msg.includes('numeric field overflow') || msg.includes('out of range'))
@@ -576,7 +586,8 @@ async function agregarCamion() {
   const tipoCarga = getSelectedCargo('admin-tipo-carga');
   const g = elId => document.getElementById(elId)?.value?.trim() || null;
 
-  if (!cap) { alert('La capacidad es obligatoria.'); return; }
+  const _done = _btnLoading('btn-agregar-camion');
+  if (!cap) { _done(); alert('La capacidad es obligatoria.'); return; }
 
   const prefijos = {
     'Torton': 'T', 'Torton caja seca': 'T', 'Torton plataforma': 'T',
@@ -598,7 +609,7 @@ async function agregarCamion() {
 
   const esSuperAdmin  = currentUser.rol === 'superadmin';
   const propietarioId = _getPropietarioId('camion');
-  if (!propietarioId) return;
+  if (!propietarioId) { _done(); return; }
 
   // Subir archivos al storage
   const fotosFiles = Array.from(document.getElementById('admin-fotos').files || []);
@@ -674,7 +685,7 @@ async function agregarCamion() {
       id: targetId, propietario_id: propietarioId, ...camionPayload,
     }));
   }
-  if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
+  if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
   if (!esSuperAdmin) {
     try {
@@ -706,8 +717,7 @@ async function agregarCamion() {
   renderCargoChipsSelect('admin-tipo-carga', []);
 
   // Reset rejected-truck edit mode
-  const btnAgregar = document.getElementById('btn-agregar-camion');
-  if (btnAgregar) btnAgregar.textContent = '➕ Enviar a aprobación';
+  _done('➕ Enviar a aprobación');
   _camionRechazadoId = null;
 
   await renderAdmin();
@@ -757,7 +767,8 @@ async function agregarCustodio() {
   const disp   = document.getElementById('ac-disp').value;
   const precio = parseFloat(document.getElementById('ac-precio').value) || null;
   const certs  = document.getElementById('ac-certs').value.trim();
-  if (!nombre || !tipo) { alert('Completa nombre y tipo.'); return; }
+  const _done = _btnLoading('btn-agregar-custodio');
+  if (!nombre || !tipo) { _done(); alert('Completa nombre y tipo.'); return; }
 
   const { data: existentes } = await sb.from('custodios').select('id').like('id','CUS-%');
   const maxNum = (existentes || []).reduce((max, c) => {
@@ -767,7 +778,7 @@ async function agregarCustodio() {
 
   const esSuperAdmin = currentUser.rol === 'superadmin';
   const propietarioId = _getPropietarioId('custodio');
-  if (!propietarioId) return;
+  if (!propietarioId) { _done(); return; }
   const { error } = await sb.from('custodios').insert({
     id, nombre, tipo, descripcion: desc || null,
     disponibilidad: disp,
@@ -776,11 +787,12 @@ async function agregarCustodio() {
     certificaciones: certs ? certs.split(',').map(s => s.trim()).filter(Boolean) : [],
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
   });
-  if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
+  if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
   ['ac-nombre','ac-desc','ac-precio','ac-certs'].forEach(i => {
     const el = document.getElementById(i); if (el) el.value = '';
   });
+  _done();
   await renderAdminCustodios();
   await renderMisPendientes();
   showToast(esSuperAdmin ? `✓ Custodio ${id} agregado` : `✓ Custodio ${id} enviado — recibirás confirmación`);
@@ -870,7 +882,8 @@ async function agregarPatio() {
   const capVeh   = parseInt(document.getElementById('ap-cap').value)    || null;
   const precio   = parseFloat(document.getElementById('ap-precio').value) || null;
   const svcsRaw  = document.getElementById('ap-svcs').value.trim();
-  if (!nombre || !tipo) { alert('Completa nombre y tipo.'); return; }
+  const _done = _btnLoading('btn-agregar-patio');
+  if (!nombre || !tipo) { _done(); alert('Completa nombre y tipo.'); return; }
 
   const { data: existentes } = await sb.from('patios').select('id').like('id','PAT-%');
   const maxNum = (existentes || []).reduce((max, p) => {
@@ -880,7 +893,7 @@ async function agregarPatio() {
 
   const esSuperAdmin = currentUser.rol === 'superadmin';
   const propietarioId = _getPropietarioId('patio');
-  if (!propietarioId) return;
+  if (!propietarioId) { _done(); return; }
   const { error } = await sb.from('patios').insert({
     id, nombre, tipo,
     ubicacion: ubic || null,
@@ -889,11 +902,12 @@ async function agregarPatio() {
     servicios: svcsRaw ? svcsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
   });
-  if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
+  if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
   ['ap-nombre','ap-ubic','ap-area','ap-cap','ap-precio','ap-svcs'].forEach(i => {
     const el = document.getElementById(i); if (el) el.value = '';
   });
+  _done();
   await renderAdminPatios();
   await renderMisPendientes();
   showToast(esSuperAdmin ? `✓ Patio ${id} agregado` : `✓ Patio ${id} enviado — recibirás confirmación`);
@@ -988,10 +1002,11 @@ async function agregarLavado() {
   const precio      = parseFloat(document.getElementById('al-precio').value) || null;
   const desc        = document.getElementById('al-desc').value.trim();
 
-  if (!nombre) { alert('Escribe un nombre para el servicio.'); return; }
+  const _done = _btnLoading('btn-agregar-lavado');
+  if (!nombre) { _done(); alert('Escribe un nombre para el servicio.'); return; }
 
   const propietarioId = _getPropietarioId('lavado');
-  if (!propietarioId) return;
+  if (!propietarioId) { _done(); return; }
 
   const { data: existentes } = await sb.from('lavados').select('id').like('id','LAV-%');
   const maxNum = (existentes || []).reduce((max, l) => {
@@ -1008,10 +1023,11 @@ async function agregarLavado() {
     propietario_id: propietarioId,
     aprobacion: currentUser.rol === 'superadmin' ? 'aprobada' : 'pendiente',
   });
-  if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
+  if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
   ['al-nombre','al-tipos-vehiculo','al-tipos-lavado','al-capacidad','al-ubic','al-horario','al-precio','al-desc']
     .forEach(i => { const el = document.getElementById(i); if (el) el.value = ''; });
+  _done();
   await renderAdminLavados();
   await renderMisPendientes();
   showToast(currentUser.rol === 'superadmin' ? `✓ Servicio ${id} agregado` : `✓ Servicio ${id} enviado — recibirás confirmación`);
