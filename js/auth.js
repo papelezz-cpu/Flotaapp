@@ -97,17 +97,17 @@ async function doLogin() {
     rol:    perfil?.rol    || 'cliente',
   };
 
-  hideLoginOverlay();
   applyUserUI();
+  showView('home', null);   // activar home ANTES de quitar el overlay
+  hideLoginOverlay();
   loadNotificaciones();
-  // Realtime para notificaciones de este usuario
+  actualizarBadgeChat();
   sb.channel('notif-' + currentUser.id)
     .on('postgres_changes', {
       event: 'INSERT', schema: 'public', table: 'notificaciones',
       filter: `user_id=eq.${currentUser.id}`
     }, () => loadNotificaciones())
     .subscribe();
-  init();
 }
 
 // ── REGISTRO DE NUEVOS CLIENTES ────────────────────────
@@ -151,16 +151,17 @@ async function doRegistro() {
       nombre,
       rol:    'cliente',
     };
-    hideLoginOverlay();
     applyUserUI();
+    showView('home', null);
+    hideLoginOverlay();
     loadNotificaciones();
+    actualizarBadgeChat();
     sb.channel('notif-' + currentUser.id)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'notificaciones',
         filter: `user_id=eq.${currentUser.id}`
       }, () => loadNotificaciones())
       .subscribe();
-    init();
   } else {
     // Supabase envió email de confirmación
     okEl.classList.add('show');
@@ -239,9 +240,10 @@ async function logout() {
   document.getElementById('login-error').textContent = 'Correo o contraseña incorrectos';
   document.getElementById('login-error').classList.remove('show');
 
-  // Reset all views to default so the next user starts clean
+  // Reset: dejar view-home activo (detrás del overlay) para que el próximo login la muestre de inmediato
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-home')?.classList.add('active');
+  document.getElementById('home-grid').innerHTML = '';
 
   switchLoginTab('login');
   showLoginOverlay();
