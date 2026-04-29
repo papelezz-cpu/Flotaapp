@@ -1141,6 +1141,11 @@ body.light .ro-chip:has(input:checked) { border-color: #c53030; background: rgba
   border: 1px solid rgba(229,62,62,0.3);
 }
 .rechazo-nota { font-size: 0.78rem; color: var(--text-muted); font-style: italic; }
+.rechazo-aviso-archivos {
+  font-size: 0.75rem; color: var(--red, #ef4444);
+  margin-top: 8px; padding-top: 7px;
+  border-top: 1px solid rgba(229,62,62,0.2);
+}
 body.light .rechazo-banner { background: rgba(197,48,48,0.06); border-color: rgba(197,48,48,0.25); }
 body.light .rechazo-info   { background: rgba(197,48,48,0.05); border-color: rgba(197,48,48,0.2); }
 

@@ -331,6 +331,7 @@ async function renderMisPendientes() {
         <div class="rechazo-header">⚠ El administrador solicitó correcciones</div>
         ${campos ? `<div class="rechazo-chips" style="margin-top:6px">${campos}</div>` : ''}
         ${r.rechazo_nota ? `<div class="rechazo-nota" style="margin-top:6px">"${esc(r.rechazo_nota)}"</div>` : ''}
+        <div class="rechazo-aviso-archivos">📎 Por favor vuelve a subir todos los documentos e imágenes al corregir.</div>
       </div>`;
     const actions = `
       <div style="display:flex;gap:6px;flex-shrink:0">
