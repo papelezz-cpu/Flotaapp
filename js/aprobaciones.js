@@ -229,33 +229,94 @@ async function renderAprobaciones() {
     }).join('');
   }
 
-  // ── CUSTODIOS / PATIOS / LAVADOS ──────────────────────
-  const _recursoCard = (r, icon, titulo, sub, tabla) => `
-    <div class="apr-card" id="aprec-${r.id}">
-      <div class="apr-card-header">
-        <div>
-          <div class="apr-tipo">${icon} ${r.id} — ${esc(titulo)}</div>
-          <div class="apr-sub">Empresa: <strong>${esc(r.propietario?.nombre || '—')}</strong> · ${esc(sub)}</div>
-        </div>
-        <span class="badge badge-revision">Pendiente</span>
-      </div>
-      <div class="apr-actions">
-        <button class="btn-apr-aprobar"  onclick="aprobarRecurso('${tabla}','${r.id}')">✓ Aprobar</button>
-        <button class="btn-apr-rechazar" onclick="rechazarRecursoSimple('${tabla}','${r.id}')">✕ Rechazar con comentarios</button>
-      </div>
-    </div>`;
-
+  // ── CUSTODIOS ─────────────────────────────────────────
   if (custodios?.length) {
     html += `<div class="apr-bloque-title" style="margin-top:28px">👮 Custodios por aprobar <span class="apr-count">${custodios.length}</span></div>`;
-    html += custodios.map(c => _recursoCard(c, '👮', c.nombre, `${c.tipo} · ${c.disponibilidad || '—'}`, 'custodios')).join('');
+    html += custodios.map(c => `
+      <div class="apr-card" id="aprec-${c.id}">
+        <div class="apr-card-header">
+          <div>
+            <div class="apr-tipo">👮 ${c.id} — ${esc(c.nombre)}</div>
+            <div class="apr-sub">Empresa: <strong>${esc(c.propietario?.nombre || '—')}</strong></div>
+          </div>
+          <span class="badge badge-revision">Pendiente</span>
+        </div>
+        <div class="apr-op-detalle">
+          <div class="apr-op-section-title">Datos del custodio</div>
+          <div class="apr-op-grid">
+            <div class="apr-op-row"><span>Tipo</span><strong>${esc(c.tipo || '—')}</strong></div>
+            <div class="apr-op-row"><span>Disponibilidad</span><strong>${esc(c.disponibilidad || '—')}</strong></div>
+            <div class="apr-op-row"><span>Precio / día</span><strong>${c.precio_dia ? '$'+Number(c.precio_dia).toLocaleString('es-MX')+' MXN' : '—'}</strong></div>
+          </div>
+          ${c.descripcion ? `<div class="apr-op-section-title">Descripción</div><div class="apr-desc">${esc(c.descripcion)}</div>` : ''}
+          ${(c.certificaciones||[]).length ? `<div class="apr-op-section-title">Certificaciones</div><div class="pedido-chips">${(c.certificaciones||[]).map(x=>`<span class="cargo-chip">${esc(x)}</span>`).join('')}</div>` : ''}
+        </div>
+        <div class="apr-actions">
+          <button class="btn-apr-aprobar"  onclick="aprobarRecurso('custodios','${c.id}')">✓ Aprobar</button>
+          <button class="btn-apr-rechazar" onclick="rechazarRecursoCompleto('custodios','${c.id}')">✕ Rechazar con comentarios</button>
+        </div>
+      </div>`).join('');
   }
+
+  // ── PATIOS ────────────────────────────────────────────
   if (patios?.length) {
     html += `<div class="apr-bloque-title" style="margin-top:28px">🏭 Patios por aprobar <span class="apr-count">${patios.length}</span></div>`;
-    html += patios.map(p => _recursoCard(p, '🏭', p.nombre, `${p.tipo}${p.area_m2 ? ' · '+p.area_m2+' m²' : ''}`, 'patios')).join('');
+    html += patios.map(p => `
+      <div class="apr-card" id="aprec-${p.id}">
+        <div class="apr-card-header">
+          <div>
+            <div class="apr-tipo">🏭 ${p.id} — ${esc(p.nombre)}</div>
+            <div class="apr-sub">Empresa: <strong>${esc(p.propietario?.nombre || '—')}</strong></div>
+          </div>
+          <span class="badge badge-revision">Pendiente</span>
+        </div>
+        <div class="apr-op-detalle">
+          <div class="apr-op-section-title">Datos del patio</div>
+          <div class="apr-op-grid">
+            <div class="apr-op-row"><span>Tipo</span><strong>${esc(p.tipo || '—')}</strong></div>
+            <div class="apr-op-row"><span>Ubicación</span><strong>${esc(p.ubicacion || '—')}</strong></div>
+            <div class="apr-op-row"><span>Área</span><strong>${p.area_m2 ? p.area_m2+' m²' : '—'}</strong></div>
+            <div class="apr-op-row"><span>Capacidad</span><strong>${p.capacidad_vehiculos ? p.capacidad_vehiculos+' veh.' : '—'}</strong></div>
+            <div class="apr-op-row"><span>Precio / día</span><strong>${p.precio_dia ? '$'+Number(p.precio_dia).toLocaleString('es-MX')+' MXN' : '—'}</strong></div>
+          </div>
+          ${(p.servicios||[]).length ? `<div class="apr-op-section-title">Servicios</div><div class="pedido-chips">${(p.servicios||[]).map(x=>`<span class="cargo-chip">${esc(x)}</span>`).join('')}</div>` : ''}
+        </div>
+        <div class="apr-actions">
+          <button class="btn-apr-aprobar"  onclick="aprobarRecurso('patios','${p.id}')">✓ Aprobar</button>
+          <button class="btn-apr-rechazar" onclick="rechazarRecursoCompleto('patios','${p.id}')">✕ Rechazar con comentarios</button>
+        </div>
+      </div>`).join('');
   }
+
+  // ── LAVADOS ───────────────────────────────────────────
   if (lavados?.length) {
     html += `<div class="apr-bloque-title" style="margin-top:28px">🚿 Lavados por aprobar <span class="apr-count">${lavados.length}</span></div>`;
-    html += lavados.map(l => _recursoCard(l, '🚿', l.nombre, (l.tipos_vehiculo||[]).join(', ')||'—', 'lavados')).join('');
+    html += lavados.map(l => `
+      <div class="apr-card" id="aprec-${l.id}">
+        <div class="apr-card-header">
+          <div>
+            <div class="apr-tipo">🚿 ${l.id} — ${esc(l.nombre)}</div>
+            <div class="apr-sub">Empresa: <strong>${esc(l.propietario?.nombre || '—')}</strong></div>
+          </div>
+          <span class="badge badge-revision">Pendiente</span>
+        </div>
+        <div class="apr-op-detalle">
+          <div class="apr-op-section-title">Datos del servicio</div>
+          <div class="apr-op-grid">
+            <div class="apr-op-row"><span>Ubicación</span><strong>${esc(l.ubicacion || '—')}</strong></div>
+            <div class="apr-op-row"><span>Capacidad simultánea</span><strong>${l.capacidad || '—'}</strong></div>
+            <div class="apr-op-row"><span>Horario</span><strong>${esc(l.horario || '—')}</strong></div>
+            <div class="apr-op-row"><span>Precio</span><strong>${l.precio_lavado ? '$'+Number(l.precio_lavado).toLocaleString('es-MX')+' MXN' : '—'}</strong></div>
+          </div>
+          ${(l.tipos_vehiculo||[]).length ? `<div class="apr-op-section-title">Tipos de vehículo</div><div class="pedido-chips">${(l.tipos_vehiculo||[]).map(x=>`<span class="cargo-chip">${esc(x)}</span>`).join('')}</div>` : ''}
+          ${(l.tipos_lavado||[]).length ? `<div class="apr-op-section-title">Tipos de lavado</div><div class="pedido-chips">${(l.tipos_lavado||[]).map(x=>`<span class="cargo-chip">${esc(x)}</span>`).join('')}</div>` : ''}
+          ${l.descripcion ? `<div class="apr-desc" style="margin-top:6px">${esc(l.descripcion)}</div>` : ''}
+        </div>
+        <div class="apr-actions">
+          <button class="btn-apr-aprobar"  onclick="aprobarRecurso('lavados','${l.id}')">✓ Aprobar</button>
+          <button class="btn-apr-rechazar" onclick="rechazarRecursoCompleto('lavados','${l.id}')">✕ Rechazar con comentarios</button>
+        </div>
+      </div>`).join('');
   }
 
   content.innerHTML = html;
@@ -549,12 +610,28 @@ async function confirmarRechazarCamion() {
   renderAprobaciones();
 }
 
-// ── RECHAZAR RECURSO SIMPLE (custodios, patios, lavados) ──
+// ── RECHAZAR RECURSO COMPLETO (custodios, patios, lavados) ──
 
-function rechazarRecursoSimple(tabla, id) {
+const _CAMPOS_RECURSO = {
+  custodios: ['Nombre','Tipo de custodio','Descripción','Certificaciones','Disponibilidad','Precio'],
+  patios:    ['Nombre','Tipo de patio','Ubicación','Área (m²)','Capacidad (vehículos)','Servicios','Precio'],
+  lavados:   ['Nombre','Tipos de vehículo','Tipos de lavado','Capacidad simultánea','Ubicación','Horario','Precio'],
+};
+
+function rechazarRecursoCompleto(tabla, id) {
   document.getElementById('rrs-tabla').value = tabla;
   document.getElementById('rrs-id').value    = id;
   document.getElementById('rrs-nota').value  = '';
+
+  const campos = _CAMPOS_RECURSO[tabla] || [];
+  document.getElementById('rrs-campos').innerHTML = campos.map(c =>
+    `<label class="ro-chip"><input type="checkbox" value="${c}"> ${c}</label>`
+  ).join('');
+
+  const titulos = { custodios:'custodio', patios:'patio', lavados:'servicio de lavado' };
+  document.getElementById('rrs-titulo').textContent =
+    `✕ Rechazar ${titulos[tabla] || 'recurso'} con comentarios`;
+
   document.getElementById('modal-rechazar-recurso').classList.add('open');
 }
 
@@ -563,24 +640,28 @@ function cerrarRechazarRecurso() {
 }
 
 async function confirmarRechazarRecurso() {
-  const tabla = document.getElementById('rrs-tabla').value;
-  const id    = document.getElementById('rrs-id').value;
-  const nota  = document.getElementById('rrs-nota').value.trim();
+  const tabla  = document.getElementById('rrs-tabla').value;
+  const id     = document.getElementById('rrs-id').value;
+  const nota   = document.getElementById('rrs-nota').value.trim();
+  const campos = Array.from(document.querySelectorAll('#rrs-campos input[type=checkbox]:checked')).map(c => c.value);
 
   const { data: r } = await sb.from(tabla).select('propietario_id, nombre').eq('id', id).single();
   const { error }   = await sb.from(tabla).update({
-    aprobacion: 'rechazada', rechazo_nota: nota || null,
+    aprobacion:     'rechazada',
+    rechazo_nota:   nota   || null,
+    rechazo_campos: campos.length ? campos : null,
   }).eq('id', id);
 
   if (error) { showToast('Error al rechazar', 'error'); return; }
 
   if (r?.propietario_id) {
     const tipoLabel = tabla === 'custodios' ? 'custodio' : tabla === 'patios' ? 'patio' : 'servicio de lavado';
+    const camposStr = campos.length ? ` Corregir: ${campos.join(', ')}.` : '';
     await sb.from('notificaciones').insert({
       user_id: r.propietario_id,
       tipo:    'recurso_rechazado',
       titulo:  `⚠ ${tipoLabel.charAt(0).toUpperCase() + tipoLabel.slice(1)} requiere correcciones`,
-      mensaje: `Tu ${tipoLabel} "${esc(r.nombre || id)}" necesita ajustes.${nota ? ' Comentario: ' + nota : ''} Entra al panel Admin para ver el motivo.`,
+      mensaje: `Tu ${tipoLabel} "${esc(r.nombre || id)}" necesita ajustes.${camposStr}${nota ? ' Comentario: ' + nota : ''} Entra al panel Admin para ver el motivo y corregir.`,
       leido:   false,
     });
   }

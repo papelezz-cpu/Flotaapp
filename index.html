@@ -1496,21 +1496,25 @@
   </div>
 </div>
 
-<!-- ══ MODAL RECHAZO RECURSO SIMPLE ═══════════════════ -->
+<!-- ══ MODAL RECHAZO RECURSO (custodio/patio/lavado) ══ -->
 <div class="modal-overlay" id="modal-rechazar-recurso">
-  <div class="modal" style="max-width:440px">
+  <div class="modal" style="max-width:500px">
     <div class="modal-header">
-      <h2>✕ Rechazar con comentarios</h2>
+      <h2 id="rrs-titulo">✕ Rechazar con comentarios</h2>
       <button class="modal-close" onclick="cerrarRechazarRecurso()">✕</button>
     </div>
     <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:16px">
-      La empresa verá el motivo en su panel de Admin.
+      La empresa verá el motivo y podrá corregir sin perder sus datos.
     </p>
     <input type="hidden" id="rrs-tabla">
     <input type="hidden" id="rrs-id">
     <div class="form-group">
-      <label>Motivo del rechazo</label>
-      <textarea id="rrs-nota" rows="4" placeholder="Describe qué debe corregir la empresa…"></textarea>
+      <label>Campos con problemas</label>
+      <div id="rrs-campos" class="ro-campos-wrap"></div>
+    </div>
+    <div class="form-group" style="margin-top:14px">
+      <label>Comentario adicional</label>
+      <textarea id="rrs-nota" rows="3" placeholder="Explica qué debe corregir la empresa…"></textarea>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="cerrarRechazarRecurso()">Cancelar</button>
@@ -1764,7 +1768,7 @@
 <script src="js/reservaciones.js?v=12"></script>
 <script src="js/modal.js?v=10"></script>
 <script src="js/pedidos.js?v=14"></script>
-<script src="js/aprobaciones.js?v=13"></script>
+<script src="js/aprobaciones.js?v=14"></script>
 <script src="js/admin.js?v=15"></script>
 <script src="js/operadores.js?v=4"></script>
 <script src="js/usuarios.js?v=11"></script>
