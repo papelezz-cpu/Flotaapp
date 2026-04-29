@@ -10,10 +10,15 @@ async function renderAprobaciones() {
   if (!content) return;
   content.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted)">Cargando…</div>';
 
-  const [{ data: solicitudes }, { data: acuerdos }, { data: operadores }] = await Promise.all([
+  const [{ data: solicitudes }, { data: acuerdos }, { data: operadores },
+         { data: camiones }, { data: custodios }, { data: patios }, { data: lavados }] = await Promise.all([
     sb.from('pedidos').select('*').eq('estado', 'pendiente_revision').order('created_at'),
     sb.from('pedidos').select('*').eq('estado', 'pendiente_acuerdo').order('created_at'),
     sb.from('operadores').select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at'),
+    sb.from('camiones'  ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('custodios' ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('patios'    ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('lavados'   ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
   ]);
 
   // Cargar ofertas pendientes para los acuerdos
@@ -165,7 +170,101 @@ async function renderAprobaciones() {
     }).join('');
   }
 
+  // ── UNIDADES POR APROBAR ─────────────────────────────
+  html += `<div class="apr-bloque-title" style="margin-top:28px">🚛 Unidades por aprobar <span class="apr-count">${(camiones || []).length}</span></div>`;
+  if (!camiones?.length) {
+    html += `<div class="apr-empty">Sin unidades pendientes</div>`;
+  } else {
+    html += (camiones || []).map(c => {
+      const campos = `
+        <div class="apr-op-detalle">
+          <div class="apr-op-section-title">Vehículo</div>
+          <div class="apr-op-grid">
+            <div class="apr-op-row"><span>Tipo</span><strong>${esc(c.tipo || '—')}</strong></div>
+            <div class="apr-op-row"><span>Marca</span><strong>${esc(c.marca || '—')}</strong></div>
+            <div class="apr-op-row"><span>Versión</span><strong>${esc(c.version || '—')}</strong></div>
+            <div class="apr-op-row"><span>Año</span><strong>${c.modelo_anio || '—'}</strong></div>
+            <div class="apr-op-row"><span>Color</span><strong>${esc(c.color || '—')}</strong></div>
+            <div class="apr-op-row"><span>Capacidad</span><strong>${c.capacidad ? c.capacidad + ' ton' : '—'}</strong></div>
+            <div class="apr-op-row"><span>Dimensiones</span><strong>${esc(c.dimensiones || '—')}</strong></div>
+            <div class="apr-op-row"><span>Combustible</span><strong>${esc(c.tipo_combustible || '—')}</strong></div>
+          </div>
+          <div class="apr-op-section-title">Identificación</div>
+          <div class="apr-op-grid">
+            <div class="apr-op-row"><span>Placas</span><strong>${esc(c.placas || '—')}</strong></div>
+            <div class="apr-op-row"><span>Tipo placa</span><strong>${esc(c.tipo_placa || '—')}</strong></div>
+            <div class="apr-op-row"><span>Núm. serie (NIV)</span><strong>${esc(c.num_serie || '—')}</strong></div>
+            <div class="apr-op-row"><span>Núm. motor</span><strong>${esc(c.num_motor || '—')}</strong></div>
+            <div class="apr-op-row"><span>Núm. económico</span><strong>${esc(c.num_economico || '—')}</strong></div>
+          </div>
+          <div class="apr-op-section-title">Tarjeta de circulación</div>
+          <div class="apr-op-grid">
+            <div class="apr-op-row"><span>Número TC</span><strong>${esc(c.tarjeta_circulacion || '—')}</strong></div>
+            <div class="apr-op-row"><span>Fecha expedición</span><strong>${c.fecha_expedicion_tc ? fmtFecha(c.fecha_expedicion_tc) : '—'}</strong></div>
+          </div>
+          ${c.imagen_tc ? `<a href="#" onclick="verArchivoPublico('${esc(c.imagen_tc)}')" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:4px 0">🪪 Ver imagen TC</a>` : ''}
+          <div class="apr-op-section-title">CAAT</div>
+          <div class="apr-op-grid">
+            <div class="apr-op-row"><span>Número CAAT</span><strong>${esc(c.caat || '—')}</strong></div>
+            <div class="apr-op-row"><span>Vigencia</span><strong>${c.vigencia_caat ? fmtFecha(c.vigencia_caat) : '—'}</strong></div>
+          </div>
+          ${c.imagen_caat ? `<a href="#" onclick="verArchivoPublico('${esc(c.imagen_caat)}')" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:4px 0">📄 Ver imagen CAAT</a>` : ''}
+          ${(c.archivos || []).length ? `<div style="margin-top:6px"><button class="btn-edit" onclick="verArchivos('${c.id}')">📎 Ver fotos/documentos</button></div>` : ''}
+        </div>`;
+      return `
+        <div class="apr-card" id="aprcam-${c.id}">
+          <div class="apr-card-header">
+            <div>
+              <div class="apr-tipo">${c.emoji || '🚛'} ${c.id} — ${esc(c.tipo)}</div>
+              <div class="apr-sub">Empresa: <strong>${esc(c.propietario?.nombre || '—')}</strong> · ${c.capacidad || '—'} ton</div>
+            </div>
+            <span class="badge badge-revision">Pendiente</span>
+          </div>
+          ${campos}
+          <div class="apr-actions">
+            <button class="btn-apr-aprobar"  onclick="aprobarCamion('${c.id}')">✓ Aprobar</button>
+            <button class="btn-apr-rechazar" onclick="rechazarCamion('${c.id}')">✕ Rechazar con comentarios</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── CUSTODIOS / PATIOS / LAVADOS ──────────────────────
+  const _recursoCard = (r, icon, titulo, sub, tabla) => `
+    <div class="apr-card" id="aprec-${r.id}">
+      <div class="apr-card-header">
+        <div>
+          <div class="apr-tipo">${icon} ${r.id} — ${esc(titulo)}</div>
+          <div class="apr-sub">Empresa: <strong>${esc(r.propietario?.nombre || '—')}</strong> · ${esc(sub)}</div>
+        </div>
+        <span class="badge badge-revision">Pendiente</span>
+      </div>
+      <div class="apr-actions">
+        <button class="btn-apr-aprobar"  onclick="aprobarRecurso('${tabla}','${r.id}')">✓ Aprobar</button>
+        <button class="btn-apr-rechazar" onclick="rechazarRecursoSimple('${tabla}','${r.id}')">✕ Rechazar con comentarios</button>
+      </div>
+    </div>`;
+
+  if (custodios?.length) {
+    html += `<div class="apr-bloque-title" style="margin-top:28px">👮 Custodios por aprobar <span class="apr-count">${custodios.length}</span></div>`;
+    html += custodios.map(c => _recursoCard(c, '👮', c.nombre, `${c.tipo} · ${c.disponibilidad || '—'}`, 'custodios')).join('');
+  }
+  if (patios?.length) {
+    html += `<div class="apr-bloque-title" style="margin-top:28px">🏭 Patios por aprobar <span class="apr-count">${patios.length}</span></div>`;
+    html += patios.map(p => _recursoCard(p, '🏭', p.nombre, `${p.tipo}${p.area_m2 ? ' · '+p.area_m2+' m²' : ''}`, 'patios')).join('');
+  }
+  if (lavados?.length) {
+    html += `<div class="apr-bloque-title" style="margin-top:28px">🚿 Lavados por aprobar <span class="apr-count">${lavados.length}</span></div>`;
+    html += lavados.map(l => _recursoCard(l, '🚿', l.nombre, (l.tipos_vehiculo||[]).join(', ')||'—', 'lavados')).join('');
+  }
+
   content.innerHTML = html;
+}
+
+function verArchivoPublico(path) {
+  sb.storage.from('unidades').createSignedUrl(path, 3600).then(({ data }) => {
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  });
 }
 
 function _buildChipsSol(p) {
@@ -389,4 +488,104 @@ async function rechazarAcuerdo(pedidoId) {
   showToast('Acuerdo rechazado. Vuelve a negociación');
   renderAprobaciones();
   if (document.getElementById('view-pedidos')?.classList.contains('active')) renderPedidos();
+}
+
+// ── APROBAR / RECHAZAR CAMIÓN ────────────────────────────
+
+async function aprobarCamion(id) {
+  const { data: c } = await sb.from('camiones').select('propietario_id, tipo').eq('id', id).single();
+  await sb.from('camiones').update({ aprobacion: 'aprobada' }).eq('id', id);
+  if (c?.propietario_id) {
+    await sb.from('notificaciones').insert({
+      user_id: c.propietario_id,
+      tipo:    'recurso_aprobado',
+      titulo:  '✓ Unidad aprobada',
+      mensaje: `Tu unidad ${id} (${esc(c.tipo || '')}) fue aprobada y ya está visible en el catálogo.`,
+      leido:   false,
+    });
+  }
+  document.getElementById(`aprcam-${id}`)?.remove();
+  showToast(`✓ Unidad ${id} aprobada`);
+  renderAprobaciones();
+  renderAdmin();
+}
+
+function rechazarCamion(id) {
+  document.getElementById('rc-camion-id').value = id;
+  document.getElementById('rc-nota').value = '';
+  document.querySelectorAll('#rc-campos input[type=checkbox]').forEach(c => { c.checked = false; });
+  document.getElementById('modal-rechazar-camion').classList.add('open');
+}
+
+function cerrarRechazarCamion() {
+  document.getElementById('modal-rechazar-camion').classList.remove('open');
+}
+
+async function confirmarRechazarCamion() {
+  const id     = document.getElementById('rc-camion-id').value;
+  const nota   = document.getElementById('rc-nota').value.trim();
+  const campos = Array.from(document.querySelectorAll('#rc-campos input[type=checkbox]:checked')).map(c => c.value);
+
+  const { data: c } = await sb.from('camiones').select('propietario_id, tipo').eq('id', id).single();
+  const { error }   = await sb.from('camiones').update({
+    aprobacion: 'rechazada', rechazo_nota: nota || null, rechazo_campos: campos.length ? campos : null,
+  }).eq('id', id);
+
+  if (error) { showToast('Error al rechazar', 'error'); return; }
+
+  if (c?.propietario_id) {
+    const camposStr = campos.length ? ` Corregir: ${campos.join(', ')}.` : '';
+    await sb.from('notificaciones').insert({
+      user_id: c.propietario_id,
+      tipo:    'recurso_rechazado',
+      titulo:  '⚠ Unidad requiere correcciones',
+      mensaje: `Tu unidad ${id} (${esc(c.tipo || '')}) necesita ajustes.${camposStr}${nota ? ' Comentario: ' + nota : ''} Entra al panel Admin para corregir y reenviar.`,
+      leido:   false,
+    });
+  }
+
+  cerrarRechazarCamion();
+  showToast(`Unidad ${id} devuelta con comentarios`);
+  renderAprobaciones();
+}
+
+// ── RECHAZAR RECURSO SIMPLE (custodios, patios, lavados) ──
+
+function rechazarRecursoSimple(tabla, id) {
+  document.getElementById('rrs-tabla').value = tabla;
+  document.getElementById('rrs-id').value    = id;
+  document.getElementById('rrs-nota').value  = '';
+  document.getElementById('modal-rechazar-recurso').classList.add('open');
+}
+
+function cerrarRechazarRecurso() {
+  document.getElementById('modal-rechazar-recurso').classList.remove('open');
+}
+
+async function confirmarRechazarRecurso() {
+  const tabla = document.getElementById('rrs-tabla').value;
+  const id    = document.getElementById('rrs-id').value;
+  const nota  = document.getElementById('rrs-nota').value.trim();
+
+  const { data: r } = await sb.from(tabla).select('propietario_id, nombre').eq('id', id).single();
+  const { error }   = await sb.from(tabla).update({
+    aprobacion: 'rechazada', rechazo_nota: nota || null,
+  }).eq('id', id);
+
+  if (error) { showToast('Error al rechazar', 'error'); return; }
+
+  if (r?.propietario_id) {
+    const tipoLabel = tabla === 'custodios' ? 'custodio' : tabla === 'patios' ? 'patio' : 'servicio de lavado';
+    await sb.from('notificaciones').insert({
+      user_id: r.propietario_id,
+      tipo:    'recurso_rechazado',
+      titulo:  `⚠ ${tipoLabel.charAt(0).toUpperCase() + tipoLabel.slice(1)} requiere correcciones`,
+      mensaje: `Tu ${tipoLabel} "${esc(r.nombre || id)}" necesita ajustes.${nota ? ' Comentario: ' + nota : ''} Entra al panel Admin para ver el motivo.`,
+      leido:   false,
+    });
+  }
+
+  cerrarRechazarRecurso();
+  showToast(`${id} devuelto con comentarios`);
+  renderAprobaciones();
 }

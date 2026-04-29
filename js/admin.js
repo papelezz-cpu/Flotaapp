@@ -1,14 +1,31 @@
 // ── PANEL DE ADMINISTRACIÓN ───────────────────────────
 
-const CARGO_TIPOS = ['General','Refrigerado','Peligroso','Frágil','Granel','Maquinaria','Automóviles','Contenedor'];
+const CARGO_TIPOS = ['General','Refrigerado','Peligroso','Frágil','Granel','Maquinaria','Automóviles','Contenedor','HAZMAT'];
 
 let currentAdminTab = 'camion';
+
+// edit-mode state for rejected trucks
+let _camionRechazadoId = null;
 
 const DIM_DEFAULTS = {
   'Torton':     '8.5m × 2.4m × 2.5m',
   'Rabón':      '5.5m × 2.4m × 2.4m',
   'Full':       '14.5m × 2.5m × 2.6m',
   'Plataforma': '13.5m × 2.5m — abierta',
+  'Camioneta 1.5 ton caja seca':        '3.8m × 2.0m × 2.0m',
+  'Camioneta 1.5 ton plataforma':       '3.8m × 2.0m — abierta',
+  'Camioneta 3.5 ton caja seca':        '5.0m × 2.2m × 2.2m',
+  'Camioneta 3.5 ton plataforma':       '5.0m × 2.2m — abierta',
+  'Torton caja seca':                   '8.5m × 2.4m × 2.5m',
+  'Torton plataforma':                  '8.5m × 2.5m — abierta',
+  'Sencillo porta contenedor 40/20':    '12.2m × 2.44m — contenedor',
+  'Sencillo plataforma':                '12.5m × 2.5m — abierta',
+  'Full porta contenedor 40/20':        '16.5m × 2.5m — 2 contenedores',
+  'Full plataforma':                    '16.5m × 2.5m — abierta',
+  'Lowboy':                             '12m × 3.0m — especial',
+  'Cama baja':                          '10m × 3.0m — especial',
+  'Plataforma de 3 ejes (sobrepeso)':   '15m × 3.0m — especial',
+  'HAZMAT':                             'Según unidad/permiso',
 };
 
 async function renderAdmin() {
@@ -68,7 +85,6 @@ async function renderAdmin() {
   if (currentUser.rol === 'superadmin') await _cargarEmpresasDropdowns();
   else document.querySelectorAll('.sa-empresa-row').forEach(el => el.style.display = 'none');
 
-  renderPendientes();
   if (currentUser.rol !== 'superadmin') renderMisPendientes();
 
   // Render the currently active admin tab
@@ -192,8 +208,20 @@ function getSelectedCargo(containerId) {
 // ── DIMENSIONES AUTO-FILL ─────────────────────────────
 
 function autoFillDimensiones(prefix = 'admin') {
-  const tipo  = document.getElementById(`${prefix}-tipo`)?.value;
-  const dimEl = document.getElementById(`${prefix}-dim`);
+  const tipo   = document.getElementById(`${prefix}-tipo`)?.value || '';
+  const dimEl  = document.getElementById(`${prefix}-dim`);
+  const lblEl  = document.getElementById(`${prefix}-dim-label`);
+
+  // Update label based on truck body type
+  if (lblEl) {
+    const esCaja = tipo.includes('caja seca') || tipo === 'Torton' || tipo === 'Rabón';
+    const esCont = tipo.includes('contenedor');
+    lblEl.textContent = esCaja ? 'Dimensiones de caja (L × A × H)' :
+                        esCont ? 'Capacidad de contenedor'           :
+                                 'Dimensiones de plataforma (L × A)';
+  }
+
+  // Auto-fill only when field is empty
   if (dimEl && tipo && DIM_DEFAULTS[tipo] && !dimEl.value) {
     dimEl.value = DIM_DEFAULTS[tipo];
   }
@@ -271,99 +299,156 @@ async function guardarEdicion() {
   showToast(`✓ Unidad ${id} actualizada`);
 }
 
-// ── PENDIENTES ────────────────────────────────────────
+// ── PENDIENTES (EMPRESA) ──────────────────────────────
 
-// Muestra las unidades pendientes del propio admin (no superadmin)
+// Muestra los recursos pendientes Y rechazados del propio admin
 async function renderMisPendientes() {
   const uid = currentUser.id;
-  const [{ data: camPend }, { data: cusPend }, { data: patPend }, { data: lavPend }, { data: opPend }] = await Promise.all([
-    sb.from('camiones'  ).select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
-    sb.from('custodios' ).select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
-    sb.from('patios'    ).select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
-    sb.from('lavados'   ).select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
-    sb.from('operadores').select('*').eq('propietario_id', uid).eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+  const estados = ['pendiente', 'rechazada'];
+
+  const [{ data: camAll }, { data: cusAll }, { data: patAll }, { data: lavAll }, { data: opAll }] = await Promise.all([
+    sb.from('camiones'  ).select('*').eq('propietario_id', uid).in('aprobacion', estados).order('created_at', { ascending: false }),
+    sb.from('custodios' ).select('*').eq('propietario_id', uid).in('aprobacion', estados).order('created_at', { ascending: false }),
+    sb.from('patios'    ).select('*').eq('propietario_id', uid).in('aprobacion', estados).order('created_at', { ascending: false }),
+    sb.from('lavados'   ).select('*').eq('propietario_id', uid).in('aprobacion', estados).order('created_at', { ascending: false }),
+    sb.from('operadores').select('*').eq('propietario_id', uid).in('aprobacion', estados).order('created_at', { ascending: false }),
   ]);
 
   const section = document.getElementById('pendientes-section');
   const list    = document.getElementById('pendientes-list');
 
-  const todos = [
-    ...(camPend || []).map(c => ({ label: `${c.emoji || '🚛'} ${c.id} — ${c.tipo}`, sub: `${c.operador} · ${c.capacidad} ton` })),
-    ...(cusPend || []).map(c => ({ label: `👮 ${c.id} — ${c.nombre}`, sub: `${c.tipo} · ${c.disponibilidad || ''}` })),
-    ...(patPend || []).map(p => ({ label: `🏭 ${p.id} — ${p.nombre}`, sub: `${p.tipo}${p.area_m2 ? ' · ' + p.area_m2 + ' m²' : ''}` })),
-    ...(lavPend || []).map(l => ({ label: `🚿 ${l.id} — ${l.nombre}`, sub: (l.tipos_vehiculo || []).join(', ') || '—' })),
-    ...(opPend  || []).map(o => { const n = [o.nombre, o.primer_apellido].filter(Boolean).join(' '); return { label: `👷 ${o.id} — ${n}`, sub: o.puesto || '—' }; }),
+  const _rechazoBadge = (r, tabla, corregirFn) => {
+    if (r.aprobacion !== 'rechazada') return `<span class="badge badge-busy" style="font-size:0.72rem">⏳ En revisión</span>`;
+    const campos = (r.rechazo_campos || []).map(c => `<span class="rechazo-chip">${esc(c)}</span>`).join('');
+    return `
+      <div class="rechazo-info">
+        <div class="rechazo-header">⚠ Requiere correcciones</div>
+        ${campos ? `<div class="rechazo-chips">${campos}</div>` : ''}
+        ${r.rechazo_nota ? `<div class="rechazo-nota">"${esc(r.rechazo_nota)}"</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          ${corregirFn ? `<button class="btn-edit btn-aprobar" onclick="${corregirFn}">✏ Corregir</button>` : ''}
+          <button class="btn-edit btn-rechazar" onclick="eliminarMiRecurso('${tabla}','${r.id}')">🗑 Eliminar</button>
+        </div>
+      </div>`;
+  };
+
+  const rows = [
+    ...(camAll || []).map(c => `
+      <div class="truck-list-item" style="${c.aprobacion==='rechazada'?'border-left:3px solid var(--danger);':''}">
+        <div class="truck-list-item-info">
+          <div class="truck-list-item-name">${c.emoji || '🚛'} ${c.id} — ${c.tipo}</div>
+          <div class="truck-list-item-sub">${c.operador || '—'} · ${c.capacidad} ton</div>
+        </div>
+        ${_rechazoBadge(c, 'camiones', `editarCamionRechazado('${c.id}')`)}
+      </div>`),
+    ...(cusAll || []).map(c => `
+      <div class="truck-list-item" style="${c.aprobacion==='rechazada'?'border-left:3px solid var(--danger);':''}">
+        <div class="truck-list-item-info">
+          <div class="truck-list-item-name">👮 ${c.id} — ${esc(c.nombre)}</div>
+          <div class="truck-list-item-sub">${c.tipo} · ${c.disponibilidad || '—'}</div>
+        </div>
+        ${_rechazoBadge(c, 'custodios', null)}
+      </div>`),
+    ...(patAll || []).map(p => `
+      <div class="truck-list-item" style="${p.aprobacion==='rechazada'?'border-left:3px solid var(--danger);':''}">
+        <div class="truck-list-item-info">
+          <div class="truck-list-item-name">🏭 ${p.id} — ${esc(p.nombre)}</div>
+          <div class="truck-list-item-sub">${p.tipo}${p.area_m2 ? ' · ' + p.area_m2 + ' m²' : ''}</div>
+        </div>
+        ${_rechazoBadge(p, 'patios', null)}
+      </div>`),
+    ...(lavAll || []).map(l => `
+      <div class="truck-list-item" style="${l.aprobacion==='rechazada'?'border-left:3px solid var(--danger);':''}">
+        <div class="truck-list-item-info">
+          <div class="truck-list-item-name">🚿 ${l.id} — ${esc(l.nombre)}</div>
+          <div class="truck-list-item-sub">${(l.tipos_vehiculo || []).join(', ') || '—'}</div>
+        </div>
+        ${_rechazoBadge(l, 'lavados', null)}
+      </div>`),
+    ...(opAll || []).map(o => {
+      const n = [o.nombre, o.primer_apellido].filter(Boolean).join(' ');
+      return `
+        <div class="truck-list-item" style="${o.aprobacion==='rechazada'?'border-left:3px solid var(--danger);':''}">
+          <div class="truck-list-item-info">
+            <div class="truck-list-item-name">👷 ${o.id} — ${esc(n)}</div>
+            <div class="truck-list-item-sub">${o.puesto || '—'}</div>
+          </div>
+          ${_rechazoBadge(o, 'operadores', `editarOperadorRechazado('${o.id}')`)}
+        </div>`;
+    }),
   ];
 
-  if (!todos.length) { section.style.display = 'none'; return; }
+  if (!rows.length) { section.style.display = 'none'; return; }
 
   section.style.display = 'block';
   const titulo = section.querySelector('.section-title');
-  if (titulo) titulo.innerHTML = '⏳ Mis servicios en espera de aprobación';
-
-  list.innerHTML = todos.map(t => `
-    <div class="truck-list-item">
-      <div class="truck-list-item-info">
-        <div class="truck-list-item-name">${t.label}</div>
-        <div class="truck-list-item-sub">${t.sub}</div>
-      </div>
-      <span class="badge badge-busy" style="font-size:0.72rem">⏳ Pendiente</span>
-    </div>`).join('');
+  if (titulo) titulo.innerHTML = '⏳ Mis recursos pendientes o con correcciones';
+  list.innerHTML = rows.join('');
 }
 
-// Muestra las unidades pendientes de TODOS (solo superadmin)
-async function renderPendientes() {
-  if (currentUser.rol !== 'superadmin') return;
-
-  const section = document.getElementById('pendientes-section');
-  const list    = document.getElementById('pendientes-list');
-  list.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
-
-  const [{ data: camiones }, { data: custodios }, { data: patios }, { data: lavados }] = await Promise.all([
-    sb.from('camiones' ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
-    sb.from('custodios').select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
-    sb.from('patios'   ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
-    sb.from('lavados'  ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
-  ]);
-
-  const total = (camiones?.length || 0) + (custodios?.length || 0) + (patios?.length || 0) + (lavados?.length || 0);
-  if (!total) { section.style.display = 'none'; return; }
-
-  section.style.display = 'block';
-
-  const rowCamion = (c) => `
-    <div class="truck-list-item">
-      <div class="truck-list-item-info">
-        <div class="truck-list-item-name">${c.emoji || '🚛'} ${c.id} — ${c.tipo}</div>
-        <div class="truck-list-item-sub">${c.operador} · ${c.capacidad} ton · <em style="color:var(--text-muted)">${c.propietario?.nombre || '—'}</em></div>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        ${(c.archivos || []).length ? `<button class="btn-edit" onclick="verArchivos('${c.id}')">📎 Archivos</button>` : ''}
-        <button class="btn-edit btn-aprobar"  onclick="aprobarUnidad('${c.id}')">✓ Aprobar</button>
-        <button class="btn-edit btn-rechazar" onclick="rechazarUnidad('${c.id}')">✕ Rechazar</button>
-      </div>
-    </div>`;
-
-  const rowRecurso = (r, tipo, icon, label, sub) => `
-    <div class="truck-list-item">
-      <div class="truck-list-item-info">
-        <div class="truck-list-item-name">${icon} ${r.id} — ${esc(label)}</div>
-        <div class="truck-list-item-sub">${esc(sub)} · <em style="color:var(--text-muted)">${r.propietario?.nombre || '—'}</em></div>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <button class="btn-edit btn-aprobar"  onclick="aprobarRecurso('${tipo}','${r.id}')">✓ Aprobar</button>
-        <button class="btn-edit btn-rechazar" onclick="rechazarRecurso('${tipo}','${r.id}')">✕ Rechazar</button>
-      </div>
-    </div>`;
-
-  list.innerHTML = [
-    ...(camiones  || []).map(c => rowCamion(c)),
-    ...(custodios || []).map(c => rowRecurso(c, 'custodios', '👮', c.nombre, `${c.tipo} · ${c.disponibilidad || ''}`)),
-    ...(patios    || []).map(p => rowRecurso(p, 'patios',    '🏭', p.nombre, `${p.tipo}${p.area_m2 ? ' · ' + p.area_m2 + ' m²' : ''}`)),
-    ...(lavados   || []).map(l => rowRecurso(l, 'lavados',   '🚿', l.nombre, (l.tipos_vehiculo || []).join(', ') || '—')),
-  ].join('');
+async function eliminarMiRecurso(tabla, id) {
+  if (!confirm(`¿Eliminar ${id}? Esta acción no se puede deshacer.`)) return;
+  if (tabla === 'camiones') {
+    const { data: c } = await sb.from('camiones').select('archivos').eq('id', id).single();
+    if (c?.archivos?.length) await sb.storage.from('unidades').remove(c.archivos);
+  }
+  if (tabla === 'operadores') {
+    const { data: op } = await sb.from('operadores').select('foto_operador, foto_licencia').eq('id', id).single();
+    const files = [op?.foto_operador, op?.foto_licencia].filter(Boolean);
+    if (files.length) await sb.storage.from('operadores').remove(files);
+  }
+  const { error } = await sb.from(tabla).delete().eq('id', id).eq('propietario_id', currentUser.id);
+  if (error) { showToast('Error al eliminar', 'error'); return; }
+  showToast(`${id} eliminado`);
+  renderMisPendientes();
 }
 
+async function editarCamionRechazado(id) {
+  const { data: c } = await sb.from('camiones').select('*').eq('id', id).single();
+  if (!c) { showToast('No se encontró la unidad', 'error'); return; }
+
+  // Switch to camion tab
+  cambiarAdminTab('camion');
+
+  const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val ?? ''; };
+  const setSelect = (elId, val) => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const opt = Array.from(el.options).find(o => o.value === val || o.text === val);
+    if (opt) el.value = opt.value; else el.value = '';
+  };
+
+  setSelect('admin-tipo', c.tipo);
+  set('admin-cap',          c.capacidad);
+  set('admin-precio',       c.precio_dia);
+  set('admin-placas',       c.placas);
+  set('admin-dim',          c.dimensiones);
+  set('admin-version',      c.version);
+  set('admin-modelo-anio',  c.modelo_anio);
+  set('admin-num-serie',    c.num_serie);
+  set('admin-num-motor',    c.num_motor);
+  set('admin-num-economico',c.num_economico);
+  set('admin-tc',           c.tarjeta_circulacion);
+  set('admin-fecha-tc',     c.fecha_expedicion_tc);
+  set('admin-caat',         c.caat);
+  set('admin-vigencia-caat',c.vigencia_caat);
+  setSelect('admin-marca',       c.marca);
+  setSelect('admin-color',       c.color);
+  setSelect('admin-tipo-placa',  c.tipo_placa);
+  setSelect('admin-combustible', c.tipo_combustible);
+  setSelect('admin-estado',      c.estado);
+  setSelect('admin-tiempo',      c.tiempo_respuesta);
+  renderCargoChipsSelect('admin-tipo-carga', c.tipo_carga || []);
+  autoFillDimensiones('admin');
+
+  _camionRechazadoId = id;
+  const btn = document.getElementById('btn-agregar-camion');
+  if (btn) btn.textContent = '💾 Guardar correcciones y reenviar';
+
+  document.getElementById('admin-content-camion')?.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Keep for backward compatibility (called after approving a resource via Pendientes tab)
 async function aprobarRecurso(tabla, id) {
   const { data: recurso } = await sb.from(tabla).select('propietario_id, nombre').eq('id', id).single();
   const { error } = await sb.from(tabla).update({ aprobacion: 'aprobada' }).eq('id', id);
@@ -379,16 +464,9 @@ async function aprobarRecurso(tabla, id) {
       leido:   false,
     });
   }
-
-  renderAdmin(); renderPendientes();
+  renderAdmin();
+  renderAprobaciones();
   showToast(`✓ ${id} aprobado y publicado en el catálogo`);
-}
-
-async function rechazarRecurso(tabla, id) {
-  if (!confirm(`¿Rechazar ${id}? Se eliminará del sistema.`)) return;
-  await sb.from(tabla).delete().eq('id', id);
-  renderPendientes();
-  showToast(`${id} rechazado`);
 }
 
 // ── APROBACIÓN / ELIMINACIÓN ──────────────────────────
@@ -477,7 +555,16 @@ async function agregarCamion() {
 
   if (!cap) { alert('La capacidad es obligatoria.'); return; }
 
-  const prefijos = { 'Torton': 'T', 'Rabón': 'R', 'Full': 'F', 'Plataforma': 'P' };
+  const prefijos = {
+    'Torton': 'T', 'Torton caja seca': 'T', 'Torton plataforma': 'T',
+    'Rabón': 'R',
+    'Full': 'F', 'Full porta contenedor 40/20': 'F', 'Full plataforma': 'F',
+    'Plataforma': 'P', 'Plataforma de 3 ejes (sobrepeso)': 'P',
+    'Camioneta 1.5 ton caja seca': 'C', 'Camioneta 1.5 ton plataforma': 'C',
+    'Camioneta 3.5 ton caja seca': 'C', 'Camioneta 3.5 ton plataforma': 'C',
+    'Sencillo porta contenedor 40/20': 'S', 'Sencillo plataforma': 'S',
+    'Lowboy': 'L', 'Cama baja': 'B', 'HAZMAT': 'H',
+  };
   const letra = prefijos[tipo] || 'U';
   const { data: existentes } = await sb.from('camiones').select('id').like('id', `${letra}-%`);
   const maxNum = (existentes || []).reduce((max, c) => {
@@ -514,13 +601,26 @@ async function agregarCamion() {
     if (up) { archivos.push(up.path); imagenCaat = up.path; }
   }
 
-  const emojis = { 'Torton': '🚛', 'Rabón': '🚚', 'Full': '🚛', 'Plataforma': '🏗️' };
-  const { error } = await sb.from('camiones').insert({
-    id, tipo, capacidad: cap, operador: op || null, estado,
+  const emojis = {
+    'Torton': '🚛', 'Torton caja seca': '🚛', 'Torton plataforma': '🚛',
+    'Rabón': '🚚',
+    'Full': '🚛', 'Full porta contenedor 40/20': '🚛', 'Full plataforma': '🚛',
+    'Plataforma': '🏗️', 'Plataforma de 3 ejes (sobrepeso)': '🏗️',
+    'Camioneta 1.5 ton caja seca': '🚐', 'Camioneta 1.5 ton plataforma': '🚐',
+    'Camioneta 3.5 ton caja seca': '🚐', 'Camioneta 3.5 ton plataforma': '🚐',
+    'Sencillo porta contenedor 40/20': '🚛', 'Sencillo plataforma': '🚛',
+    'Lowboy': '🏗️', 'Cama baja': '🏗️', 'HAZMAT': '⚠️',
+  };
+
+  const isEdit = !!_camionRechazadoId;
+  const targetId = isEdit ? _camionRechazadoId : id;
+
+  const camionPayload = {
+    tipo, capacidad: cap, operador: op || null, estado,
     emoji: emojis[tipo] || '🚛',
-    propietario_id: propietarioId,
     archivos,
-    aprobacion:          esSuperAdmin ? 'aprobada' : 'pendiente',
+    aprobacion:          isEdit ? 'pendiente' : (esSuperAdmin ? 'aprobada' : 'pendiente'),
+    ...(isEdit && { rechazo_nota: null, rechazo_campos: null }),
     ...(placas         && { placas }),
     ...(dim            && { dimensiones: dim }),
     ...(tiempo         && { tiempo_respuesta: tiempo }),
@@ -541,8 +641,17 @@ async function agregarCamion() {
     caat:                g('admin-caat'),
     vigencia_caat:       document.getElementById('admin-vigencia-caat')?.value || null,
     imagen_caat:         imagenCaat,
-  });
-  if (error) { alert('Error: ' + (error.message || 'No se pudo agregar.')); return; }
+  };
+
+  let error;
+  if (isEdit) {
+    ({ error } = await sb.from('camiones').update(camionPayload).eq('id', targetId));
+  } else {
+    ({ error } = await sb.from('camiones').insert({
+      id: targetId, propietario_id: propietarioId, ...camionPayload,
+    }));
+  }
+  if (error) { alert('Error: ' + (error.message || 'No se pudo guardar.')); return; }
 
   if (!esSuperAdmin) {
     try {
@@ -573,8 +682,16 @@ async function agregarCamion() {
   });
   renderCargoChipsSelect('admin-tipo-carga', []);
 
+  // Reset rejected-truck edit mode
+  const btnAgregar = document.getElementById('btn-agregar-camion');
+  if (btnAgregar) btnAgregar.textContent = '➕ Enviar a aprobación';
+  _camionRechazadoId = null;
+
   await renderAdmin();
-  showToast(esSuperAdmin ? `✓ Unidad ${id} agregada` : `✓ Unidad ${id} enviada — recibirás confirmación por correo`);
+  const msg = isEdit
+    ? `✓ Unidad ${targetId} corregida y reenviada — un administrador la revisará`
+    : (esSuperAdmin ? `✓ Unidad ${targetId} agregada` : `✓ Unidad ${targetId} enviada — recibirás confirmación por correo`);
+  showToast(msg);
 }
 
 // ── CUSTODIOS (ADMIN) ─────────────────────────────────

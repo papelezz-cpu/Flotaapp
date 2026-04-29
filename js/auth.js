@@ -239,7 +239,10 @@ async function logout() {
   document.getElementById('login-error').textContent = 'Correo o contraseña incorrectos';
   document.getElementById('login-error').classList.remove('show');
 
-  // Volver al tab de login y mostrar overlay
+  // Reset all views to default so the next user starts clean
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+
   switchLoginTab('login');
   showLoginOverlay();
 }

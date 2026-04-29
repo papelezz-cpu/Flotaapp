@@ -1114,3 +1114,22 @@ body.light .op-foto-img { border-color: rgba(37,99,235,0.15); }
 body.light .ro-chip { border-color: rgba(0,0,0,0.15); background: #fff; color: #64748b; }
 body.light .ro-chip:has(input:checked) { border-color: #c53030; background: rgba(197,48,48,0.07); color: #c53030; }
 
+/* ── Rechazo info en tarjetas de empresa ─────────────── */
+.rechazo-info {
+  background: rgba(229,62,62,0.06);
+  border: 1.5px solid rgba(229,62,62,0.25);
+  border-radius: 10px; padding: 10px 13px; margin-top: 8px;
+}
+.rechazo-header {
+  font-size: 0.78rem; font-weight: 700; color: var(--danger, #e53e3e);
+  margin-bottom: 6px;
+}
+.rechazo-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+.rechazo-chip {
+  font-size: 0.72rem; padding: 2px 9px; border-radius: 12px;
+  background: rgba(229,62,62,0.12); color: var(--danger, #e53e3e);
+  border: 1px solid rgba(229,62,62,0.3);
+}
+.rechazo-nota { font-size: 0.78rem; color: var(--text-muted); font-style: italic; }
+body.light .rechazo-info { background: rgba(197,48,48,0.05); border-color: rgba(197,48,48,0.2); }
+
