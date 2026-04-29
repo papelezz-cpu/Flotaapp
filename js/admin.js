@@ -725,14 +725,13 @@ async function agregarCamion() {
   if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
   if (!esSuperAdmin) {
-    try {
-      const session = (await sb.auth.getSession()).data.session;
-      await fetch(`${FN_URL.replace('gestionar-usuario', 'enviar-notificacion')}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ camion: { id, tipo, operador: op, capacidad: cap, estado }, propietarioNombre: currentUser.nombre })
-      });
-    } catch (_) {}
+    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
+      user_id: sa.user_id, tipo: 'nueva_unidad_pendiente',
+      titulo:  'Nueva unidad pendiente de revisión',
+      mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta la unidad ${targetId} (${tipo}). Revísala en Pendientes.`,
+      leido:   false,
+    })));
   }
 
   // Limpiar formulario
@@ -825,6 +824,16 @@ async function agregarCustodio() {
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
   });
   if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
+
+  if (!esSuperAdmin) {
+    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
+      user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
+      titulo:  'Nuevo custodio pendiente de revisión',
+      mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta el custodio ${id} (${nombre}). Revísalo en Pendientes.`,
+      leido:   false,
+    })));
+  }
 
   ['ac-nombre','ac-desc','ac-precio','ac-certs'].forEach(i => {
     const el = document.getElementById(i); if (el) el.value = '';
@@ -958,6 +967,16 @@ async function agregarPatio() {
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
   });
   if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
+
+  if (!esSuperAdmin) {
+    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
+      user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
+      titulo:  'Nuevo patio pendiente de revisión',
+      mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta el patio ${id} (${nombre}). Revísalo en Pendientes.`,
+      leido:   false,
+    })));
+  }
 
   ['ap-nombre','ap-ubic','ap-area','ap-cap','ap-precio','ap-svcs'].forEach(i => {
     const el = document.getElementById(i); if (el) el.value = '';
@@ -1097,6 +1116,16 @@ async function agregarLavado() {
     aprobacion: currentUser.rol === 'superadmin' ? 'aprobada' : 'pendiente',
   });
   if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
+
+  if (currentUser.rol !== 'superadmin') {
+    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
+      user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
+      titulo:  'Nuevo servicio de lavado pendiente de revisión',
+      mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta el servicio ${id} (${nombre}). Revísalo en Pendientes.`,
+      leido:   false,
+    })));
+  }
 
   ['al-nombre','al-tipos-vehiculo','al-tipos-lavado','al-capacidad','al-ubic','al-horario','al-precio','al-desc']
     .forEach(i => { const el = document.getElementById(i); if (el) el.value = ''; });
