@@ -28,6 +28,29 @@ const DIM_DEFAULTS = {
   'HAZMAT':                             'Según unidad/permiso',
 };
 
+function _dbError(error) {
+  const msg = (error?.message || '').toLowerCase();
+  if (msg.includes('numeric field overflow') || msg.includes('out of range'))
+    return 'Un campo numérico tiene un valor demasiado grande (p.ej. el precio). Reduce el número e intenta de nuevo.';
+  if (msg.includes('invalid input syntax for type date') || msg.includes('date/time field'))
+    return 'Una de las fechas ingresadas no tiene el formato correcto. Usa el selector de fecha.';
+  if (msg.includes('invalid input syntax for type'))
+    return 'Uno de los campos tiene un formato incorrecto. Verifica que los números y fechas sean válidos.';
+  if (msg.includes('null value') || msg.includes('not-null') || msg.includes('violates not-null')) {
+    const col = error?.message?.match(/column "([^"]+)"/)?.[1];
+    return col ? `El campo "${col}" es obligatorio y no puede estar vacío.` : 'Falta un campo obligatorio.';
+  }
+  if (msg.includes('unique') || msg.includes('duplicate key'))
+    return 'Ya existe un registro con ese valor. Verifica que no estés duplicando datos.';
+  if (msg.includes('foreign key') || msg.includes('violates foreign key'))
+    return 'Referencia inválida: uno de los valores seleccionados no existe en el sistema.';
+  if (msg.includes('value too long') || msg.includes('character varying'))
+    return 'Uno de los campos de texto supera el límite de caracteres permitido.';
+  if (msg.includes('permission') || msg.includes('rls') || msg.includes('policy'))
+    return 'No tienes permiso para realizar esta acción.';
+  return error?.message || 'Error desconocido. Intenta de nuevo.';
+}
+
 async function renderAdmin() {
   const list = document.getElementById('admin-list');
   list.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando...</div>`;
@@ -293,7 +316,7 @@ async function guardarEdicion() {
   };
 
   const { error } = await sb.from('camiones').update(payload).eq('id', id);
-  if (error) { showToast('Error: ' + (error.message || 'No se pudo actualizar')); return; }
+  if (error) { showToast('No se pudo actualizar: ' + _dbError(error), 'error'); return; }
   closeEditarCamion();
   await renderAdmin();
   showToast(`✓ Unidad ${id} actualizada`);
@@ -651,7 +674,7 @@ async function agregarCamion() {
       id: targetId, propietario_id: propietarioId, ...camionPayload,
     }));
   }
-  if (error) { alert('Error: ' + (error.message || 'No se pudo guardar.')); return; }
+  if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
   if (!esSuperAdmin) {
     try {
@@ -753,7 +776,7 @@ async function agregarCustodio() {
     certificaciones: certs ? certs.split(',').map(s => s.trim()).filter(Boolean) : [],
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
   });
-  if (error) { showToast('Error: ' + (error.message || '')); return; }
+  if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
   ['ac-nombre','ac-desc','ac-precio','ac-certs'].forEach(i => {
     const el = document.getElementById(i); if (el) el.value = '';
@@ -793,7 +816,7 @@ async function guardarEdicionCustodio() {
     certificaciones: certs ? certs.split(',').map(s => s.trim()).filter(Boolean) : [],
     estado:          document.getElementById('ec-estado').value,
   }).eq('id', id);
-  if (error) { showToast('Error: ' + (error.message || '')); return; }
+  if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
   closeEditarCustodio();
   await renderAdminCustodios();
   showToast(`✓ Custodio ${id} actualizado`);
@@ -866,7 +889,7 @@ async function agregarPatio() {
     servicios: svcsRaw ? svcsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
   });
-  if (error) { showToast('Error: ' + (error.message || '')); return; }
+  if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
   ['ap-nombre','ap-ubic','ap-area','ap-cap','ap-precio','ap-svcs'].forEach(i => {
     const el = document.getElementById(i); if (el) el.value = '';
@@ -908,7 +931,7 @@ async function guardarEdicionPatio() {
     servicios:           svcsRaw ? svcsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
     estado:              document.getElementById('ep-estado').value,
   }).eq('id', id);
-  if (error) { showToast('Error: ' + (error.message || '')); return; }
+  if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
   closeEditarPatio();
   await renderAdminPatios();
   showToast(`✓ Patio ${id} actualizado`);
@@ -985,7 +1008,7 @@ async function agregarLavado() {
     propietario_id: propietarioId,
     aprobacion: currentUser.rol === 'superadmin' ? 'aprobada' : 'pendiente',
   });
-  if (error) { showToast('Error: ' + (error.message || '')); return; }
+  if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
   ['al-nombre','al-tipos-vehiculo','al-tipos-lavado','al-capacidad','al-ubic','al-horario','al-precio','al-desc']
     .forEach(i => { const el = document.getElementById(i); if (el) el.value = ''; });
@@ -1027,7 +1050,7 @@ async function guardarEdicionLavado() {
     precio_lavado:  parseFloat(document.getElementById('elav-precio').value)     || null,
     estado:         document.getElementById('elav-estado').value,
   }).eq('id', id);
-  if (error) { showToast('Error: ' + (error.message || '')); return; }
+  if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
   closeEditarLavado();
   await renderAdminLavados();
   showToast(`✓ Servicio ${id} actualizado`);
