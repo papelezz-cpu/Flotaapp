@@ -91,19 +91,57 @@ async function onNotifClick(id, tipo) {
     return;
   }
 
+  const goTo = (view, tabText, delay, scrollId) => {
+    const tab = [...tabs].find(t => t.textContent.trim() === tabText) || null;
+    showView(view, tab);
+    if (scrollId && delay) setTimeout(() => {
+      document.getElementById(scrollId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, delay);
+  };
+
+  // Empresa: el superadmin aprobó/rechazó un recurso → ir a panel Admin
+  if (tipo === 'recurso_aprobado') {
+    goTo('admin', 'Admin', 400, 'admin-list');
+    return;
+  }
+  if (tipo === 'recurso_rechazado') {
+    goTo('admin', 'Admin', 400, 'pendientes-section');
+    return;
+  }
+
+  // Superadmin: empresa envió nuevo recurso → ir a Pendientes
+  if (['nueva_unidad_pendiente','nuevo_recurso_pendiente'].includes(tipo)) {
+    goTo('pendientes', 'Pendientes', 0, null);
+    return;
+  }
+
+  // Acuerdo aprobado → reservaciones; rechazado → pedidos
+  if (tipo === 'acuerdo_aprobado') {
+    goTo('reservaciones', 'Reservaciones', 0, null);
+    return;
+  }
+  if (tipo === 'acuerdo_rechazado' || tipo === 'solicitud_rechazada') {
+    goTo('pedidos', 'Solicitudes', 0, null);
+    return;
+  }
+
+  // Nueva solicitud publicada → pedidos (para admins)
+  if (tipo === 'nueva_solicitud') {
+    goTo('pedidos', 'Solicitudes', 0, null);
+    return;
+  }
+
   if (tipo === 'revision_solicitud' || tipo === 'revision_acuerdo') {
-    const tab = [...tabs].find(t => t.textContent.trim() === 'Admin' || t.dataset.view === 'admin');
-    if (tab) showView('admin', tab);
-    setTimeout(() => {
-      const sec = document.getElementById('aprobaciones-section');
-      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 300);
-  } else if (tipo === 'reserva_pendiente' || tipo === 'reserva_aceptada' || tipo === 'reserva_rechazada') {
-    const tab = [...tabs].find(t => t.textContent.trim() === 'Reservaciones');
-    if (tab) showView('reservaciones', tab);
-  } else if (['nueva_oferta','respuesta_oferta','respuesta_contra_oferta','oferta_no_seleccionada'].includes(tipo)) {
-    const tab = [...tabs].find(t => t.textContent.trim() === 'Solicitudes');
-    if (tab) showView('pedidos', tab);
+    goTo('admin', 'Admin', 300, 'aprobaciones-section');
+    return;
+  }
+  if (tipo === 'reserva_pendiente' || tipo === 'reserva_aceptada' || tipo === 'reserva_rechazada') {
+    goTo('reservaciones', 'Reservaciones', 0, null);
+    return;
+  }
+  if (['nueva_oferta','respuesta_oferta','respuesta_contra_oferta','oferta_no_seleccionada'].includes(tipo)) {
+    goTo('pedidos', 'Solicitudes', 0, null);
+    return;
   }
 }
 

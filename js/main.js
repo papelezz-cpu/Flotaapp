@@ -11,13 +11,7 @@ function showToast(msg, tipo = 'ok') {
 // ── INICIALIZACIÓN (llamada tras login) ───────────────
 // Solo refresca la vista activa; el resto ya cargó en el arranque público
 function init() {
-  if (currentUser.rol === 'superadmin') {
-    const tabPendientes = document.querySelector('.nav-tab[onclick*="pendientes"]');
-    showView('pendientes', tabPendientes);
-  } else {
-    const tabPedidos = document.querySelectorAll('.nav-tab')[0];
-    showView('pedidos', tabPedidos);
-  }
+  showView('home', null);
   actualizarBadgeChat();
 }
 
@@ -44,12 +38,8 @@ function init() {
   // Solo continuar si hay sesión activa
   if (!currentUser.id) return;
 
-  // Cargar vista principal y notificaciones
-  if (currentUser.rol === 'superadmin') {
-    renderAprobaciones();
-  } else {
-    renderPedidos();
-  }
+  // Cargar home y notificaciones
+  renderHome();
   loadNotificaciones();
   actualizarBadgeChat();
 

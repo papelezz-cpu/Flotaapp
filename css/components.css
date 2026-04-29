@@ -1149,3 +1149,97 @@ body.light .ro-chip:has(input:checked) { border-color: #c53030; background: rgba
 body.light .rechazo-banner { background: rgba(197,48,48,0.06); border-color: rgba(197,48,48,0.25); }
 body.light .rechazo-info   { background: rgba(197,48,48,0.05); border-color: rgba(197,48,48,0.2); }
 
+/* ── HOME PAGE ──────────────────────────────────────── */
+.home-page {
+  min-height: calc(100vh - 64px);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 0 16px 48px;
+}
+.home-hero {
+  text-align: center;
+  padding: 48px 20px 32px;
+}
+.home-logo-img {
+  height: 52px; margin-bottom: 12px; opacity: 0.9;
+}
+.home-greeting {
+  font-size: 2rem; font-weight: 800;
+  color: var(--text-main); margin: 0 0 8px;
+}
+.home-sub {
+  font-size: 1rem; color: var(--text-muted); margin: 0;
+}
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 16px; width: 100%; max-width: 940px;
+}
+.home-card {
+  border-radius: 20px; padding: 28px 16px 22px;
+  cursor: pointer; text-align: center;
+  position: relative; overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid rgba(255,255,255,0.08);
+  user-select: none;
+}
+.home-card:hover  { transform: translateY(-6px); box-shadow: 0 20px 48px rgba(0,0,0,0.35); }
+.home-card:active { transform: translateY(-2px); }
+.hc-bg-emoji {
+  position: absolute; font-size: 7rem; opacity: 0.09;
+  top: -12px; right: -12px; pointer-events: none; line-height: 1;
+}
+.hc-icon  { font-size: 2.8rem; margin-bottom: 10px; position: relative; }
+.hc-title {
+  font-size: 0.92rem; font-weight: 700; color: #fff;
+  position: relative; line-height: 1.25;
+}
+.hc-desc  {
+  font-size: 0.72rem; color: rgba(255,255,255,0.72);
+  margin-top: 5px; position: relative;
+}
+.hc-badge {
+  display: none; margin-top: 10px;
+  background: rgba(255,255,255,0.22); border-radius: 12px;
+  padding: 3px 10px; font-size: 0.72rem; font-weight: 700;
+  color: #fff; position: relative;
+}
+/* Card gradients */
+.hc-blue   { background: linear-gradient(135deg,#1e3a8a,#2563eb); }
+.hc-teal   { background: linear-gradient(135deg,#0d4f4f,#0d9488); }
+.hc-amber  { background: linear-gradient(135deg,#78350f,#d97706); }
+.hc-red    { background: linear-gradient(135deg,#7f1d1d,#dc2626); }
+.hc-purple { background: linear-gradient(135deg,#3b0764,#7c3aed); }
+.hc-green  { background: linear-gradient(135deg,#14532d,#16a34a); }
+.hc-slate  { background: linear-gradient(135deg,#1e293b,#475569); }
+.hc-orange { background: linear-gradient(135deg,#431407,#ea580c); }
+
+/* Diff de edición en aprobaciones */
+.apr-edicion-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(234,179,8,0.15); color: #f59e0b;
+  border: 1px solid rgba(234,179,8,0.3);
+  border-radius: 8px; padding: 3px 10px;
+  font-size: 0.72rem; font-weight: 700;
+}
+.apr-diff {
+  background: rgba(234,179,8,0.06); border: 1px solid rgba(234,179,8,0.2);
+  border-radius: 10px; padding: 10px 14px; margin: 8px 0;
+}
+.apr-diff-title {
+  font-size: 0.72rem; font-weight: 700; color: #f59e0b; margin-bottom: 8px;
+}
+.apr-diff-row {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: 0.78rem; margin-bottom: 4px;
+}
+.apr-diff-field  { font-weight: 600; color: var(--text-main); min-width: 110px; }
+.apr-diff-antes  { color: var(--red,#ef4444); text-decoration: line-through; }
+.apr-diff-flecha { color: var(--text-muted); }
+.apr-diff-nuevo  { color: var(--green,#22c55e); font-weight: 600; }
+
+@media (max-width: 500px) {
+  .home-grid { grid-template-columns: repeat(2,1fr); }
+  .home-greeting { font-size: 1.5rem; }
+  .home-hero { padding: 32px 16px 24px; }
+}
+

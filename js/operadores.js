@@ -97,6 +97,7 @@ function _operadorCardHTML(op) {
       </div>
       <div class="op-actions">
         ${licFotoBtn}
+        <button class="btn-edit" onclick="editarOperadorAprobado('${op.id}')">✏ Editar</button>
         <button class="btn-edit btn-rechazar" onclick="eliminarOperador('${op.id}')">🗑</button>
       </div>
     </div>`;
@@ -125,6 +126,14 @@ function _operadorCardRechazadoHTML(op) {
         <button class="btn-edit btn-aprobar" onclick="editarOperadorRechazado('${op.id}')">✏ Corregir</button>
       </div>
     </div>`;
+}
+
+async function editarOperadorAprobado(id) {
+  // Igual que editarOperadorRechazado pero marca modo edición-aprobación
+  await editarOperadorRechazado(id);
+  // Cambiar el texto del botón para que quede claro que es una edición
+  const btn = document.querySelector('#admin-content-operador .btn-add');
+  if (btn) btn.textContent = '✏ Guardar cambios y enviar a aprobación';
 }
 
 async function editarOperadorRechazado(id) {
@@ -290,9 +299,22 @@ async function agregarOperador() {
   };
 
   let error;
+  let esEdicionAprobado = false;
   if (isEdit) {
+    const { data: anterior } = await sb.from('operadores').select('*').eq('id', id).single();
+    const esAprobado = anterior?.aprobacion === 'aprobada';
+    esEdicionAprobado = esAprobado;
+    const camposEditados = esAprobado
+      ? Object.keys(payload).filter(k => JSON.stringify(anterior?.[k]) !== JSON.stringify(payload[k]))
+      : [];
     const { error: e } = await sb.from('operadores').update({
-      ...payload, aprobacion: 'pendiente', rechazo_nota: null, rechazo_campos: null,
+      ...payload,
+      aprobacion:        'pendiente',
+      rechazo_nota:      null,
+      rechazo_campos:    null,
+      es_edicion:        esAprobado,
+      campos_editados:   esAprobado ? camposEditados : null,
+      snapshot_anterior: esAprobado ? anterior : null,
     }).eq('id', id);
     error = e;
   } else {
@@ -306,9 +328,11 @@ async function agregarOperador() {
   if (supers?.length) {
     await sb.from('notificaciones').insert(supers.map(s => ({
       user_id: s.user_id,
-      tipo:    'operador_pendiente',
-      titulo:  '👷 Nuevo operador por aprobar',
-      mensaje: `${currentUser.nombre} registró al operador ${nombre} (${id}). Revísalo en el panel de aprobaciones.`,
+      tipo:    'nuevo_recurso_pendiente',
+      titulo:  esEdicionAprobado ? '✏️ Operador editado — revisión pendiente' : '👷 Nuevo operador por aprobar',
+      mensaje: esEdicionAprobado
+        ? `La empresa ${currentUser.nombre} editó al operador ${nombre} (${id}). Revisa los cambios en Pendientes.`
+        : `${currentUser.nombre} registró al operador ${nombre} (${id}). Revísalo en el panel de aprobaciones.`,
       leido:   false,
     })));
   }

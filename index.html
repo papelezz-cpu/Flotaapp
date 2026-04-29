@@ -46,7 +46,7 @@
 <!-- ══ HEADER ══════════════════════════════════════════ -->
 <header>
   <div class="header-inner">
-    <div class="logo" onclick="showView('pedidos', document.querySelectorAll('.nav-tab')[0])" style="cursor:pointer">
+    <div class="logo" onclick="showView('home', null)" style="cursor:pointer">
       <img src="icon.svg" class="logo-icon" alt="PortGo">
       PortGo
     </div>
@@ -55,7 +55,7 @@
       <button class="nav-tab"                 onclick="showView('reservaciones', this)">Reservaciones</button>
       <button class="nav-tab"                 onclick="showView('cliente', this)">Catálogo</button>
       <button class="nav-tab admin-only"      onclick="showView('admin', this)">Admin</button>
-      <button class="nav-tab superadmin-only" onclick="showView('pendientes', this)">⏳ Pendientes</button>
+      <button class="nav-tab superadmin-only" onclick="showView('pendientes', this)">Pendientes</button>
       <button class="nav-tab superadmin-only" onclick="showView('usuarios', this)">Usuarios</button>
     </div>
     <div class="header-right">
@@ -100,6 +100,18 @@
   </div>
 </header>
 
+<!-- ══ VISTA: HOME ═════════════════════════════════════ -->
+<div id="view-home" class="view active">
+  <div class="home-page">
+    <div class="home-hero">
+      <img src="icon.svg" class="home-logo-img" alt="PortGo">
+      <h1 class="home-greeting" id="home-greeting">Bienvenido 👋</h1>
+      <p class="home-sub">¿Qué quieres hacer hoy?</p>
+    </div>
+    <div class="home-grid" id="home-grid"></div>
+  </div>
+</div>
+
 <!-- ══ VISTA: CATÁLOGO DE EMPRESAS ══════════════════════ -->
 <div id="view-cliente" class="view">
   <div class="page">
@@ -138,7 +150,7 @@
 </div>
 
 <!-- ══ VISTA: PEDIDOS ══════════════════════════════════ -->
-<div id="view-pedidos" class="view active">
+<div id="view-pedidos" class="view">
   <div class="page">
     <div class="section-title">📋 Solicitudes de servicio</div>
 

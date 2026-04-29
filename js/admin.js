@@ -325,11 +325,38 @@ async function guardarEdicion() {
     vigencia_caat:       g('editar-vigencia-caat'),
   };
 
-  const { error } = await sb.from('camiones').update(payload).eq('id', id);
+  const esSuperAdmin = currentUser.rol === 'superadmin';
+  let updatePayload = payload;
+
+  if (!esSuperAdmin) {
+    // Fetch estado actual para calcular diff
+    const { data: anterior } = await sb.from('camiones').select('*').eq('id', id).single();
+    const camposEditados = Object.keys(payload).filter(k =>
+      JSON.stringify(anterior?.[k]) !== JSON.stringify(payload[k])
+    );
+    updatePayload = {
+      ...payload,
+      aprobacion:        'pendiente',
+      es_edicion:        true,
+      campos_editados:   camposEditados,
+      snapshot_anterior: anterior,
+    };
+  }
+
+  const { error } = await sb.from('camiones').update(updatePayload).eq('id', id);
   if (error) { showToast('No se pudo actualizar: ' + _dbError(error), 'error'); return; }
+  if (!esSuperAdmin) {
+    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
+      user_id: sa.user_id, tipo: 'nueva_unidad_pendiente',
+      titulo:  'Unidad editada — revisión pendiente',
+      mensaje: `La empresa ${esc(currentUser.nombre || '')} editó la unidad ${id}. Revisa los cambios en Pendientes.`,
+      leido:   false,
+    })));
+  }
   closeEditarCamion();
   await renderAdmin();
-  showToast(`✓ Unidad ${id} actualizada`);
+  showToast(esSuperAdmin ? `✓ Unidad ${id} actualizada` : `✓ Cambios enviados — pendientes de aprobación`);
 }
 
 // ── PENDIENTES (EMPRESA) ──────────────────────────────
@@ -484,7 +511,7 @@ async function editarCamionRechazado(id) {
 // Keep for backward compatibility (called after approving a resource via Pendientes tab)
 async function aprobarRecurso(tabla, id) {
   const { data: recurso } = await sb.from(tabla).select('propietario_id, nombre').eq('id', id).single();
-  const { error } = await sb.from(tabla).update({ aprobacion: 'aprobada' }).eq('id', id);
+  const { error } = await sb.from(tabla).update({ aprobacion: 'aprobada', es_edicion: false, campos_editados: null, snapshot_anterior: null }).eq('id', id);
   if (error) { showToast('Error al aprobar'); return; }
 
   if (recurso?.propietario_id) {
@@ -819,7 +846,7 @@ function closeEditarCustodio() {
 async function guardarEdicionCustodio() {
   const id = document.getElementById('ec-id').value;
   const certs = document.getElementById('ec-certs').value.trim();
-  const { error } = await sb.from('custodios').update({
+  const payload = {
     nombre:          document.getElementById('ec-nombre').value.trim(),
     tipo:            document.getElementById('ec-tipo').value,
     descripcion:     document.getElementById('ec-desc').value.trim() || null,
@@ -827,11 +854,29 @@ async function guardarEdicionCustodio() {
     precio_dia:      parseFloat(document.getElementById('ec-precio').value) || null,
     certificaciones: certs ? certs.split(',').map(s => s.trim()).filter(Boolean) : [],
     estado:          document.getElementById('ec-estado').value,
-  }).eq('id', id);
+  };
+  const esSA = currentUser.rol === 'superadmin';
+  let upd = payload;
+  if (!esSA) {
+    const { data: ant } = await sb.from('custodios').select('*').eq('id', id).single();
+    upd = { ...payload, aprobacion:'pendiente', es_edicion:true,
+      campos_editados: Object.keys(payload).filter(k => JSON.stringify(ant?.[k]) !== JSON.stringify(payload[k])),
+      snapshot_anterior: ant };
+  }
+  const { error } = await sb.from('custodios').update(upd).eq('id', id);
   if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
+  if (!esSA) {
+    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
+      user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
+      titulo:  'Custodio editado — revisión pendiente',
+      mensaje: `La empresa ${esc(currentUser.nombre || '')} editó el custodio ${id}. Revisa los cambios en Pendientes.`,
+      leido:   false,
+    })));
+  }
   closeEditarCustodio();
   await renderAdminCustodios();
-  showToast(`✓ Custodio ${id} actualizado`);
+  showToast(esSA ? `✓ Custodio ${id} actualizado` : `✓ Cambios enviados — pendientes de aprobación`);
 }
 
 async function eliminarCustodio(id) {
@@ -935,20 +980,38 @@ function closeEditarPatio() {
 async function guardarEdicionPatio() {
   const id = document.getElementById('ep-id').value;
   const svcsRaw = document.getElementById('ep-svcs').value.trim();
-  const { error } = await sb.from('patios').update({
+  const payload = {
     nombre:              document.getElementById('ep-nombre').value.trim(),
     tipo:                document.getElementById('ep-tipo').value,
-    ubicacion:           document.getElementById('ep-ubic').value.trim()   || null,
-    area_m2:             parseFloat(document.getElementById('ep-area').value)  || null,
-    capacidad_vehiculos: parseInt(document.getElementById('ep-cap').value)     || null,
+    ubicacion:           document.getElementById('ep-ubic').value.trim()    || null,
+    area_m2:             parseFloat(document.getElementById('ep-area').value)   || null,
+    capacidad_vehiculos: parseInt(document.getElementById('ep-cap').value)      || null,
     precio_dia:          parseFloat(document.getElementById('ep-precio').value) || null,
     servicios:           svcsRaw ? svcsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
     estado:              document.getElementById('ep-estado').value,
-  }).eq('id', id);
+  };
+  const esSA = currentUser.rol === 'superadmin';
+  let upd = payload;
+  if (!esSA) {
+    const { data: ant } = await sb.from('patios').select('*').eq('id', id).single();
+    upd = { ...payload, aprobacion:'pendiente', es_edicion:true,
+      campos_editados: Object.keys(payload).filter(k => JSON.stringify(ant?.[k]) !== JSON.stringify(payload[k])),
+      snapshot_anterior: ant };
+  }
+  const { error } = await sb.from('patios').update(upd).eq('id', id);
   if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
+  if (!esSA) {
+    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
+      user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
+      titulo:  'Patio editado — revisión pendiente',
+      mensaje: `La empresa ${esc(currentUser.nombre || '')} editó el patio ${id}. Revisa los cambios en Pendientes.`,
+      leido:   false,
+    })));
+  }
   closeEditarPatio();
   await renderAdminPatios();
-  showToast(`✓ Patio ${id} actualizado`);
+  showToast(esSA ? `✓ Patio ${id} actualizado` : `✓ Cambios enviados — pendientes de aprobación`);
 }
 
 async function eliminarPatio(id) {
@@ -1056,7 +1119,7 @@ async function guardarEdicionLavado() {
   const id = document.getElementById('elav-id').value;
   const tiposVehRaw = document.getElementById('elav-tipos-vehiculo').value.trim();
   const tiposLavRaw = document.getElementById('elav-tipos-lavado').value.trim();
-  const { error } = await sb.from('lavados').update({
+  const payload = {
     nombre:         document.getElementById('elav-nombre').value.trim(),
     tipos_vehiculo: tiposVehRaw ? tiposVehRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
     tipos_lavado:   tiposLavRaw ? tiposLavRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
@@ -1065,11 +1128,29 @@ async function guardarEdicionLavado() {
     horario:        document.getElementById('elav-horario').value.trim()         || null,
     precio_lavado:  parseFloat(document.getElementById('elav-precio').value)     || null,
     estado:         document.getElementById('elav-estado').value,
-  }).eq('id', id);
+  };
+  const esSA = currentUser.rol === 'superadmin';
+  let upd = payload;
+  if (!esSA) {
+    const { data: ant } = await sb.from('lavados').select('*').eq('id', id).single();
+    upd = { ...payload, aprobacion:'pendiente', es_edicion:true,
+      campos_editados: Object.keys(payload).filter(k => JSON.stringify(ant?.[k]) !== JSON.stringify(payload[k])),
+      snapshot_anterior: ant };
+  }
+  const { error } = await sb.from('lavados').update(upd).eq('id', id);
   if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
+  if (!esSA) {
+    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
+      user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
+      titulo:  'Servicio de lavado editado — revisión pendiente',
+      mensaje: `La empresa ${esc(currentUser.nombre || '')} editó el servicio de lavado ${id}. Revisa los cambios en Pendientes.`,
+      leido:   false,
+    })));
+  }
   closeEditarLavado();
   await renderAdminLavados();
-  showToast(`✓ Servicio ${id} actualizado`);
+  showToast(esSA ? `✓ Servicio ${id} actualizado` : `✓ Cambios enviados — pendientes de aprobación`);
 }
 
 async function eliminarLavado(id) {
