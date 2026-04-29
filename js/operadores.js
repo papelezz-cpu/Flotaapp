@@ -165,8 +165,9 @@ async function editarOperadorRechazado(id) {
     if (el && op[field]) el.value = op[field];
   });
 
-  if (op.foto_operador) document.getElementById('op-foto-preview').innerHTML = `<img src="${esc(op.foto_operador)}" class="op-upload-preview" alt="foto actual">`;
-  if (op.foto_licencia) document.getElementById('op-lic-preview').innerHTML  = `<img src="${esc(op.foto_licencia)}"  class="op-upload-preview" alt="licencia actual">`;
+  // No mostrar imágenes previas — se deben subir de nuevo obligatoriamente
+  document.getElementById('op-foto-preview').innerHTML = '';
+  document.getElementById('op-lic-preview').innerHTML  = '';
 
   // Mostrar banner con motivo de rechazo
   const btn = document.querySelector('#admin-content-operador .btn-add');
@@ -241,12 +242,17 @@ async function agregarOperador() {
     : currentUser.id;
   if (!propietarioId) { showToast('Selecciona una empresa propietaria', 'error'); restore(); return; }
 
+  // Validar archivos obligatorios
+  const fotoFile = document.getElementById('op-foto-file')?.files?.[0];
+  const licFile  = document.getElementById('op-lic-file')?.files?.[0];
+  if (!fotoFile) { showToast('Debes adjuntar la foto del operador', 'error'); restore(); return; }
+  if (!licFile)  { showToast('Debes adjuntar la foto de la licencia de conducir', 'error'); restore(); return; }
+
   const isEdit = !!_operadorEditId;
   const id = isEdit ? _operadorEditId : await _autoIdOperador();
 
   // Subir foto del operador
   let fotoOperadorUrl = null;
-  const fotoFile = document.getElementById('op-foto-file')?.files?.[0];
   if (fotoFile) {
     const ext  = fotoFile.name.split('.').pop();
     const path = `${propietarioId}/${id}/foto_${Date.now()}.${ext}`;
@@ -259,7 +265,6 @@ async function agregarOperador() {
 
   // Subir foto de licencia
   let fotoLicenciaUrl = null;
-  const licFile = document.getElementById('op-lic-file')?.files?.[0];
   if (licFile) {
     const ext  = licFile.name.split('.').pop();
     const path = `${propietarioId}/${id}/licencia_${Date.now()}.${ext}`;

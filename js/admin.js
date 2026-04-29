@@ -616,6 +616,16 @@ async function agregarCamion() {
   const _done = _btnLoading('btn-agregar-camion');
   if (!cap) { _done(); alert('La capacidad es obligatoria.'); return; }
 
+  // Validar archivos obligatorios
+  const _fotosFiles = Array.from(document.getElementById('admin-fotos').files || []);
+  const _docsFiles  = Array.from(document.getElementById('admin-docs').files  || []);
+  const _tcFileChk  = document.getElementById('admin-img-tc')?.files?.[0];
+  const _caatFileChk= document.getElementById('admin-img-caat')?.files?.[0];
+  if (!_fotosFiles.length) { _done(); showToast('Debes adjuntar al menos una foto de la unidad', 'error'); return; }
+  if (!_docsFiles.length)  { _done(); showToast('Debes adjuntar al menos un documento de la unidad', 'error'); return; }
+  if (!_tcFileChk)         { _done(); showToast('Debes adjuntar la imagen de la Tarjeta de Circulación', 'error'); return; }
+  if (!_caatFileChk)       { _done(); showToast('Debes adjuntar la imagen del CAAT', 'error'); return; }
+
   const prefijos = {
     'Torton': 'T', 'Torton caja seca': 'T', 'Torton plataforma': 'T',
     'Rabón': 'R',
