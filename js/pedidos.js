@@ -6,6 +6,7 @@ let pedidoParaOfertar  = null;   // pedido sobre el que el admin ofertará
 let _pendingOferta     = null;   // oferta en espera de confirmar detalles
 let _pendingPedido     = null;   // pedido en espera de confirmar detalles
 let _filtroTipo        = 'todos';
+let _pedidosMode       = 'lista'; // 'solicitar' | 'lista'
 
 const TIPO_EMOJI = {
   Torton:'🚛', 'Torton caja seca':'🚛', 'Torton plataforma':'🚛',
@@ -39,18 +40,25 @@ async function renderPedidos() {
   const container = document.getElementById('pedidos-list');
   container.innerHTML = skeletonList(3);
 
-  // Botones de servicio: solo para clientes logueados
-  const btnServ = document.getElementById('ped-serv-btns');
-  if (btnServ) {
-    btnServ.style.display = (currentUser.id && currentUser.rol === 'cliente') ? 'grid' : 'none';
-  }
-  // Barra de filtros: para cualquier usuario logueado
+  // Botones de servicio / barra de filtros según modo
+  const btnServ   = document.getElementById('ped-serv-btns');
   const filtrosBar = document.getElementById('ped-filtros-bar');
+  const esCliente = currentUser.id && currentUser.rol === 'cliente';
+
+  if (esCliente && _pedidosMode === 'solicitar') {
+    // Modo "Solicitar servicio": solo mostrar los 4 botones, sin lista
+    if (btnServ)    btnServ.style.display    = 'grid';
+    if (filtrosBar) filtrosBar.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  // Modo lista (admins, superadmins, o cliente en "Mis solicitudes")
+  if (btnServ)    btnServ.style.display    = 'none';
   if (filtrosBar) filtrosBar.style.display = currentUser.id ? '' : 'none';
 
   // Fetch pedidos + ofertas en paralelo
   // Clientes solo ven pedidos activos (nunca acordado/cancelado)
-  const esCliente = currentUser.id && currentUser.rol === 'cliente';
   let pedidosQ = sb.from('pedidos').select('*').order('created_at', { ascending: false });
   // Clientes: ven públicos (abierto/en_negociacion) + los suyos en cualquier estado activo
   // La RLS ya permite esto: (admin) OR (estado público) OR (cliente_id = auth.uid())
@@ -530,6 +538,7 @@ async function crearPedido() {
   });
   actualizarSubtipoPedido();
 
+  _pedidosMode = 'lista';
   await renderPedidos();
   showToast('✓ Solicitud enviada — un administrador la revisará pronto');
 }

@@ -41,8 +41,8 @@ function renderHome() {
 
   const C = {
     cliente: [
-      { e:'🚛', bg:'hc-blue',   t:'Solicitar servicio',     d:'Transporte, custodia y más',      fn:`showView('pedidos',null)` },
-      { e:'📋', bg:'hc-slate',  t:'Mis solicitudes',         d:'Revisa el estado de tus pedidos', fn:`showView('pedidos',null)` },
+      { e:'🚛', bg:'hc-blue',   t:'Solicitar servicio',     d:'Transporte, custodia y más',      fn:`_pedidosMode='solicitar';showView('pedidos',null)` },
+      { e:'📋', bg:'hc-slate',  t:'Mis solicitudes',         d:'Revisa el estado de tus pedidos', fn:`_pedidosMode='lista';showView('pedidos',null)` },
       { e:'📚', bg:'hc-teal',   t:'Catálogo',                d:'Empresas verificadas',            fn:`showView('cliente',null)` },
       { e:'🗓️', bg:'hc-purple', t:'Reservaciones',           d:'Tus reservas activas',            fn:`showView('reservaciones',null)` },
     ],
