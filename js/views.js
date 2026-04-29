@@ -22,9 +22,9 @@ function showView(v, btn) {
 }
 
 function toggleMenu() {
-  document.getElementById('btn-hamburger').classList.toggle('open');
-  document.querySelector('.nav-tabs').classList.toggle('open');
-  document.getElementById('menu-backdrop').classList.toggle('open');
+  document.getElementById('btn-hamburger')?.classList.toggle('open');
+  document.querySelector('.nav-tabs')?.classList.toggle('open');
+  document.getElementById('menu-backdrop')?.classList.toggle('open');
 }
 
 // ── HOME PAGE ─────────────────────────────────────────
@@ -41,13 +41,13 @@ function renderHome() {
 
   const C = {
     cliente: [
-      { e:'🚛', bg:'hc-blue',   t:'Solicitar servicio',     d:'Transporte, custodia y más',      fn:`showView('pedidos',_navTab('pedidos'))` },
-      { e:'📋', bg:'hc-slate',  t:'Mis solicitudes',         d:'Revisa el estado de tus pedidos', fn:`showView('pedidos',_navTab('pedidos'))` },
-      { e:'📚', bg:'hc-teal',   t:'Catálogo',                d:'Empresas verificadas',            fn:`showView('cliente',_navTab('cliente'))` },
-      { e:'🗓️', bg:'hc-purple', t:'Reservaciones',           d:'Tus reservas activas',            fn:`showView('reservaciones',_navTab('reservaciones'))` },
+      { e:'🚛', bg:'hc-blue',   t:'Solicitar servicio',     d:'Transporte, custodia y más',      fn:`showView('pedidos',null)` },
+      { e:'📋', bg:'hc-slate',  t:'Mis solicitudes',         d:'Revisa el estado de tus pedidos', fn:`showView('pedidos',null)` },
+      { e:'📚', bg:'hc-teal',   t:'Catálogo',                d:'Empresas verificadas',            fn:`showView('cliente',null)` },
+      { e:'🗓️', bg:'hc-purple', t:'Reservaciones',           d:'Tus reservas activas',            fn:`showView('reservaciones',null)` },
     ],
     admin: [
-      { e:'📋', bg:'hc-blue',   t:'Solicitudes',   d:'Ofertas y pedidos activos',        fn:`showView('pedidos',_navTab('pedidos'))` },
+      { e:'📋', bg:'hc-blue',   t:'Solicitudes',   d:'Ofertas y pedidos activos',        fn:`showView('pedidos',null)` },
       { e:'🚛', bg:'hc-slate',  t:'Mis unidades',  d:'Gestiona tu flota de camiones',    fn:`_irAdmin('camion')` },
       { e:'👷', bg:'hc-amber',  t:'Operadores',    d:'Personal de conducción',           fn:`_irAdmin('operador')` },
       { e:'👮', bg:'hc-teal',   t:'Custodios',     d:'Servicios de seguridad',           fn:`_irAdmin('custodio')` },
@@ -55,11 +55,11 @@ function renderHome() {
       { e:'🚿', bg:'hc-green',  t:'Lavados',       d:'Limpieza vehicular',               fn:`_irAdmin('lavado')` },
     ],
     superadmin: [
-      { e:'✅', bg:'hc-red',    t:'Por aprobar',   d:'Solicitudes y recursos pendientes', fn:`showView('pendientes',_navTab('pendientes'))`, badge:'home-apr-badge' },
-      { e:'👥', bg:'hc-blue',   t:'Usuarios',      d:'Gestión de cuentas',               fn:`showView('usuarios',_navTab('usuarios'))` },
-      { e:'📋', bg:'hc-slate',  t:'Solicitudes',   d:'Pedidos en el sistema',            fn:`showView('pedidos',_navTab('pedidos'))` },
-      { e:'📚', bg:'hc-teal',   t:'Catálogo',      d:'Directorio de proveedores',        fn:`showView('cliente',_navTab('cliente'))` },
-      { e:'🗓️', bg:'hc-purple', t:'Reservaciones', d:'Reservas activas',                 fn:`showView('reservaciones',_navTab('reservaciones'))` },
+      { e:'✅', bg:'hc-red',    t:'Por aprobar',   d:'Solicitudes y recursos pendientes', fn:`showView('pendientes',null)`, badge:'home-apr-badge' },
+      { e:'👥', bg:'hc-blue',   t:'Usuarios',      d:'Gestión de cuentas',               fn:`showView('usuarios',null)` },
+      { e:'📋', bg:'hc-slate',  t:'Solicitudes',   d:'Pedidos en el sistema',            fn:`showView('pedidos',null)` },
+      { e:'📚', bg:'hc-teal',   t:'Catálogo',      d:'Directorio de proveedores',        fn:`showView('cliente',null)` },
+      { e:'🗓️', bg:'hc-purple', t:'Reservaciones', d:'Reservas activas',                 fn:`showView('reservaciones',null)` },
     ],
   };
 
@@ -81,7 +81,7 @@ function _navTab(view) {
 }
 
 function _irAdmin(tab) {
-  showView('admin', _navTab('admin'));
+  showView('admin', null);
   setTimeout(() => cambiarAdminTab(tab), 150);
 }
 

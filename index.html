@@ -50,14 +50,6 @@
       <img src="icon.svg" class="logo-icon" alt="PortGo">
       PortGo
     </div>
-    <div class="nav-tabs">
-      <button class="nav-tab active"          onclick="showView('pedidos', this)">Solicitudes</button>
-      <button class="nav-tab"                 onclick="showView('reservaciones', this)">Reservaciones</button>
-      <button class="nav-tab"                 onclick="showView('cliente', this)">Catálogo</button>
-      <button class="nav-tab admin-only"      onclick="showView('admin', this)">Admin</button>
-      <button class="nav-tab superadmin-only" onclick="showView('pendientes', this)">Pendientes</button>
-      <button class="nav-tab superadmin-only" onclick="showView('usuarios', this)">Usuarios</button>
-    </div>
     <div class="header-right">
       <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
       <!-- Globo de mensajes (solo logueados) -->
@@ -115,6 +107,7 @@
 <!-- ══ VISTA: CATÁLOGO DE EMPRESAS ══════════════════════ -->
 <div id="view-cliente" class="view">
   <div class="page">
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
     <div class="cat-header">
       <h1 class="cat-titulo">Directorio de Proveedores</h1>
       <p class="cat-sub">Empresas verificadas que pueden atender tus solicitudes de transporte, custodia y almacenamiento</p>
@@ -139,6 +132,7 @@
 <!-- ══ VISTA: RESERVACIONES ════════════════════════════ -->
 <div id="view-reservaciones" class="view">
   <div class="page">
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
     <div class="section-title">Reservaciones activas</div>
     <div class="reserv-table">
       <div id="reserv-header" class="reserv-row header">
@@ -152,6 +146,7 @@
 <!-- ══ VISTA: PEDIDOS ══════════════════════════════════ -->
 <div id="view-pedidos" class="view">
   <div class="page">
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
     <div class="section-title">📋 Solicitudes de servicio</div>
 
     <!-- Botones de servicio — solo clientes logueados -->
@@ -192,6 +187,7 @@
 <!-- ══ VISTA: ADMIN ════════════════════════════════════ -->
 <div id="view-admin" class="view">
   <div class="page">
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
     <div class="section-title">Panel de Administración</div>
 
     <!-- Perfil de empresa (oculto para superadmin) -->
@@ -801,6 +797,7 @@
 <!-- ══ VISTA: PENDIENTES (solo superadmin) ════════════ -->
 <div id="view-pendientes" class="view">
   <div class="page">
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
     <div class="section-title">⏳ Pendientes de aprobación</div>
     <div id="aprobaciones-section">
       <div id="aprobaciones-content"></div>
@@ -811,6 +808,7 @@
 <!-- ══ VISTA: USUARIOS (solo superadmin) ══════════════ -->
 <div id="view-usuarios" class="view">
   <div class="page">
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
     <div class="section-title">Gestión de Usuarios</div>
     <div class="admin-grid">
 
