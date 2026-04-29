@@ -1180,10 +1180,6 @@ body.light .rechazo-info   { background: rgba(197,48,48,0.05); border-color: rgb
 }
 .home-logo-img {
   height: 52px; margin-bottom: 12px; opacity: 0.95;
-  filter: brightness(0) invert(1); /* blanco en modo oscuro */
-}
-body.light .home-logo-img {
-  filter: none; /* color original en modo claro */
 }
 .home-greeting {
   font-size: 2rem; font-weight: 800;

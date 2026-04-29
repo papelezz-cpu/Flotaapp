@@ -80,9 +80,10 @@ function init() {
       // Refrescar campanita cuando llega una notificación para mí
       if (currentUser.id && payload.new?.user_id === currentUser.id) {
         loadNotificaciones();
-        // Si soy superadmin y la vista Pendientes está activa, refrescar
-        if (currentUser.rol === 'superadmin' && pendientesActivo()) {
-          renderAprobaciones();
+        // Si soy superadmin: refrescar badge del recuadro en home y pendientes si está activo
+        if (currentUser.rol === 'superadmin') {
+          _loadAprBadge();
+          if (pendientesActivo()) renderAprobaciones();
         }
       }
     })
