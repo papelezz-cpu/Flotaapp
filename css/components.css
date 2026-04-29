@@ -1115,21 +1115,32 @@ body.light .ro-chip { border-color: rgba(0,0,0,0.15); background: #fff; color: #
 body.light .ro-chip:has(input:checked) { border-color: #c53030; background: rgba(197,48,48,0.07); color: #c53030; }
 
 /* ── Rechazo info en tarjetas de empresa ─────────────── */
+.item-rechazado {
+  border-left: 3px solid var(--red, #ef4444) !important;
+}
+/* Banner full-width que va ARRIBA de la info del recurso */
+.rechazo-banner {
+  background: rgba(229,62,62,0.08);
+  border: 1.5px solid rgba(229,62,62,0.3);
+  border-radius: 10px; padding: 10px 14px;
+  margin-bottom: 10px; width: 100%; box-sizing: border-box;
+}
+/* Legado — mantener por compatibilidad */
 .rechazo-info {
   background: rgba(229,62,62,0.06);
   border: 1.5px solid rgba(229,62,62,0.25);
   border-radius: 10px; padding: 10px 13px; margin-top: 8px;
 }
 .rechazo-header {
-  font-size: 0.78rem; font-weight: 700; color: var(--danger, #e53e3e);
-  margin-bottom: 6px;
+  font-size: 0.8rem; font-weight: 700; color: var(--red, #ef4444);
 }
-.rechazo-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+.rechazo-chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .rechazo-chip {
   font-size: 0.72rem; padding: 2px 9px; border-radius: 12px;
-  background: rgba(229,62,62,0.12); color: var(--danger, #e53e3e);
+  background: rgba(229,62,62,0.12); color: var(--red, #ef4444);
   border: 1px solid rgba(229,62,62,0.3);
 }
 .rechazo-nota { font-size: 0.78rem; color: var(--text-muted); font-style: italic; }
-body.light .rechazo-info { background: rgba(197,48,48,0.05); border-color: rgba(197,48,48,0.2); }
+body.light .rechazo-banner { background: rgba(197,48,48,0.06); border-color: rgba(197,48,48,0.25); }
+body.light .rechazo-info   { background: rgba(197,48,48,0.05); border-color: rgba(197,48,48,0.2); }
 

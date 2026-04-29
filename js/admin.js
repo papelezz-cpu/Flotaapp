@@ -317,64 +317,63 @@ async function renderMisPendientes() {
   const section = document.getElementById('pendientes-section');
   const list    = document.getElementById('pendientes-list');
 
-  const _rechazoBadge = (r, tabla, corregirFn) => {
-    if (r.aprobacion !== 'rechazada') return `<span class="badge badge-busy" style="font-size:0.72rem">⏳ En revisión</span>`;
-    const campos = (r.rechazo_campos || []).map(c => `<span class="rechazo-chip">${esc(c)}</span>`).join('');
+  // Returns { banner, actions } — banner goes ABOVE the resource info row
+  const _rechazoParts = (r, tabla, corregirFn) => {
+    if (r.aprobacion !== 'rechazada') {
+      return {
+        banner: '',
+        actions: `<span class="badge badge-busy" style="font-size:0.72rem;flex-shrink:0">⏳ En revisión</span>`,
+      };
+    }
+    const campos = (r.rechazo_campos || []).map(f => `<span class="rechazo-chip">${esc(f)}</span>`).join('');
+    const banner = `
+      <div class="rechazo-banner">
+        <div class="rechazo-header">⚠ El administrador solicitó correcciones</div>
+        ${campos ? `<div class="rechazo-chips" style="margin-top:6px">${campos}</div>` : ''}
+        ${r.rechazo_nota ? `<div class="rechazo-nota" style="margin-top:6px">"${esc(r.rechazo_nota)}"</div>` : ''}
+      </div>`;
+    const actions = `
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        ${corregirFn ? `<button class="btn-edit btn-aprobar" onclick="${corregirFn}">✏ Corregir</button>` : ''}
+        <button class="btn-edit btn-rechazar" onclick="eliminarMiRecurso('${tabla}','${r.id}')">🗑 Eliminar</button>
+      </div>`;
+    return { banner, actions };
+  };
+
+  const _card = (r, icono, nombre, sub, tabla, corregirFn) => {
+    const { banner, actions } = _rechazoParts(r, tabla, corregirFn);
+    const esRechazada = r.aprobacion === 'rechazada';
     return `
-      <div class="rechazo-info">
-        <div class="rechazo-header">⚠ Requiere correcciones</div>
-        ${campos ? `<div class="rechazo-chips">${campos}</div>` : ''}
-        ${r.rechazo_nota ? `<div class="rechazo-nota">"${esc(r.rechazo_nota)}"</div>` : ''}
-        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-          ${corregirFn ? `<button class="btn-edit btn-aprobar" onclick="${corregirFn}">✏ Corregir</button>` : ''}
-          <button class="btn-edit btn-rechazar" onclick="eliminarMiRecurso('${tabla}','${r.id}')">🗑 Eliminar</button>
+      <div class="truck-list-item${esRechazada ? ' item-rechazado' : ''}"
+           style="${esRechazada ? 'flex-direction:column;align-items:stretch;gap:0' : ''}">
+        ${banner}
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="truck-list-item-info">
+            <div class="truck-list-item-name">${icono} ${nombre}</div>
+            <div class="truck-list-item-sub">${sub}</div>
+          </div>
+          ${actions}
         </div>
       </div>`;
   };
 
   const rows = [
-    ...(camAll || []).map(c => `
-      <div class="truck-list-item" style="${c.aprobacion==='rechazada'?'border-left:3px solid var(--danger);':''}">
-        <div class="truck-list-item-info">
-          <div class="truck-list-item-name">${c.emoji || '🚛'} ${c.id} — ${c.tipo}</div>
-          <div class="truck-list-item-sub">${c.operador || '—'} · ${c.capacidad} ton</div>
-        </div>
-        ${_rechazoBadge(c, 'camiones', `editarCamionRechazado('${c.id}')`)}
-      </div>`),
-    ...(cusAll || []).map(c => `
-      <div class="truck-list-item" style="${c.aprobacion==='rechazada'?'border-left:3px solid var(--danger);':''}">
-        <div class="truck-list-item-info">
-          <div class="truck-list-item-name">👮 ${c.id} — ${esc(c.nombre)}</div>
-          <div class="truck-list-item-sub">${c.tipo} · ${c.disponibilidad || '—'}</div>
-        </div>
-        ${_rechazoBadge(c, 'custodios', null)}
-      </div>`),
-    ...(patAll || []).map(p => `
-      <div class="truck-list-item" style="${p.aprobacion==='rechazada'?'border-left:3px solid var(--danger);':''}">
-        <div class="truck-list-item-info">
-          <div class="truck-list-item-name">🏭 ${p.id} — ${esc(p.nombre)}</div>
-          <div class="truck-list-item-sub">${p.tipo}${p.area_m2 ? ' · ' + p.area_m2 + ' m²' : ''}</div>
-        </div>
-        ${_rechazoBadge(p, 'patios', null)}
-      </div>`),
-    ...(lavAll || []).map(l => `
-      <div class="truck-list-item" style="${l.aprobacion==='rechazada'?'border-left:3px solid var(--danger);':''}">
-        <div class="truck-list-item-info">
-          <div class="truck-list-item-name">🚿 ${l.id} — ${esc(l.nombre)}</div>
-          <div class="truck-list-item-sub">${(l.tipos_vehiculo || []).join(', ') || '—'}</div>
-        </div>
-        ${_rechazoBadge(l, 'lavados', null)}
-      </div>`),
+    ...(camAll || []).map(c => _card(c, c.emoji || '🚛', `${c.id} — ${c.tipo}`,
+        `${c.operador || '—'} · ${c.capacidad} ton`,
+        'camiones', `editarCamionRechazado('${c.id}')`)),
+    ...(cusAll || []).map(c => _card(c, '👮', `${c.id} — ${esc(c.nombre)}`,
+        `${c.tipo} · ${c.disponibilidad || '—'}`,
+        'custodios', null)),
+    ...(patAll || []).map(p => _card(p, '🏭', `${p.id} — ${esc(p.nombre)}`,
+        `${p.tipo}${p.area_m2 ? ' · ' + p.area_m2 + ' m²' : ''}`,
+        'patios', null)),
+    ...(lavAll || []).map(l => _card(l, '🚿', `${l.id} — ${esc(l.nombre)}`,
+        (l.tipos_vehiculo || []).join(', ') || '—',
+        'lavados', null)),
     ...(opAll || []).map(o => {
       const n = [o.nombre, o.primer_apellido].filter(Boolean).join(' ');
-      return `
-        <div class="truck-list-item" style="${o.aprobacion==='rechazada'?'border-left:3px solid var(--danger);':''}">
-          <div class="truck-list-item-info">
-            <div class="truck-list-item-name">👷 ${o.id} — ${esc(n)}</div>
-            <div class="truck-list-item-sub">${o.puesto || '—'}</div>
-          </div>
-          ${_rechazoBadge(o, 'operadores', `editarOperadorRechazado('${o.id}')`)}
-        </div>`;
+      return _card(o, '👷', `${o.id} — ${esc(n)}`, o.puesto || '—',
+        'operadores', `editarOperadorRechazado('${o.id}')`);
     }),
   ];
 
