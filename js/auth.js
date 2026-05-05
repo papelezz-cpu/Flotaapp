@@ -431,27 +431,55 @@ async function doRegistro() {
   const btn = document.querySelector('#registro-panel .btn-login');
   if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
 
+  // Intentar crear usuario nuevo
+  let userId = null;
+  let esReregistro = false;
   const { data, error } = await sb.auth.signUp({ email, password: pass });
+
   if (error || !data.user) {
-    showErr(error?.message || 'Error al crear la cuenta. El correo puede ya estar registrado.');
-    if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud de registro'; }
-    return;
+    // Si el correo ya existe, revisar si es una cuenta rechazada (permitir re-registro)
+    const yaExiste = error?.message?.toLowerCase().includes('already registered') ||
+                     error?.message?.toLowerCase().includes('already been registered');
+    if (!yaExiste) {
+      showErr(error?.message || 'Error al crear la cuenta.');
+      if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud de registro'; }
+      return;
+    }
+    // Intentar login para verificar estado
+    const { data: ld, error: le } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (le || !ld?.user) {
+      showErr('El correo ya está registrado con otra contraseña. Si tu solicitud fue rechazada, usa la contraseña original para volver a solicitarla.');
+      if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud de registro'; }
+      return;
+    }
+    const { data: sc } = await sb.from('solicitudes_cuenta')
+      .select('estado').eq('user_id', ld.user.id).maybeSingle();
+    if (sc?.estado !== 'rechazada') {
+      await sb.auth.signOut();
+      showErr(sc?.estado === 'pendiente'
+        ? 'Tu solicitud ya está en revisión. Te avisaremos cuando sea aprobada.'
+        : 'Ya tienes una cuenta activa. Inicia sesión directamente.');
+      if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud de registro'; }
+      return;
+    }
+    // Cuenta rechazada → permitir re-registro con el mismo user_id
+    userId = ld.user.id;
+    esReregistro = true;
+  } else {
+    if (!data.session) {
+      document.getElementById('registro-panel').innerHTML = `
+        <div class="reg-success-msg">
+          <div class="reg-success-icon">📧</div>
+          <div class="reg-success-title">Confirma tu correo</div>
+          <div class="reg-success-desc">
+            Hemos enviado un enlace a <strong>${esc(email)}</strong>.<br>
+            Una vez confirmado vuelve a intentar el registro con tus documentos.
+          </div>
+        </div>`;
+      return;
+    }
+    userId = data.user.id;
   }
-
-  if (!data.session) {
-    document.getElementById('registro-panel').innerHTML = `
-      <div class="reg-success-msg">
-        <div class="reg-success-icon">📧</div>
-        <div class="reg-success-title">Confirma tu correo</div>
-        <div class="reg-success-desc">
-          Hemos enviado un enlace a <strong>${esc(email)}</strong>.<br>
-          Una vez confirmado vuelve a intentar el registro con tus documentos.
-        </div>
-      </div>`;
-    return;
-  }
-
-  const userId = data.user.id;
 
   const uploadDoc = async (file, name) => {
     if (!file) return null;
@@ -461,25 +489,16 @@ async function doRegistro() {
     return upErr ? null : path;
   };
 
-  const [docIne, docCompDom, docFotoDom, docCsf, docOpinion, docActa] = await Promise.all([
+  const [docIne, docCompDom, docFotoDom, docCsf, , docActa] = await Promise.all([
     uploadDoc(ineFile,     'ine'),
     uploadDoc(compDomFile, 'comprobante_domicilio'),
     uploadDoc(fotoDomFile, 'foto'),
     uploadDoc(csfFile,     'constancia_fiscal'),
-    uploadDoc(opinionFile, 'opinion_cumplimiento'),
+    Promise.resolve(null),
     uploadDoc(actaFile,    'acta_constitutiva'),
   ]);
 
-  await sb.from('perfiles').upsert({
-    user_id:           userId,
-    nombre,
-    rol:               _regRol === 'cliente' ? 'cliente' : 'admin',
-    aprobacion_cuenta: 'pendiente',
-  });
-
-  await sb.from('solicitudes_cuenta').insert({
-    user_id:              userId,
-    rol:                  _regRol,
+  const solicitudPayload = {
     nombre,
     email,
     telefono,
@@ -500,7 +519,24 @@ async function doRegistro() {
     doc_constancia_fiscal: docCsf  || null,
     doc_acta_constitutiva: docActa || null,
     estado:               'pendiente',
-  });
+  };
+
+  if (esReregistro) {
+    // Actualizar registros existentes
+    await Promise.all([
+      sb.from('perfiles').update({ nombre, aprobacion_cuenta: 'pendiente', nota_rechazo_cuenta: null })
+        .eq('user_id', userId),
+      sb.from('solicitudes_cuenta').update(solicitudPayload).eq('user_id', userId),
+    ]);
+  } else {
+    await sb.from('perfiles').upsert({
+      user_id:           userId,
+      nombre,
+      rol:               _regRol === 'cliente' ? 'cliente' : 'admin',
+      aprobacion_cuenta: 'pendiente',
+    });
+    await sb.from('solicitudes_cuenta').insert({ user_id: userId, rol: _regRol, ...solicitudPayload });
+  }
 
   const { data: superadmins } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
   if (superadmins?.length) {
