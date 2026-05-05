@@ -30,12 +30,23 @@ async function checkExistingSession() {
   const { data: perfil } = await sb.from('perfiles')
     .select('nombre, rol, aprobacion_cuenta, nota_rechazo_cuenta')
     .eq('user_id', session.user.id)
-    .single();
+    .maybeSingle();
 
   if (perfil?.aprobacion_cuenta === 'pendiente' || perfil?.aprobacion_cuenta === 'rechazada') {
     await sb.auth.signOut();
     showLoginOverlay();
     return;
+  }
+
+  // Fallback: sin perfil pero con solicitud pendiente/rechazada
+  if (!perfil) {
+    const { data: sc } = await sb.from('solicitudes_cuenta')
+      .select('estado').eq('user_id', session.user.id).maybeSingle();
+    if (sc?.estado === 'pendiente' || sc?.estado === 'rechazada') {
+      await sb.auth.signOut();
+      showLoginOverlay();
+      return;
+    }
   }
 
   currentUser = {
@@ -91,7 +102,7 @@ async function doLogin() {
   const { data: perfil } = await sb.from('perfiles')
     .select('nombre, rol, aprobacion_cuenta, nota_rechazo_cuenta')
     .eq('user_id', data.user.id)
-    .single();
+    .maybeSingle();
 
   if (perfil?.aprobacion_cuenta === 'pendiente') {
     await sb.auth.signOut();
@@ -102,6 +113,24 @@ async function doLogin() {
     await sb.auth.signOut();
     err.textContent = `Tu solicitud fue rechazada.${perfil.nota_rechazo_cuenta ? ' Motivo: ' + perfil.nota_rechazo_cuenta : ' Contacta a soporte para más información.'}`;
     err.classList.add('show'); return;
+  }
+
+  // Fallback: si no hay perfil, revisar si hay solicitud pendiente/rechazada en solicitudes_cuenta
+  if (!perfil) {
+    const { data: sc } = await sb.from('solicitudes_cuenta')
+      .select('estado, nota_rechazo')
+      .eq('user_id', data.user.id)
+      .maybeSingle();
+    if (sc?.estado === 'pendiente') {
+      await sb.auth.signOut();
+      err.textContent = 'Tu cuenta está pendiente de aprobación. Te contactaremos cuando sea revisada.';
+      err.classList.add('show'); return;
+    }
+    if (sc?.estado === 'rechazada') {
+      await sb.auth.signOut();
+      err.textContent = `Tu solicitud fue rechazada.${sc.nota_rechazo ? ' Motivo: ' + sc.nota_rechazo : ''}`;
+      err.classList.add('show'); return;
+    }
   }
 
   currentUser = {
