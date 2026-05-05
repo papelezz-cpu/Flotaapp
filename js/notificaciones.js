@@ -131,8 +131,9 @@ async function onNotifClick(id, tipo) {
     return;
   }
 
+  // Superadmin: pedido o acuerdo en espera de revisión → ir a Solicitudes
   if (tipo === 'revision_solicitud' || tipo === 'revision_acuerdo') {
-    goTo('admin', 'Admin', 300, 'aprobaciones-section');
+    goTo('pedidos', 'Solicitudes', 0, null);
     return;
   }
   if (tipo === 'reserva_pendiente' || tipo === 'reserva_aceptada' || tipo === 'reserva_rechazada') {
