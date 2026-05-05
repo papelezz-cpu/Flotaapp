@@ -1712,46 +1712,27 @@
       <button class="btn-forgot" onclick="forgotPassword()">¿Olvidaste tu contraseña?</button>
     </div>
 
-    <!-- Panel registro -->
-    <div id="registro-panel">
-      <div class="login-error"   id="registro-error"></div>
-      <div class="login-success" id="registro-success">¡Cuenta creada! Revisa tu correo para confirmar.</div>
-      <div class="form-group">
-        <label>Nombre completo</label>
-        <input type="text" id="reg-nombre" placeholder="Ej. María López"
-               onkeydown="if(event.key==='Enter') doRegistro()">
-      </div>
-      <div class="form-group">
-        <label>Correo electrónico</label>
-        <input type="email" id="reg-email" placeholder="correo@empresa.com"
-               onkeydown="if(event.key==='Enter') doRegistro()">
-      </div>
-      <div class="form-group">
-        <label>Contraseña <span style="font-weight:400;color:var(--text-muted)">(mínimo 6 caracteres)</span></label>
-        <input type="password" id="reg-pass" placeholder="••••••••"
-               onkeydown="if(event.key==='Enter') doRegistro()">
-      </div>
-      <button class="btn-login" onclick="doRegistro()">Crear cuenta</button>
-    </div>
+    <!-- Panel registro (rendered by JS) -->
+    <div id="registro-panel"></div>
 
   </div>
 </div>
 
 <!-- ══ SCRIPTS (orden importante) ══════════════════════ -->
 <script src="js/utils.js"></script>
-<script src="js/notificaciones.js?v=11"></script>
+<script src="js/notificaciones.js?v=12"></script>
 <script src="js/detalle.js?v=12"></script>
 <script src="js/tracking.js"></script>
 <script src="js/config.js?v=9"></script>
-<script src="js/auth.js?v=10"></script>
+<script src="js/auth.js?v=11"></script>
 <script src="js/theme.js?v=10"></script>
-<script src="js/views.js?v=11"></script>
+<script src="js/views.js?v=12"></script>
 <script src="js/camiones.js?v=10"></script>
 <script src="js/recursos.js?v=10"></script>
 <script src="js/reservaciones.js?v=12"></script>
 <script src="js/modal.js?v=10"></script>
 <script src="js/pedidos.js?v=14"></script>
-<script src="js/aprobaciones.js?v=14"></script>
+<script src="js/aprobaciones.js?v=15"></script>
 <script src="js/admin.js?v=15"></script>
 <script src="js/operadores.js?v=4"></script>
 <script src="js/usuarios.js?v=11"></script>

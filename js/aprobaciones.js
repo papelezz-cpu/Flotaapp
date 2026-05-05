@@ -11,7 +11,8 @@ async function renderAprobaciones() {
   content.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted)">Cargando…</div>';
 
   const [{ data: solicitudes }, { data: acuerdos }, { data: operadores },
-         { data: camiones }, { data: custodios }, { data: patios }, { data: lavados }] = await Promise.all([
+         { data: camiones }, { data: custodios }, { data: patios }, { data: lavados },
+         { data: cuentasPend }] = await Promise.all([
     sb.from('pedidos').select('*').eq('estado', 'pendiente_revision').order('created_at'),
     sb.from('pedidos').select('*').eq('estado', 'pendiente_acuerdo').order('created_at'),
     sb.from('operadores').select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at'),
@@ -19,6 +20,7 @@ async function renderAprobaciones() {
     sb.from('custodios' ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
     sb.from('patios'    ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
     sb.from('lavados'   ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('solicitudes_cuenta').select('*').eq('estado', 'pendiente').order('created_at', { ascending: false }),
   ]);
 
   // Cargar ofertas pendientes para los acuerdos
@@ -33,8 +35,68 @@ async function renderAprobaciones() {
 
   let html = '';
 
+  // ── CUENTAS POR VERIFICAR ────────────────────────────
+  html += `<div class="apr-bloque-title">👤 Cuentas por verificar <span class="apr-count">${cuentasPend.length}</span></div>`;
+  if (!cuentasPend.length) {
+    html += `<div class="apr-empty">Sin solicitudes de cuenta pendientes</div>`;
+  } else {
+    const verDoc = (path, label) => path
+      ? `<a href="#" onclick="verDocRegistro('${esc(path)}');return false" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:2px 4px 2px 0">📄 ${label}</a>`
+      : '';
+    html += cuentasPend.map(s => {
+      const rolLabel  = s.rol === 'cliente' ? '🛒 Cliente' : '🏢 Empresa';
+      const fachada   = Array.isArray(s.doc_fotos_oficinas) ? s.doc_fotos_oficinas[0] : null;
+      const idDoc     = s.doc_id_oficial || s.doc_id_representante;
+      return `
+        <div class="apr-card" id="aprcuenta-${s.user_id}">
+          <div class="apr-card-header">
+            <div>
+              <div class="apr-tipo">${rolLabel} — ${esc(s.nombre || '—')}</div>
+              <div class="apr-sub">${esc(s.email)} · ${esc(s.telefono || '—')}</div>
+            </div>
+            <span class="badge badge-revision">Pendiente</span>
+          </div>
+          <div class="apr-op-detalle">
+            ${s.rol === 'admin' ? `
+              <div class="apr-op-section-title">Datos de la empresa</div>
+              <div class="apr-op-grid">
+                <div class="apr-op-row"><span>Razón social</span><strong>${esc(s.razon_social || '—')}</strong></div>
+                <div class="apr-op-row"><span>RFC</span><strong>${esc(s.rfc || '—')}</strong></div>
+                <div class="apr-op-row"><span>Tipo persona</span><strong>${esc(s.tipo_persona || '—')}</strong></div>
+              </div>` : `
+              <div class="apr-op-section-title">Datos personales</div>
+              <div class="apr-op-grid">
+                <div class="apr-op-row"><span>RFC</span><strong>${esc(s.rfc || '—')}</strong></div>
+                <div class="apr-op-row"><span>CURP</span><strong>${esc(s.curp || '—')}</strong></div>
+              </div>`}
+            <div class="apr-op-section-title">Domicilio</div>
+            <div class="apr-op-grid">
+              <div class="apr-op-row"><span>Calle</span><strong>${esc(s.calle || '—')}</strong></div>
+              <div class="apr-op-row"><span>Colonia</span><strong>${esc(s.colonia || '—')}</strong></div>
+              <div class="apr-op-row"><span>CP</span><strong>${esc(s.cp || '—')}</strong></div>
+              <div class="apr-op-row"><span>Ciudad / Estado</span><strong>${esc([s.ciudad, s.estado_mx].filter(Boolean).join(', '))}</strong></div>
+            </div>
+            <div class="apr-op-section-title">Documentos</div>
+            <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:2px">
+              ${verDoc(idDoc,                    'Identificación')}
+              ${verDoc(s.doc_comprobante_dom,    'Comp. domicilio')}
+              ${verDoc(s.doc_foto_domicilio,     'Foto domicilio')}
+              ${verDoc(fachada,                  'Foto fachada')}
+              ${verDoc(s.doc_constancia_fiscal,  'Const. Fiscal SAT')}
+              ${verDoc(s.doc_acta_constitutiva,  'Acta constitutiva')}
+              ${verDoc(s.doc_poder_notarial,     'Poder notarial')}
+            </div>
+          </div>
+          <div class="apr-actions">
+            <button class="btn-apr-aprobar" onclick="aprobarCuenta('${s.user_id}')">✓ Aprobar cuenta</button>
+            <button class="btn-apr-rechazar" onclick="rechazarCuenta('${s.user_id}')">✕ Rechazar</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
   // ── SOLICITUDES POR REVISAR ──────────────────────────
-  html += `<div class="apr-bloque-title">📋 Solicitudes por revisar <span class="apr-count">${(solicitudes || []).length}</span></div>`;
+  html += `<div class="apr-bloque-title" style="margin-top:28px">📋 Solicitudes por revisar <span class="apr-count">${(solicitudes || []).length}</span></div>`;
 
   if (!solicitudes?.length) {
     html += `<div class="apr-empty">Sin solicitudes pendientes de revisión</div>`;
@@ -370,6 +432,51 @@ function verArchivoPublico(path) {
   sb.storage.from('unidades').createSignedUrl(path, 3600).then(({ data }) => {
     if (data?.signedUrl) window.open(data.signedUrl, '_blank');
   });
+}
+
+function verDocRegistro(path) {
+  sb.storage.from('registros').createSignedUrl(path, 3600).then(({ data }) => {
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  });
+}
+
+async function aprobarCuenta(userId) {
+  const { data: sc } = await sb.from('solicitudes_cuenta')
+    .select('nombre').eq('user_id', userId).single();
+
+  const [{ error }] = await Promise.all([
+    sb.from('perfiles').update({ aprobacion_cuenta: null }).eq('user_id', userId),
+    sb.from('solicitudes_cuenta').update({ estado: 'aprobada' }).eq('user_id', userId),
+  ]);
+  if (error) { showToast('Error al aprobar', 'error'); return; }
+
+  await sb.from('notificaciones').insert({
+    user_id: userId,
+    tipo:    'cuenta_aprobada',
+    titulo:  '¡Cuenta aprobada!',
+    mensaje: 'Tu cuenta ha sido verificada. Ya puedes iniciar sesión en PortGo.',
+    leido:   false,
+  });
+
+  document.getElementById(`aprcuenta-${userId}`)?.remove();
+  showToast(`✓ Cuenta de ${esc(sc?.nombre || 'usuario')} aprobada`);
+  _loadAprBadge();
+}
+
+async function rechazarCuenta(userId) {
+  const nota = prompt('Motivo del rechazo (el usuario lo verá al intentar iniciar sesión):');
+  if (nota === null) return;
+
+  const notaTrim = nota.trim() || null;
+  const [{ error }] = await Promise.all([
+    sb.from('perfiles').update({ aprobacion_cuenta: 'rechazada', nota_rechazo_cuenta: notaTrim }).eq('user_id', userId),
+    sb.from('solicitudes_cuenta').update({ estado: 'rechazada', nota_rechazo: notaTrim }).eq('user_id', userId),
+  ]);
+  if (error) { showToast('Error al rechazar', 'error'); return; }
+
+  document.getElementById(`aprcuenta-${userId}`)?.remove();
+  showToast('Solicitud rechazada');
+  _loadAprBadge();
 }
 
 function _diffHtml(recurso, labels) {

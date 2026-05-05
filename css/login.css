@@ -86,3 +86,79 @@ body:not(.logged-in) #login-overlay { cursor: default; }
   margin-top: 4px; transition: color 0.2s;
 }
 .btn-forgot:hover { color: var(--accent); }
+
+/* ── REGISTRO EXPANDIDO ────────────────────────────────── */
+.login-box.expanded {
+  max-width: 560px;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.reg-header { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
+.reg-sub { font-size: 0.83rem; color: var(--text-muted); margin-bottom: 18px; }
+
+.reg-role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.reg-role-card {
+  border: 1.5px solid var(--border); border-radius: 14px;
+  padding: 20px 14px; cursor: pointer; text-align: center;
+  transition: border-color 0.18s, background 0.18s;
+}
+.reg-role-card:hover { border-color: var(--accent); background: rgba(78,142,247,0.07); }
+.reg-role-icon { font-size: 2rem; margin-bottom: 8px; }
+.reg-role-title { font-weight: 700; font-size: 0.92rem; margin-bottom: 4px; color: var(--text-main); }
+.reg-role-desc { font-size: 0.76rem; color: var(--text-muted); line-height: 1.4; }
+
+.reg-section-title {
+  font-size: 0.72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--text-muted); margin: 18px 0 10px;
+  padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.reg-back-btn {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: 0.82rem; padding: 0;
+  margin-bottom: 14px; display: flex; align-items: center; gap: 4px;
+}
+.reg-back-btn:hover { color: var(--accent); }
+
+.reg-role-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(78,142,247,0.12); border: 1px solid rgba(78,142,247,0.25);
+  border-radius: 20px; padding: 4px 12px;
+  font-size: 0.78rem; font-weight: 600; color: var(--accent);
+  margin-bottom: 16px;
+}
+
+.reg-file-label {
+  display: flex; align-items: center; justify-content: space-between;
+  border: 1.5px dashed rgba(255,255,255,0.15); border-radius: 10px;
+  padding: 10px 14px; cursor: pointer; transition: border-color 0.18s;
+  font-size: 0.82rem; color: var(--text-muted); gap: 8px;
+}
+.reg-file-label:hover { border-color: var(--accent); color: var(--text-main); }
+.reg-file-label input[type=file] { display: none; }
+.reg-file-label > span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reg-file-label::after { content: '📎'; flex-shrink: 0; }
+
+.reg-docs-hint {
+  font-size: 0.76rem; color: var(--text-muted);
+  background: rgba(78,142,247,0.07); border: 1px solid rgba(78,142,247,0.15);
+  border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; line-height: 1.5;
+}
+
+.reg-tipo-persona { display: flex; gap: 8px; margin-bottom: 14px; }
+.reg-tipo-btn {
+  flex: 1; padding: 8px; border: 1.5px solid var(--border);
+  border-radius: 8px; background: none; color: var(--text-muted);
+  cursor: pointer; font-size: 0.83rem; font-weight: 600;
+  transition: all 0.18s;
+}
+.reg-tipo-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(78,142,247,0.08); }
+
+.reg-optional { font-size: 0.72rem; color: var(--text-muted); font-weight: 400; margin-left: 4px; }
+
+.reg-success-msg { text-align: center; padding: 24px 8px; }
+.reg-success-icon { font-size: 3rem; margin-bottom: 12px; }
+.reg-success-title { font-weight: 700; font-size: 1.05rem; margin-bottom: 8px; color: var(--text-main); }
+.reg-success-desc { font-size: 0.84rem; color: var(--text-muted); line-height: 1.7; }

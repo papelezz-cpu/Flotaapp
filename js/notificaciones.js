@@ -109,8 +109,8 @@ async function onNotifClick(id, tipo) {
     return;
   }
 
-  // Superadmin: empresa envió nuevo recurso → ir a Pendientes
-  if (['nueva_unidad_pendiente','nuevo_recurso_pendiente'].includes(tipo)) {
+  // Superadmin: empresa envió nuevo recurso o nueva cuenta → ir a Pendientes
+  if (['nueva_unidad_pendiente','nuevo_recurso_pendiente','nueva_cuenta_pendiente'].includes(tipo)) {
     goTo('pendientes', 'Pendientes', 0, null);
     return;
   }
