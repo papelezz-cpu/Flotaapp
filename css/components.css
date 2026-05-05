@@ -1234,10 +1234,16 @@ body.light .rechazo-info   { background: rgba(197,48,48,0.05); border-color: rgb
   margin-top: 5px; position: relative;
 }
 .hc-badge {
-  display: none; margin-top: 10px;
-  background: rgba(255,255,255,0.22); border-radius: 12px;
-  padding: 3px 10px; font-size: 0.72rem; font-weight: 700;
-  color: #fff; position: relative;
+  display: none;
+  position: absolute; top: 11px; right: 13px;
+  min-width: 24px; height: 24px; padding: 0 7px;
+  border-radius: 12px;
+  background: #fff;
+  color: #c0392b;
+  font-size: 0.72rem; font-weight: 800;
+  line-height: 24px; text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  pointer-events: none;
 }
 /* Card gradients */
 .hc-blue   { background: linear-gradient(135deg,#1e3a8a,#2563eb); }

@@ -94,10 +94,13 @@ async function _loadAprBadge() {
     sb.from('custodios' ).select('id',{count:'exact',head:true}).eq('aprobacion','pendiente'),
     sb.from('patios'    ).select('id',{count:'exact',head:true}).eq('aprobacion','pendiente'),
     sb.from('lavados'   ).select('id',{count:'exact',head:true}).eq('aprobacion','pendiente'),
+    sb.from('pedidos'   ).select('id',{count:'exact',head:true}).eq('estado','pendiente_revision'),
   ]);
   const total = counts.reduce((s,r) => s + (r.count||0), 0);
   if (total > 0) {
-    badge.textContent = `${total} pendiente${total > 1 ? 's' : ''}`;
+    badge.textContent = total > 99 ? '99+' : total;
     badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
   }
 }
