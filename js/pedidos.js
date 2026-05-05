@@ -8,6 +8,17 @@ let _pendingPedido     = null;   // pedido en espera de confirmar detalles
 let _filtroTipo        = 'todos';
 let _pedidosMode       = 'lista'; // 'solicitar' | 'lista'
 
+// Capacidades máximas reglamentadas por tipo (NOM-012-SCT-2), en toneladas
+const CAP_REGLAMENTADA = {
+  'Camioneta 1.5 ton caja seca': 1.5, 'Camioneta 1.5 ton plataforma': 1.5,
+  'Camioneta 3.5 ton caja seca': 3.5, 'Camioneta 3.5 ton plataforma': 3.5,
+  'Rabón': 8,
+  'Torton': 14, 'Torton caja seca': 14, 'Torton plataforma': 14,
+  'Sencillo porta contenedor 40/20': 24.5, 'Sencillo plataforma': 24.5, 'Plataforma': 24.5,
+  'Full': 49, 'Full porta contenedor 40/20': 49, 'Full plataforma': 49,
+  'Lowboy': 40, 'Cama baja': 35,
+};
+
 const TIPO_EMOJI = {
   Torton:'🚛', 'Torton caja seca':'🚛', 'Torton plataforma':'🚛',
   Rabón:'🚚',
@@ -288,6 +299,17 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
   const chipsHTML = chips.length
     ? `<div class="pedido-chips">${chips.map(c => `<span class="cargo-chip">${c}</span>`).join('')}</div>` : '';
 
+  // Indicador de sobrepeso — solo para vistas de empresa
+  let sobrepesoBanner = '';
+  const esVistaAdmin = vista === 'admin' || vista === 'admin_propio';
+  if (esVistaAdmin && esCamionCard && p.peso_carga) {
+    const capRef = CAP_REGLAMENTADA[p.tipo_camion];
+    if (capRef && p.peso_carga > capRef) {
+      const exceso = (p.peso_carga - capRef).toFixed(1);
+      sobrepesoBanner = `<div class="pedido-sobrepeso-alert">⚠️ Sobrepeso: la carga pesa <strong>${p.peso_carga} ton</strong> — el límite reglamentado para este tipo es <strong>${capRef} ton</strong> (exceso: <strong>+${exceso} ton</strong>). Valida si puedes tomarlo o ajusta tu precio.</div>`;
+    }
+  }
+
   return `
     <div class="pedido-card" id="ped-${p.id}">
       <div class="pedido-top">
@@ -300,6 +322,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
         <span class="badge ${badgeCls}">${estadoLabel}</span>
       </div>
       ${chipsHTML}
+      ${sobrepesoBanner}
       ${p.descripcion ? `<div class="pedido-desc">${esc(p.descripcion)}</div>` : ''}
       <div class="pedido-footer">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
