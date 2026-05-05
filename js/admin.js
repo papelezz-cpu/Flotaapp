@@ -28,6 +28,26 @@ const DIM_DEFAULTS = {
   'HAZMAT':                             'Según unidad/permiso',
 };
 
+// Capacidades máximas reglamentadas (NOM-012-SCT-2) en toneladas de carga neta
+const CAP_DEFAULTS = {
+  'Camioneta 1.5 ton caja seca':      1.5,
+  'Camioneta 1.5 ton plataforma':     1.5,
+  'Camioneta 3.5 ton caja seca':      3.5,
+  'Camioneta 3.5 ton plataforma':     3.5,
+  'Rabón':                            8,
+  'Torton':                           14,
+  'Torton caja seca':                 14,
+  'Torton plataforma':                14,
+  'Sencillo porta contenedor 40/20':  24.5,
+  'Sencillo plataforma':              24.5,
+  'Plataforma':                       24.5,
+  'Full':                             49,
+  'Full porta contenedor 40/20':      49,
+  'Full plataforma':                  49,
+  'Lowboy':                           40,
+  'Cama baja':                        35,
+};
+
 // Deshabilita un botón y devuelve función que lo restaura
 function _btnLoading(id) {
   const btn = document.getElementById(id);
@@ -244,6 +264,7 @@ function autoFillDimensiones(prefix = 'admin') {
   const tipo   = document.getElementById(`${prefix}-tipo`)?.value || '';
   const dimEl  = document.getElementById(`${prefix}-dim`);
   const lblEl  = document.getElementById(`${prefix}-dim-label`);
+  const capEl  = document.getElementById(`${prefix}-cap`);
 
   // Update label based on truck body type
   if (lblEl) {
@@ -254,9 +275,14 @@ function autoFillDimensiones(prefix = 'admin') {
                                  'Dimensiones de plataforma (L × A)';
   }
 
-  // Auto-fill only when field is empty
+  // Auto-fill dimensions only when field is empty
   if (dimEl && tipo && DIM_DEFAULTS[tipo] && !dimEl.value) {
     dimEl.value = DIM_DEFAULTS[tipo];
+  }
+
+  // Auto-fill capacidad máxima reglamentada
+  if (capEl && tipo && CAP_DEFAULTS[tipo]) {
+    capEl.value = CAP_DEFAULTS[tipo];
   }
 }
 
@@ -286,8 +312,6 @@ async function editarCamion(id) {
   set('editar-combustible', c.tipo_combustible || '');
   set('editar-tc', c.tarjeta_circulacion || '');
   set('editar-fecha-tc', c.fecha_expedicion_tc || '');
-  set('editar-caat', c.caat || '');
-  set('editar-vigencia-caat', c.vigencia_caat || '');
 
   renderCargoChipsSelect('editar-tipo-carga', c.tipo_carga || []);
   document.getElementById('modal-editar').classList.add('open');
@@ -321,8 +345,6 @@ async function guardarEdicion() {
     tipo_combustible:    g('editar-combustible'),
     tarjeta_circulacion: g('editar-tc'),
     fecha_expedicion_tc: g('editar-fecha-tc'),
-    caat:                g('editar-caat'),
-    vigencia_caat:       g('editar-vigencia-caat'),
   };
 
   const esSuperAdmin = currentUser.rol === 'superadmin';
@@ -490,8 +512,6 @@ async function editarCamionRechazado(id) {
   set('admin-num-economico',c.num_economico);
   set('admin-tc',           c.tarjeta_circulacion);
   set('admin-fecha-tc',     c.fecha_expedicion_tc);
-  set('admin-caat',         c.caat);
-  set('admin-vigencia-caat',c.vigencia_caat);
   setSelect('admin-marca',       c.marca);
   setSelect('admin-color',       c.color);
   setSelect('admin-tipo-placa',  c.tipo_placa);
@@ -620,11 +640,9 @@ async function agregarCamion() {
   const _fotosFiles = Array.from(document.getElementById('admin-fotos').files || []);
   const _docsFiles  = Array.from(document.getElementById('admin-docs').files  || []);
   const _tcFileChk  = document.getElementById('admin-img-tc')?.files?.[0];
-  const _caatFileChk= document.getElementById('admin-img-caat')?.files?.[0];
   if (!_fotosFiles.length) { _done(); showToast('Debes adjuntar al menos una foto de la unidad', 'error'); return; }
   if (!_docsFiles.length)  { _done(); showToast('Debes adjuntar al menos un documento de la unidad', 'error'); return; }
   if (!_tcFileChk)         { _done(); showToast('Debes adjuntar la imagen de la Tarjeta de Circulación', 'error'); return; }
-  if (!_caatFileChk)       { _done(); showToast('Debes adjuntar la imagen del CAAT', 'error'); return; }
 
   const prefijos = {
     'Torton': 'T', 'Torton caja seca': 'T', 'Torton plataforma': 'T',
@@ -652,9 +670,8 @@ async function agregarCamion() {
   const fotosFiles = Array.from(document.getElementById('admin-fotos').files || []);
   const docsFiles  = Array.from(document.getElementById('admin-docs').files  || []);
   const tcFile     = document.getElementById('admin-img-tc')?.files?.[0];
-  const caatFile   = document.getElementById('admin-img-caat')?.files?.[0];
   const archivos   = [];
-  let   imagenTc = null, imagenCaat = null;
+  let   imagenTc = null;
 
   for (const file of [...fotosFiles, ...docsFiles]) {
     const path = `${propietarioId}/${id}/${Date.now()}_${file.name}`;
@@ -665,11 +682,6 @@ async function agregarCamion() {
     const path = `${propietarioId}/${id}/tc_${Date.now()}.${tcFile.name.split('.').pop()}`;
     const { data: up } = await sb.storage.from('unidades').upload(path, tcFile);
     if (up) { archivos.push(up.path); imagenTc = up.path; }
-  }
-  if (caatFile) {
-    const path = `${propietarioId}/${id}/caat_${Date.now()}.${caatFile.name.split('.').pop()}`;
-    const { data: up } = await sb.storage.from('unidades').upload(path, caatFile);
-    if (up) { archivos.push(up.path); imagenCaat = up.path; }
   }
 
   const emojis = {
@@ -709,9 +721,6 @@ async function agregarCamion() {
     tarjeta_circulacion: g('admin-tc'),
     fecha_expedicion_tc: document.getElementById('admin-fecha-tc')?.value  || null,
     imagen_tc:           imagenTc,
-    caat:                g('admin-caat'),
-    vigencia_caat:       document.getElementById('admin-vigencia-caat')?.value || null,
-    imagen_caat:         imagenCaat,
   };
 
   let error;
@@ -736,17 +745,15 @@ async function agregarCamion() {
 
   // Limpiar formulario
   ['admin-cap','admin-precio','admin-placas','admin-dim','admin-version','admin-modelo-anio',
-   'admin-num-serie','admin-num-motor','admin-num-economico','admin-tc','admin-fecha-tc',
-   'admin-caat','admin-vigencia-caat'].forEach(fid => {
+   'admin-num-serie','admin-num-motor','admin-num-economico','admin-tc','admin-fecha-tc'].forEach(fid => {
     const el = document.getElementById(fid); if (el) el.value = '';
   });
-  ['admin-fotos','admin-docs','admin-img-tc','admin-img-caat'].forEach(fid => {
+  ['admin-fotos','admin-docs','admin-img-tc'].forEach(fid => {
     const el = document.getElementById(fid); if (el) el.value = '';
   });
-  document.getElementById('fotos-label').textContent   = 'Seleccionar fotos';
-  document.getElementById('docs-label').textContent    = 'Seleccionar documentos (PDF / imagen)';
-  const tcLbl   = document.getElementById('img-tc-label');   if (tcLbl)   tcLbl.textContent   = 'Adjuntar imagen';
-  const caatLbl = document.getElementById('img-caat-label'); if (caatLbl) caatLbl.textContent = 'Adjuntar imagen';
+  document.getElementById('fotos-label').textContent = 'Seleccionar fotos';
+  document.getElementById('docs-label').textContent  = 'Seleccionar documentos (PDF / imagen)';
+  const tcLbl = document.getElementById('img-tc-label'); if (tcLbl) tcLbl.textContent = 'Adjuntar imagen';
   ['admin-marca','admin-color','admin-tipo-placa','admin-combustible'].forEach(fid => {
     const el = document.getElementById(fid); if (el) el.selectedIndex = 0;
   });
@@ -1204,10 +1211,9 @@ function updateFileLabel(inputId, labelId) {
   const label = document.getElementById(labelId);
   if (!label) return;
   const defaults = {
-    'admin-fotos':    'Seleccionar fotos',
-    'admin-docs':     'Seleccionar documentos (PDF / imagen)',
-    'admin-img-tc':   'Adjuntar imagen',
-    'admin-img-caat': 'Adjuntar imagen',
+    'admin-fotos':  'Seleccionar fotos',
+    'admin-docs':   'Seleccionar documentos (PDF / imagen)',
+    'admin-img-tc': 'Adjuntar imagen',
   };
   if (!files?.length) {
     label.textContent = defaults[inputId] || 'Seleccionar archivo';
