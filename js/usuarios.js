@@ -30,10 +30,17 @@ async function renderUsuarios() {
     return;
   }
 
+  const APR_BADGE = {
+    pendiente: `<span style="display:inline-block;font-size:0.68rem;font-weight:700;background:rgba(234,179,8,0.15);color:#ca8a04;border:1px solid rgba(234,179,8,0.35);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">Pendiente</span>`,
+    rechazada: `<span style="display:inline-block;font-size:0.68rem;font-weight:700;background:rgba(239,68,68,0.12);color:var(--danger);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">Rechazada</span>`,
+  };
+
   list.innerHTML = json.lista.map(u => `
     <div class="truck-list-item">
       <div class="truck-list-item-info">
-        <div class="truck-list-item-name">${esc(u.nombre)}</div>
+        <div class="truck-list-item-name">
+          ${esc(u.nombre)}${APR_BADGE[u.aprobacion_cuenta] || ''}
+        </div>
         <div class="truck-list-item-sub">${esc(u.email)} · ${ROL_LABEL[u.rol] || u.rol}</div>
       </div>
       <button class="btn-edit" onclick="abrirEditarUsuario('${u.user_id}','${esc(u.nombre)}','${esc(u.email)}','${u.rol}')">✏ Editar</button>
