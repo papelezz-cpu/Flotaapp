@@ -72,3 +72,60 @@ function formatPrecio(num) {
   if (!num) return null;
   return '$' + Number(num).toLocaleString('es-MX', { minimumFractionDigits: 0 }) + ' MXN/día';
 }
+
+// ── GEO AUTOCOMPLETE (Nominatim OpenStreetMap) ─────────
+let _geoTimer = null;
+
+function setupGeoAutocomplete(inputEl) {
+  if (!inputEl || inputEl.dataset.geoSetup) return;
+  inputEl.dataset.geoSetup = '1';
+
+  const wrap = inputEl.closest('.form-group') || inputEl.parentNode;
+  wrap.style.position = 'relative';
+
+  const dd = document.createElement('div');
+  dd.className = 'geo-dropdown';
+  wrap.appendChild(dd);
+
+  inputEl.addEventListener('input', () => {
+    clearTimeout(_geoTimer);
+    dd.innerHTML = '';
+    dd.style.display = 'none';
+    const q = inputEl.value.trim();
+    if (q.length < 3) return;
+    _geoTimer = setTimeout(() => _geoFetch(q, inputEl, dd), 420);
+  });
+
+  document.addEventListener('click', e => {
+    if (!wrap.contains(e.target)) dd.style.display = 'none';
+  }, true);
+}
+
+async function _geoFetch(query, inputEl, dd) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=mx&accept-language=es`;
+    const res  = await fetch(url, { headers: { 'User-Agent': 'PortGo/1.0' } });
+    const data = await res.json();
+    if (!data.length) return;
+    dd.innerHTML = data.map(r => {
+      const label = r.display_name.split(',').slice(0, 3).join(',');
+      return `<div class="geo-item" onclick="_geoSelect(this, '${label.replace(/'/g,"&#39;")}', event)">${esc(label)}</div>`;
+    }).join('');
+    dd.style.display = 'block';
+    // Store reference to input
+    dd._input = inputEl;
+  } catch (_) {}
+}
+
+function _geoSelect(itemEl, value, e) {
+  e.stopPropagation();
+  const dd = itemEl.closest('.geo-dropdown');
+  if (dd?._input) dd._input.value = value;
+  if (dd) dd.style.display = 'none';
+}
+
+function setupAllGeoInputs() {
+  document.querySelectorAll('[id="np-origen"],[id="np-destino"],[id="np-ubic-lav"],[id="np-zona-cust"],[id="np-ubic-patio"]').forEach(el => {
+    setupGeoAutocomplete(el);
+  });
+}

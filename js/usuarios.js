@@ -43,6 +43,7 @@ async function renderUsuarios() {
         </div>
         <div class="truck-list-item-sub">${esc(u.email)} · ${ROL_LABEL[u.rol] || u.rol}</div>
       </div>
+      <button class="btn-edit" onclick="abrirHistorialUsuario('${u.user_id}','${esc(u.nombre)}','${u.rol}')">📋</button>
       <button class="btn-edit" onclick="abrirEditarUsuario('${u.user_id}','${esc(u.nombre)}','${esc(u.email)}','${u.rol}')">✏ Editar</button>
       ${u.rol !== 'superadmin'
         ? `<button class="btn-edit btn-rechazar" onclick="eliminarUsuario('${u.user_id}','${esc(u.nombre)}')">🗑</button>`
@@ -135,4 +136,91 @@ async function eliminarUsuario(userId, nombre) {
 
   await renderUsuarios();
   showToast(`Usuario ${nombre} eliminado`);
+}
+
+// ── HISTORIAL POR USUARIO ──────────────────────────────
+
+async function abrirHistorialUsuario(userId, nombre, rol) {
+  document.getElementById('hist-titulo').textContent = `Historial — ${nombre}`;
+  document.getElementById('hist-body').innerHTML =
+    '<div style="text-align:center;padding:24px;color:var(--text-muted)">Cargando…</div>';
+  document.getElementById('modal-historial-usuario').classList.add('open');
+
+  if (rol === 'cliente') {
+    const { data: pedidos } = await sb.from('pedidos')
+      .select('id, tipo_camion, estado, origen, destino, fecha_ini, created_at, precio_cliente')
+      .eq('cliente_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    const ESTADO_LABEL = {
+      abierto: 'Abierto', en_negociacion: 'En negociación', acordado: '✓ Acordado',
+      cancelado: 'Cancelado', rechazado: 'Rechazado', pendiente_revision: 'En revisión',
+      pendiente_acuerdo: 'Acuerdo en revisión',
+    };
+    const ESTADO_COLOR = {
+      acordado: 'var(--green)', cancelado: 'var(--text-muted)', rechazado: 'var(--danger)',
+      abierto: 'var(--accent)', en_negociacion: 'var(--amber)',
+    };
+
+    document.getElementById('hist-body').innerHTML = pedidos?.length ? `
+      <div style="margin-bottom:10px;color:var(--text-muted);font-size:0.82rem">${pedidos.length} solicitud${pedidos.length !== 1 ? 'es' : ''} encontrada${pedidos.length !== 1 ? 's' : ''}</div>
+      <table class="rep-table">
+        <thead><tr><th>Servicio</th><th>Ruta</th><th>Fecha</th><th>Estado</th></tr></thead>
+        <tbody>
+          ${pedidos.map(p => `<tr>
+            <td>${esc(p.tipo_camion || '—')}</td>
+            <td style="font-size:0.78rem">${esc(p.origen || '—')}${p.destino ? ' → ' + esc(p.destino) : ''}</td>
+            <td style="font-size:0.78rem;color:var(--text-muted)">${fmtFecha(p.fecha_ini || (p.created_at||'').substring(0,10))}</td>
+            <td style="color:${ESTADO_COLOR[p.estado]||'inherit'};font-size:0.8rem">${ESTADO_LABEL[p.estado] || p.estado}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>` : '<div class="rep-empty">Este cliente no tiene solicitudes.</div>';
+
+  } else if (rol === 'admin') {
+    const [{ data: reservas }, { data: ofertas }] = await Promise.all([
+      sb.from('reservaciones')
+        .select('id, unidad, cliente, fecha_ini, fecha_fin, estado, precio_acordado, created_at')
+        .eq('propietario_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50),
+      sb.from('ofertas')
+        .select('id, pedido_id, precio_oferta, estado, created_at')
+        .eq('admin_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20),
+    ]);
+
+    const ganadas   = (ofertas || []).filter(o => o.estado === 'aceptada').length;
+    const enviadas  = (ofertas || []).length;
+    const ingresos  = (reservas || []).reduce((s, r) => s + (Number(r.precio_acordado) || 0), 0);
+
+    document.getElementById('hist-body').innerHTML = `
+      <div class="rep-cards" style="margin-bottom:16px">
+        <div class="rep-kpi-card"><div class="rep-kpi-val">${reservas?.length || 0}</div><div class="rep-kpi-label">Reservaciones</div></div>
+        <div class="rep-kpi-card"><div class="rep-kpi-val green">$${ingresos.toLocaleString('es-MX')}</div><div class="rep-kpi-label">Ingreso est.</div></div>
+        <div class="rep-kpi-card"><div class="rep-kpi-val">${ganadas}/${enviadas}</div><div class="rep-kpi-label">Ofertas ganadas</div></div>
+      </div>
+      ${reservas?.length ? `
+      <div class="rep-section-title" style="font-size:0.82rem;margin-bottom:8px">Últimas reservaciones</div>
+      <table class="rep-table">
+        <thead><tr><th>Cliente</th><th>Período</th><th>Precio</th><th>Estado</th></tr></thead>
+        <tbody>
+          ${reservas.slice(0, 20).map(r => `<tr>
+            <td>${esc(r.cliente || '—')}</td>
+            <td style="font-size:0.78rem">${fmtFecha(r.fecha_ini)} – ${fmtFecha(r.fecha_fin)}</td>
+            <td style="color:var(--green);font-size:0.8rem">$${(Number(r.precio_acordado)||0).toLocaleString('es-MX')}</td>
+            <td style="font-size:0.78rem;color:var(--text-muted)">${esc(r.estado)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>` : '<div class="rep-empty">Sin reservaciones aún.</div>'}`;
+
+  } else {
+    document.getElementById('hist-body').innerHTML =
+      '<div class="rep-empty">No hay historial disponible para este rol.</div>';
+  }
+}
+
+function cerrarHistorialUsuario() {
+  document.getElementById('modal-historial-usuario').classList.remove('open');
 }

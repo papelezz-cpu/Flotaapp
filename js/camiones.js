@@ -2,6 +2,8 @@
 
 let allCamiones = [];
 let currentRecursoTipo = 'camion'; // 'camion' | 'custodio' | 'patio'
+const RECURSOS_PAGE = 12;
+let _recursoPage = 0;
 
 const RECURSO_FILTRO_OPTS = {
   camion:   [['','Todos los tipos'],['Torton','Torton'],['Rabón','Rabón'],['Full','Full'],['Plataforma','Plataforma']],

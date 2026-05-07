@@ -507,6 +507,86 @@ body.light .modal-close-x:hover { background: rgba(239,68,68,0.1); }
 .btn-aprobar  { background: rgba(34,197,94,0.12)  !important; border-color: rgba(34,197,94,0.35)  !important; color: var(--green) !important; }
 .btn-rechazar { background: rgba(239,68,68,0.12)  !important; border-color: rgba(239,68,68,0.35)  !important; color: var(--red)   !important; }
 
+/* ── CARGAR MÁS ──────────────────────────────────────── */
+.btn-cargar-mas {
+  padding: 10px 28px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 20px;
+  font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn-cargar-mas:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── CATÁLOGO: INFO CHIPS DE EMPRESA ─────────────────── */
+.emp-info-chips {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  margin: 6px 0 8px;
+}
+.emp-info-chip {
+  font-size: 0.72rem; padding: 2px 8px;
+  background: rgba(78,142,247,0.09);
+  border: 1px solid rgba(78,142,247,0.2);
+  border-radius: 20px; color: var(--accent);
+}
+.emp-desc {
+  font-size: 0.82rem; color: var(--text-muted);
+  line-height: 1.45; margin-bottom: 10px;
+  display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+.btn-emp-perfil {
+  padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  font-size: 0.8rem; font-weight: 600;
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text-muted); transition: border-color 0.15s, color 0.15s;
+}
+.btn-emp-perfil:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── MODAL EMPRESA (catálogo) ────────────────────────── */
+.epc-rows { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.epc-row  { display: flex; align-items: center; gap: 10px; }
+.epc-row-icon  { font-size: 1rem; width: 22px; text-align: center; }
+.epc-row-label { font-size: 0.8rem; color: var(--text-muted); min-width: 130px; }
+.epc-row-val   { font-size: 0.85rem; color: var(--text-main); font-weight: 500; }
+
+/* ── REPORTES ─────────────────────────────────────────── */
+.rep-cards {
+  display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
+}
+.rep-kpi-card {
+  flex: 1; min-width: 120px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px 18px; text-align: center;
+}
+.rep-kpi-val   { font-size: 1.6rem; font-weight: 700; color: var(--text-main); }
+.rep-kpi-val.green { color: var(--green); }
+.rep-kpi-val.amber { color: var(--amber); }
+.rep-kpi-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+.rep-section   { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+.rep-section-title { font-size: 0.9rem; font-weight: 700; color: var(--text-main); margin-bottom: 14px; }
+.rep-cols { display: flex; gap: 16px; flex-wrap: wrap; }
+.rep-empty { color: var(--text-muted); font-size: 0.85rem; padding: 10px 0; }
+.rep-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.rep-table th { color: var(--text-muted); font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.rep-table td { padding: 7px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.rep-rank  { display: inline-block; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 0.7rem; font-weight: 700; text-align: center; line-height: 18px; margin-right: 5px; }
+
+/* Bar chart */
+.rep-bar-chart {
+  display: flex; align-items: flex-end; gap: 10px;
+  height: 140px; padding: 0 4px;
+}
+.rep-bar-col   { display: flex; flex-direction: column; align-items: center; flex: 1; height: 100%; }
+.rep-bar-wrap  { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+.rep-bar-fill  { width: 100%; border-radius: 4px 4px 0 0; background: var(--accent); min-height: 4px; transition: height 0.3s; }
+.rep-bar-val   { font-size: 0.75rem; font-weight: 600; color: var(--text-main); margin-top: 4px; }
+.rep-bar-label { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
+
 /* ── ARCHIVOS MODAL ──────────────────────────────────── */
 .archivo-item   { margin-bottom: 14px; }
 .archivo-preview { width: 100%; border-radius: 8px; margin-bottom: 6px; display: block; }
@@ -1284,4 +1364,58 @@ body.light .rechazo-info   { background: rgba(197,48,48,0.05); border-color: rgb
   .home-greeting { font-size: 1.5rem; }
   .home-hero { padding: 32px 16px 24px; }
 }
+
+/* ── CATÁLOGO: BÚSQUEDA ──────────────────────────────── */
+.cat-search-wrap { margin-top: 14px; }
+.cat-search-input {
+  width: 100%; padding: 10px 16px; box-sizing: border-box;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 10px; color: var(--text-main);
+  font-size: 0.88rem; font-family: inherit;
+  transition: border-color 0.15s;
+}
+.cat-search-input:focus { outline: none; border-color: var(--accent); }
+
+/* ── TIMELINE DE SOLICITUD (cliente) ─────────────────── */
+.ped-timeline {
+  display: flex; align-items: center; padding: 12px 0 4px;
+  margin: 6px 0 0;
+}
+.ped-tl-item  { display: flex; flex-direction: column; align-items: center; gap: 5px; flex-shrink: 0; }
+.ped-tl-dot   {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 2px solid var(--border); background: var(--surface);
+  transition: all 0.2s;
+}
+.ped-tl-dot.done   { background: var(--green); border-color: var(--green); }
+.ped-tl-dot.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(78,142,247,0.2); }
+.ped-tl-dot.failed { background: var(--danger); border-color: var(--danger); }
+.ped-tl-label {
+  font-size: 0.66rem; color: var(--text-muted);
+  white-space: nowrap; max-width: 60px; text-align: center;
+  line-height: 1.2;
+}
+.ped-tl-item:has(.ped-tl-dot.active) .ped-tl-label,
+.ped-tl-item:has(.ped-tl-dot.done)   .ped-tl-label { color: var(--text-main); font-weight: 600; }
+.ped-tl-line {
+  flex: 1; height: 2px; background: var(--border);
+  margin: 0 4px; margin-bottom: 17px;
+}
+.ped-tl-line.done { background: var(--green); }
+
+/* ── GEO AUTOCOMPLETE ────────────────────────────────── */
+.geo-dropdown {
+  display: none; position: absolute; z-index: 300;
+  top: 100%; left: 0; right: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  max-height: 200px; overflow-y: auto;
+}
+.geo-item {
+  padding: 9px 14px; cursor: pointer; font-size: 0.83rem;
+  color: var(--text-main); border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.geo-item:last-child { border-bottom: none; }
+.geo-item:hover { background: var(--surface-2); }
 

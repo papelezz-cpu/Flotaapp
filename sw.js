@@ -1,5 +1,7 @@
 // ── SERVICE WORKER — PortGo ────────────────────────────
-const CACHE = 'portgo-v35';
+const CACHE      = 'portgo-v36';
+const DATA_CACHE = 'portgo-data-v1';
+
 const SHELL = [
   '/',
   '/index.html',
@@ -24,6 +26,7 @@ const SHELL = [
   '/js/aprobaciones.js',
   '/js/admin.js',
   '/js/usuarios.js',
+  '/js/reportes.js',
   '/js/chat.js',
   '/js/catalogo.js',
   '/js/operadores.js',
@@ -42,41 +45,76 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE && k !== DATA_CACHE).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
 
-// Fetch: network-first para JS/CSS (siempre frescos), cache-first para imágenes
+// Fetch handler
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+  const isSameOrigin = url.hostname === location.hostname;
+  const isSupabaseRest = url.hostname.endsWith('supabase.co') &&
+                         url.pathname.startsWith('/rest/v1/') &&
+                         e.request.method === 'GET';
+  const isSupabaseEdge = url.hostname.endsWith('supabase.co') &&
+                         url.pathname.startsWith('/functions/');
 
-  // Supabase y CDN siempre desde red
-  if (url.hostname !== location.hostname) return;
+  // ── Supabase Edge Functions: always network, never cache ──
+  if (isSupabaseEdge) return;
 
-  const esScript = url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.html');
+  // ── Supabase REST (data): stale-while-revalidate ──────────
+  if (isSupabaseRest) {
+    e.respondWith(
+      caches.open(DATA_CACHE).then(async cache => {
+        const cached = await cache.match(e.request);
 
-  if (esScript) {
-    // Network-first: si falla la red, usar cache como fallback
+        const networkFetch = fetch(e.request.clone()).then(res => {
+          if (res.ok) cache.put(e.request.clone(), res.clone());
+          return res;
+        }).catch(() => null);
+
+        if (cached) {
+          // Return cached immediately, update in background
+          networkFetch.catch(() => {});
+          return cached;
+        }
+
+        // No cache yet: wait for network, fallback to empty array when offline
+        const networkRes = await networkFetch;
+        return networkRes ?? new Response('[]', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json', 'X-From-Cache': 'offline' }
+        });
+      })
+    );
+    return;
+  }
+
+  // ── Other Supabase calls (realtime, auth): always network ──
+  if (!isSameOrigin) return;
+
+  // ── App JS/CSS/HTML: network-first, fallback to cache ─────
+  const isAsset = /\.(js|css|html)$/.test(url.pathname) || url.pathname === '/';
+  if (isAsset) {
     e.respondWith(
       fetch(e.request).then(res => {
         if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
+          caches.open(CACHE).then(c => c.put(e.request, res.clone()));
         }
         return res;
       }).catch(() => caches.match(e.request))
     );
-  } else {
-    // Imágenes y otros assets: cache-first
-    e.respondWith(
-      caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }))
-    );
+    return;
   }
+
+  // ── Images and other static assets: cache-first ───────────
+  e.respondWith(
+    caches.match(e.request).then(cached =>
+      cached || fetch(e.request).then(res => {
+        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        return res;
+      })
+    )
+  );
 });

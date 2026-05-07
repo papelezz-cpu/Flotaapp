@@ -19,6 +19,7 @@ function showView(v, btn) {
   if (v === 'pendientes')    renderAprobaciones();
   if (v === 'pedidos')       renderPedidos();
   if (v === 'usuarios')      renderUsuarios();
+  if (v === 'reportes')      renderReportes();
 }
 
 function toggleMenu() {
@@ -58,6 +59,7 @@ function renderHome() {
       { e:'✅', bg:'hc-red',    t:'Por aprobar',   d:'Solicitudes y recursos pendientes', fn:`showView('pendientes',null)`, badge:'home-apr-badge' },
       { e:'👥', bg:'hc-blue',   t:'Usuarios',      d:'Gestión de cuentas',               fn:`showView('usuarios',null)` },
       { e:'📋', bg:'hc-slate',  t:'Solicitudes',   d:'Pedidos en el sistema',            fn:`showView('pedidos',null)` },
+      { e:'📊', bg:'hc-amber',  t:'Reportes',      d:'Métricas y estadísticas',          fn:`showView('reportes',null)` },
       { e:'📚', bg:'hc-teal',   t:'Catálogo',      d:'Directorio de proveedores',        fn:`showView('cliente',null)` },
       { e:'🗓️', bg:'hc-purple', t:'Reservaciones', d:'Reservas activas',                 fn:`showView('reservaciones',null)` },
     ],

@@ -8,6 +8,11 @@ let _pendingPedido     = null;   // pedido en espera de confirmar detalles
 let _filtroTipo        = 'todos';
 let _pedidosMode       = 'lista'; // 'solicitar' | 'lista'
 
+const PEDIDOS_PAGE = 30;
+let _pedidosOffset = 0;
+let _pedidosAccum  = [];
+let _ofertasAccum  = {};
+
 // Capacidades máximas reglamentadas por tipo (NOM-012-SCT-2), en toneladas
 const CAP_REGLAMENTADA = {
   'Camioneta 1.5 ton caja seca': 1.5, 'Camioneta 1.5 ton plataforma': 1.5,
@@ -47,59 +52,70 @@ function fmtTiempoRestante(isoStr) {
 
 // ── RENDER PRINCIPAL ───────────────────────────────────
 
-async function renderPedidos() {
+async function renderPedidos(append = false) {
   const container = document.getElementById('pedidos-list');
-  container.innerHTML = skeletonList(3);
 
-  // Botones de servicio / barra de filtros según modo
-  const btnServ   = document.getElementById('ped-serv-btns');
+  if (!append) {
+    _pedidosOffset = 0;
+    _pedidosAccum  = [];
+    _ofertasAccum  = {};
+    container.innerHTML = skeletonList(3);
+  }
+
+  const btnServ    = document.getElementById('ped-serv-btns');
   const filtrosBar = document.getElementById('ped-filtros-bar');
-  const esCliente = currentUser.id && currentUser.rol === 'cliente';
+  const esCliente  = currentUser.id && currentUser.rol === 'cliente';
 
   if (esCliente && _pedidosMode === 'solicitar') {
-    // Modo "Solicitar servicio": solo mostrar los 4 botones, sin lista
     if (btnServ)    btnServ.style.display    = 'grid';
     if (filtrosBar) filtrosBar.style.display = 'none';
     container.innerHTML = '';
     return;
   }
 
-  // Modo lista (admins, superadmins, o cliente en "Mis solicitudes")
   if (btnServ)    btnServ.style.display    = 'none';
   if (filtrosBar) filtrosBar.style.display = currentUser.id ? '' : 'none';
 
-  // Fetch pedidos + ofertas en paralelo
-  // Clientes solo ven pedidos activos (nunca acordado/cancelado)
-  let pedidosQ = sb.from('pedidos').select('*').order('created_at', { ascending: false });
-  // Clientes: ven públicos (abierto/en_negociacion) + los suyos en cualquier estado activo
-  // La RLS ya permite esto: (admin) OR (estado público) OR (cliente_id = auth.uid())
+  let pedidosQ = sb.from('pedidos').select('*').order('created_at', { ascending: false })
+    .range(_pedidosOffset, _pedidosOffset + PEDIDOS_PAGE - 1);
   if (esCliente) pedidosQ = pedidosQ.in('estado', ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado', 'acordado', 'cancelado']);
 
-  const [{ data: pedidos, error }, { data: todasOfertas }] = await Promise.all([
-    pedidosQ,
-    sb.from('ofertas').select('*').order('created_at', { ascending: true })
-  ]);
+  const { data: pedidosPage, error } = await pedidosQ;
 
   if (error) {
     container.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar solicitudes.</div>`;
     return;
   }
 
-  // Mapear ofertas por pedido
-  const ofertasMap = {};
-  (todasOfertas || []).forEach(o => {
-    if (!ofertasMap[o.pedido_id]) ofertasMap[o.pedido_id] = [];
-    ofertasMap[o.pedido_id].push(o);
-  });
+  // Accumulate new pedidos (skip duplicates)
+  const existingIds = new Set(_pedidosAccum.map(p => p.id));
+  (pedidosPage || []).forEach(p => { if (!existingIds.has(p.id)) _pedidosAccum.push(p); });
 
-  // Expiración lazy: marcar como rechazadas ofertas vencidas (fire-and-forget)
-  const expiradas = (todasOfertas || []).filter(o =>
-    o.estado === 'enviada' && o.expira_en && new Date(o.expira_en) < new Date()
-  );
-  if (expiradas.length) {
-    sb.from('ofertas').update({ estado: 'rechazada' })
-      .in('id', expiradas.map(o => o.id)).then(() => {});
+  // Fetch ofertas only for the new pedido IDs
+  if (pedidosPage?.length) {
+    const { data: nuevasOfertas } = await sb.from('ofertas')
+      .select('*').order('created_at', { ascending: true })
+      .in('pedido_id', pedidosPage.map(p => p.id));
+
+    (nuevasOfertas || []).forEach(o => {
+      if (!_ofertasAccum[o.pedido_id]) _ofertasAccum[o.pedido_id] = [];
+      if (!_ofertasAccum[o.pedido_id].some(x => x.id === o.id))
+        _ofertasAccum[o.pedido_id].push(o);
+    });
+
+    // Expiración lazy: marcar como rechazadas ofertas vencidas (fire-and-forget)
+    const expiradas = (nuevasOfertas || []).filter(o =>
+      o.estado === 'enviada' && o.expira_en && new Date(o.expira_en) < new Date()
+    );
+    if (expiradas.length) {
+      sb.from('ofertas').update({ estado: 'rechazada' })
+        .in('id', expiradas.map(o => o.id)).then(() => {});
+    }
   }
+
+  const pedidos      = _pedidosAccum;
+  const ofertasMap   = _ofertasAccum;
+  const todasOfertas = Object.values(_ofertasAccum).flat();
 
   const _filtrar = lista => {
     let r = lista;
@@ -149,16 +165,13 @@ async function renderPedidos() {
   // ── ADMIN / SUPERADMIN ─────────────────────────────
   } else if (currentUser.id && ['admin','superadmin'].includes(currentUser.rol)) {
     const misOfertaIds = new Set(
-      (todasOfertas || []).filter(o => o.admin_id === currentUser.id).map(o => o.pedido_id)
+      todasOfertas.filter(o => o.admin_id === currentUser.id).map(o => o.pedido_id)
     );
 
-    // Pedidos donde tengo oferta activa (enviada o contra_oferta)
     const misNegociaciones = _filtrar((pedidos || []).filter(p =>
       (ofertasMap[p.id] || []).some(o => o.admin_id === currentUser.id && ['enviada','contra_oferta'].includes(o.estado))
     ));
-    const misNegIds = new Set(misNegociaciones.map(p => p.id));
 
-    // Pedidos abiertos donde aún no he ofertado
     const disponibles = _filtrar((pedidos || []).filter(p =>
       p.estado === 'abierto' && !misOfertaIds.has(p.id)
     ));
@@ -188,8 +201,17 @@ async function renderPedidos() {
     }
   }
 
-  container.innerHTML = html ||
-    `<div class="empty-state"><div class="icon">📋</div>Sin actividad.</div>`;
+  const hasMas   = (pedidosPage?.length || 0) === PEDIDOS_PAGE;
+  const btnMasHtml = hasMas
+    ? `<div style="text-align:center;padding:16px 0"><button class="btn-cargar-mas" onclick="cargarMasPedidos()">Cargar más solicitudes</button></div>`
+    : '';
+
+  container.innerHTML = (html || `<div class="empty-state"><div class="icon">📋</div>Sin actividad.</div>`) + btnMasHtml;
+}
+
+async function cargarMasPedidos() {
+  _pedidosOffset += PEDIDOS_PAGE;
+  await renderPedidos(true);
 }
 
 // ── CARD DE PEDIDO ─────────────────────────────────────
@@ -238,8 +260,10 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
       ${p.estado === 'abierto'
         ? `<button class="btn-cancelar-ped" onclick="cancelarPedido('${p.id}')">Cancelar</button>`
         : ''}`;
-  } else if (vista === 'cliente' && p.estado === 'rechazado' && p.rechazo_nota) {
-    acciones = `<div class="apr-rechazo-nota">Motivo: ${esc(p.rechazo_nota)}</div>`;
+  } else if (vista === 'cliente' && p.estado === 'rechazado') {
+    acciones = `
+      ${p.rechazo_nota ? `<div class="apr-rechazo-nota" style="margin-bottom:8px">Motivo: ${esc(p.rechazo_nota)}</div>` : ''}
+      <button class="btn-ofertar" onclick="abrirReenviarPedido('${p.id}')">🔄 Corregir y reenviar</button>`;
 
   } else if (vista === 'admin') {
     acciones = `<button class="btn-ofertar" onclick="openHacerOferta('${p.id}')">Hacer oferta</button>`;
@@ -310,6 +334,25 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
     }
   }
 
+  // ── Timeline para vista cliente ──────────────────────
+  let timelineHTML = '';
+  if (vista === 'cliente') {
+    const TL_STEPS = ['Publicada', 'Negociando', 'En revisión', 'Acordada'];
+    const TL_POS = { abierto:0, en_negociacion:1, pendiente_revision:2, pendiente_acuerdo:2, acordado:3 };
+    const cur = TL_POS[p.estado] ?? -1;
+    const isFailed = p.estado === 'rechazado' || p.estado === 'cancelado';
+    timelineHTML = `<div class="ped-timeline">` +
+      TL_STEPS.map((label, i) => {
+        const done   = !isFailed && i < cur;
+        const active = !isFailed && i === cur;
+        const failed = isFailed && i === Math.min(2, cur < 0 ? 1 : cur);
+        return `<div class="ped-tl-item">
+          <div class="ped-tl-dot ${done ? 'done' : active ? 'active' : failed ? 'failed' : ''}"></div>
+          <div class="ped-tl-label">${label}</div>
+        </div>${i < TL_STEPS.length - 1 ? `<div class="ped-tl-line ${done ? 'done' : ''}"></div>` : ''}`;
+      }).join('') + `</div>`;
+  }
+
   return `
     <div class="pedido-card" id="ped-${p.id}">
       <div class="pedido-top">
@@ -324,6 +367,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
       ${chipsHTML}
       ${sobrepesoBanner}
       ${p.descripcion ? `<div class="pedido-desc">${esc(p.descripcion)}</div>` : ''}
+      ${timelineHTML}
       <div class="pedido-footer">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           ${precioBadge}
@@ -448,6 +492,8 @@ function openNuevoPedido(servicio) {
   }
 
   document.getElementById('modal-nuevo-pedido').classList.add('open');
+  // Setup geo autocomplete on first open
+  setTimeout(setupAllGeoInputs, 0);
 }
 function closeNuevoPedido() {
   document.getElementById('modal-nuevo-pedido').classList.remove('open');
@@ -978,6 +1024,23 @@ async function enviarOferta() {
   // Marcar pedido en negociación
   await sb.from('pedidos').update({ estado: 'en_negociacion' }).eq('id', pedidoParaOfertar);
 
+  // Email al cliente (fire-and-forget)
+  const ped = _pedidosAccum.find(p => p.id === pedidoParaOfertar);
+  if (ped?.cliente_id) {
+    fetch(FN_NOTIFICACION, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tipo:           'nueva_oferta',
+        clienteId:      ped.cliente_id,
+        clienteNombre:  ped.cliente_nombre,
+        adminNombre:    currentUser.nombre,
+        tipo_camion:    ped.tipo_camion,
+        precio,
+      }),
+    }).catch(() => {});
+  }
+
   closeHacerOferta();
   await renderPedidos();
   await loadNotificaciones();
@@ -1118,7 +1181,12 @@ async function cerrarAcuerdo(oferta, pedido) {
     estado:          'Activa',
     precio_acordado: oferta.precio_oferta,
   });
-  if (error) console.error('Error creando reservación desde pedido:', error);
+  if (error) {
+    if (error.message?.includes('RECURSO_NO_DISPONIBLE') || error.code === 'P0001') {
+      throw new Error('RECURSO_NO_DISPONIBLE');
+    }
+    throw new Error(error.message || 'Error al crear reservación');
+  }
 
   // Marcar camión como ocupado solo si la reserva ya inició (solo aplica a camiones)
   if (recursoTipo === 'camion' && oferta.camion_id && pedido.fecha_ini <= today()) {
@@ -1204,6 +1272,54 @@ async function openEmpresaPerfil(adminId, adminNombre) {
 
 function closeEmpresaPerfil() {
   document.getElementById('modal-empresa-perfil').classList.remove('open');
+}
+
+// ── CORREGIR Y REENVIAR PEDIDO ────────────────────────
+
+function abrirReenviarPedido(pedidoId) {
+  const pedido = _pedidosAccum.find(p => p.id === pedidoId);
+  if (!pedido) return;
+  document.getElementById('rp-id').value           = pedidoId;
+  document.getElementById('rp-tipo').textContent   = pedido.tipo_camion || '—';
+  document.getElementById('rp-origen').textContent  = pedido.origen || '—';
+  document.getElementById('rp-destino').textContent = pedido.destino || '—';
+  document.getElementById('rp-fecha-ini').value    = pedido.fecha_ini || '';
+  document.getElementById('rp-fecha-fin').value    = pedido.fecha_fin || '';
+  document.getElementById('rp-descripcion').value  = pedido.descripcion || '';
+  document.getElementById('rp-precio').value       = pedido.precio_cliente || '';
+  document.getElementById('modal-reenviar-pedido').classList.add('open');
+}
+
+function cerrarReenviarPedido() {
+  document.getElementById('modal-reenviar-pedido').classList.remove('open');
+}
+
+async function confirmarReenviar() {
+  const id       = document.getElementById('rp-id').value;
+  const fechaIni = document.getElementById('rp-fecha-ini').value;
+  const fechaFin = document.getElementById('rp-fecha-fin').value;
+  const desc     = document.getElementById('rp-descripcion').value.trim();
+  const precio   = document.getElementById('rp-precio').value;
+
+  if (!fechaIni) { showToast('Ingresa la fecha de inicio.'); return; }
+
+  const { error } = await sb.from('pedidos').update({
+    estado:         'abierto',
+    rechazo_nota:   null,
+    descripcion:    desc,
+    fecha_ini:      fechaIni,
+    fecha_fin:      fechaFin || fechaIni,
+    precio_cliente: precio ? Number(precio) : null,
+  }).eq('id', id);
+
+  if (error) { showToast('Error al reenviar: ' + error.message, 'error'); return; }
+
+  cerrarReenviarPedido();
+  _pedidosOffset = 0;
+  _pedidosAccum  = [];
+  _ofertasAccum  = {};
+  await renderPedidos();
+  showToast('✓ Solicitud reenviada. Está abierta para nuevas ofertas.');
 }
 
 // ── FILTROS SOLICITUDES ────────────────────────────────

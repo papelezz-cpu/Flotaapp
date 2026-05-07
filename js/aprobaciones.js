@@ -586,7 +586,16 @@ async function aprobarAcuerdo(pedidoId) {
   if (!oferta) { showToast('Error: oferta no encontrada', 'error'); return; }
 
   // Ejecutar el cierre real (rechaza otras ofertas, crea reservación, marca camión ocupado)
-  await cerrarAcuerdo(oferta, ped);
+  try {
+    await cerrarAcuerdo(oferta, ped);
+  } catch (e) {
+    if (e.message === 'RECURSO_NO_DISPONIBLE') {
+      showToast('❌ El recurso ya tiene una reserva activa en esas fechas. Rechaza el acuerdo antes de asignar otro recurso.', 'error');
+    } else {
+      showToast('Error al crear reservación: ' + e.message, 'error');
+    }
+    return;
+  }
 
   // Notificar a cliente y proveedor
   const notifs = [

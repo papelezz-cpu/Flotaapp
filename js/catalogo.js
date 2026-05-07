@@ -20,7 +20,7 @@ async function renderCatalogo() {
   grid.innerHTML = skeletonGrid(3);
 
   const { data: perfiles } = await sb.from('perfiles')
-    .select('user_id, nombre')
+    .select('user_id, nombre, rfc, razon_social, anos_operacion, num_unidades, seguro_rc, seguro_carga, permiso_sct, descripcion, telefono')
     .eq('rol', 'admin')
     .order('nombre');
 
@@ -120,6 +120,17 @@ function _empresaCardHTML(e) {
   if (e.patios.length)    bloques += _bloqueEstandar ('patio',    '🏭', 'Patios',    e.patios);
   if (e.lavados.length)   bloques += _bloqueLavado   (e.lavados);
 
+  const chips = [];
+  if (e.razon_social)    chips.push(`🏢 ${esc(e.razon_social)}`);
+  if (e.rfc)             chips.push(`RFC: ${esc(e.rfc)}`);
+  if (e.anos_operacion)  chips.push(`${e.anos_operacion} años`);
+  if (e.permiso_sct)     chips.push('SCT ✓');
+  if (e.seguro_rc)       chips.push('Seg. RC ✓');
+  if (e.seguro_carga)    chips.push('Seg. Carga ✓');
+  const infoChips = chips.length
+    ? `<div class="emp-info-chips">${chips.map(c => `<span class="emp-info-chip">${c}</span>`).join('')}</div>`
+    : '';
+
   return `
     <div class="empresa-card" data-servicios="${servicios.join(' ')}">
       <div class="empresa-card-top">
@@ -129,12 +140,18 @@ function _empresaCardHTML(e) {
           <div class="empresa-serv-icons">${iconBadges}</div>
         </div>
       </div>
+      ${infoChips}
+      ${e.descripcion ? `<div class="emp-desc">${esc(e.descripcion)}</div>` : ''}
       ${stars}
       <div class="empresa-recursos-list">${bloques}</div>
-      ${currentUser.rol === 'cliente' || !currentUser.id ? `
       <div class="empresa-card-footer">
-        <button class="btn-emp-solicitar" onclick="openNuevoPedido()">📋 Publicar solicitud</button>
-      </div>` : ''}
+        ${currentUser.rol === 'cliente' || !currentUser.id
+          ? `<button class="btn-emp-solicitar" onclick="openNuevoPedido()">📋 Publicar solicitud</button>`
+          : ''}
+        ${e.telefono || e.descripcion || e.rfc
+          ? `<button class="btn-emp-perfil" onclick="abrirPerfilEmpresaCat('${e.user_id}','${esc(e.nombre)}')">Ver empresa</button>`
+          : ''}
+      </div>
     </div>`;
 }
 
@@ -224,7 +241,7 @@ async function openVerCalificaciones(adminId, adminNombre) {
       <div class="vcal-item-top">
         <span class="vcal-stars">${'★'.repeat(c.rating)}${'☆'.repeat(5 - c.rating)}</span>
         <span class="vcal-label">${labels[c.rating] || ''}</span>
-        <span class="vcal-fecha">${fmtFecha(c.created_at)}</span>
+        <span class="vcal-fecha">${fmtFecha((c.created_at||'').substring(0,10))}</span>
       </div>
       ${c.comentario ? `<div class="vcal-comentario">"${esc(c.comentario)}"</div>` : ''}
     </div>`).join('');
@@ -234,18 +251,88 @@ function cerrarVerCalificaciones() {
   document.getElementById('modal-ver-calificaciones').classList.remove('open');
 }
 
+// ─── Modal perfil de empresa (desde catálogo) ──────────
+let _catPerfilesCache = {};
+
+async function abrirPerfilEmpresaCat(adminId, adminNombre) {
+  document.getElementById('epc-titulo').textContent = adminNombre;
+  document.getElementById('epc-body').innerHTML =
+    '<div style="text-align:center;padding:24px;color:var(--text-muted)">Cargando…</div>';
+  document.getElementById('modal-emp-cat').classList.add('open');
+
+  const [{ data: p }, { data: cals }] = await Promise.all([
+    sb.from('perfiles')
+      .select('rfc, razon_social, anos_operacion, num_unidades, seguro_rc, seguro_carga, permiso_sct, descripcion, telefono')
+      .eq('user_id', adminId).single(),
+    sb.from('calificaciones').select('rating, comentario, created_at').eq('admin_id', adminId).order('created_at', { ascending: false }).limit(5),
+  ]);
+
+  const avg = cals?.length ? (cals.reduce((s, c) => s + c.rating, 0) / cals.length).toFixed(1) : null;
+
+  const rows = [
+    p?.razon_social  && ['🏢', 'Razón social',        esc(p.razon_social)],
+    p?.rfc           && ['📄', 'RFC',                  esc(p.rfc)],
+    p?.telefono      && ['📞', 'Teléfono',              esc(p.telefono)],
+    p?.permiso_sct   && ['📋', 'Permiso SCT',          esc(p.permiso_sct)],
+    p?.anos_operacion && ['⏱️', 'Años de operación',   `${p.anos_operacion} años`],
+    p?.num_unidades  && ['🚛', 'Unidades en flota',    `${p.num_unidades}`],
+    (p?.seguro_rc || p?.seguro_carga) && ['🛡️', 'Seguros',
+      [p.seguro_rc && 'Responsabilidad Civil', p.seguro_carga && 'Carga'].filter(Boolean).join(' · ')],
+  ].filter(Boolean);
+
+  const recientes = (cals || []).slice(0, 3).map(c => `
+    <div class="vcal-item">
+      <div class="vcal-item-top">
+        <span class="vcal-stars">${'★'.repeat(c.rating)}${'☆'.repeat(5 - c.rating)}</span>
+        <span class="vcal-fecha">${fmtFecha((c.created_at||'').substring(0,10))}</span>
+      </div>
+      ${c.comentario ? `<div class="vcal-comentario">"${esc(c.comentario)}"</div>` : ''}
+    </div>`).join('');
+
+  document.getElementById('epc-body').innerHTML = `
+    ${p?.descripcion ? `<p class="emp-desc" style="margin-bottom:16px">${esc(p.descripcion)}</p>` : ''}
+    ${rows.length ? `
+    <div class="epc-rows">
+      ${rows.map(([icon, label, val]) => `
+        <div class="epc-row">
+          <span class="epc-row-icon">${icon}</span>
+          <span class="epc-row-label">${label}</span>
+          <span class="epc-row-val">${val}</span>
+        </div>`).join('')}
+    </div>` : ''}
+    ${avg ? `
+    <div style="margin-top:16px">
+      <div class="section-title" style="font-size:0.85rem;margin-bottom:8px">Calificación: ${avg} ⭐</div>
+      ${recientes}
+    </div>` : ''}`;
+}
+
+function cerrarPerfilEmpresaCat() {
+  document.getElementById('modal-emp-cat').classList.remove('open');
+}
+
 // ─── Filtro: muestra empresas y bloques del tipo activo ─
 function filtrarEmpresas(tipo) {
   document.querySelectorAll('.cat-pill').forEach(p =>
     p.classList.toggle('active', p.dataset.filter === tipo)
   );
+  const q = (document.getElementById('cat-search')?.value || '').toLowerCase().trim();
+  _aplicarFiltrosCat(tipo, q);
+}
 
+function buscarEmpresas(query) {
+  const tipo = document.querySelector('.cat-pill.active')?.dataset?.filter || 'camion';
+  _aplicarFiltrosCat(tipo, query.toLowerCase().trim());
+}
+
+function _aplicarFiltrosCat(tipo, q) {
   document.querySelectorAll('.empresa-card').forEach(card => {
     const tieneServicio = card.dataset.servicios?.includes(tipo);
-    card.style.display = tieneServicio ? '' : 'none';
+    const nombre = card.querySelector('.empresa-nombre')?.textContent?.toLowerCase() || '';
+    const matchQ = !q || nombre.includes(q);
+    card.style.display = tieneServicio && matchQ ? '' : 'none';
 
     if (tieneServicio) {
-      // Mostrar SOLO el bloque del tipo activo, ocultar los demás
       card.querySelectorAll('.emp-rec-bloque').forEach(bloque => {
         bloque.style.display = bloque.dataset.tipo === tipo ? '' : 'none';
       });

@@ -117,6 +117,11 @@
         <button class="cat-pill"        data-filter="patio"    onclick="filtrarEmpresas('patio')">🏭 Patios</button>
         <button class="cat-pill"        data-filter="lavado"   onclick="filtrarEmpresas('lavado')">🚿 Lavado</button>
       </div>
+      <div class="cat-search-wrap">
+        <input type="search" id="cat-search" class="cat-search-input"
+               placeholder="🔍 Buscar empresa por nombre..."
+               oninput="buscarEmpresas(this.value)">
+      </div>
     </div>
     <div class="empresa-grid" id="empresa-grid"></div>
     <!-- Elementos ocultos referenciados por JS legacy -->
@@ -787,6 +792,15 @@
 </div>
 
 <!-- ══ VISTA: USUARIOS (solo superadmin) ══════════════ -->
+<!-- ══ VISTA: REPORTES ═════════════════════════════════ -->
+<div id="view-reportes" class="view superadmin-only">
+  <div class="page">
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
+    <div class="section-title">📊 Reportes del sistema</div>
+    <div id="reportes-content"></div>
+  </div>
+</div>
+
 <div id="view-usuarios" class="view">
   <div class="page">
     <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
@@ -1718,26 +1732,92 @@
   </div>
 </div>
 
+<!-- ══ MODAL CORREGIR Y REENVIAR PEDIDO ════════════════ -->
+<div class="modal-overlay" id="modal-reenviar-pedido">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Corregir y reenviar solicitud</h2>
+      <button class="modal-close" onclick="cerrarReenviarPedido()">✕</button>
+    </div>
+    <input type="hidden" id="rp-id">
+    <div class="form-group">
+      <label>Servicio solicitado</label>
+      <div id="rp-tipo" style="padding:8px 12px;background:var(--surface-2);border-radius:8px;font-size:0.9rem;color:var(--text-muted)"></div>
+    </div>
+    <div class="form-group">
+      <label>Ruta</label>
+      <div style="padding:8px 12px;background:var(--surface-2);border-radius:8px;font-size:0.9rem;color:var(--text-muted)">
+        📍 <span id="rp-origen"></span> → <span id="rp-destino"></span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label>Fecha inicio</label>
+        <input type="date" id="rp-fecha-ini">
+      </div>
+      <div class="form-group">
+        <label>Fecha fin</label>
+        <input type="date" id="rp-fecha-fin">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Descripción / correcciones</label>
+      <textarea id="rp-descripcion" rows="3" placeholder="Explica los cambios o agrega detalles relevantes" style="resize:vertical"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Precio ofrecido MXN <span style="color:var(--text-muted);font-size:0.8rem">(opcional)</span></label>
+      <input type="number" id="rp-precio" placeholder="Ej. 5000" min="0">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn-add" style="flex:1" onclick="confirmarReenviar()">🔄 Reenviar solicitud</button>
+      <button class="btn-edit" onclick="cerrarReenviarPedido()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL PERFIL EMPRESA (catálogo) ═════════════════ -->
+<div class="modal-overlay" id="modal-emp-cat">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="epc-titulo">Empresa</h2>
+      <button class="modal-close" onclick="cerrarPerfilEmpresaCat()">✕</button>
+    </div>
+    <div id="epc-body"></div>
+  </div>
+</div>
+
+<!-- ══ MODAL HISTORIAL DE USUARIO ══════════════════════ -->
+<div class="modal-overlay" id="modal-historial-usuario">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <h2 id="hist-titulo">Historial</h2>
+      <button class="modal-close" onclick="cerrarHistorialUsuario()">✕</button>
+    </div>
+    <div id="hist-body"></div>
+  </div>
+</div>
+
 <!-- ══ SCRIPTS (orden importante) ══════════════════════ -->
-<script src="js/utils.js"></script>
+<script src="js/utils.js?v=1"></script>
 <script src="js/notificaciones.js?v=12"></script>
 <script src="js/detalle.js?v=12"></script>
 <script src="js/tracking.js"></script>
 <script src="js/config.js?v=9"></script>
 <script src="js/auth.js?v=11"></script>
 <script src="js/theme.js?v=10"></script>
-<script src="js/views.js?v=12"></script>
+<script src="js/views.js?v=13"></script>
 <script src="js/camiones.js?v=10"></script>
 <script src="js/recursos.js?v=10"></script>
 <script src="js/reservaciones.js?v=12"></script>
 <script src="js/modal.js?v=10"></script>
-<script src="js/pedidos.js?v=14"></script>
-<script src="js/aprobaciones.js?v=15"></script>
+<script src="js/pedidos.js?v=17"></script>
+<script src="js/aprobaciones.js?v=16"></script>
 <script src="js/admin.js?v=15"></script>
 <script src="js/operadores.js?v=4"></script>
-<script src="js/usuarios.js?v=11"></script>
+<script src="js/usuarios.js?v=12"></script>
+<script src="js/reportes.js?v=1"></script>
 <script src="js/chat.js?v=10"></script>
-<script src="js/catalogo.js?v=14"></script>
+<script src="js/catalogo.js?v=16"></script>
 <script src="js/tracking.js?v=10"></script>
 <script src="js/main.js?v=12"></script>
 
