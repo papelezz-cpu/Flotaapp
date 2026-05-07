@@ -1405,17 +1405,20 @@ body.light .rechazo-info   { background: rgba(197,48,48,0.05); border-color: rgb
 
 /* ── GEO AUTOCOMPLETE ────────────────────────────────── */
 .geo-dropdown {
-  display: none; position: absolute; z-index: 300;
-  top: 100%; left: 0; right: 0;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.25);
-  max-height: 200px; overflow-y: auto;
+  display: none; position: absolute; z-index: 9999;
+  top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--navy-mid); border: 1px solid var(--steel);
+  border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+  max-height: 220px; overflow-y: auto;
 }
 .geo-item {
-  padding: 9px 14px; cursor: pointer; font-size: 0.83rem;
-  color: var(--text-main); border-bottom: 1px solid var(--border);
-  transition: background 0.1s;
+  padding: 10px 14px; cursor: pointer; font-size: 0.84rem;
+  color: var(--text-main); border-bottom: 1px solid rgba(255,255,255,0.06);
+  transition: background 0.12s; line-height: 1.35;
 }
 .geo-item:last-child { border-bottom: none; }
-.geo-item:hover { background: var(--surface-2); }
+.geo-item:hover { background: var(--navy-light); }
+body.light .geo-dropdown { background: #fff; border-color: rgba(37,99,235,0.25); box-shadow: 0 8px 28px rgba(37,99,235,0.15); }
+body.light .geo-item { color: #0d1f3c; border-bottom-color: rgba(37,99,235,0.08); }
+body.light .geo-item:hover { background: #e8f4fd; }
 
