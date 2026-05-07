@@ -616,6 +616,18 @@ async function aprobarAcuerdo(pedidoId) {
   ];
   await sb.from('notificaciones').insert(notifs);
 
+  // Correo al cliente y proveedor: acuerdo aprobado
+  fetch(FN_NOTIFICACION, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tipo:        'acuerdo_aprobado',
+      tipo_camion: ped.tipo_camion,
+      clienteId:   ped.cliente_id,
+      adminId:     oferta.admin_id,
+    }),
+  }).catch(() => {});
+
   showToast('✓ Acuerdo aprobado. Reservación creada');
   renderAprobaciones();
   if (document.getElementById('view-pedidos')?.classList.contains('active')) renderPedidos();

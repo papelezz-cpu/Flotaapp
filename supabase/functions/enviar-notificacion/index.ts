@@ -107,8 +107,8 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: strin
   acuerdo_aprobado: (p) => tpl(
     `¡Acuerdo aprobado! — PortGo`,
     `<h2 style="margin:0 0 12px;color:#16a34a">✓ Acuerdo aprobado</h2>
-    <p>Hola <strong>${p.destinatarioNombre}</strong>, el acuerdo para tu servicio de <strong>${p.tipo_camion || 'transporte'}</strong> fue aprobado. Ya tienes una reservación activa.</p>
-    <p>Ingresa a la plataforma para ver los detalles de tu reservación.</p>`
+    <p>El acuerdo de <strong>${p.tipo_camion || 'transporte'}</strong> fue aprobado. Ya hay una reservación activa.</p>
+    <p>Ingresa a la plataforma para ver los detalles.</p>`
   ),
 };
 
