@@ -132,6 +132,13 @@ body.light .np-cat-banner { background: rgba(37,99,235,0.06); border-color: rgba
   color: #f87171; cursor: pointer; transition: background 0.15s;
 }
 .btn-apr-rechazar:hover { background: rgba(239,68,68,0.2); }
+.btn-apr-batch {
+  padding: 4px 12px; border-radius: 8px; font-size: 0.72rem; font-weight: 700;
+  background: rgba(74,222,128,0.15); border: 1.5px solid rgba(74,222,128,0.35);
+  color: #4ade80; cursor: pointer; transition: background 0.15s; text-transform: none;
+  letter-spacing: 0;
+}
+.btn-apr-batch:hover { background: rgba(74,222,128,0.25); }
 .apr-rechazo-nota {
   font-size: 0.78rem; color: #f87171; font-style: italic; margin-top: 4px;
 }

@@ -634,7 +634,7 @@ async function agregarCamion() {
   const g = elId => document.getElementById(elId)?.value?.trim() || null;
 
   const _done = _btnLoading('btn-agregar-camion');
-  if (!cap) { _done(); alert('La capacidad es obligatoria.'); return; }
+  if (!cap) { _done(); showToast('La capacidad es obligatoria.', 'error'); return; }
 
   // Validar archivos obligatorios
   const _fotosFiles = Array.from(document.getElementById('admin-fotos').files || []);
@@ -811,7 +811,7 @@ async function agregarCustodio() {
   const precio = parseFloat(document.getElementById('ac-precio').value) || null;
   const certs  = document.getElementById('ac-certs').value.trim();
   const _done = _btnLoading('btn-agregar-custodio');
-  if (!nombre || !tipo) { _done(); alert('Completa nombre y tipo.'); return; }
+  if (!nombre || !tipo) { _done(); showToast('Completa nombre y tipo.', 'error'); return; }
 
   const { data: existentes } = await sb.from('custodios').select('id').like('id','CUS-%');
   const maxNum = (existentes || []).reduce((max, c) => {
@@ -954,7 +954,7 @@ async function agregarPatio() {
   const precio   = parseFloat(document.getElementById('ap-precio').value) || null;
   const svcsRaw  = document.getElementById('ap-svcs').value.trim();
   const _done = _btnLoading('btn-agregar-patio');
-  if (!nombre || !tipo) { _done(); alert('Completa nombre y tipo.'); return; }
+  if (!nombre || !tipo) { _done(); showToast('Completa nombre y tipo.', 'error'); return; }
 
   const { data: existentes } = await sb.from('patios').select('id').like('id','PAT-%');
   const maxNum = (existentes || []).reduce((max, p) => {
@@ -1102,7 +1102,7 @@ async function agregarLavado() {
   const desc        = document.getElementById('al-desc').value.trim();
 
   const _done = _btnLoading('btn-agregar-lavado');
-  if (!nombre) { _done(); alert('Escribe un nombre para el servicio.'); return; }
+  if (!nombre) { _done(); showToast('Escribe un nombre para el servicio.', 'error'); return; }
 
   const propietarioId = _getPropietarioId('lavado');
   if (!propietarioId) { _done(); return; }

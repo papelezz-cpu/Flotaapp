@@ -262,9 +262,10 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
       <button class="btn-ver-pedido" onclick="openPedidoDetalle('${p.id}')">
         Ver ofertas${pendientes.length ? `<span class="ped-badge-count">${pendientes.length}</span>` : ''}
       </button>
-      ${p.estado === 'abierto'
-        ? `<button class="btn-cancelar-ped" onclick="cancelarPedido('${p.id}')">Cancelar</button>`
-        : ''}`;
+      ${p.estado === 'abierto' ? `
+        <button class="btn-edit" onclick="openEditarPedido('${p.id}')" title="Editar solicitud">✏</button>
+        <button class="btn-cancelar-ped" onclick="cancelarPedido('${p.id}')">Cancelar</button>
+      ` : ''}`;
   } else if (vista === 'cliente' && p.estado === 'rechazado') {
     acciones = `
       ${p.rechazo_nota ? `<div class="apr-rechazo-nota" style="margin-bottom:8px">Motivo: ${esc(p.rechazo_nota)}</div>` : ''}
@@ -1336,6 +1337,53 @@ async function confirmarReenviar() {
   _ofertasAccum  = {};
   await renderPedidos();
   showToast('✓ Solicitud reenviada. Está abierta para nuevas ofertas.');
+}
+
+// ── EDITAR PEDIDO (estado abierto) ────────────────────
+
+function openEditarPedido(pedidoId) {
+  const p = _pedidosAccum.find(x => x.id === pedidoId);
+  if (!p) return;
+  document.getElementById('edp-id').value          = pedidoId;
+  document.getElementById('edp-fecha-ini').value   = (p.fecha_ini || '').split('T')[0];
+  document.getElementById('edp-fecha-fin').value   = (p.fecha_fin || '').split('T')[0];
+  document.getElementById('edp-descripcion').value = p.descripcion || '';
+  document.getElementById('edp-precio').value      = p.precio_cliente || '';
+  document.getElementById('modal-editar-pedido').classList.add('open');
+}
+
+function cerrarEditarPedido() {
+  document.getElementById('modal-editar-pedido').classList.remove('open');
+}
+
+async function confirmarEditarPedido() {
+  const id       = document.getElementById('edp-id').value;
+  const fechaIni = document.getElementById('edp-fecha-ini').value;
+  const fechaFin = document.getElementById('edp-fecha-fin').value;
+  const desc     = document.getElementById('edp-descripcion').value.trim();
+  const precio   = document.getElementById('edp-precio').value;
+
+  if (!fechaIni) { showToast('La fecha de inicio es requerida.', 'error'); return; }
+
+  const btnSave = document.querySelector('#modal-editar-pedido .btn-confirm');
+  if (btnSave) { btnSave.disabled = true; btnSave.textContent = 'Guardando…'; }
+
+  const { error } = await sb.from('pedidos').update({
+    fecha_ini:      fechaIni,
+    fecha_fin:      fechaFin || fechaIni,
+    descripcion:    desc || null,
+    precio_cliente: precio ? Number(precio) : null,
+  }).eq('id', id);
+
+  if (btnSave) { btnSave.disabled = false; btnSave.textContent = '💾 Guardar cambios'; }
+  if (error) { showToast('Error al guardar: ' + error.message, 'error'); return; }
+
+  cerrarEditarPedido();
+  _pedidosOffset = 0;
+  _pedidosAccum  = [];
+  _ofertasAccum  = {};
+  await renderPedidos();
+  showToast('✓ Solicitud actualizada');
 }
 
 // ── FILTROS SOLICITUDES ────────────────────────────────

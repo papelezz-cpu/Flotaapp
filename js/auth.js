@@ -32,7 +32,7 @@ async function checkExistingSession() {
     .eq('user_id', session.user.id)
     .maybeSingle();
 
-  if (perfil?.aprobacion_cuenta === 'pendiente' || perfil?.aprobacion_cuenta === 'rechazada') {
+  if (['pendiente','rechazada','suspendida'].includes(perfil?.aprobacion_cuenta)) {
     await sb.auth.signOut();
     showLoginOverlay();
     return;
@@ -112,6 +112,11 @@ async function doLogin() {
   if (perfil?.aprobacion_cuenta === 'rechazada') {
     await sb.auth.signOut();
     err.textContent = `Tu solicitud fue rechazada.${perfil.nota_rechazo_cuenta ? ' Motivo: ' + perfil.nota_rechazo_cuenta : ' Contacta a soporte para más información.'}`;
+    err.classList.add('show'); return;
+  }
+  if (perfil?.aprobacion_cuenta === 'suspendida') {
+    await sb.auth.signOut();
+    err.textContent = 'Tu cuenta ha sido suspendida. Contacta a soporte para más información.';
     err.classList.add('show'); return;
   }
 
@@ -639,6 +644,30 @@ async function doPasswordReset() {
   await sb.auth.signOut();
   showToast('✓ Contraseña actualizada. Inicia sesión.');
   location.reload();
+}
+
+// ── PERFIL PROPIO (desde header) ──────────────────────
+function abrirMiPerfil() {
+  if (!currentUser.id) return;
+  const ROL_LABEL_MAP = { superadmin: '⭐ Superadmin', admin: '🏢 Empresa', cliente: '🛒 Cliente' };
+  const rolLabel = ROL_LABEL_MAP[currentUser.rol] || currentUser.rol;
+  const initial  = (currentUser.nombre || '?')[0].toUpperCase();
+  document.getElementById('mi-perfil-body').innerHTML = `
+    <div style="text-align:center;padding:8px 0 16px">
+      <div style="width:60px;height:60px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;margin:0 auto 12px">${esc(initial)}</div>
+      <div style="font-size:1.1rem;font-weight:700;color:var(--text)">${esc(currentUser.nombre || '—')}</div>
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-top:4px">${esc(currentUser.email || '')}</div>
+      <span class="badge badge-avail" style="margin-top:8px;display:inline-block">${rolLabel}</span>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--steel);margin:4px 0 16px">
+    <button class="btn-add" style="width:100%;margin-bottom:10px" onclick="cerrarMiPerfil();showPasswordResetModal()">🔑 Cambiar contraseña</button>
+    <button class="btn-edit" style="width:100%" onclick="cerrarMiPerfil();logout()">🚪 Cerrar sesión</button>
+  `;
+  document.getElementById('modal-mi-perfil').classList.add('open');
+}
+
+function cerrarMiPerfil() {
+  document.getElementById('modal-mi-perfil').classList.remove('open');
 }
 
 async function logout() {

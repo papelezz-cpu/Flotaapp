@@ -1,5 +1,29 @@
 // ── MÓDULO DE REVISIONES (solo superadmin) ─────────────
 
+// ─── Modal genérico para rechazo con nota ──────────────
+let _rechazarNotaCb = null;
+
+function _abrirRechazarNota(titulo, label, callback) {
+  document.getElementById('rn-titulo').textContent = titulo;
+  document.getElementById('rn-label').textContent  = label;
+  document.getElementById('rn-nota').value         = '';
+  _rechazarNotaCb = callback;
+  document.getElementById('modal-rechazar-nota').classList.add('open');
+  setTimeout(() => document.getElementById('rn-nota')?.focus(), 100);
+}
+
+function cerrarRechazarNota() {
+  document.getElementById('modal-rechazar-nota').classList.remove('open');
+  _rechazarNotaCb = null;
+}
+
+function confirmarRechazarNota() {
+  const nota = document.getElementById('rn-nota').value.trim();
+  const cb   = _rechazarNotaCb;
+  cerrarRechazarNota();
+  if (cb) cb(nota);
+}
+
 async function renderAprobaciones() {
   if (currentUser.rol !== 'superadmin') return;
 
@@ -96,7 +120,7 @@ async function renderAprobaciones() {
   }
 
   // ── SOLICITUDES POR REVISAR ──────────────────────────
-  html += `<div class="apr-bloque-title" style="margin-top:28px">📋 Solicitudes por revisar <span class="apr-count">${(solicitudes || []).length}</span></div>`;
+  html += `<div class="apr-bloque-title" style="margin-top:28px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">📋 Solicitudes por revisar <span class="apr-count">${(solicitudes || []).length}</span>${(solicitudes||[]).length > 1 ? `<button class="btn-apr-batch" onclick="aprobarTodasSolicitudes()">✓ Aprobar todas</button>` : ''}</div>`;
 
   if (!solicitudes?.length) {
     html += `<div class="apr-empty">Sin solicitudes pendientes de revisión</div>`;
@@ -126,7 +150,7 @@ async function renderAprobaciones() {
   }
 
   // ── ACUERDOS POR APROBAR ─────────────────────────────
-  html += `<div class="apr-bloque-title" style="margin-top:28px">🤝 Acuerdos por aprobar <span class="apr-count">${(acuerdos || []).length}</span></div>`;
+  html += `<div class="apr-bloque-title" style="margin-top:28px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">🤝 Acuerdos por aprobar <span class="apr-count">${(acuerdos || []).length}</span>${(acuerdos||[]).length > 1 ? `<button class="btn-apr-batch" onclick="aprobarTodosAcuerdos()">✓ Aprobar todos</button>` : ''}</div>`;
 
   if (!acuerdos?.length) {
     html += `<div class="apr-empty">Sin acuerdos pendientes de aprobación</div>`;
@@ -463,20 +487,22 @@ async function aprobarCuenta(userId) {
   _loadAprBadge();
 }
 
-async function rechazarCuenta(userId) {
-  const nota = prompt('Motivo del rechazo (el usuario lo verá al intentar iniciar sesión):');
-  if (nota === null) return;
-
-  const notaTrim = nota.trim() || null;
-  const [{ error }] = await Promise.all([
-    sb.from('perfiles').update({ aprobacion_cuenta: 'rechazada', nota_rechazo_cuenta: notaTrim }).eq('user_id', userId),
-    sb.from('solicitudes_cuenta').update({ estado: 'rechazada', nota_rechazo: notaTrim }).eq('user_id', userId),
-  ]);
-  if (error) { showToast('Error al rechazar', 'error'); return; }
-
-  document.getElementById(`aprcuenta-${userId}`)?.remove();
-  showToast('Solicitud rechazada');
-  _loadAprBadge();
+function rechazarCuenta(userId) {
+  _abrirRechazarNota(
+    'Rechazar solicitud de cuenta',
+    'Motivo (el usuario lo verá al intentar iniciar sesión):',
+    async nota => {
+      const notaTrim = nota || null;
+      const [{ error }] = await Promise.all([
+        sb.from('perfiles').update({ aprobacion_cuenta: 'rechazada', nota_rechazo_cuenta: notaTrim }).eq('user_id', userId),
+        sb.from('solicitudes_cuenta').update({ estado: 'rechazada', nota_rechazo: notaTrim }).eq('user_id', userId),
+      ]);
+      if (error) { showToast('Error al rechazar', 'error'); return; }
+      document.getElementById(`aprcuenta-${userId}`)?.remove();
+      showToast('Solicitud rechazada');
+      _loadAprBadge();
+    }
+  );
 }
 
 function _diffHtml(recurso, labels) {
@@ -555,25 +581,27 @@ async function aprobarSolicitud(pedidoId) {
 
 // ── RECHAZAR SOLICITUD ───────────────────────────────────
 
-async function rechazarSolicitud(pedidoId) {
-  const nota = prompt('Motivo del rechazo (se enviará al cliente):') ?? '';
-
-  const { data: ped } = await sb.from('pedidos').select('cliente_id, tipo_camion').eq('id', pedidoId).single();
-  await sb.from('pedidos').update({ estado: 'rechazado', rechazo_nota: nota || null }).eq('id', pedidoId);
-
-  if (ped?.cliente_id) {
-    await sb.from('notificaciones').insert({
-      user_id: ped.cliente_id,
-      tipo:    'solicitud_rechazada',
-      titulo:  'Solicitud no aprobada',
-      mensaje: `Tu solicitud de ${esc(ped.tipo_camion || 'servicio')} no fue aprobada.${nota ? ' Motivo: ' + nota : ''}`,
-      leido:   false,
-    });
-  }
-
-  showToast('Solicitud rechazada y notificada al cliente');
-  renderAprobaciones();
-  if (document.getElementById('view-pedidos')?.classList.contains('active')) renderPedidos();
+function rechazarSolicitud(pedidoId) {
+  _abrirRechazarNota(
+    'Rechazar solicitud',
+    'Motivo del rechazo (se enviará al cliente):',
+    async nota => {
+      const { data: ped } = await sb.from('pedidos').select('cliente_id, tipo_camion').eq('id', pedidoId).single();
+      await sb.from('pedidos').update({ estado: 'rechazado', rechazo_nota: nota || null }).eq('id', pedidoId);
+      if (ped?.cliente_id) {
+        await sb.from('notificaciones').insert({
+          user_id: ped.cliente_id,
+          tipo:    'solicitud_rechazada',
+          titulo:  'Solicitud no aprobada',
+          mensaje: `Tu solicitud de ${esc(ped.tipo_camion || 'servicio')} no fue aprobada.${nota ? ' Motivo: ' + nota : ''}`,
+          leido:   false,
+        });
+      }
+      showToast('Solicitud rechazada y notificada al cliente');
+      renderAprobaciones();
+      if (document.getElementById('view-pedidos')?.classList.contains('active')) renderPedidos();
+    }
+  );
 }
 
 // ── APROBAR ACUERDO ──────────────────────────────────────
@@ -705,9 +733,15 @@ async function aprobarOperador(id) {
 }
 
 
-async function rechazarAcuerdo(pedidoId) {
-  const nota = prompt('Motivo del rechazo (se notificará a ambas partes):') ?? '';
+function rechazarAcuerdo(pedidoId) {
+  _abrirRechazarNota(
+    'Rechazar acuerdo',
+    'Motivo del rechazo (se notificará a ambas partes):',
+    nota => _ejecutarRechazarAcuerdo(pedidoId, nota)
+  );
+}
 
+async function _ejecutarRechazarAcuerdo(pedidoId, nota) {
   const { data: ped } = await sb.from('pedidos').select('*').eq('id', pedidoId).single();
   const ofertaId = ped?.oferta_pendiente_id;
 
@@ -873,4 +907,39 @@ async function confirmarRechazarRecurso() {
   cerrarRechazarRecurso();
   showToast(`${id} devuelto con comentarios`);
   renderAprobaciones();
+}
+
+// ── APROBACIÓN EN LOTE ────────────────────────────────────
+
+async function aprobarTodasSolicitudes() {
+  if (!confirm('¿Aprobar y publicar todas las solicitudes pendientes de revisión?')) return;
+  const { data: solic } = await sb.from('pedidos').select('id').eq('estado', 'pendiente_revision');
+  if (!solic?.length) { showToast('No hay solicitudes pendientes'); return; }
+  for (const p of solic) {
+    await sb.from('pedidos').update({ estado: 'abierto', rechazo_nota: null }).eq('id', p.id);
+  }
+  const { data: admins } = await sb.from('perfiles').select('user_id').in('rol', ['admin', 'superadmin']);
+  if (admins?.length) {
+    await sb.from('notificaciones').insert(admins.map(a => ({
+      user_id: a.user_id,
+      tipo:    'nueva_solicitud',
+      titulo:  `${solic.length} solicitudes publicadas`,
+      mensaje: `Se aprobaron ${solic.length} solicitudes. Ya están disponibles para ofertar.`,
+      leido:   false,
+    })));
+  }
+  await renderAprobaciones();
+  if (document.getElementById('view-pedidos')?.classList.contains('active')) renderPedidos();
+  showToast(`✓ ${solic.length} solicitud${solic.length !== 1 ? 'es' : ''} aprobada${solic.length !== 1 ? 's' : ''} y publicada${solic.length !== 1 ? 's' : ''}`);
+}
+
+async function aprobarTodosAcuerdos() {
+  if (!confirm('¿Aprobar todos los acuerdos pendientes? Se crearán reservaciones para cada uno.')) return;
+  const { data: acuerdos } = await sb.from('pedidos').select('id').eq('estado', 'pendiente_acuerdo');
+  if (!acuerdos?.length) { showToast('No hay acuerdos pendientes'); return; }
+  let ok = 0, err = 0;
+  for (const a of acuerdos) {
+    try { await aprobarAcuerdo(a.id); ok++; } catch (_) { err++; }
+  }
+  showToast(`✓ ${ok} acuerdo${ok !== 1 ? 's' : ''} aprobado${ok !== 1 ? 's' : ''}${err ? ` · ${err} con error` : ''}`);
 }

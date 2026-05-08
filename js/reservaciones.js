@@ -85,6 +85,9 @@ async function renderReserv() {
       const calBtn = (r.estado === 'Completada' && !r.calificado && propId)
         ? `<button class="btn-calificar" onclick="openCalificar('${r.id}','${propId}','${esc(empresaMap[r.unidad]||'')}')">⭐ Calificar</button>`
         : '';
+      const pagoLbl = (r.estado === 'Completada' && r.pagado)
+        ? `<span style="font-size:0.7rem;color:var(--green);font-weight:600">💰 Pagado</span>`
+        : '';
       return `
       <div class="reserv-row reserv-row-cli">
         <div class="reserv-id">${unidadLabel}</div>
@@ -96,6 +99,7 @@ async function renderReserv() {
           ${trackBtn}
           ${chatBtn}
           ${calBtn}
+          ${pagoLbl}
         </div>
       </div>`;
     }).join('');
@@ -205,6 +209,10 @@ async function renderReserv() {
         <button class="btn-edit" onclick="openTracking('${r.id}')" title="Ver seguimiento">📍 ${esc(trackStep)}</button>
         <button class="btn-completar-reserva" onclick="marcarCompletado('${r.id}')">✓ Completar</button>
         <button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${esc(r.unidad)}')">Cancelar</button>`;
+    } else if (esDueno && esCompletada) {
+      acciones = r.pagado
+        ? `<span style="font-size:0.72rem;color:var(--green);font-weight:600">💰 Pagado</span>`
+        : `<button class="btn-edit" style="font-size:0.72rem;color:var(--amber);border-color:rgba(245,158,11,0.4)" onclick="marcarPagado('${r.id}')">💰 Marcar pagado</button>`;
     }
 
     const unidadLabel = recursoLabelMap[r.unidad] || esc(r.unidad) || '—';
@@ -437,6 +445,15 @@ async function enviarCalificacion() {
   closeCalificar();
   await renderReserv();
   showToast('⭐ ¡Gracias por tu calificación!');
+}
+
+// ── MARCAR PAGO ────────────────────────────────────────
+async function marcarPagado(reservaId) {
+  if (!confirm('¿Confirmar que el pago fue recibido para esta reservación?')) return;
+  const { error } = await sb.from('reservaciones').update({ pagado: true }).eq('id', reservaId);
+  if (error) { showToast('Error al registrar pago: ' + error.message, 'error'); return; }
+  await renderReserv();
+  showToast('💰 Pago registrado');
 }
 
 // Helper: envía email via edge function (fire-and-forget)

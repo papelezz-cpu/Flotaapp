@@ -31,8 +31,9 @@ async function renderUsuarios() {
   }
 
   const APR_BADGE = {
-    pendiente: `<span style="display:inline-block;font-size:0.68rem;font-weight:700;background:rgba(234,179,8,0.15);color:#ca8a04;border:1px solid rgba(234,179,8,0.35);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">Pendiente</span>`,
-    rechazada: `<span style="display:inline-block;font-size:0.68rem;font-weight:700;background:rgba(239,68,68,0.12);color:var(--danger);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">Rechazada</span>`,
+    pendiente:  `<span style="display:inline-block;font-size:0.68rem;font-weight:700;background:rgba(234,179,8,0.15);color:#ca8a04;border:1px solid rgba(234,179,8,0.35);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">Pendiente</span>`,
+    rechazada:  `<span style="display:inline-block;font-size:0.68rem;font-weight:700;background:rgba(239,68,68,0.12);color:var(--danger);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">Rechazada</span>`,
+    suspendida: `<span style="display:inline-block;font-size:0.68rem;font-weight:700;background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.35);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">Suspendida</span>`,
   };
 
   list.innerHTML = json.lista.map(u => `
@@ -45,9 +46,12 @@ async function renderUsuarios() {
       </div>
       <button class="btn-edit" onclick="abrirHistorialUsuario('${u.user_id}','${esc(u.nombre)}','${u.rol}')">📋</button>
       <button class="btn-edit" onclick="abrirEditarUsuario('${u.user_id}','${esc(u.nombre)}','${esc(u.email)}','${u.rol}')">✏ Editar</button>
-      ${u.rol !== 'superadmin'
-        ? `<button class="btn-edit btn-rechazar" onclick="eliminarUsuario('${u.user_id}','${esc(u.nombre)}')">🗑</button>`
-        : ''}
+      ${u.rol !== 'superadmin' ? `
+        ${u.aprobacion_cuenta === 'suspendida'
+          ? `<button class="btn-edit" style="color:var(--green);border-color:rgba(34,197,94,0.3)" onclick="reactivarUsuario('${u.user_id}','${esc(u.nombre)}')">↑ Activar</button>`
+          : `<button class="btn-edit" style="color:var(--amber);border-color:rgba(245,158,11,0.3)" onclick="suspenderUsuario('${u.user_id}','${esc(u.nombre)}')">🚫</button>`}
+        <button class="btn-edit btn-rechazar" onclick="eliminarUsuario('${u.user_id}','${esc(u.nombre)}')">🗑</button>
+      ` : ''}
     </div>`).join('');
 }
 
@@ -223,4 +227,21 @@ async function abrirHistorialUsuario(userId, nombre, rol) {
 
 function cerrarHistorialUsuario() {
   document.getElementById('modal-historial-usuario').classList.remove('open');
+}
+
+// ── SUSPENDER / REACTIVAR ──────────────────────────────
+
+async function suspenderUsuario(userId, nombre) {
+  if (!confirm(`¿Suspender la cuenta de "${nombre}"?\nNo podrá iniciar sesión hasta que sea reactivada.`)) return;
+  const { error } = await sb.from('perfiles').update({ aprobacion_cuenta: 'suspendida' }).eq('user_id', userId);
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  await renderUsuarios();
+  showToast(`🚫 Cuenta de ${nombre} suspendida`);
+}
+
+async function reactivarUsuario(userId, nombre) {
+  const { error } = await sb.from('perfiles').update({ aprobacion_cuenta: null }).eq('user_id', userId);
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  await renderUsuarios();
+  showToast(`✓ Cuenta de ${nombre} reactivada`);
 }
