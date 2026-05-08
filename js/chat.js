@@ -103,7 +103,13 @@ function _msgHTML(m) {
 }
 
 // ─── Enviar mensaje ─────────────────────────────────────
+let _chatLastSend = 0;
+
 async function enviarMensaje() {
+  const ahora = Date.now();
+  if (ahora - _chatLastSend < 800) return; // throttle: máximo 1 msg cada 800ms
+  _chatLastSend = ahora;
+
   const input = document.getElementById('chat-input');
   const texto = input.value.trim();
   if (!texto || !currentUser.id) return;

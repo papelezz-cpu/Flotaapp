@@ -188,6 +188,8 @@ function iniciarRegistro(rol) {
 function _regVolverInicio() {
   _regRol = null;
   document.querySelector('.login-box')?.classList.remove('expanded');
+  const errEl = document.getElementById('registro-error');
+  if (errEl) errEl.classList.remove('show');
   _renderRegSelector();
 }
 

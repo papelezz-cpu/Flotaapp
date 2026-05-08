@@ -64,12 +64,12 @@ function renderNotifPanel() {
 }
 
 async function onNotifClick(id, tipo) {
-  // Marcar como leída
-  await sb.from('notificaciones').update({ leido: true }).eq('id', id);
+  // Optimistic: actualizar UI primero, DB en segundo plano
   const notif = (notifPanel || []).find(n => n.id === id);
   notifPanel = (notifPanel || []).map(n => n.id === id ? { ...n, leido: true } : n);
   loadNotificaciones();
   toggleNotifPanel();
+  sb.from('notificaciones').update({ leido: true }).eq('id', id).then(() => {});
 
   // Navegar a la vista correspondiente
   const tabs = document.querySelectorAll('.nav-tab');
@@ -148,11 +148,12 @@ async function onNotifClick(id, tipo) {
 
 async function markAllRead() {
   if (!currentUser.id) return;
-  await sb.from('notificaciones').update({ leido: true })
-    .eq('user_id', currentUser.id).eq('leido', false);
+  // Optimistic: UI primero
   notifPanel = (notifPanel || []).map(n => ({ ...n, leido: true }));
   loadNotificaciones();
   renderNotifPanel();
+  sb.from('notificaciones').update({ leido: true })
+    .eq('user_id', currentUser.id).eq('leido', false).then(() => {});
 }
 
 function fmtTimeAgo(isoStr) {

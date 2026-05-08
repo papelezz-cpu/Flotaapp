@@ -209,9 +209,14 @@ async function renderPedidos(append = false) {
   container.innerHTML = (html || `<div class="empty-state"><div class="icon">📋</div>Sin actividad.</div>`) + btnMasHtml;
 }
 
+let _cargandoMas = false;
+
 async function cargarMasPedidos() {
+  if (_cargandoMas) return;
+  _cargandoMas = true;
   _pedidosOffset += PEDIDOS_PAGE;
   await renderPedidos(true);
+  _cargandoMas = false;
 }
 
 // ── CARD DE PEDIDO ─────────────────────────────────────
