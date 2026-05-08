@@ -415,6 +415,18 @@ async function doRegistro() {
     showErr('Adjunta todos los documentos requeridos.'); return;
   }
 
+  const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+  const TIPOS_OK = ['image/jpeg','image/png','image/webp','application/pdf'];
+  const validarDoc = (f, label) => {
+    if (!f) return true;
+    if (f.size > MAX_SIZE) { showErr(`"${label}" excede 10 MB. Usa una imagen o PDF más pequeño.`); return false; }
+    if (!TIPOS_OK.includes(f.type)) { showErr(`"${label}" debe ser JPG, PNG o PDF.`); return false; }
+    return true;
+  };
+  if (!validarDoc(ineFile, 'Identificación oficial')) return;
+  if (!validarDoc(compDomFile, 'Comprobante de domicilio')) return;
+  if (!validarDoc(fotoDomFile, 'Fotografía')) return;
+
   let curp = '', razonSocial = '', csfFile = null, opinionFile = null, actaFile = null;
   if (_regRol === 'cliente') {
     curp = document.getElementById('reg-curp')?.value.trim() || '';
@@ -574,8 +586,12 @@ async function forgotPassword() {
   const { error } = await sb.auth.resetPasswordForEmail(email, {
     redirectTo: window.location.origin + window.location.pathname
   });
-  document.getElementById('login-error').classList.remove('show');
-  if (error) { alert('Error: ' + error.message); return; }
+  const errEl = document.getElementById('login-error');
+  errEl.classList.remove('show');
+  if (error) {
+    errEl.textContent = 'Error al enviar el correo. Verifica tu dirección e intenta de nuevo.';
+    errEl.classList.add('show'); return;
+  }
   showToast('✓ Revisa tu correo para restablecer tu contraseña');
 }
 

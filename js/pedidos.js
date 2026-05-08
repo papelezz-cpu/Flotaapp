@@ -516,19 +516,19 @@ async function crearPedido() {
   // Validaciones por tipo
   if (esCamion) {
     if (!v('np-origen') || !v('np-carga') || !v('np-fecha-ini')) {
-      alert('Por favor completa: tipo de carga, origen y fecha de carga.'); return;
+      showToast('Completa: tipo de carga, origen y fecha de carga.', 'error'); return;
     }
   } else if (esCustodio) {
     if (!v('np-zona') || !v('np-fecha-ini-cust')) {
-      alert('Por favor completa: zona de cobertura y fecha de inicio.'); return;
+      showToast('Completa: zona de cobertura y fecha de inicio.', 'error'); return;
     }
   } else if (esPatio) {
     if (!v('np-fecha-ini-patio')) {
-      alert('Por favor completa la fecha de entrada.'); return;
+      showToast('Completa la fecha de entrada al patio.', 'error'); return;
     }
   } else if (esLavado) {
     if (!v('np-vehiculo-lavar') || !v('np-ubic-lav') || !v('np-fecha-ini-lav')) {
-      alert('Por favor completa: tipo de vehículo, ubicación y fecha requerida.'); return;
+      showToast('Completa: tipo de vehículo, ubicación y fecha requerida.', 'error'); return;
     }
   }
 
@@ -578,8 +578,12 @@ async function crearPedido() {
   // Estado inicial: pendiente de revisión por superadmin
   payload.estado = 'pendiente_revision';
 
+  const btnPublicar = document.querySelector('#modal-nuevo-pedido .modal-actions .btn-confirm');
+  if (btnPublicar) { btnPublicar.disabled = true; btnPublicar.textContent = 'Publicando…'; }
+
   const { error } = await sb.from('pedidos').insert(payload);
-  if (error) { showToast('Error al publicar: ' + (error.message || '')); return; }
+  if (btnPublicar) { btnPublicar.disabled = false; btnPublicar.textContent = '📋 Publicar solicitud'; }
+  if (error) { showToast('Error al publicar: ' + (error.message || ''), 'error'); return; }
 
   // Notificar solo a superadmins para revisión
   const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
@@ -779,7 +783,7 @@ function closeDetallesServicio() {
 }
 
 function omitirDetallesServicio() {
-  // Limpiar campos opcionales y confirmar directamente
+  if (!confirm('¿Confirmar el acuerdo sin ingresar detalles adicionales? Esta acción no se puede deshacer.')) return;
   ['ds-fecha','ds-hora','ds-lugar','ds-contacto-nombre','ds-contacto-tel'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
@@ -790,6 +794,9 @@ function omitirDetallesServicio() {
 async function confirmarDetallesServicio() {
   if (!_pendingOferta || !_pendingPedido) return;
   const v = id => document.getElementById(id)?.value?.trim() || '';
+
+  const btnConfirmar = document.querySelector('#modal-detalles-servicio .btn-confirm');
+  if (btnConfirmar) { btnConfirmar.disabled = true; btnConfirmar.textContent = 'Guardando…'; }
   const fecha = v('ds-fecha');
   const lugar = v('ds-lugar');
 
@@ -844,6 +851,7 @@ async function confirmarDetallesServicio() {
   _pendingOferta = null;
   _pendingPedido = null;
   document.getElementById('modal-detalles-servicio').classList.remove('open');
+  if (btnConfirmar) { btnConfirmar.disabled = false; btnConfirmar.textContent = '✓ Guardar y confirmar'; }
 
   await loadNotificaciones();
   closePedidoDetalle();
@@ -854,8 +862,7 @@ async function confirmarDetallesServicio() {
 async function enviarContraoferta(ofertaId) {
   const precio = parseFloat(document.getElementById(`contra-precio-${ofertaId}`).value);
   const msg    = document.getElementById(`contra-msg-${ofertaId}`).value.trim();
-  if (!precio || precio <= 0) { alert('Ingresa un precio válido.'); return; }
-  if (precio <= 0) return;
+  if (!precio || precio <= 0) { showToast('Ingresa un precio válido.', 'error'); return; }
 
   const { error } = await sb.from('ofertas').update({
     contra_precio:  precio,
@@ -1009,7 +1016,10 @@ async function enviarOferta() {
   const precio  = parseFloat(document.getElementById('ho-precio').value);
   const camion  = document.getElementById('ho-camion').value || null;
   const mensaje = document.getElementById('ho-mensaje').value.trim();
-  if (!precio || precio <= 0) { alert('Ingresa un precio válido.'); return; }
+  if (!precio || precio <= 0) { showToast('Ingresa un precio válido.', 'error'); return; }
+
+  const btnEnv = document.getElementById('btn-enviar-oferta');
+  if (btnEnv) { btnEnv.disabled = true; btnEnv.textContent = 'Enviando…'; }
 
   const { error } = await sb.from('ofertas').insert({
     pedido_id:     pedidoParaOfertar,
@@ -1019,7 +1029,8 @@ async function enviarOferta() {
     precio_oferta: precio,
     mensaje:       mensaje || null,
   });
-  if (error) { showToast('Error al enviar: ' + (error.message || '')); return; }
+  if (btnEnv) { btnEnv.disabled = false; btnEnv.textContent = 'Enviar oferta'; }
+  if (error) { showToast('Error al enviar: ' + (error.message || ''), 'error'); return; }
 
   // Marcar pedido en negociación
   await sb.from('pedidos').update({ estado: 'en_negociacion' }).eq('id', pedidoParaOfertar);

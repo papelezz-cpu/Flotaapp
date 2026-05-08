@@ -57,8 +57,8 @@ async function crearUsuario() {
   const pass   = document.getElementById('nu-pass').value;
   const rol    = document.getElementById('nu-rol').value;
 
-  if (!nombre || !email || !pass) { alert('Completa todos los campos.'); return; }
-  if (pass.length < 6) { alert('La contraseña debe tener al menos 6 caracteres.'); return; }
+  if (!nombre || !email || !pass) { showToast('Completa todos los campos.', 'error'); return; }
+  if (pass.length < 6) { showToast('La contraseña debe tener al menos 6 caracteres.', 'error'); return; }
 
   const { data: { session } } = await sb.auth.getSession();
   const res = await fetch(FN_URL, {
@@ -70,7 +70,7 @@ async function crearUsuario() {
     body: JSON.stringify({ accion: 'crear', nombre, email, password: pass, rol })
   });
   const json = await res.json();
-  if (!res.ok) { alert('Error: ' + (json.error || 'No se pudo crear.')); return; }
+  if (!res.ok) { showToast('Error: ' + (json.error || 'No se pudo crear.'), 'error'); return; }
 
   document.getElementById('nu-nombre').value = '';
   document.getElementById('nu-email').value  = '';
@@ -132,7 +132,7 @@ async function eliminarUsuario(userId, nombre) {
     body: JSON.stringify({ accion: 'eliminar', user_id: userId })
   });
   const json = await res.json();
-  if (!res.ok) { alert('Error: ' + (json.error || 'No se pudo eliminar.')); return; }
+  if (!res.ok) { showToast('Error: ' + (json.error || 'No se pudo eliminar.'), 'error'); return; }
 
   await renderUsuarios();
   showToast(`Usuario ${nombre} eliminado`);

@@ -235,7 +235,11 @@ async function renderReserv() {
 
 // ── ACCIONES ───────────────────────────────────────────
 
+let _reservaActiva = false; // guard anti-double-click
+
 async function aceptarReserva(reservaId, unidad, recurso_tipo) {
+  if (_reservaActiva) return;
+  _reservaActiva = true;
   // Obtener datos antes de actualizar para el email
   const { data: r } = await sb.from('reservaciones').select('*').eq('id', reservaId).single();
   const tipoFinal = recurso_tipo || r?.recurso_tipo || 'camion';
@@ -272,6 +276,7 @@ async function aceptarReserva(reservaId, unidad, recurso_tipo) {
     fecha_fin: r?.fecha_fin
   });
 
+  _reservaActiva = false;
   await renderReserv();
   await loadNotificaciones();
   const recursoLabel = tipoFinal === 'custodio' ? 'custodio' : tipoFinal === 'patio' ? 'patio' : 'camión';
@@ -282,7 +287,9 @@ async function aceptarReserva(reservaId, unidad, recurso_tipo) {
 }
 
 async function rechazarReserva(reservaId, unidad) {
+  if (_reservaActiva) return;
   if (!confirm('¿Rechazar esta solicitud?')) return;
+  _reservaActiva = true;
   const { data: r } = await sb.from('reservaciones').select('*').eq('id', reservaId).single();
   await sb.from('reservaciones').update({ estado: 'Rechazada' }).eq('id', reservaId);
 
@@ -295,13 +302,16 @@ async function rechazarReserva(reservaId, unidad) {
     fecha_fin: r?.fecha_fin
   });
 
+  _reservaActiva = false;
   await renderReserv();
   await loadNotificaciones();
   showToast('Solicitud rechazada');
 }
 
 async function cancelarReserva(reservaId, unidad) {
+  if (_reservaActiva) return;
   if (!confirm('¿Cancelar esta reserva? El recurso volverá a estar disponible.')) return;
+  _reservaActiva = true;
   const { data: r } = await sb.from('reservaciones').select('recurso_tipo').eq('id', reservaId).single();
   const tipoFinal = r?.recurso_tipo || 'camion';
   await sb.from('reservaciones').update({ estado: 'Cancelada' }).eq('id', reservaId);
@@ -309,6 +319,7 @@ async function cancelarReserva(reservaId, unidad) {
     const tabla = tipoFinal === 'custodio' ? 'custodios' : tipoFinal === 'patio' ? 'patios' : 'camiones';
     await sb.from(tabla).update({ estado: 'disponible' }).eq('id', unidad);
   }
+  _reservaActiva = false;
   await renderReserv();
   showToast('Reserva cancelada — recurso disponible de nuevo');
 }
