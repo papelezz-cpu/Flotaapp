@@ -468,8 +468,8 @@ async function renderMisPendientes() {
   list.innerHTML = rows.join('');
 }
 
-async function eliminarMiRecurso(tabla, id) {
-  if (!confirm(`¿Eliminar ${id}? Esta acción no se puede deshacer.`)) return;
+function eliminarMiRecurso(tabla, id) {
+  showConfirm(`¿Eliminar ${id}? Esta acción no se puede deshacer.`, async () => {
   if (tabla === 'camiones') {
     const { data: c } = await sb.from('camiones').select('archivos').eq('id', id).single();
     if (c?.archivos?.length) await sb.storage.from('unidades').remove(c.archivos);
@@ -483,6 +483,7 @@ async function eliminarMiRecurso(tabla, id) {
   if (error) { showToast('Error al eliminar', 'error'); return; }
   showToast(`${id} eliminado`);
   renderMisPendientes();
+  }, { danger: true, confirmLabel: 'Eliminar' });
 }
 
 async function editarCamionRechazado(id) {
@@ -570,23 +571,25 @@ async function aprobarUnidad(id) {
   showToast(`✓ Unidad ${id} aprobada y publicada`);
 }
 
-async function rechazarUnidad(id) {
-  if (!confirm(`¿Rechazar la unidad ${id}? Se eliminará del sistema.`)) return;
-  const { data: c } = await sb.from('camiones').select('archivos').eq('id', id).single();
-  if (c?.archivos?.length) await sb.storage.from('unidades').remove(c.archivos);
-  await sb.from('camiones').delete().eq('id', id);
-  await renderAdmin();
-  showToast(`Unidad ${id} rechazada`);
+function rechazarUnidad(id) {
+  showConfirm(`¿Rechazar la unidad ${id}? Se eliminará del sistema.`, async () => {
+    const { data: c } = await sb.from('camiones').select('archivos').eq('id', id).single();
+    if (c?.archivos?.length) await sb.storage.from('unidades').remove(c.archivos);
+    await sb.from('camiones').delete().eq('id', id);
+    await renderAdmin();
+    showToast(`Unidad ${id} rechazada`);
+  }, { danger: true, confirmLabel: 'Rechazar' });
 }
 
-async function eliminarUnidad(id) {
-  if (!confirm(`¿Eliminar la unidad ${id}? Esta acción no se puede deshacer.`)) return;
-  const { data: c } = await sb.from('camiones').select('archivos').eq('id', id).single();
-  if (c?.archivos?.length) await sb.storage.from('unidades').remove(c.archivos);
-  const { error } = await sb.from('camiones').delete().eq('id', id);
-  if (error) { showToast('Error: no tienes permiso para eliminar esta unidad'); return; }
-  await renderAdmin();
-  showToast(`Unidad ${id} eliminada`);
+function eliminarUnidad(id) {
+  showConfirm(`¿Eliminar la unidad ${id}? Esta acción no se puede deshacer.`, async () => {
+    const { data: c } = await sb.from('camiones').select('archivos').eq('id', id).single();
+    if (c?.archivos?.length) await sb.storage.from('unidades').remove(c.archivos);
+    const { error } = await sb.from('camiones').delete().eq('id', id);
+    if (error) { showToast('Error: no tienes permiso para eliminar esta unidad'); return; }
+    await renderAdmin();
+    showToast(`Unidad ${id} eliminada`);
+  }, { danger: true, confirmLabel: 'Eliminar' });
 }
 
 async function verArchivos(id) {
@@ -905,11 +908,12 @@ async function guardarEdicionCustodio() {
   showToast(esSA ? `✓ Custodio ${id} actualizado` : `✓ Cambios enviados — pendientes de aprobación`);
 }
 
-async function eliminarCustodio(id) {
-  if (!confirm(`¿Eliminar custodio ${id}?`)) return;
-  await sb.from('custodios').delete().eq('id', id);
-  await renderAdminCustodios();
-  showToast(`Custodio ${id} eliminado`);
+function eliminarCustodio(id) {
+  showConfirm(`¿Eliminar custodio ${id}? Esta acción no se puede deshacer.`, async () => {
+    await sb.from('custodios').delete().eq('id', id);
+    await renderAdminCustodios();
+    showToast(`Custodio ${id} eliminado`);
+  }, { danger: true, confirmLabel: 'Eliminar' });
 }
 
 // ── PATIOS (ADMIN) ─────────────────────────────────────
@@ -1050,11 +1054,12 @@ async function guardarEdicionPatio() {
   showToast(esSA ? `✓ Patio ${id} actualizado` : `✓ Cambios enviados — pendientes de aprobación`);
 }
 
-async function eliminarPatio(id) {
-  if (!confirm(`¿Eliminar patio ${id}?`)) return;
-  await sb.from('patios').delete().eq('id', id);
-  await renderAdminPatios();
-  showToast(`Patio ${id} eliminado`);
+function eliminarPatio(id) {
+  showConfirm(`¿Eliminar patio ${id}? Esta acción no se puede deshacer.`, async () => {
+    await sb.from('patios').delete().eq('id', id);
+    await renderAdminPatios();
+    showToast(`Patio ${id} eliminado`);
+  }, { danger: true, confirmLabel: 'Eliminar' });
 }
 
 // ── LAVADOS (ADMIN) ────────────────────────────────────
@@ -1199,11 +1204,12 @@ async function guardarEdicionLavado() {
   showToast(esSA ? `✓ Servicio ${id} actualizado` : `✓ Cambios enviados — pendientes de aprobación`);
 }
 
-async function eliminarLavado(id) {
-  if (!confirm(`¿Eliminar servicio de lavado ${id}?`)) return;
+function eliminarLavado(id) {
+  showConfirm(`¿Eliminar servicio de lavado ${id}? Esta acción no se puede deshacer.`, async () => {
   await sb.from('lavados').delete().eq('id', id);
   await renderAdminLavados();
   showToast(`Servicio ${id} eliminado`);
+  }, { danger: true, confirmLabel: 'Eliminar' });
 }
 
 function updateFileLabel(inputId, labelId) {

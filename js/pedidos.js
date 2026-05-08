@@ -6,6 +6,8 @@ let pedidoParaOfertar  = null;   // pedido sobre el que el admin ofertará
 let _pendingOferta     = null;   // oferta en espera de confirmar detalles
 let _pendingPedido     = null;   // pedido en espera de confirmar detalles
 let _filtroTipo        = 'todos';
+let _filtroGeo         = '';
+let _filtroEstadoCli   = 'todos';
 let _pedidosMode       = 'lista'; // 'solicitar' | 'lista'
 
 const PEDIDOS_PAGE = 30;
@@ -129,7 +131,26 @@ async function renderPedidos(append = false) {
         return true;
       });
     }
+    if (_filtroGeo) {
+      const geo = _filtroGeo.toLowerCase();
+      r = r.filter(p =>
+        (p.origen || '').toLowerCase().includes(geo) ||
+        (p.destino || '').toLowerCase().includes(geo) ||
+        (p.zona_cobertura || '').toLowerCase().includes(geo)
+      );
+    }
     return r;
+  };
+
+  const _filtrarEstadoCli = lista => {
+    if (_filtroEstadoCli === 'todos') return lista;
+    if (_filtroEstadoCli === 'activo')
+      return lista.filter(p => ['abierto','en_negociacion','pendiente_revision','pendiente_acuerdo','rechazado'].includes(p.estado));
+    if (_filtroEstadoCli === 'acordado')
+      return lista.filter(p => p.estado === 'acordado');
+    if (_filtroEstadoCli === 'cancelado')
+      return lista.filter(p => p.estado === 'cancelado');
+    return lista;
   };
 
   let html = '';
@@ -138,12 +159,9 @@ async function renderPedidos(append = false) {
   if (currentUser.id && currentUser.rol === 'cliente') {
     const ESTADOS_ACTIVOS = ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado'];
     const ESTADOS_HIST    = ['acordado', 'cancelado'];
-    const misPedidos   = _filtrar((pedidos || []).filter(p =>
-      p.cliente_id === currentUser.id && ESTADOS_ACTIVOS.includes(p.estado)
-    ));
-    const misHistorial = _filtrar((pedidos || []).filter(p =>
-      p.cliente_id === currentUser.id && ESTADOS_HIST.includes(p.estado)
-    ));
+    const todosMios = _filtrar((pedidos || []).filter(p => p.cliente_id === currentUser.id));
+    const misPedidos   = _filtrarEstadoCli(todosMios.filter(p => ESTADOS_ACTIVOS.includes(p.estado)));
+    const misHistorial = _filtrarEstadoCli(todosMios.filter(p => ESTADOS_HIST.includes(p.estado)));
     const otrosPedidos = _filtrar((pedidos || []).filter(p => p.cliente_id !== currentUser.id && p.estado === 'abierto'));
 
     if (misPedidos.length) {
@@ -789,12 +807,13 @@ function closeDetallesServicio() {
 }
 
 function omitirDetallesServicio() {
-  if (!confirm('¿Confirmar el acuerdo sin ingresar detalles adicionales? Esta acción no se puede deshacer.')) return;
-  ['ds-fecha','ds-hora','ds-lugar','ds-contacto-nombre','ds-contacto-tel'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
+  showConfirm('¿Confirmar el acuerdo sin ingresar detalles adicionales?', () => {
+    ['ds-fecha','ds-hora','ds-lugar','ds-contacto-nombre','ds-contacto-tel'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    confirmarDetallesServicio();
   });
-  confirmarDetallesServicio();
 }
 
 async function confirmarDetallesServicio() {
@@ -1213,23 +1232,47 @@ async function cerrarAcuerdo(oferta, pedido) {
 
 // ── CANCELAR PEDIDO ────────────────────────────────────
 
-async function cancelarPedido(pedidoId) {
-  if (!confirm('¿Cancelar esta solicitud? Las ofertas activas quedarán descartadas.')) return;
-  await sb.from('pedidos').update({ estado: 'cancelado' }).eq('id', pedidoId);
-  await renderPedidos();
-  showToast('Pedido cancelado');
+function cancelarPedido(pedidoId) {
+  showConfirm('¿Cancelar esta solicitud? Las ofertas activas quedarán descartadas.', async () => {
+    await sb.from('pedidos').update({ estado: 'cancelado' }).eq('id', pedidoId);
+
+    // Rechazar todas las ofertas activas y notificar a los admins afectados
+    const { data: ofertasActivas } = await sb.from('ofertas')
+      .select('id, admin_id')
+      .eq('pedido_id', pedidoId)
+      .in('estado', ['enviada', 'contra_oferta']);
+
+    if (ofertasActivas?.length) {
+      await sb.from('ofertas').update({ estado: 'rechazada' })
+        .in('id', ofertasActivas.map(o => o.id));
+
+      const adminIds = [...new Set(ofertasActivas.map(o => o.admin_id).filter(Boolean))];
+      if (adminIds.length) {
+        await sb.from('notificaciones').insert(adminIds.map(aid => ({
+          user_id: aid,
+          tipo:    'pedido_cancelado',
+          titulo:  'Solicitud cancelada',
+          mensaje: `El cliente canceló una solicitud en la que tenías una oferta activa.`,
+          leido:   false,
+        })));
+      }
+    }
+
+    await renderPedidos();
+    showToast('Pedido cancelado');
+  }, { danger: true, confirmLabel: 'Sí, cancelar' });
 }
 
 // ── ELIMINAR PEDIDO (superadmin) ───────────────────────
 
-async function eliminarPedido(pedidoId) {
-  if (!confirm('¿Eliminar esta solicitud permanentemente? Esta acción no se puede deshacer.')) return;
-  // Eliminar ofertas asociadas primero (si RLS lo requiere)
-  await sb.from('ofertas').delete().eq('pedido_id', pedidoId);
-  const { error } = await sb.from('pedidos').delete().eq('id', pedidoId);
-  if (error) { showToast('Error al eliminar: ' + (error.message || '')); return; }
-  document.getElementById(`ped-${pedidoId}`)?.remove();
-  showToast('🗑 Pedido eliminado');
+function eliminarPedido(pedidoId) {
+  showConfirm('¿Eliminar esta solicitud permanentemente? Esta acción no se puede deshacer.', async () => {
+    await sb.from('ofertas').delete().eq('pedido_id', pedidoId);
+    const { error } = await sb.from('pedidos').delete().eq('id', pedidoId);
+    if (error) { showToast('Error al eliminar: ' + (error.message || '')); return; }
+    document.getElementById(`ped-${pedidoId}`)?.remove();
+    showToast('🗑 Pedido eliminado');
+  }, { danger: true, confirmLabel: 'Eliminar' });
 }
 
 // ── PERFIL DE EMPRESA (desde oferta) ──────────────────
@@ -1390,8 +1433,20 @@ async function confirmarEditarPedido() {
 
 function filtrarPedidosTipo(tipo) {
   _filtroTipo = tipo;
-  document.querySelectorAll('.ped-filtro-pill').forEach(el =>
+  document.querySelectorAll('.ped-filtro-pill[data-tipo]').forEach(el =>
     el.classList.toggle('active', el.dataset.tipo === tipo));
+  renderPedidos();
+}
+
+function filtrarPedidosEstado(est) {
+  _filtroEstadoCli = est;
+  document.querySelectorAll('.ped-filtro-pill[data-est]').forEach(el =>
+    el.classList.toggle('active', el.dataset.est === est));
+  renderPedidos();
+}
+
+function filtrarPedidosGeo(val) {
+  _filtroGeo = val.trim();
   renderPedidos();
 }
 

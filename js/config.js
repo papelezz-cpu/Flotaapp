@@ -10,3 +10,7 @@ const sb = createClient(
 // URL de la Edge Function para gestión de usuarios
 const FN_URL = 'https://xnyqsewaluezkkrlyhxg.supabase.co/functions/v1/gestionar-usuario';
 const FN_NOTIFICACION = 'https://xnyqsewaluezkkrlyhxg.supabase.co/functions/v1/enviar-notificacion';
+
+// Contacto de soporte
+const SOPORTE_EMAIL = 'soporte@portgo.mx';
+const SOPORTE_TEL   = '800-767-8461';

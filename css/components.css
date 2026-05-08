@@ -1429,3 +1429,59 @@ body.light .geo-dropdown { background: #fff; border-color: rgba(37,99,235,0.25);
 body.light .geo-item { color: #0d1f3c; border-bottom-color: rgba(37,99,235,0.08); }
 body.light .geo-item:hover { background: #e8f4fd; }
 
+/* ── GEO FILTER EN PEDIDOS ───────────────────────────── */
+.ped-geo-filter { margin-top: 8px; }
+.ped-geo-input {
+  width: 100%; max-width: 340px; padding: 8px 14px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 10px; color: var(--text-main); font-size: 0.85rem;
+  transition: border-color 0.15s;
+}
+.ped-geo-input:focus { border-color: var(--accent); outline: none; }
+body.light .ped-geo-input { background: #fff; }
+
+/* ── FECHA FILTER EN REPORTES ────────────────────────── */
+.rep-date-filter {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 18px; padding: 12px 16px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.rep-date-filter label { font-size: 0.82rem; color: var(--text-muted); font-weight: 600; }
+.rep-date-filter input[type=date] {
+  padding: 6px 10px; background: var(--navy-mid); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-main); font-size: 0.83rem;
+}
+body.light .rep-date-filter { background: #f8faff; }
+body.light .rep-date-filter input[type=date] { background: #fff; color: #0d1f3c; }
+
+/* ── PWA INSTALL BANNER ──────────────────────────────── */
+.pwa-banner {
+  display: none; position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--navy-mid); border-top: 1px solid rgba(78,142,247,0.3);
+  padding: 12px 16px; z-index: 9998;
+  align-items: center; gap: 12px; flex-wrap: wrap;
+  font-size: 0.85rem; color: var(--text-muted);
+}
+.pwa-banner.show { display: flex; }
+.btn-pwa-install {
+  padding: 7px 18px; border-radius: 10px; border: none;
+  background: var(--accent); color: #fff; font-weight: 700; font-size: 0.82rem;
+  cursor: pointer; white-space: nowrap;
+}
+.btn-pwa-close {
+  margin-left: auto; background: none; border: none;
+  color: var(--text-muted); font-size: 1rem; cursor: pointer; padding: 4px 8px;
+}
+
+/* ── SOPORTE LINK EN LOGIN ───────────────────────────── */
+.login-soporte {
+  text-align: center; font-size: 0.75rem; color: var(--text-muted); margin-top: 12px;
+}
+.login-soporte a { color: var(--accent); text-decoration: none; }
+.login-soporte a:hover { text-decoration: underline; }
+
+/* ── ADMIN HIDDEN (para cliente) ─────────────────────── */
+.admin-hidden { display: none; }
+body:not(.role-admin):not(.role-superadmin) .admin-hidden { display: flex; }
+

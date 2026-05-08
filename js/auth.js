@@ -116,7 +116,7 @@ async function doLogin() {
   }
   if (perfil?.aprobacion_cuenta === 'suspendida') {
     await sb.auth.signOut();
-    err.textContent = 'Tu cuenta ha sido suspendida. Contacta a soporte para más información.';
+    err.textContent = `Tu cuenta ha sido suspendida. Contacta a soporte: ${SOPORTE_EMAIL}`;
     err.classList.add('show'); return;
   }
 
@@ -262,6 +262,10 @@ function _regFormHTML(rol) {
         <input type="password" id="reg-pass" placeholder="••••••••">
       </div>
       <div class="form-group">
+        <label>Confirmar contraseña *</label>
+        <input type="password" id="reg-pass-confirm" placeholder="••••••••">
+      </div>
+      <div class="form-group">
         <label>Teléfono *</label>
         <input type="tel" id="reg-telefono" placeholder="55 1234 5678">
       </div>
@@ -318,6 +322,10 @@ function _regFormHTML(rol) {
     <div class="form-group">
       <label>Contraseña * <span class="reg-optional">mínimo 6 caracteres</span></label>
       <input type="password" id="reg-pass" placeholder="••••••••">
+    </div>
+    <div class="form-group">
+      <label>Confirmar contraseña *</label>
+      <input type="password" id="reg-pass-confirm" placeholder="••••••••">
     </div>
     <div class="form-group">
       <label>Teléfono *</label>
@@ -417,7 +425,9 @@ async function doRegistro() {
       !calle || !num || !colonia || !cp || !ciudad || !estadoMx) {
     showErr('Completa todos los campos requeridos (*).'); return;
   }
+  const passConfirm = document.getElementById('reg-pass-confirm')?.value || '';
   if (pass.length < 6) { showErr('La contraseña debe tener al menos 6 caracteres.'); return; }
+  if (pass !== passConfirm) { showErr('Las contraseñas no coinciden.'); return; }
   if (!ineFile || !compDomFile || !fotoDomFile) {
     showErr('Adjunta todos los documentos requeridos.'); return;
   }
@@ -669,6 +679,16 @@ function abrirMiPerfil() {
 function cerrarMiPerfil() {
   document.getElementById('modal-mi-perfil').classList.remove('open');
 }
+
+// Detecta expiración de sesión en background (token refresh failure)
+sb.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT' && currentUser.id) {
+    currentUser = { id: null, nombre: null, rol: null };
+    document.body.classList.remove('role-admin', 'role-superadmin', 'logged-in');
+    showLoginOverlay();
+    showToast('Tu sesión ha expirado. Por favor inicia sesión de nuevo.', 'error');
+  }
+});
 
 async function logout() {
   await sb.auth.signOut();

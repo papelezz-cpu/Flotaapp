@@ -44,9 +44,10 @@ function init() {
   actualizarBadgeChat();
 
   // #5 — Realtime: actualizar vistas cuando cambia la BD
-  const clienteActivo    = () => document.getElementById('view-cliente').classList.contains('active');
-  const adminActivo      = () => document.getElementById('view-admin').classList.contains('active');
-  const pendientesActivo = () => document.getElementById('view-pendientes')?.classList.contains('active');
+  const clienteActivo       = () => document.getElementById('view-cliente').classList.contains('active');
+  const adminActivo         = () => document.getElementById('view-admin').classList.contains('active');
+  const pendientesActivo    = () => document.getElementById('view-pendientes')?.classList.contains('active');
+  const pedidosActivo       = () => document.getElementById('view-pedidos').classList.contains('active');
 
   sb.channel('portgo-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'camiones' }, () => {
@@ -67,6 +68,12 @@ function init() {
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'reservaciones' }, () => {
       if (document.getElementById('view-reservaciones').classList.contains('active')) renderReserv();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
+      if (pedidosActivo()) renderPedidos();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ofertas' }, () => {
+      if (pedidosActivo()) renderPedidos();
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
       // Actualizar badge si el mensaje va dirigido a mí y no está abierto su chat
@@ -99,4 +106,25 @@ document.getElementById('modal-reserva').addEventListener('click', function (e) 
 // #4 — Service Worker (PWA)
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
+// #12 — PWA install prompt
+let _deferredInstall = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstall = e;
+  document.getElementById('pwa-install-banner')?.classList.add('show');
+});
+window.addEventListener('appinstalled', () => {
+  _deferredInstall = null;
+  document.getElementById('pwa-install-banner')?.classList.remove('show');
+});
+
+function installPWA() {
+  if (!_deferredInstall) return;
+  _deferredInstall.prompt();
+  _deferredInstall.userChoice.then(() => {
+    _deferredInstall = null;
+    document.getElementById('pwa-install-banner')?.classList.remove('show');
+  });
 }

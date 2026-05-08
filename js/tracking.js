@@ -102,6 +102,18 @@ async function avanzarTracking() {
   const esUltimo = idx + 1 === TRACKING_ESTADOS.length - 1;
   if (esUltimo) showToast('✓ Servicio marcado como finalizado');
   if (document.getElementById('view-reservaciones').classList.contains('active')) renderReserv();
+
+  // Notificar al cliente sobre el avance del tracking
+  if (trackingReserva.cliente_user_id) {
+    const r = trackingReserva;
+    await sb.from('notificaciones').insert({
+      user_id: r.cliente_user_id,
+      tipo:    'tracking_actualizado',
+      titulo:  `${next.icon} ${next.label}`,
+      mensaje: `Tu servicio "${r.unidad}" avanzó a: ${next.label}.`,
+      leido:   false,
+    });
+  }
 }
 
 function closeTracking() {

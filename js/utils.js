@@ -73,6 +73,31 @@ function formatPrecio(num) {
   return '$' + Number(num).toLocaleString('es-MX', { minimumFractionDigits: 0 }) + ' MXN/día';
 }
 
+// ── CONFIRM MODAL (reemplaza window.confirm) ───────────
+
+let _confirmCb = null;
+
+function showConfirm(msg, onConfirm, { danger = false, confirmLabel = 'Confirmar', cancelLabel = 'Cancelar' } = {}) {
+  document.getElementById('sc-msg').textContent   = msg;
+  document.getElementById('sc-confirm').textContent = confirmLabel;
+  document.getElementById('sc-confirm').style.background = danger ? 'var(--danger)' : '';
+  document.getElementById('sc-confirm').style.borderColor = danger ? 'var(--danger)' : '';
+  _confirmCb = onConfirm;
+  document.getElementById('modal-confirm').classList.add('open');
+}
+
+function _scCancel() {
+  document.getElementById('modal-confirm').classList.remove('open');
+  _confirmCb = null;
+}
+
+function _scConfirm() {
+  document.getElementById('modal-confirm').classList.remove('open');
+  const cb = _confirmCb;
+  _confirmCb = null;
+  if (cb) cb();
+}
+
 // ── GEO AUTOCOMPLETE (Nominatim OpenStreetMap) ─────────
 let _geoTimer = null;
 

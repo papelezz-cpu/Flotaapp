@@ -88,6 +88,9 @@ async function renderReserv() {
       const pagoLbl = (r.estado === 'Completada' && r.pagado)
         ? `<span style="font-size:0.7rem;color:var(--green);font-weight:600">💰 Pagado</span>`
         : '';
+      const precioLbl = r.precio_acordado
+        ? `<span style="font-size:0.7rem;color:var(--text-muted)">$${Number(r.precio_acordado).toLocaleString('es-MX')} MXN</span>`
+        : '';
       return `
       <div class="reserv-row reserv-row-cli">
         <div class="reserv-id">${unidadLabel}</div>
@@ -100,6 +103,7 @@ async function renderReserv() {
           ${chatBtn}
           ${calBtn}
           ${pagoLbl}
+          ${precioLbl}
         </div>
       </div>`;
     }).join('');
@@ -294,9 +298,9 @@ async function aceptarReserva(reservaId, unidad, recurso_tipo) {
   showToast(toastMsg);
 }
 
-async function rechazarReserva(reservaId, unidad) {
+function rechazarReserva(reservaId, unidad) {
   if (_reservaActiva) return;
-  if (!confirm('¿Rechazar esta solicitud?')) return;
+  showConfirm('¿Rechazar esta solicitud de reserva?', async () => {
   _reservaActiva = true;
   const { data: r } = await sb.from('reservaciones').select('*').eq('id', reservaId).single();
   await sb.from('reservaciones').update({ estado: 'Rechazada' }).eq('id', reservaId);
@@ -314,76 +318,88 @@ async function rechazarReserva(reservaId, unidad) {
   await renderReserv();
   await loadNotificaciones();
   showToast('Solicitud rechazada');
+  }, { danger: true, confirmLabel: 'Rechazar' });
 }
 
-async function cancelarReserva(reservaId, unidad) {
+function cancelarReserva(reservaId, unidad) {
   if (_reservaActiva) return;
-  if (!confirm('¿Cancelar esta reserva? El recurso volverá a estar disponible.')) return;
-  _reservaActiva = true;
-  const { data: r } = await sb.from('reservaciones').select('recurso_tipo').eq('id', reservaId).single();
-  const tipoFinal = r?.recurso_tipo || 'camion';
-  await sb.from('reservaciones').update({ estado: 'Cancelada' }).eq('id', reservaId);
-  if (unidad) {
-    const tabla = tipoFinal === 'custodio' ? 'custodios' : tipoFinal === 'patio' ? 'patios' : 'camiones';
-    await sb.from(tabla).update({ estado: 'disponible' }).eq('id', unidad);
-  }
-  _reservaActiva = false;
-  await renderReserv();
-  showToast('Reserva cancelada — recurso disponible de nuevo');
+  showConfirm('¿Cancelar esta reserva? El recurso volverá a estar disponible.', async () => {
+    _reservaActiva = true;
+    const { data: rv } = await sb.from('reservaciones').select('*').eq('id', reservaId).single();
+    const tipoFinal = rv?.recurso_tipo || 'camion';
+    await sb.from('reservaciones').update({ estado: 'Cancelada' }).eq('id', reservaId);
+    if (unidad) {
+      const tabla = tipoFinal === 'custodio' ? 'custodios' : tipoFinal === 'patio' ? 'patios' : 'camiones';
+      await sb.from(tabla).update({ estado: 'disponible' }).eq('id', unidad);
+    }
+    // Notificar al cliente
+    if (rv?.cliente_user_id) {
+      await sb.from('notificaciones').insert({
+        user_id: rv.cliente_user_id,
+        tipo:    'reserva_cancelada',
+        titulo:  'Reserva cancelada',
+        mensaje: `Tu reserva de "${rv.unidad || unidad}" fue cancelada por el proveedor.`,
+        leido:   false,
+      });
+    }
+    _reservaActiva = false;
+    await renderReserv();
+    showToast('Reserva cancelada — recurso disponible de nuevo');
+  }, { danger: true, confirmLabel: 'Sí, cancelar' });
 }
 
 // ── ELIMINAR RESERVA (superadmin) → mover a histórico ──
-async function eliminarReserva(reservaId) {
-  if (!confirm('¿Archivar esta reservación? Se moverá al historial y desaparecerá de la lista activa.')) return;
+function eliminarReserva(reservaId) {
+  showConfirm('¿Archivar esta reservación? Se moverá al historial y desaparecerá de la lista activa.', async () => {
 
   // 1. Obtener la reservación completa
   const { data: r, error: fetchErr } = await sb.from('reservaciones').select('*').eq('id', reservaId).single();
   if (fetchErr || !r) { showToast('Error al obtener la reservación'); return; }
 
-  // 2. Insertar en histórico
-  const { error: insertErr } = await sb.from('reservaciones_historico').insert({
-    id:              r.id,
-    unidad:          r.unidad,
-    recurso_tipo:    r.recurso_tipo,
-    cliente:         r.cliente,
-    cliente_email:   r.cliente_email,
-    cliente_user_id: r.cliente_user_id,
-    empresa:         r.empresa || null,
-    fecha_ini:       r.fecha_ini,
-    fecha_fin:       r.fecha_fin,
-    descripcion:     r.descripcion,
-    estado:          r.estado,
-    tracking_estado: r.tracking_estado,
-    created_at:      r.created_at,
-    archivado_por:   currentUser.id,
+    // 2. Insertar en histórico
+    const { error: insertErr } = await sb.from('reservaciones_historico').insert({
+      id:              r.id,
+      unidad:          r.unidad,
+      recurso_tipo:    r.recurso_tipo,
+      cliente:         r.cliente,
+      cliente_email:   r.cliente_email,
+      cliente_user_id: r.cliente_user_id,
+      empresa:         r.empresa || null,
+      fecha_ini:       r.fecha_ini,
+      fecha_fin:       r.fecha_fin,
+      descripcion:     r.descripcion,
+      estado:          r.estado,
+      tracking_estado: r.tracking_estado,
+      created_at:      r.created_at,
+      archivado_por:   currentUser.id,
+    });
+    if (insertErr) { showToast('Error al archivar: ' + (insertErr.message || '')); return; }
+
+    // 3. Eliminar de la tabla activa
+    const { error: delErr } = await sb.from('reservaciones').delete().eq('id', reservaId);
+    if (delErr) { showToast('Error al eliminar: ' + (delErr.message || '')); return; }
+
+    await renderReserv();
+    showToast('✓ Reservación archivada en el historial');
   });
-  if (insertErr) { showToast('Error al archivar: ' + (insertErr.message || '')); return; }
-
-  // 3. Eliminar de la tabla activa
-  const { error: delErr } = await sb.from('reservaciones').delete().eq('id', reservaId);
-  if (delErr) { showToast('Error al eliminar: ' + (delErr.message || '')); return; }
-
-  await renderReserv();
-  showToast('✓ Reservación archivada en el historial');
 }
 
 // ── COMPLETAR SERVICIO (admin) ─────────────────────────
 
-async function marcarCompletado(reservaId) {
-  if (!confirm('¿Marcar este servicio como completado? El cliente podrá calificarlo.')) return;
-  const { data: r } = await sb.from('reservaciones').select('unidad, recurso_tipo').eq('id', reservaId).single();
-  await sb.from('reservaciones').update({
-    estado:       'Completada',
-    completado_en: new Date().toISOString(),
-  }).eq('id', reservaId);
-
-  // Liberar recurso
-  if (r?.unidad) {
-    const tabla = r.recurso_tipo === 'custodio' ? 'custodios' : r.recurso_tipo === 'patio' ? 'patios' : 'camiones';
-    await sb.from(tabla).update({ estado: 'disponible' }).eq('id', r.unidad);
-  }
-  await renderReserv();
-  showToast('✓ Servicio marcado como completado');
+function marcarCompletado(reservaId) {
+  showConfirm('¿Marcar este servicio como completado? El cliente podrá calificarlo.', async () => {
+    const { data: r } = await sb.from('reservaciones').select('unidad, recurso_tipo').eq('id', reservaId).single();
+    await sb.from('reservaciones').update({
+      estado:        'Completada',
+      completado_en: new Date().toISOString(),
+    }).eq('id', reservaId);
+    if (r?.unidad) {
+      const tabla = r.recurso_tipo === 'custodio' ? 'custodios' : r.recurso_tipo === 'patio' ? 'patios' : 'camiones';
+      await sb.from(tabla).update({ estado: 'disponible' }).eq('id', r.unidad);
+    }
+    await renderReserv();
+    showToast('✓ Servicio marcado como completado');
+  });
 }
 
 // ── CALIFICAR SERVICIO (cliente) ───────────────────────
@@ -448,12 +464,51 @@ async function enviarCalificacion() {
 }
 
 // ── MARCAR PAGO ────────────────────────────────────────
-async function marcarPagado(reservaId) {
-  if (!confirm('¿Confirmar que el pago fue recibido para esta reservación?')) return;
-  const { error } = await sb.from('reservaciones').update({ pagado: true }).eq('id', reservaId);
-  if (error) { showToast('Error al registrar pago: ' + error.message, 'error'); return; }
-  await renderReserv();
-  showToast('💰 Pago registrado');
+function marcarPagado(reservaId) {
+  showConfirm('¿Confirmar que el pago fue recibido para esta reservación?', async () => {
+    const { error } = await sb.from('reservaciones').update({ pagado: true }).eq('id', reservaId);
+    if (error) { showToast('Error al registrar pago: ' + error.message, 'error'); return; }
+    await renderReserv();
+    showToast('💰 Pago registrado');
+  }, { confirmLabel: 'Confirmar pago' });
+}
+
+// ── HISTORIAL DE RESERVACIONES ARCHIVADAS (superadmin) ─
+
+async function renderHistorialReservas() {
+  const el = document.getElementById('historial-reservas-content');
+  if (!el) return;
+  el.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando historial…</div>`;
+
+  const { data, error } = await sb.from('reservaciones_historico')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) { el.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar historial.</div>`; return; }
+  if (!data?.length) { el.innerHTML = `<div class="empty-state"><div class="icon">🗃</div>No hay reservaciones archivadas.</div>`; return; }
+
+  el.innerHTML = `
+    <table class="rep-table" style="width:100%">
+      <thead>
+        <tr>
+          <th>Unidad</th><th>Cliente</th><th>Empresa</th><th>Inicio</th><th>Fin</th>
+          <th>Estado</th><th>Archivado</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.map(r => `
+        <tr>
+          <td>${esc(r.unidad || '—')}</td>
+          <td>${esc(r.cliente || '—')}</td>
+          <td>${esc(r.empresa || '—')}</td>
+          <td>${fmtFecha(r.fecha_ini)}</td>
+          <td>${fmtFecha(r.fecha_fin)}</td>
+          <td><span class="badge badge-maint">${esc(r.estado || '—')}</span></td>
+          <td style="font-size:0.75rem;color:var(--text-muted)">${r.created_at ? new Date(r.created_at).toLocaleDateString('es-MX') : '—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
 }
 
 // Helper: envía email via edge function (fire-and-forget)

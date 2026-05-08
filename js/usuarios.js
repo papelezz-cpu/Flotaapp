@@ -123,23 +123,22 @@ async function guardarEdicionUsuario() {
   showToast(`✓ Usuario ${nombre} actualizado`);
 }
 
-async function eliminarUsuario(userId, nombre) {
-  if (!confirm(`¿Eliminar al usuario "${nombre}"? Esta acción no se puede deshacer.`)) return;
-
-  const { data: { session } } = await sb.auth.getSession();
-  const res = await fetch(FN_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ accion: 'eliminar', user_id: userId })
-  });
-  const json = await res.json();
-  if (!res.ok) { showToast('Error: ' + (json.error || 'No se pudo eliminar.'), 'error'); return; }
-
-  await renderUsuarios();
-  showToast(`Usuario ${nombre} eliminado`);
+function eliminarUsuario(userId, nombre) {
+  showConfirm(`¿Eliminar al usuario "${nombre}"? Esta acción no se puede deshacer.`, async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(FN_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ accion: 'eliminar', user_id: userId })
+    });
+    const json = await res.json();
+    if (!res.ok) { showToast('Error: ' + (json.error || 'No se pudo eliminar.'), 'error'); return; }
+    await renderUsuarios();
+    showToast(`Usuario ${nombre} eliminado`);
+  }, { danger: true, confirmLabel: 'Eliminar' });
 }
 
 // ── HISTORIAL POR USUARIO ──────────────────────────────
@@ -231,12 +230,13 @@ function cerrarHistorialUsuario() {
 
 // ── SUSPENDER / REACTIVAR ──────────────────────────────
 
-async function suspenderUsuario(userId, nombre) {
-  if (!confirm(`¿Suspender la cuenta de "${nombre}"?\nNo podrá iniciar sesión hasta que sea reactivada.`)) return;
-  const { error } = await sb.from('perfiles').update({ aprobacion_cuenta: 'suspendida' }).eq('user_id', userId);
-  if (error) { showToast('Error: ' + error.message, 'error'); return; }
-  await renderUsuarios();
-  showToast(`🚫 Cuenta de ${nombre} suspendida`);
+function suspenderUsuario(userId, nombre) {
+  showConfirm(`¿Suspender la cuenta de "${nombre}"? No podrá iniciar sesión hasta que sea reactivada.`, async () => {
+    const { error } = await sb.from('perfiles').update({ aprobacion_cuenta: 'suspendida' }).eq('user_id', userId);
+    if (error) { showToast('Error: ' + error.message, 'error'); return; }
+    await renderUsuarios();
+    showToast(`🚫 Cuenta de ${nombre} suspendida`);
+  }, { danger: true, confirmLabel: 'Suspender' });
 }
 
 async function reactivarUsuario(userId, nombre) {

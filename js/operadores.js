@@ -350,13 +350,14 @@ async function agregarOperador() {
   renderAprobaciones();
 }
 
-async function eliminarOperador(id) {
-  if (!confirm(`¿Eliminar al operador ${id}? Esta acción no se puede deshacer.`)) return;
-  await sb.from('operadores').delete().eq('id', id);
-  document.getElementById(`opcard-${id}`)?.remove();
-  _poblarSelectOperadores();
-  _prefillNumTrabajador();
-  showToast(`Operador ${id} eliminado`);
+function eliminarOperador(id) {
+  showConfirm(`¿Eliminar al operador ${id}? Esta acción no se puede deshacer.`, async () => {
+    await sb.from('operadores').delete().eq('id', id);
+    document.getElementById(`opcard-${id}`)?.remove();
+    _poblarSelectOperadores();
+    _prefillNumTrabajador();
+    showToast(`Operador ${id} eliminado`);
+  }, { danger: true, confirmLabel: 'Eliminar' });
 }
 
 // ── POPULAR SELECT EN FORMULARIOS DE CAMIÓN ───────────

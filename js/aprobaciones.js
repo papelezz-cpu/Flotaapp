@@ -911,35 +911,37 @@ async function confirmarRechazarRecurso() {
 
 // ── APROBACIÓN EN LOTE ────────────────────────────────────
 
-async function aprobarTodasSolicitudes() {
-  if (!confirm('¿Aprobar y publicar todas las solicitudes pendientes de revisión?')) return;
-  const { data: solic } = await sb.from('pedidos').select('id').eq('estado', 'pendiente_revision');
-  if (!solic?.length) { showToast('No hay solicitudes pendientes'); return; }
-  for (const p of solic) {
-    await sb.from('pedidos').update({ estado: 'abierto', rechazo_nota: null }).eq('id', p.id);
-  }
-  const { data: admins } = await sb.from('perfiles').select('user_id').in('rol', ['admin', 'superadmin']);
-  if (admins?.length) {
-    await sb.from('notificaciones').insert(admins.map(a => ({
-      user_id: a.user_id,
-      tipo:    'nueva_solicitud',
-      titulo:  `${solic.length} solicitudes publicadas`,
-      mensaje: `Se aprobaron ${solic.length} solicitudes. Ya están disponibles para ofertar.`,
-      leido:   false,
-    })));
-  }
-  await renderAprobaciones();
-  if (document.getElementById('view-pedidos')?.classList.contains('active')) renderPedidos();
-  showToast(`✓ ${solic.length} solicitud${solic.length !== 1 ? 'es' : ''} aprobada${solic.length !== 1 ? 's' : ''} y publicada${solic.length !== 1 ? 's' : ''}`);
+function aprobarTodasSolicitudes() {
+  showConfirm('¿Aprobar y publicar todas las solicitudes pendientes de revisión?', async () => {
+    const { data: solic } = await sb.from('pedidos').select('id').eq('estado', 'pendiente_revision');
+    if (!solic?.length) { showToast('No hay solicitudes pendientes'); return; }
+    for (const p of solic) {
+      await sb.from('pedidos').update({ estado: 'abierto', rechazo_nota: null }).eq('id', p.id);
+    }
+    const { data: admins } = await sb.from('perfiles').select('user_id').in('rol', ['admin', 'superadmin']);
+    if (admins?.length) {
+      await sb.from('notificaciones').insert(admins.map(a => ({
+        user_id: a.user_id,
+        tipo:    'nueva_solicitud',
+        titulo:  `${solic.length} solicitudes publicadas`,
+        mensaje: `Se aprobaron ${solic.length} solicitudes. Ya están disponibles para ofertar.`,
+        leido:   false,
+      })));
+    }
+    await renderAprobaciones();
+    if (document.getElementById('view-pedidos')?.classList.contains('active')) renderPedidos();
+    showToast(`✓ ${solic.length} solicitud${solic.length !== 1 ? 'es' : ''} aprobada${solic.length !== 1 ? 's' : ''} y publicada${solic.length !== 1 ? 's' : ''}`);
+  }, { confirmLabel: 'Aprobar todas' });
 }
 
-async function aprobarTodosAcuerdos() {
-  if (!confirm('¿Aprobar todos los acuerdos pendientes? Se crearán reservaciones para cada uno.')) return;
-  const { data: acuerdos } = await sb.from('pedidos').select('id').eq('estado', 'pendiente_acuerdo');
-  if (!acuerdos?.length) { showToast('No hay acuerdos pendientes'); return; }
-  let ok = 0, err = 0;
-  for (const a of acuerdos) {
-    try { await aprobarAcuerdo(a.id); ok++; } catch (_) { err++; }
-  }
-  showToast(`✓ ${ok} acuerdo${ok !== 1 ? 's' : ''} aprobado${ok !== 1 ? 's' : ''}${err ? ` · ${err} con error` : ''}`);
+function aprobarTodosAcuerdos() {
+  showConfirm('¿Aprobar todos los acuerdos pendientes? Se crearán reservaciones para cada uno.', async () => {
+    const { data: acuerdos } = await sb.from('pedidos').select('id').eq('estado', 'pendiente_acuerdo');
+    if (!acuerdos?.length) { showToast('No hay acuerdos pendientes'); return; }
+    let ok = 0, err = 0;
+    for (const a of acuerdos) {
+      try { await aprobarAcuerdo(a.id); ok++; } catch (_) { err++; }
+    }
+    showToast(`✓ ${ok} acuerdo${ok !== 1 ? 's' : ''} aprobado${ok !== 1 ? 's' : ''}${err ? ` · ${err} con error` : ''}`);
+  }, { confirmLabel: 'Aprobar todos' });
 }

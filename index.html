@@ -174,6 +174,19 @@
         <button class="ped-filtro-pill"        data-tipo="patio"     onclick="filtrarPedidosTipo('patio')"><span class="pill-icon">🏭</span>Patio</button>
         <button class="ped-filtro-pill"        data-tipo="lavado"    onclick="filtrarPedidosTipo('lavado')"><span class="pill-icon">🚿</span>Lavado</button>
       </div>
+      <!-- Filtro de estado para clientes -->
+      <div class="ped-filtro-pills admin-hidden" id="ped-estado-pills" style="margin-top:6px">
+        <button class="ped-filtro-pill active" data-est="todos"     onclick="filtrarPedidosEstado('todos')">Todos</button>
+        <button class="ped-filtro-pill"        data-est="activo"    onclick="filtrarPedidosEstado('activo')">Activos</button>
+        <button class="ped-filtro-pill"        data-est="acordado"  onclick="filtrarPedidosEstado('acordado')">Acordados</button>
+        <button class="ped-filtro-pill"        data-est="cancelado" onclick="filtrarPedidosEstado('cancelado')">Cancelados</button>
+      </div>
+      <!-- Filtro geográfico para admin/superadmin -->
+      <div class="ped-geo-filter admin-only" id="ped-geo-wrap">
+        <input type="search" id="ped-geo-input" class="ped-geo-input"
+               placeholder="🔍 Filtrar por origen o destino…"
+               oninput="filtrarPedidosGeo(this.value)">
+      </div>
     </div>
 
     <div id="pedidos-list"></div>
@@ -788,7 +801,32 @@
   <div class="page">
     <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
     <div class="section-title">📊 Reportes del sistema</div>
+    <div class="rep-date-filter">
+      <label>Desde</label>
+      <input type="date" id="rep-fecha-desde">
+      <label>Hasta</label>
+      <input type="date" id="rep-fecha-hasta">
+      <button class="btn-apr-batch" onclick="renderReportes()">Aplicar</button>
+    </div>
     <div id="reportes-content"></div>
+  </div>
+</div>
+
+<!-- ══ VISTA: MIS STATS (admin) ════════════════════════ -->
+<div id="view-mis-stats" class="view">
+  <div class="page">
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
+    <div class="section-title">📈 Mi desempeño</div>
+    <div id="mis-stats-content"></div>
+  </div>
+</div>
+
+<!-- ══ VISTA: HISTORIAL RESERVAS (superadmin) ══════════ -->
+<div id="view-historial-reservas" class="view">
+  <div class="page">
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
+    <div class="section-title">🗃 Historial de reservaciones archivadas</div>
+    <div id="historial-reservas-content"></div>
   </div>
 </div>
 
@@ -1686,6 +1724,13 @@
 <!-- ══ TOAST ════════════════════════════════════════════ -->
 <div class="toast" id="toast"></div>
 
+<!-- ══ PWA INSTALL BANNER ════════════════════════════════ -->
+<div class="pwa-banner" id="pwa-install-banner">
+  <span>Instala PortGo en tu dispositivo para acceso rápido y uso sin conexión.</span>
+  <button class="btn-pwa-install" onclick="installPWA()">Instalar</button>
+  <button class="btn-pwa-close" onclick="document.getElementById('pwa-install-banner').classList.remove('show')" title="Cerrar">✕</button>
+</div>
+
 <!-- ══ LOGIN ════════════════════════════════════════════ -->
 <div id="login-overlay">
   <div class="login-box">
@@ -1715,6 +1760,7 @@
       </div>
       <button class="btn-login" onclick="doLogin()">Entrar</button>
       <button class="btn-forgot" onclick="forgotPassword()">¿Olvidaste tu contraseña?</button>
+      <p class="login-soporte">¿Necesitas ayuda? <a href="mailto:soporte@portgo.mx">soporte@portgo.mx</a></p>
     </div>
 
     <!-- Panel registro (rendered by JS) -->
@@ -1850,29 +1896,39 @@
   </div>
 </div>
 
+<!-- ══ MODAL CONFIRM GENÉRICO ═══════════════════════════ -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal" style="max-width:400px">
+    <p id="sc-msg" style="font-size:0.95rem;color:var(--text);line-height:1.5;margin-bottom:4px"></p>
+    <div class="modal-actions" style="margin-top:18px">
+      <button class="btn-cancel" onclick="_scCancel()">Cancelar</button>
+      <button class="btn-confirm" id="sc-confirm" onclick="_scConfirm()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ SCRIPTS (orden importante) ══════════════════════ -->
-<script src="js/utils.js?v=1"></script>
+<script src="js/utils.js?v=2"></script>
 <script src="js/notificaciones.js?v=13"></script>
 <script src="js/detalle.js?v=12"></script>
-<script src="js/tracking.js"></script>
-<script src="js/config.js?v=10"></script>
-<script src="js/auth.js?v=13"></script>
+<script src="js/config.js?v=11"></script>
+<script src="js/auth.js?v=14"></script>
 <script src="js/theme.js?v=10"></script>
-<script src="js/views.js?v=13"></script>
+<script src="js/views.js?v=14"></script>
 <script src="js/camiones.js?v=10"></script>
 <script src="js/recursos.js?v=10"></script>
-<script src="js/reservaciones.js?v=14"></script>
+<script src="js/reservaciones.js?v=15"></script>
 <script src="js/modal.js?v=10"></script>
-<script src="js/pedidos.js?v=19"></script>
-<script src="js/aprobaciones.js?v=17"></script>
-<script src="js/admin.js?v=16"></script>
-<script src="js/operadores.js?v=4"></script>
-<script src="js/usuarios.js?v=14"></script>
-<script src="js/reportes.js?v=1"></script>
+<script src="js/pedidos.js?v=20"></script>
+<script src="js/aprobaciones.js?v=18"></script>
+<script src="js/admin.js?v=17"></script>
+<script src="js/operadores.js?v=5"></script>
+<script src="js/usuarios.js?v=15"></script>
+<script src="js/reportes.js?v=2"></script>
 <script src="js/chat.js?v=11"></script>
 <script src="js/catalogo.js?v=16"></script>
-<script src="js/tracking.js?v=10"></script>
-<script src="js/main.js?v=12"></script>
+<script src="js/tracking.js?v=11"></script>
+<script src="js/main.js?v=13"></script>
 
 <!-- ══ PANEL DE CHAT ════════════════════════════════════ -->
 <div id="chat-panel" class="chat-panel">
