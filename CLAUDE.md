@@ -209,6 +209,150 @@ formatPrecio(row.monto)    // → "$1,250.00"
 
 ---
 
+## Database Schema
+
+All tables are in the `public` schema with RLS enabled.
+
+### `perfiles`
+User profile — one row per `auth.users` entry. PK: `user_id`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `user_id` | uuid | FK → `auth.users.id` |
+| `nombre` | text | Display name |
+| `rol` | text | `superadmin` \| `admin` \| `cliente` |
+| `aprobacion_cuenta` | text | `null` (active) \| `pendiente` \| `rechazada` \| `suspendida` |
+| `rfc`, `razon_social` | text | Fiscal data (admins) |
+| `anos_operacion`, `num_unidades` | int | Fleet info (admins) |
+| `seguro_rc`, `seguro_carga` | bool | Insurance flags (admins) |
+| `permiso_sct` | text | SCT permit number (admins) |
+| `telefono`, `descripcion` | text | Contact / bio |
+
+---
+
+### `pedidos`
+Transport requests posted by clients. PK: `id` (uuid).
+
+| Column | Type | Notes |
+|---|---|---|
+| `cliente_id` | uuid | FK → `auth.users.id` |
+| `cliente_nombre`, `cliente_email` | text | Denormalized for display |
+| `tipo_camion` | text | Requested truck type |
+| `tipo_carga` | text | Cargo type |
+| `origen`, `destino` | text | Route |
+| `fecha_ini`, `fecha_fin` | date | Service window |
+| `precio_cliente` | numeric | Client's target price |
+| `estado` | text | `abierto` \| `en_negociacion` \| `acordado` \| `cancelado` \| `pendiente_revision` \| `pendiente_acuerdo` \| `rechazado` |
+| `oferta_pendiente_id` | uuid | FK → `ofertas.id` — the offer under superadmin review |
+| `detalles_completados` | bool | Whether client filled in operational details |
+| `carga_peligrosa`, `temp_controlada`, `requiere_seguro`, `requiere_factura` | bool | Special requirements |
+
+---
+
+### `ofertas`
+Bids placed by admins on pedidos. PK: `id` (uuid).
+
+| Column | Type | Notes |
+|---|---|---|
+| `pedido_id` | uuid | FK → `pedidos.id` |
+| `admin_id` | uuid | FK → `auth.users.id` |
+| `admin_nombre` | text | Denormalized |
+| `precio_oferta` | numeric | Admin's offered price |
+| `contra_precio` | numeric | Client counter-offer |
+| `ronda` | int | `1` (admin offer) or `2` (client counter) |
+| `estado` | text | `enviada` \| `contra_oferta` \| `aceptada` \| `rechazada` |
+| `expira_en` | timestamptz | Defaults to now + 2 days |
+
+---
+
+### `reservaciones`
+Active service bookings (created when a pedido is acordado, or booked directly). PK: `id` (uuid).
+
+| Column | Type | Notes |
+|---|---|---|
+| `propietario_id` | uuid | Admin who owns the reservation |
+| `cliente_user_id` | uuid | Client's auth user id |
+| `cliente`, `cliente_email` | text | Denormalized |
+| `unidad` | text | Truck / resource name |
+| `recurso_tipo` | text | `camion` \| `custodio` \| `patio` \| `lavado` |
+| `fecha_ini`, `fecha_fin` | date | Service period |
+| `precio_acordado` | numeric | Agreed price |
+| `tracking_estado` | text | `Confirmado` → `En camino` → `En puerto` → `Cargando` → `En tránsito` → `Entregado` |
+| `estado` | text | `Activa` \| `Completada` \| `Cancelada` |
+| `pagado`, `calificado` | bool | Payment and rating flags |
+
+### `reservaciones_historico`
+Archived completed/cancelled reservations (moved from `reservaciones` by superadmin). Same shape minus operational fields; adds `archivado_at` and `archivado_por`.
+
+---
+
+### `mensajes`
+Real-time chat messages. PK: `id` (uuid).
+
+| Column | Type | Notes |
+|---|---|---|
+| `de_user_id` | uuid | Sender |
+| `de_nombre` | text | Sender display name |
+| `texto` | text | Message body |
+| `pedido_id` | uuid | FK → `pedidos.id` (nullable) |
+| `reserva_id` | uuid | FK → `reservaciones.id` (nullable) |
+| `participantes` | uuid[] | Array of allowed viewer UUIDs |
+| `leido` | bool | Read flag |
+
+---
+
+### `notificaciones`
+In-app notifications. PK: `id` (uuid).
+
+| Column | Type | Notes |
+|---|---|---|
+| `user_id` | uuid | Recipient |
+| `tipo` | text | e.g. `reserva`, `pedido_cancelado`, `tracking_actualizado`, `reserva_cancelada` |
+| `titulo`, `mensaje` | text | Display text |
+| `leido` | bool | |
+| `meta` | jsonb | Optional extra payload |
+
+---
+
+### Fleet / Resource tables
+
+All four follow the same pattern: `propietario_id` (FK → `perfiles.user_id`), `estado` (`disponible` \| `ocupado` \| `no_disponible`), `aprobacion` (`pendiente` \| `aprobada` \| `rechazada`), plus `rechazo_nota`, `rechazo_campos`, `es_edicion`, `campos_editados`, `snapshot_anterior` for the edit-approval workflow.
+
+| Table | PK type | Extra key columns |
+|---|---|---|
+| `camiones` | text | `tipo`, `capacidad`, `placas`, `marca`, `modelo_anio`, `precio_dia`, `tipo_carga[]`, `caat`, `vigencia_caat` |
+| `custodios` | text | `tipo`, `certificaciones[]`, `disponibilidad`, `precio_dia` |
+| `patios` | text | `tipo`, `ubicacion`, `area_m2`, `capacidad_vehiculos`, `servicios[]`, `precio_dia` |
+| `lavados` | text | `tipos_vehiculo[]`, `tipos_lavado[]`, `precio_lavado`, `capacidad`, `ubicacion`, `horario` |
+
+---
+
+### `operadores`
+Truck drivers registered by admins. PK: `id` (text). Same approval workflow as fleet tables.
+
+Key columns: `propietario_id`, `curp`, `nombre`, `primer_apellido`, `nss`, `num_licencia`, `clase_licencia`, `fecha_vencimiento`, `foto_operador`, `foto_licencia`.
+
+---
+
+### `calificaciones`
+Post-service ratings left by clients. PK: `id` (uuid).
+
+| Column | Type | Notes |
+|---|---|---|
+| `reservacion_id` | uuid | FK → `reservaciones.id` |
+| `admin_id`, `cliente_id` | uuid | Both parties recorded |
+| `rating` | int | 1–5 |
+| `comentario` | text | Optional |
+
+---
+
+### `solicitudes_cuenta`
+Account registration requests submitted via the signup form. PK: `id` (uuid). Reviewed by superadmin before the account is activated.
+
+Key columns: `user_id`, `rol` (`cliente` \| `admin`), `email`, `nombre`, fiscal data (same as `perfiles`), document storage paths (`doc_id_oficial`, `doc_constancia_fiscal`, etc.), `estado` (`pendiente` \| `aprobada` \| `rechazada`), `nota_rechazo`.
+
+---
+
 ## PWA / Service Worker
 
 - `sw.js` uses a **cache-first** strategy for static assets (JS, CSS, fonts, images).
