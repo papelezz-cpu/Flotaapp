@@ -554,6 +554,23 @@ body.light .modal-close-x:hover { background: rgba(239,68,68,0.1); }
 }
 .btn-emp-perfil:hover { border-color: var(--accent); color: var(--accent); }
 
+/* ── BOTÓN PRÓXIMAMENTE ──────────────────────────────── */
+.btn-prox {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.72rem; padding: 4px 10px; border-radius: 8px;
+  background: transparent; border: 1px dashed rgba(255,255,255,0.12);
+  color: var(--text-muted); cursor: not-allowed; opacity: 0.55;
+  font-family: 'Syne', sans-serif; font-weight: 600;
+}
+.prox-badge {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.03em;
+  background: rgba(78,142,247,0.12); color: var(--accent);
+  border: 1px solid rgba(78,142,247,0.22); border-radius: 5px;
+  padding: 1px 5px;
+}
+body.light .btn-prox { border-color: rgba(0,0,0,0.12); }
+body.light .prox-badge { background: rgba(37,99,235,0.08); border-color: rgba(37,99,235,0.2); }
+
 /* ── MODAL EMPRESA (catálogo) ────────────────────────── */
 .epc-rows { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
 .epc-row  { display: flex; align-items: center; gap: 10px; }

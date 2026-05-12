@@ -91,6 +91,12 @@ async function renderReserv() {
       const precioLbl = r.precio_acordado
         ? `<span style="font-size:0.7rem;color:var(--text-muted)">$${Number(r.precio_acordado).toLocaleString('es-MX')} MXN</span>`
         : '';
+      const pagarBtn = (r.estado === 'Activa' && !r.pagado)
+        ? `<button class="btn-prox" disabled title="Pagos en línea — próximamente">💳 Pagar <span class="prox-badge">Prox.</span></button>`
+        : '';
+      const cartaPorteBtn = (r.estado === 'Activa' || r.estado === 'Completada')
+        ? `<button class="btn-prox" disabled title="Carta Porte digital — próximamente">📄 Carta Porte <span class="prox-badge">Prox.</span></button>`
+        : '';
       return `
       <div class="reserv-row reserv-row-cli">
         <div class="reserv-id">${unidadLabel}</div>
@@ -104,6 +110,8 @@ async function renderReserv() {
           ${calBtn}
           ${pagoLbl}
           ${precioLbl}
+          ${pagarBtn}
+          ${cartaPorteBtn}
         </div>
       </div>`;
     }).join('');
@@ -219,6 +227,10 @@ async function renderReserv() {
         : `<button class="btn-edit" style="font-size:0.72rem;color:var(--amber);border-color:rgba(245,158,11,0.4)" onclick="marcarPagado('${r.id}')">💰 Marcar pagado</button>`;
     }
 
+    const cartaPorteBtnAdmin = (esActiva || esCompletada)
+      ? `<button class="btn-prox" disabled title="Carta Porte digital — próximamente">📄 Carta Porte <span class="prox-badge">Prox.</span></button>`
+      : '';
+
     const unidadLabel = recursoLabelMap[r.unidad] || esc(r.unidad) || '—';
     // Chat con el cliente (solo si hay cliente_user_id y la reserva está activa/pendiente)
     const chatBtn = (esDueno && r.cliente_user_id && !inactiva)
@@ -238,6 +250,7 @@ async function renderReserv() {
       <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
         <span class="badge ${badgeCls}">${esc(r.estado)}</span>
         ${acciones}
+        ${cartaPorteBtnAdmin}
         ${chatBtn}
         ${elimBtn}
       </div>
