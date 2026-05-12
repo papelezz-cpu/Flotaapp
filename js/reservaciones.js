@@ -87,6 +87,11 @@ async function renderReserv() {
         : '';
       const pagoLbl = (r.estado === 'Completada' && r.pagado)
         ? `<span style="font-size:0.7rem;color:var(--green);font-weight:600">💰 Pagado</span>`
+        : (r.estado === 'Completada' && !r.pagado)
+          ? `<button class="btn-edit" disabled title="Disponible próximamente" style="font-size:0.7rem;opacity:0.5;cursor:not-allowed">💳 Pagar</button>`
+          : '';
+      const cartaPorteBtn = (r.estado === 'Activa' || r.estado === 'Completada') && (!r.recurso_tipo || r.recurso_tipo === 'camion')
+        ? `<button class="btn-edit" disabled title="Disponible próximamente" style="font-size:0.7rem;opacity:0.5;cursor:not-allowed">📄 Carta Porte</button>`
         : '';
       const precioLbl = r.precio_acordado
         ? `<span style="font-size:0.7rem;color:var(--text-muted)">$${Number(r.precio_acordado).toLocaleString('es-MX')} MXN</span>`
@@ -103,6 +108,7 @@ async function renderReserv() {
           ${chatBtn}
           ${calBtn}
           ${pagoLbl}
+          ${cartaPorteBtn}
           ${precioLbl}
         </div>
       </div>`;
@@ -214,9 +220,13 @@ async function renderReserv() {
         <button class="btn-completar-reserva" onclick="marcarCompletado('${r.id}')">✓ Completar</button>
         <button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${esc(r.unidad)}')">Cancelar</button>`;
     } else if (esDueno && esCompletada) {
-      acciones = r.pagado
+      const pagoAccion = r.pagado
         ? `<span style="font-size:0.72rem;color:var(--green);font-weight:600">💰 Pagado</span>`
         : `<button class="btn-edit" style="font-size:0.72rem;color:var(--amber);border-color:rgba(245,158,11,0.4)" onclick="marcarPagado('${r.id}')">💰 Marcar pagado</button>`;
+      const cartaPorteAdminBtn = (!r.recurso_tipo || r.recurso_tipo === 'camion')
+        ? `<button class="btn-edit" disabled title="Disponible próximamente" style="font-size:0.72rem;opacity:0.5;cursor:not-allowed">📄 Carta Porte</button>`
+        : '';
+      acciones = pagoAccion + cartaPorteAdminBtn;
     }
 
     const unidadLabel = recursoLabelMap[r.unidad] || esc(r.unidad) || '—';
