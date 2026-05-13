@@ -131,16 +131,18 @@ async function onNotifClick(id, tipo) {
     return;
   }
 
-  // Superadmin: pedido o acuerdo en espera de revisión → ir a Solicitudes
+  // Superadmin: solicitud o acuerdo en espera de revisión → ir a Pendientes (aprobaciones)
   if (tipo === 'revision_solicitud' || tipo === 'revision_acuerdo') {
-    goTo('pedidos', 'Solicitudes', 0, null);
+    goTo('pendientes', 'Pendientes', 0, null);
     return;
   }
-  if (tipo === 'reserva_pendiente' || tipo === 'reserva_aceptada' || tipo === 'reserva_rechazada') {
+  if (tipo === 'reserva_pendiente' || tipo === 'reserva_aceptada' || tipo === 'reserva_rechazada' ||
+      tipo === 'tracking_actualizado' || tipo === 'reserva_cancelada') {
     goTo('reservaciones', 'Reservaciones', 0, null);
     return;
   }
-  if (['nueva_oferta','respuesta_oferta','respuesta_contra_oferta','oferta_no_seleccionada'].includes(tipo)) {
+  if (['nueva_oferta','respuesta_oferta','respuesta_contra_oferta','oferta_no_seleccionada',
+       'pedido_cancelado','negociacion_cerrada'].includes(tipo)) {
     goTo('pedidos', 'Solicitudes', 0, null);
     return;
   }
