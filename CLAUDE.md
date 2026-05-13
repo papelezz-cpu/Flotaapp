@@ -125,7 +125,7 @@ Realtime subscriptions in `main.js` watch key tables (`pedidos`, `ofertas`, `men
 | `admin` | Bid on requests, manage own fleet (trucks, custodians, patios) |
 | `superadmin` | Full access — all of the above + user management |
 
-> Auth uses `sessionStorage` (not `localStorage`). Sessions **do not persist** across tabs or browser restarts. This is intentional for security in shared-device port environments.
+> Auth uses `sessionStorage` (not `localStorage`). The Supabase client is explicitly initialized with `storage: window.sessionStorage` in `js/config.js`. Sessions survive page refreshes within the same tab but are destroyed when the tab or browser is closed. This is intentional — closing the browser = automatic logout. Do not change this to `localStorage`.
 
 ### CSS Architecture
 
