@@ -392,7 +392,7 @@ async function renderMisPendientes() {
     sb.from('camiones'  ).select('*').eq('propietario_id', uid).in('aprobacion', estados).order('created_at', { ascending: false }),
     sb.from('custodios' ).select('*').eq('propietario_id', uid).in('aprobacion', estados).order('created_at', { ascending: false }),
     sb.from('patios'    ).select('*').eq('propietario_id', uid).in('aprobacion', estados).order('created_at', { ascending: false }),
-    sb.from('lavados'   ).select('*').eq('propietario_id', uid).in('aprobacion', estados).order('created_at', { ascending: false }),
+    sb.from('lavados'   ).select('*').eq('propietario_id', uid).in('aprobacion', estados).order('id', { ascending: false }),
     sb.from('operadores').select('*').eq('propietario_id', uid).in('aprobacion', estados).order('created_at', { ascending: false }),
   ]);
 
