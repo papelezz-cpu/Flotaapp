@@ -212,6 +212,16 @@ function updateRegFileLabel(id) {
   if (input?.files[0] && nameEl) nameEl.textContent = input.files[0].name;
 }
 
+function updateRegFotosLabel() {
+  const input = document.getElementById('reg-fotos-empresa');
+  const nameEl = document.getElementById('reg-fotos-empresa-name');
+  if (!input || !nameEl) return;
+  const count = input.files?.length || 0;
+  nameEl.textContent = count === 0 ? 'Seleccionar fotos…'
+    : count === 1 ? input.files[0].name
+    : `${count} fotos seleccionadas`;
+}
+
 function _regFormHTML(rol) {
   const domFields = `
     <div class="form-group">
@@ -248,14 +258,112 @@ function _regFormHTML(rol) {
       <button class="reg-back-btn" onclick="_regVolverInicio()">← Volver</button>
       <div class="reg-role-badge">🛒 Cliente</div>
       <div id="registro-error" class="login-error"></div>
-      <div class="reg-section-title">Datos personales</div>
+
+      <div class="reg-section-title">Datos de la empresa</div>
       <div class="form-group">
-        <label>Nombre completo *</label>
+        <label>Nombre de la empresa *</label>
+        <input type="text" id="reg-nombre-empresa" placeholder="Ej. Comercializadora ACME S.A. de C.V.">
+      </div>
+      <div class="form-group">
+        <label>RFC de la empresa *</label>
+        <input type="text" id="reg-rfc" placeholder="ACM900101ABC" maxlength="13" oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="form-group">
+        <label>Giro de la empresa *</label>
+        <select id="reg-giro">
+          <option value="">— Selecciona el giro —</option>
+          <option>Importación / Exportación</option>
+          <option>Manufactura e Industria</option>
+          <option>Comercio y Distribución</option>
+          <option>Alimentos y Bebidas</option>
+          <option>Automotriz</option>
+          <option>Farmacéutica</option>
+          <option>Química y Petroquímica</option>
+          <option>Construcción y Materiales</option>
+          <option>Tecnología y Electrónica</option>
+          <option>Minería y Recursos Naturales</option>
+          <option>Agroindustria</option>
+          <option>Logística y Almacenaje</option>
+          <option>Otro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Tipo de mercancía que manejan *</label>
+        <input type="text" id="reg-tipo-mercancia" placeholder="Ej. Electrónicos, alimentos secos, autopartes">
+      </div>
+      <div class="form-group">
+        <label>Certificaciones <span class="reg-optional">opcional — ISO, CTPAT, OEA, etc.</span></label>
+        <input type="text" id="reg-certificaciones" placeholder="Ej. ISO 9001, CTPAT">
+      </div>
+
+      <div class="reg-section-title">Domicilio fiscal</div>
+      <div class="form-group">
+        <label>Calle *</label>
+        <input type="text" id="reg-calle" placeholder="Av. Insurgentes">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label>Número *</label>
+          <input type="text" id="reg-num" placeholder="123-A">
+        </div>
+        <div class="form-group">
+          <label>Código postal *</label>
+          <input type="text" id="reg-cp" placeholder="06600" maxlength="5">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Colonia *</label>
+        <input type="text" id="reg-colonia" placeholder="Roma Norte">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label>Ciudad *</label>
+          <input type="text" id="reg-ciudad" placeholder="CDMX">
+        </div>
+        <div class="form-group">
+          <label>Estado *</label>
+          <input type="text" id="reg-estado" placeholder="Ciudad de México">
+        </div>
+      </div>
+
+      <div class="reg-section-title">Domicilio de oficinas</div>
+      <div class="form-group">
+        <label>Calle *</label>
+        <input type="text" id="reg-of-calle" placeholder="Av. Reforma">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label>Número *</label>
+          <input type="text" id="reg-of-num" placeholder="456">
+        </div>
+        <div class="form-group">
+          <label>Código postal *</label>
+          <input type="text" id="reg-of-cp" placeholder="06600" maxlength="5">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Colonia *</label>
+        <input type="text" id="reg-of-colonia" placeholder="Juárez">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label>Ciudad *</label>
+          <input type="text" id="reg-of-ciudad" placeholder="CDMX">
+        </div>
+        <div class="form-group">
+          <label>Estado *</label>
+          <input type="text" id="reg-of-estado" placeholder="Ciudad de México">
+        </div>
+      </div>
+
+      <div class="reg-section-title">Datos del representante</div>
+      <div class="form-group">
+        <label>Nombre completo del representante *</label>
         <input type="text" id="reg-nombre" placeholder="Ej. María González López">
       </div>
       <div class="form-group">
         <label>Correo electrónico *</label>
-        <input type="email" id="reg-email" placeholder="correo@ejemplo.com">
+        <input type="email" id="reg-email" placeholder="correo@empresa.com">
       </div>
       <div class="form-group">
         <label>Contraseña * <span class="reg-optional">mínimo 6 caracteres</span></label>
@@ -270,36 +378,45 @@ function _regFormHTML(rol) {
         <input type="tel" id="reg-telefono" placeholder="55 1234 5678">
       </div>
       <div class="form-group">
-        <label>RFC *</label>
-        <input type="text" id="reg-rfc" placeholder="GOML900101ABC" maxlength="13" oninput="this.value=this.value.toUpperCase()">
-      </div>
-      <div class="form-group">
-        <label>CURP *</label>
+        <label>CURP del representante *</label>
         <input type="text" id="reg-curp" placeholder="GOML900101MDFNBR01" maxlength="18" oninput="this.value=this.value.toUpperCase()">
       </div>
-      <div class="reg-section-title">Domicilio</div>
-      ${domFields}
+
       <div class="reg-section-title">Documentos de verificación</div>
-      <div class="reg-docs-hint">📎 Necesitamos estos documentos para verificar tu identidad. Formatos aceptados: JPG, PNG, PDF.</div>
+      <div class="reg-docs-hint">📎 Formatos aceptados: JPG, PNG, PDF (máx. 10 MB por archivo).</div>
       <div class="form-group">
-        <label>Identificación oficial (INE / Pasaporte) *</label>
+        <label>Constancia de Situación Fiscal (SAT) *</label>
+        <label class="reg-file-label" for="reg-csf">
+          <span id="reg-csf-name">Seleccionar archivo…</span>
+          <input type="file" id="reg-csf" accept="image/*,.pdf" onchange="updateRegFileLabel('reg-csf')">
+        </label>
+      </div>
+      <div class="form-group">
+        <label>Acta constitutiva *</label>
+        <label class="reg-file-label" for="reg-acta">
+          <span id="reg-acta-name">Seleccionar archivo…</span>
+          <input type="file" id="reg-acta" accept="image/*,.pdf" onchange="updateRegFileLabel('reg-acta')">
+        </label>
+      </div>
+      <div class="form-group">
+        <label>Opinión de cumplimiento positiva (SAT) *</label>
+        <label class="reg-file-label" for="reg-opinion-sat">
+          <span id="reg-opinion-sat-name">Seleccionar archivo…</span>
+          <input type="file" id="reg-opinion-sat" accept="image/*,.pdf" onchange="updateRegFileLabel('reg-opinion-sat')">
+        </label>
+      </div>
+      <div class="form-group">
+        <label>Fotos reales de instalaciones / empresa * <span class="reg-optional">hasta 3 fotos</span></label>
+        <label class="reg-file-label" for="reg-fotos-empresa">
+          <span id="reg-fotos-empresa-name">Seleccionar fotos…</span>
+          <input type="file" id="reg-fotos-empresa" accept="image/*" multiple onchange="updateRegFotosLabel()">
+        </label>
+      </div>
+      <div class="form-group">
+        <label>Identificación oficial del representante (INE / Pasaporte) *</label>
         <label class="reg-file-label" for="reg-ine">
           <span id="reg-ine-name">Seleccionar archivo…</span>
           <input type="file" id="reg-ine" accept="image/*,.pdf" onchange="updateRegFileLabel('reg-ine')">
-        </label>
-      </div>
-      <div class="form-group">
-        <label>Comprobante de domicilio *</label>
-        <label class="reg-file-label" for="reg-comp-dom">
-          <span id="reg-comp-dom-name">Seleccionar archivo…</span>
-          <input type="file" id="reg-comp-dom" accept="image/*,.pdf" onchange="updateRegFileLabel('reg-comp-dom')">
-        </label>
-      </div>
-      <div class="form-group">
-        <label>Fotografía exterior del domicilio *</label>
-        <label class="reg-file-label" for="reg-foto-dom">
-          <span id="reg-foto-dom-name">Seleccionar archivo…</span>
-          <input type="file" id="reg-foto-dom" accept="image/*" onchange="updateRegFileLabel('reg-foto-dom')">
         </label>
       </div>
       <button class="btn-login" onclick="doRegistro()">Enviar solicitud de registro</button>`;
@@ -416,8 +533,8 @@ async function doRegistro() {
   const estadoMx = document.getElementById('reg-estado')?.value.trim()   || '';
 
   const ineFile     = document.getElementById('reg-ine')?.files[0];
-  const compDomFile = document.getElementById('reg-comp-dom')?.files[0];
-  const fotoDomFile = document.getElementById('reg-foto-dom')?.files[0];
+  const compDomFile = _regRol === 'admin' ? document.getElementById('reg-comp-dom')?.files[0] : null;
+  const fotoDomFile = _regRol === 'admin' ? document.getElementById('reg-foto-dom')?.files[0] : null;
 
   const showErr = msg => { errEl.textContent = msg; errEl.classList.add('show'); };
 
@@ -428,7 +545,7 @@ async function doRegistro() {
   const passConfirm = document.getElementById('reg-pass-confirm')?.value || '';
   if (pass.length < 6) { showErr('La contraseña debe tener al menos 6 caracteres.'); return; }
   if (pass !== passConfirm) { showErr('Las contraseñas no coinciden.'); return; }
-  if (!ineFile || !compDomFile || !fotoDomFile) {
+  if (_regRol === 'admin' && (!ineFile || !compDomFile || !fotoDomFile)) {
     showErr('Adjunta todos los documentos requeridos.'); return;
   }
 
@@ -445,9 +562,46 @@ async function doRegistro() {
   if (!validarDoc(fotoDomFile, 'Fotografía')) return;
 
   let curp = '', razonSocial = '', csfFile = null, opinionFile = null, actaFile = null;
+  let nombreEmpresa = '', giro = '', tipoMercancia = '', certificaciones = '';
+  let ofCalle = '', ofNum = '', ofColonia = '', ofCp = '', ofCiudad = '', ofEstado = '';
+  let opinionSatFile = null, fotosEmpresaFiles = [];
+
   if (_regRol === 'cliente') {
-    curp = document.getElementById('reg-curp')?.value.trim() || '';
-    if (!curp) { showErr('El CURP es requerido.'); return; }
+    nombreEmpresa   = document.getElementById('reg-nombre-empresa')?.value.trim() || '';
+    giro            = document.getElementById('reg-giro')?.value || '';
+    tipoMercancia   = document.getElementById('reg-tipo-mercancia')?.value.trim() || '';
+    certificaciones = document.getElementById('reg-certificaciones')?.value.trim() || '';
+    ofCalle         = document.getElementById('reg-of-calle')?.value.trim() || '';
+    ofNum           = document.getElementById('reg-of-num')?.value.trim() || '';
+    ofColonia       = document.getElementById('reg-of-colonia')?.value.trim() || '';
+    ofCp            = document.getElementById('reg-of-cp')?.value.trim() || '';
+    ofCiudad        = document.getElementById('reg-of-ciudad')?.value.trim() || '';
+    ofEstado        = document.getElementById('reg-of-estado')?.value.trim() || '';
+    curp            = document.getElementById('reg-curp')?.value.trim() || '';
+    csfFile         = document.getElementById('reg-csf')?.files[0];
+    actaFile        = document.getElementById('reg-acta')?.files[0];
+    opinionSatFile  = document.getElementById('reg-opinion-sat')?.files[0];
+    fotosEmpresaFiles = Array.from(document.getElementById('reg-fotos-empresa')?.files || []).slice(0, 3);
+
+    if (!nombreEmpresa) { showErr('El nombre de la empresa es requerido.'); return; }
+    if (!giro) { showErr('Selecciona el giro de la empresa.'); return; }
+    if (!tipoMercancia) { showErr('Indica el tipo de mercancía que manejan.'); return; }
+    if (!ofCalle || !ofNum || !ofColonia || !ofCp || !ofCiudad || !ofEstado) {
+      showErr('Completa todos los campos del domicilio de oficinas.'); return;
+    }
+    if (!curp) { showErr('El CURP del representante es requerido.'); return; }
+    if (!ineFile) { showErr('Adjunta la identificación oficial del representante.'); return; }
+    if (!csfFile) { showErr('La Constancia de Situación Fiscal es requerida.'); return; }
+    if (!actaFile) { showErr('El Acta constitutiva es requerida.'); return; }
+    if (!opinionSatFile) { showErr('La Opinión de cumplimiento positiva (SAT) es requerida.'); return; }
+    if (!fotosEmpresaFiles.length) { showErr('Adjunta al menos una foto de las instalaciones.'); return; }
+    if (!validarDoc(ineFile,         'Identificación oficial')) return;
+    if (!validarDoc(csfFile,         'Constancia de Situación Fiscal')) return;
+    if (!validarDoc(actaFile,        'Acta constitutiva')) return;
+    if (!validarDoc(opinionSatFile,  'Opinión de cumplimiento')) return;
+    for (const f of fotosEmpresaFiles) {
+      if (!validarDoc(f, 'Foto de instalaciones')) return;
+    }
   } else {
     razonSocial = document.getElementById('reg-razon-social')?.value.trim() || '';
     csfFile     = document.getElementById('reg-csf')?.files[0];
@@ -518,36 +672,67 @@ async function doRegistro() {
     return upErr ? null : path;
   };
 
-  const [docIne, docCompDom, docFotoDom, docCsf, , docActa] = await Promise.all([
-    uploadDoc(ineFile,     'ine'),
-    uploadDoc(compDomFile, 'comprobante_domicilio'),
-    uploadDoc(fotoDomFile, 'foto'),
-    uploadDoc(csfFile,     'constancia_fiscal'),
-    Promise.resolve(null),
-    uploadDoc(actaFile,    'acta_constitutiva'),
-  ]);
+  let docIne, docCompDom, docFotoDom, docCsf, docActa, docOpinionSat, docFotosEmpresa;
+  if (_regRol === 'cliente') {
+    const fotosPaths = await Promise.all(
+      fotosEmpresaFiles.map((f, i) => uploadDoc(f, `foto_empresa_${i + 1}`))
+    );
+    [docIne, docCsf, docActa, docOpinionSat] = await Promise.all([
+      uploadDoc(ineFile,        'ine'),
+      uploadDoc(csfFile,        'constancia_fiscal'),
+      uploadDoc(actaFile,       'acta_constitutiva'),
+      uploadDoc(opinionSatFile, 'opinion_sat'),
+    ]);
+    docFotosEmpresa = fotosPaths.filter(Boolean);
+  } else {
+    [docIne, docCompDom, docFotoDom, docCsf, , docActa] = await Promise.all([
+      uploadDoc(ineFile,     'ine'),
+      uploadDoc(compDomFile, 'comprobante_domicilio'),
+      uploadDoc(fotoDomFile, 'foto'),
+      uploadDoc(csfFile,     'constancia_fiscal'),
+      Promise.resolve(null),
+      uploadDoc(actaFile,    'acta_constitutiva'),
+    ]);
+  }
 
   const solicitudPayload = {
     nombre,
     email,
     telefono,
     rfc,
-    curp:                 curp        || null,
-    razon_social:         razonSocial || null,
-    tipo_persona:         _regRol === 'admin' ? _regTipoPersona : null,
-    calle:                `${calle} ${num}`.trim(),
+    curp:        curp || null,
+    tipo_persona: _regRol === 'admin' ? _regTipoPersona : null,
+    calle:        `${calle} ${num}`.trim(),
     colonia,
     cp,
     ciudad,
-    estado_mx:            estadoMx,
-    doc_id_oficial:       _regRol === 'cliente' ? docIne : null,
-    doc_id_representante: _regRol === 'admin'   ? docIne : null,
-    doc_comprobante_dom:  docCompDom,
-    doc_foto_domicilio:   _regRol === 'cliente' ? docFotoDom : null,
-    doc_fotos_oficinas:   _regRol === 'admin' && docFotoDom ? [docFotoDom] : null,
-    doc_constancia_fiscal: docCsf  || null,
-    doc_acta_constitutiva: docActa || null,
-    estado:               'pendiente',
+    estado_mx:    estadoMx,
+    estado:       'pendiente',
+    ...(_regRol === 'cliente' ? {
+      razon_social:          nombreEmpresa || null,
+      giro_empresa:          giro          || null,
+      tipo_mercancia:        tipoMercancia || null,
+      certificaciones:       certificaciones || null,
+      nombre_representante:  nombre,
+      of_calle:              `${ofCalle} ${ofNum}`.trim() || null,
+      of_colonia:            ofColonia  || null,
+      of_cp:                 ofCp       || null,
+      of_ciudad:             ofCiudad   || null,
+      of_estado_mx:          ofEstado   || null,
+      doc_id_oficial:        docIne     || null,
+      doc_constancia_fiscal: docCsf     || null,
+      doc_acta_constitutiva: docActa    || null,
+      doc_opinion_sat:       docOpinionSat || null,
+      doc_fotos_oficinas:    docFotosEmpresa?.length ? docFotosEmpresa : null,
+    } : {
+      razon_social:          razonSocial  || null,
+      doc_id_representante:  docIne       || null,
+      doc_comprobante_dom:   docCompDom   || null,
+      doc_foto_domicilio:    docFotoDom   || null,
+      doc_fotos_oficinas:    docFotoDom   ? [docFotoDom] : null,
+      doc_constancia_fiscal: docCsf       || null,
+      doc_acta_constitutiva: docActa      || null,
+    }),
   };
 
   if (esReregistro) {
