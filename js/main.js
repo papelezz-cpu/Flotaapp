@@ -108,23 +108,3 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 
-// #12 — PWA install prompt
-let _deferredInstall = null;
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  _deferredInstall = e;
-  document.getElementById('pwa-install-banner')?.classList.add('show');
-});
-window.addEventListener('appinstalled', () => {
-  _deferredInstall = null;
-  document.getElementById('pwa-install-banner')?.classList.remove('show');
-});
-
-function installPWA() {
-  if (!_deferredInstall) return;
-  _deferredInstall.prompt();
-  _deferredInstall.userChoice.then(() => {
-    _deferredInstall = null;
-    document.getElementById('pwa-install-banner')?.classList.remove('show');
-  });
-}
