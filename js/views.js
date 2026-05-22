@@ -51,6 +51,7 @@ function renderHome() {
     ],
     admin: [
       { e:'📋', bg:'hc-blue',   t:'Solicitudes',   d:'Ofertas y pedidos activos',        fn:`showView('pedidos',null)` },
+      { e:'🗓️', bg:'hc-purple', t:'Reservaciones', d:'Viajes y servicios activos',       fn:`showView('reservaciones',null)` },
       { e:'🚛', bg:'hc-slate',  t:'Mis unidades',  d:'Gestiona tu flota de camiones',    fn:`_irAdmin('camion')` },
       { e:'👷', bg:'hc-amber',  t:'Operadores',    d:'Personal de conducción',           fn:`_irAdmin('operador')` },
       { e:'👮', bg:'hc-teal',   t:'Custodios',     d:'Servicios de seguridad',           fn:`_irAdmin('custodio')` },
