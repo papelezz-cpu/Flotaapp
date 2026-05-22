@@ -130,8 +130,21 @@ async function renderPedidos(append = false) {
     if (aReabrir.length) {
       sb.from('pedidos').update({ estado: 'abierto' })
         .in('id', aReabrir.map(p => p.id)).then(() => {});
-      // Actualizar en el acumulado local para que la UI refleje ya el cambio
       aReabrir.forEach(p => { p.estado = 'abierto'; });
+    }
+
+    // Estado lazy: pedido en_negociacion pero tiene oferta aceptada → completar a pendiente_acuerdo
+    // (ocurre si la segunda operación falló al confirmar el acuerdo)
+    for (const p of (pedidosPage || [])) {
+      if (p.estado !== 'en_negociacion') continue;
+      const aceptada = (ofertasPorPedido[p.id] || []).find(o => o.estado === 'aceptada');
+      if (!aceptada) continue;
+      sb.from('pedidos').update({
+        estado:              'pendiente_acuerdo',
+        oferta_pendiente_id: aceptada.id,
+      }).eq('id', p.id).then(() => {});
+      p.estado              = 'pendiente_acuerdo';
+      p.oferta_pendiente_id = aceptada.id;
     }
   }
 
@@ -273,8 +286,10 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
   }[p.estado] || 'badge-maint';
 
   const ofertasVivaz   = ofertas.filter(o => o.estado !== 'rechazada');
+  const hayAceptada    = ofertas.some(o => o.estado === 'aceptada');
   const estadoLabel = (p.estado === 'abierto' || (p.estado === 'en_negociacion' && !ofertasVivaz.length))
     ? (ofertasVivaz.length ? `${ofertasVivaz.length} oferta${ofertasVivaz.length > 1 ? 's' : ''}` : 'Sin ofertas aún')
+    : (p.estado === 'en_negociacion' && hayAceptada) ? '⏳ Acuerdo en revisión'
     : p.estado === 'en_negociacion'     ? 'En negociación'
     : p.estado === 'acordado'           ? '✓ Acordado'
     : p.estado === 'cancelado'          ? 'Cancelado'
