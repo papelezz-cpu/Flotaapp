@@ -222,7 +222,12 @@ async function renderPedidos(append = false) {
     const ESTADOS_NEGOCIABLES = ['abierto','en_negociacion','pendiente_revision','pendiente_acuerdo'];
     const misNegociaciones = _filtrar((pedidos || []).filter(p =>
       ESTADOS_NEGOCIABLES.includes(p.estado) &&
-      (ofertasMap[p.id] || []).some(o => o.admin_id === currentUser.id && ['enviada','contra_oferta'].includes(o.estado))
+      (ofertasMap[p.id] || []).some(o =>
+        o.admin_id === currentUser.id && (
+          ['enviada','contra_oferta'].includes(o.estado) ||
+          (o.estado === 'aceptada' && ['pendiente_acuerdo','pendiente_revision'].includes(p.estado))
+        )
+      )
     ));
 
     const disponibles = _filtrar((pedidos || []).filter(p =>
@@ -331,11 +336,13 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
 
   } else if (vista === 'admin_propio' && miOferta) {
     const st = miOferta.estado;
+    const enRevision = st === 'aceptada' && ['pendiente_acuerdo','pendiente_revision'].includes(p.estado);
     const etq = st === 'enviada'      ? 'Esperando respuesta'
               : st === 'contra_oferta' ? `Contraoferta: $${Number(miOferta.contra_precio).toLocaleString('es-MX')}`
+              : enRevision             ? '⏳ Acuerdo en revisión'
               : st === 'aceptada'      ? '✓ Aceptada'
               : 'Rechazada';
-    const bdg = st === 'aceptada' ? 'badge-avail' : st === 'rechazada' ? 'badge-maint' : 'badge-busy';
+    const bdg = enRevision ? 'badge-revision' : st === 'aceptada' ? 'badge-avail' : st === 'rechazada' ? 'badge-maint' : 'badge-busy';
     const chatAdminBtn = (p.cliente_id && st !== 'rechazada')
       ? `<button class="btn-chat-hilo" onclick="openChatPedido('${p.id}','${p.cliente_id}','${esc(p.cliente_nombre||'')}')">💬 Chat</button>`
       : '';
