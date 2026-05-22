@@ -473,6 +473,15 @@ function _regFormHTML(rol) {
         </label>
       </div>
     </div>
+    <div class="reg-section-title">Información operativa</div>
+    <div class="form-group">
+      <label>Número de operaciones mensuales <span class="reg-optional">aproximado</span></label>
+      <input type="number" id="reg-num-ops" placeholder="Ej. 25" min="1" max="9999">
+    </div>
+    <div class="form-group">
+      <label>Mercancía que importan o exportan <span class="reg-optional">opcional</span></label>
+      <input type="text" id="reg-mercancia-ops" placeholder="Ej. Electrónicos, autopartes, alimentos">
+    </div>
     <div class="reg-section-title">Domicilio fiscal</div>
     ${domFields}
     <div class="reg-section-title">Documentos de verificación</div>
@@ -611,6 +620,13 @@ async function doRegistro() {
     if (!csfFile) { showErr('La Constancia de Situación Fiscal (SAT) es requerida.'); return; }
   }
 
+  const numOpsMensuales = _regRol === 'admin'
+    ? (parseInt(document.getElementById('reg-num-ops')?.value) || null)
+    : null;
+  const mercanciaOps = _regRol === 'admin'
+    ? (document.getElementById('reg-mercancia-ops')?.value.trim() || null)
+    : null;
+
   const btn = document.querySelector('#registro-panel .btn-login');
   if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
 
@@ -725,13 +741,15 @@ async function doRegistro() {
       doc_opinion_sat:       docOpinionSat || null,
       doc_fotos_oficinas:    docFotosEmpresa?.length ? docFotosEmpresa : null,
     } : {
-      razon_social:          razonSocial  || null,
-      doc_id_representante:  docIne       || null,
-      doc_comprobante_dom:   docCompDom   || null,
-      doc_foto_domicilio:    docFotoDom   || null,
-      doc_fotos_oficinas:    docFotoDom   ? [docFotoDom] : null,
-      doc_constancia_fiscal: docCsf       || null,
-      doc_acta_constitutiva: docActa      || null,
+      razon_social:               razonSocial     || null,
+      num_operaciones_mensuales:  numOpsMensuales || null,
+      mercancia_operaciones:      mercanciaOps    || null,
+      doc_id_representante:       docIne          || null,
+      doc_comprobante_dom:        docCompDom      || null,
+      doc_foto_domicilio:         docFotoDom      || null,
+      doc_fotos_oficinas:         docFotoDom      ? [docFotoDom] : null,
+      doc_constancia_fiscal:      docCsf          || null,
+      doc_acta_constitutiva:      docActa         || null,
     }),
   };
 

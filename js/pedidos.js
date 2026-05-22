@@ -113,6 +113,26 @@ async function renderPedidos(append = false) {
       sb.from('ofertas').update({ estado: 'rechazada' })
         .in('id', expiradas.map(o => o.id)).then(() => {});
     }
+
+    // Estado lazy: pedidos en_negociacion donde TODAS las ofertas están rechazadas → reabrir
+    const ofertasPorPedido = {};
+    (nuevasOfertas || []).forEach(o => {
+      if (!ofertasPorPedido[o.pedido_id]) ofertasPorPedido[o.pedido_id] = [];
+      ofertasPorPedido[o.pedido_id].push(o);
+    });
+    const aReabrir = (pedidosPage || []).filter(p => {
+      if (p.estado !== 'en_negociacion') return false;
+      const ofs = ofertasPorPedido[p.id] || [];
+      return ofs.length > 0 && ofs.every(o =>
+        o.estado === 'rechazada' || (o.estado === 'enviada' && o.expira_en && new Date(o.expira_en) < new Date())
+      );
+    });
+    if (aReabrir.length) {
+      sb.from('pedidos').update({ estado: 'abierto' })
+        .in('id', aReabrir.map(p => p.id)).then(() => {});
+      // Actualizar en el acumulado local para que la UI refleje ya el cambio
+      aReabrir.forEach(p => { p.estado = 'abierto'; });
+    }
   }
 
   const pedidos      = _pedidosAccum;
@@ -253,7 +273,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
   }[p.estado] || 'badge-maint';
 
   const ofertasVivaz   = ofertas.filter(o => o.estado !== 'rechazada');
-  const estadoLabel = p.estado === 'abierto'
+  const estadoLabel = (p.estado === 'abierto' || (p.estado === 'en_negociacion' && !ofertasVivaz.length))
     ? (ofertasVivaz.length ? `${ofertasVivaz.length} oferta${ofertasVivaz.length > 1 ? 's' : ''}` : 'Sin ofertas aún')
     : p.estado === 'en_negociacion'     ? 'En negociación'
     : p.estado === 'acordado'           ? '✓ Acordado'
