@@ -127,22 +127,7 @@ async function renderReserv() {
     .order('created_at', { ascending: false });
 
   if (currentUser.rol !== 'superadmin') {
-    // Obtener IDs de todos los recursos propios (camiones + custodios + patios)
-    const [{ data: misCamiones }, { data: misCustodios }, { data: misPatios }] = await Promise.all([
-      sb.from('camiones').select('id').eq('propietario_id', currentUser.id),
-      sb.from('custodios').select('id').eq('propietario_id', currentUser.id),
-      sb.from('patios').select('id').eq('propietario_id', currentUser.id),
-    ]);
-    const misIds = [
-      ...(misCamiones  || []).map(c => c.id),
-      ...(misCustodios || []).map(c => c.id),
-      ...(misPatios    || []).map(p => p.id),
-    ];
-    if (!misIds.length) {
-      body.innerHTML = `<div class="empty-state"><div class="icon">🚛</div>No tienes recursos registrados.</div>`;
-      return;
-    }
-    reservQuery = reservQuery.in('unidad', misIds);
+    reservQuery = reservQuery.eq('propietario_id', currentUser.id);
   }
 
   const { data, error } = await reservQuery;
