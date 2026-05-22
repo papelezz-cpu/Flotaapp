@@ -186,7 +186,9 @@ async function renderPedidos(append = false) {
       todasOfertas.filter(o => o.admin_id === currentUser.id).map(o => o.pedido_id)
     );
 
+    const ESTADOS_NEGOCIABLES = ['abierto','en_negociacion','pendiente_revision','pendiente_acuerdo'];
     const misNegociaciones = _filtrar((pedidos || []).filter(p =>
+      ESTADOS_NEGOCIABLES.includes(p.estado) &&
       (ofertasMap[p.id] || []).some(o => o.admin_id === currentUser.id && ['enviada','contra_oferta'].includes(o.estado))
     ));
 
