@@ -375,15 +375,6 @@
           <label>Fecha de expedición TC</label>
           <input type="date" id="admin-fecha-tc">
         </div>
-        <div class="form-group">
-          <label>Imagen tarjeta de circulación</label>
-          <label class="file-upload-area" for="admin-img-tc">
-            <span class="file-upload-icon">📄</span>
-            <span id="img-tc-label" class="file-upload-text">Adjuntar imagen</span>
-          </label>
-          <input type="file" id="admin-img-tc" accept="image/*,.pdf" style="display:none"
-                 onchange="updateFileLabel('admin-img-tc','img-tc-label')">
-        </div>
 
         <div class="op-form-section-title" style="margin-top:16px">Operación</div>
         <div class="form-group">
@@ -422,24 +413,71 @@
           </select>
         </div>
 
-        <div class="op-form-section-title" style="margin-top:16px">Fotos y documentos</div>
+        <div class="op-form-section-title" style="margin-top:16px">Fotos de la unidad</div>
         <div class="form-group">
-          <label>Fotos de la unidad</label>
-          <label class="file-upload-area" for="admin-fotos">
+          <label>Frente <span style="color:var(--danger)">*</span></label>
+          <label class="file-upload-area" for="admin-foto-frente">
             <span class="file-upload-icon">📷</span>
-            <span id="fotos-label" class="file-upload-text">Seleccionar fotos</span>
+            <span id="foto-frente-label" class="file-upload-text">Adjuntar foto</span>
           </label>
-          <input type="file" id="admin-fotos" multiple accept="image/*" style="display:none"
-                 onchange="updateFileLabel('admin-fotos','fotos-label')">
+          <input type="file" id="admin-foto-frente" accept="image/*" style="display:none"
+                 onchange="updateFileLabel('admin-foto-frente','foto-frente-label')">
         </div>
         <div class="form-group">
-          <label>Documentación adicional (PDF / imagen)</label>
-          <label class="file-upload-area" for="admin-docs">
-            <span class="file-upload-icon">📄</span>
-            <span id="docs-label" class="file-upload-text">Seleccionar documentos</span>
+          <label>Laterales</label>
+          <label class="file-upload-area" for="admin-foto-laterales">
+            <span class="file-upload-icon">📷</span>
+            <span id="foto-laterales-label" class="file-upload-text">Adjuntar fotos</span>
           </label>
-          <input type="file" id="admin-docs" multiple accept=".pdf,.jpg,.jpeg,.png" style="display:none"
-                 onchange="updateFileLabel('admin-docs','docs-label')">
+          <input type="file" id="admin-foto-laterales" multiple accept="image/*" style="display:none"
+                 onchange="updateFileLabel('admin-foto-laterales','foto-laterales-label')">
+        </div>
+        <div class="form-group">
+          <label>Trasera</label>
+          <label class="file-upload-area" for="admin-foto-trasera">
+            <span class="file-upload-icon">📷</span>
+            <span id="foto-trasera-label" class="file-upload-text">Adjuntar foto</span>
+          </label>
+          <input type="file" id="admin-foto-trasera" accept="image/*" style="display:none"
+                 onchange="updateFileLabel('admin-foto-trasera','foto-trasera-label')">
+        </div>
+        <div class="form-group">
+          <label>Foto de placa <span style="color:var(--danger)">*</span></label>
+          <label class="file-upload-area" for="admin-foto-placa">
+            <span class="file-upload-icon">📷</span>
+            <span id="foto-placa-label" class="file-upload-text">Adjuntar foto</span>
+          </label>
+          <input type="file" id="admin-foto-placa" accept="image/*" style="display:none"
+                 onchange="updateFileLabel('admin-foto-placa','foto-placa-label')">
+        </div>
+
+        <div class="op-form-section-title" style="margin-top:16px">Documentos requeridos</div>
+        <div class="form-group">
+          <label>Tarjeta de circulación <span style="color:var(--danger)">*</span></label>
+          <label class="file-upload-area" for="admin-doc-tc">
+            <span class="file-upload-icon">📄</span>
+            <span id="doc-tc-label" class="file-upload-text">Adjuntar documento</span>
+          </label>
+          <input type="file" id="admin-doc-tc" accept="image/*,.pdf" style="display:none"
+                 onchange="updateFileLabel('admin-doc-tc','doc-tc-label')">
+        </div>
+        <div class="form-group">
+          <label>Permiso SCT <span style="color:var(--danger)">*</span></label>
+          <label class="file-upload-area" for="admin-doc-sct">
+            <span class="file-upload-icon">📄</span>
+            <span id="doc-sct-label" class="file-upload-text">Adjuntar documento</span>
+          </label>
+          <input type="file" id="admin-doc-sct" accept="image/*,.pdf" style="display:none"
+                 onchange="updateFileLabel('admin-doc-sct','doc-sct-label')">
+        </div>
+        <div class="form-group">
+          <label>Póliza de seguro <span style="color:var(--danger)">*</span></label>
+          <label class="file-upload-area" for="admin-doc-seguro">
+            <span class="file-upload-icon">📄</span>
+            <span id="doc-seguro-label" class="file-upload-text">Adjuntar documento</span>
+          </label>
+          <input type="file" id="admin-doc-seguro" accept="image/*,.pdf" style="display:none"
+                 onchange="updateFileLabel('admin-doc-seguro','doc-seguro-label')">
         </div>
 
         <div class="form-group sa-empresa-row" style="display:none">
@@ -1915,7 +1953,7 @@
 <script src="js/modal.js?v=10"></script>
 <script src="js/pedidos.js?v=25"></script>
 <script src="js/aprobaciones.js?v=19"></script>
-<script src="js/admin.js?v=18"></script>
+<script src="js/admin.js?v=19"></script>
 <script src="js/operadores.js?v=5"></script>
 <script src="js/usuarios.js?v=15"></script>
 <script src="js/reportes.js?v=2"></script>

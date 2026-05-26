@@ -640,12 +640,11 @@ async function agregarCamion() {
   if (!cap) { _done(); showToast('La capacidad es obligatoria.', 'error'); return; }
 
   // Validar archivos obligatorios
-  const _fotosFiles = Array.from(document.getElementById('admin-fotos').files || []);
-  const _docsFiles  = Array.from(document.getElementById('admin-docs').files  || []);
-  const _tcFileChk  = document.getElementById('admin-img-tc')?.files?.[0];
-  if (!_fotosFiles.length) { _done(); showToast('Debes adjuntar al menos una foto de la unidad', 'error'); return; }
-  if (!_docsFiles.length)  { _done(); showToast('Debes adjuntar al menos un documento de la unidad', 'error'); return; }
-  if (!_tcFileChk)         { _done(); showToast('Debes adjuntar la imagen de la Tarjeta de Circulación', 'error'); return; }
+  if (!document.getElementById('admin-foto-frente')?.files?.[0])  { _done(); showToast('Debes adjuntar la foto del frente de la unidad', 'error'); return; }
+  if (!document.getElementById('admin-foto-placa')?.files?.[0])   { _done(); showToast('Debes adjuntar la foto de la placa', 'error'); return; }
+  if (!document.getElementById('admin-doc-tc')?.files?.[0])       { _done(); showToast('Debes adjuntar la Tarjeta de Circulación', 'error'); return; }
+  if (!document.getElementById('admin-doc-sct')?.files?.[0])      { _done(); showToast('Debes adjuntar el Permiso SCT', 'error'); return; }
+  if (!document.getElementById('admin-doc-seguro')?.files?.[0])   { _done(); showToast('Debes adjuntar la Póliza de seguro', 'error'); return; }
 
   const prefijos = {
     'Torton': 'T', 'Torton caja seca': 'T', 'Torton plataforma': 'T',
@@ -670,21 +669,32 @@ async function agregarCamion() {
   if (!propietarioId) { _done(); return; }
 
   // Subir archivos al storage
-  const fotosFiles = Array.from(document.getElementById('admin-fotos').files || []);
-  const docsFiles  = Array.from(document.getElementById('admin-docs').files  || []);
-  const tcFile     = document.getElementById('admin-img-tc')?.files?.[0];
+  const _getFile = elId => document.getElementById(elId)?.files?.[0];
+  const _getFiles = elId => Array.from(document.getElementById(elId)?.files || []);
   const archivos   = [];
   let   imagenTc = null;
 
-  for (const file of [...fotosFiles, ...docsFiles]) {
-    const path = `${propietarioId}/${id}/${Date.now()}_${file.name}`;
+  const fotoEntradas = [
+    { prefix: 'frente',   file: _getFile('admin-foto-frente') },
+    { prefix: 'trasera',  file: _getFile('admin-foto-trasera') },
+    { prefix: 'placa',    file: _getFile('admin-foto-placa') },
+    ..._getFiles('admin-foto-laterales').map((f, i) => ({ prefix: `lat${i + 1}`, file: f })),
+  ];
+  const docEntradas = [
+    { prefix: 'tc',     file: _getFile('admin-doc-tc') },
+    { prefix: 'sct',    file: _getFile('admin-doc-sct') },
+    { prefix: 'seguro', file: _getFile('admin-doc-seguro') },
+  ];
+
+  for (const { prefix, file } of [...fotoEntradas, ...docEntradas]) {
+    if (!file) continue;
+    const ext  = file.name.split('.').pop();
+    const path = `${propietarioId}/${id}/${prefix}_${Date.now()}.${ext}`;
     const { data: up, error: upErr } = await sb.storage.from('unidades').upload(path, file);
-    if (!upErr && up) archivos.push(up.path);
-  }
-  if (tcFile) {
-    const path = `${propietarioId}/${id}/tc_${Date.now()}.${tcFile.name.split('.').pop()}`;
-    const { data: up } = await sb.storage.from('unidades').upload(path, tcFile);
-    if (up) { archivos.push(up.path); imagenTc = up.path; }
+    if (!upErr && up) {
+      archivos.push(up.path);
+      if (prefix === 'tc') imagenTc = up.path;
+    }
   }
 
   const emojis = {
@@ -751,12 +761,16 @@ async function agregarCamion() {
    'admin-num-serie','admin-num-motor','admin-num-economico','admin-tc','admin-fecha-tc'].forEach(fid => {
     const el = document.getElementById(fid); if (el) el.value = '';
   });
-  ['admin-fotos','admin-docs','admin-img-tc'].forEach(fid => {
+  ['admin-foto-frente','admin-foto-laterales','admin-foto-trasera','admin-foto-placa',
+   'admin-doc-tc','admin-doc-sct','admin-doc-seguro'].forEach(fid => {
     const el = document.getElementById(fid); if (el) el.value = '';
   });
-  document.getElementById('fotos-label').textContent = 'Seleccionar fotos';
-  document.getElementById('docs-label').textContent  = 'Seleccionar documentos (PDF / imagen)';
-  const tcLbl = document.getElementById('img-tc-label'); if (tcLbl) tcLbl.textContent = 'Adjuntar imagen';
+  [['foto-frente-label','Adjuntar foto'],['foto-laterales-label','Adjuntar fotos'],
+   ['foto-trasera-label','Adjuntar foto'],['foto-placa-label','Adjuntar foto'],
+   ['doc-tc-label','Adjuntar documento'],['doc-sct-label','Adjuntar documento'],
+   ['doc-seguro-label','Adjuntar documento']].forEach(([id, txt]) => {
+    const el = document.getElementById(id); if (el) el.textContent = txt;
+  });
   ['admin-marca','admin-color','admin-tipo-placa','admin-combustible'].forEach(fid => {
     const el = document.getElementById(fid); if (el) el.selectedIndex = 0;
   });
@@ -1217,9 +1231,13 @@ function updateFileLabel(inputId, labelId) {
   const label = document.getElementById(labelId);
   if (!label) return;
   const defaults = {
-    'admin-fotos':  'Seleccionar fotos',
-    'admin-docs':   'Seleccionar documentos (PDF / imagen)',
-    'admin-img-tc': 'Adjuntar imagen',
+    'admin-foto-frente':    'Adjuntar foto',
+    'admin-foto-laterales': 'Adjuntar fotos',
+    'admin-foto-trasera':   'Adjuntar foto',
+    'admin-foto-placa':     'Adjuntar foto',
+    'admin-doc-tc':         'Adjuntar documento',
+    'admin-doc-sct':        'Adjuntar documento',
+    'admin-doc-seguro':     'Adjuntar documento',
   };
   if (!files?.length) {
     label.textContent = defaults[inputId] || 'Seleccionar archivo';
