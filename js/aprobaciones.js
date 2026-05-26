@@ -838,8 +838,21 @@ function _buildChipsSol(p) {
 async function aprobarSolicitud(pedidoId) {
   await sb.from('pedidos').update({ estado: 'abierto', rechazo_nota: null }).eq('id', pedidoId);
 
+  const { data: ped } = await sb.from('pedidos').select('tipo_camion, origen, destino, cliente_id').eq('id', pedidoId).single();
+
+  // Notificar al cliente que su solicitud fue aprobada
+  if (ped?.cliente_id) {
+    const ruta = ped.origen ? ` (${ped.origen}${ped.destino ? ' → ' + ped.destino : ''})` : '';
+    await sb.from('notificaciones').insert({
+      user_id: ped.cliente_id,
+      tipo:    'solicitud_aprobada',
+      titulo:  '✅ Tu solicitud fue aprobada',
+      mensaje: `Tu solicitud de ${ped.tipo_camion || 'servicio'}${ruta} fue aprobada y ya está publicada. Pronto recibirás ofertas de proveedores.`,
+      leido:   false,
+    });
+  }
+
   // Notificar a todos los admins que hay nueva solicitud disponible
-  const { data: ped } = await sb.from('pedidos').select('tipo_camion, origen, destino').eq('id', pedidoId).single();
   const { data: admins } = await sb.from('perfiles').select('user_id').in('rol', ['admin', 'superadmin']);
   if (admins?.length) {
     await sb.from('notificaciones').insert(admins.map(a => ({
@@ -1191,11 +1204,25 @@ async function confirmarRechazarRecurso() {
 
 function aprobarTodasSolicitudes() {
   showConfirm('¿Aprobar y publicar todas las solicitudes pendientes de revisión?', async () => {
-    const { data: solic } = await sb.from('pedidos').select('id').eq('estado', 'pendiente_revision');
+    const { data: solic } = await sb.from('pedidos').select('id, cliente_id, tipo_camion, origen, destino').eq('estado', 'pendiente_revision');
     if (!solic?.length) { showToast('No hay solicitudes pendientes'); return; }
     for (const p of solic) {
       await sb.from('pedidos').update({ estado: 'abierto', rechazo_nota: null }).eq('id', p.id);
     }
+
+    // Notificar a cada cliente cuya solicitud fue aprobada
+    const notifClientes = solic.filter(p => p.cliente_id).map(p => {
+      const ruta = p.origen ? ` (${p.origen}${p.destino ? ' → ' + p.destino : ''})` : '';
+      return {
+        user_id: p.cliente_id,
+        tipo:    'solicitud_aprobada',
+        titulo:  '✅ Tu solicitud fue aprobada',
+        mensaje: `Tu solicitud de ${p.tipo_camion || 'servicio'}${ruta} fue aprobada y ya está publicada. Pronto recibirás ofertas de proveedores.`,
+        leido:   false,
+      };
+    });
+    if (notifClientes.length) await sb.from('notificaciones').insert(notifClientes);
+
     const { data: admins } = await sb.from('perfiles').select('user_id').in('rol', ['admin', 'superadmin']);
     if (admins?.length) {
       await sb.from('notificaciones').insert(admins.map(a => ({
