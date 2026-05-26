@@ -162,9 +162,9 @@ async function renderAprobaciones() {
       const chips = _buildChipsSol(p);
       const header = `
         <div style="flex:1;min-width:0">
-          <div class="apr-empresa-name">${TIPO_EMOJI[p.tipo_camion] || '🚛'} ${esc(p.tipo_camion)}</div>
+          <div class="apr-empresa-name">👤 ${esc(p.cliente_nombre)}</div>
           <div class="apr-empresa-counts">
-            <span class="apr-ec">👤 ${esc(p.cliente_nombre)}</span>
+            <span class="apr-ec">${TIPO_EMOJI[p.tipo_camion] || '🚛'} ${esc(p.tipo_camion)}</span>
             ${p.fecha_ini ? `<span class="apr-ec">📅 ${fmtFecha(p.fecha_ini)}</span>` : ''}
             ${p.precio_cliente ? `<span class="apr-ec">💰 $${Number(p.precio_cliente).toLocaleString('es-MX')}</span>` : ''}
             <span class="apr-ec-total">En revisión</span>
@@ -198,9 +198,9 @@ async function renderAprobaciones() {
       const chips  = _buildChipsSol(p);
       const header = `
         <div style="flex:1;min-width:0">
-          <div class="apr-empresa-name">${TIPO_EMOJI[p.tipo_camion] || '🚛'} ${esc(p.tipo_camion)}</div>
+          <div class="apr-empresa-name">👤 ${esc(p.cliente_nombre)}</div>
           <div class="apr-empresa-counts">
-            <span class="apr-ec">👤 ${esc(p.cliente_nombre)}</span>
+            <span class="apr-ec">${TIPO_EMOJI[p.tipo_camion] || '🚛'} ${esc(p.tipo_camion)}</span>
             ${oferta ? `<span class="apr-ec">🏢 ${esc(oferta.admin_nombre||'—')}</span>` : ''}
             ${oferta ? `<span class="apr-ec">💰 $${Number(oferta.precio_oferta).toLocaleString('es-MX')}</span>` : ''}
             ${p.fecha_ini ? `<span class="apr-ec">📅 ${fmtFecha(p.fecha_ini)}</span>` : ''}
