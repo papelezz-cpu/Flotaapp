@@ -434,7 +434,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
     }
     acciones = puedeOfertar
       ? `<button class="btn-ofertar" onclick="openHacerOferta('${p.id}')">Hacer oferta</button>`
-      : `<div class="ped-sin-tipo">⚠ No cuentas con unidades de tipo <strong>${esc(tipoPed)}</strong></div>`;
+      : `<button class="btn-ofertar btn-ofertar-disabled" disabled title="No cuentas con unidades de tipo ${esc(tipoPed)}">Sin unidades de tipo ${esc(tipoPed)}</button>`;
 
   } else if (vista === 'admin_propio' && miOferta) {
     const st = miOferta.estado;

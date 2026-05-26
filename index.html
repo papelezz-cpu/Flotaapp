@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>PortGo â€” LogÃ­stica Conectada</title>
+  <title>PortGo — Logística Conectada</title>
 
   <!-- #7 Favicon -->
   <link rel="icon" href="icon-light.svg" type="image/svg+xml">
@@ -24,7 +24,7 @@
   <!-- Estilos -->
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
-  <link rel="stylesheet" href="css/components.css?v=7">
+  <link rel="stylesheet" href="css/components.css?v=8">
   <link rel="stylesheet" href="css/login.css?v=2">
   <link rel="stylesheet" href="css/detalle.css">
   <link rel="stylesheet" href="css/theme.css">
@@ -34,7 +34,7 @@
 </head>
 <body>
 
-<!-- â•â• HEADER â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ HEADER ══════════════════════════════════════════ -->
 <header>
   <div class="header-inner">
     <div class="logo" onclick="showView('home', null)" style="cursor:pointer">
@@ -42,11 +42,11 @@
       PortGo
     </div>
     <div class="header-right">
-      <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Cambiar tema">ðŸŒ™</button>
+      <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
       <!-- Globo de mensajes (solo logueados) -->
       <div class="notif-wrap logged-in-only" style="position:relative">
         <button class="btn-notif" id="btn-chat" onclick="toggleChatList()" title="Mensajes">
-          ðŸ’¬
+          💬
           <span class="notif-badge" id="chat-badge" style="display:none">0</span>
         </button>
         <div class="notif-panel" id="chat-bubble-panel">
@@ -59,58 +59,58 @@
       <!-- Campana de notificaciones (solo logueados) -->
       <div class="notif-wrap logged-in-only" style="position:relative">
         <button class="btn-notif" id="btn-notif" onclick="toggleNotifPanel()" title="Notificaciones">
-          ðŸ””
+          🔔
           <span class="notif-badge" id="notif-badge" style="display:none">0</span>
         </button>
         <div class="notif-panel" id="notif-panel">
           <div class="notif-panel-header">
             <span>Notificaciones</span>
-            <button class="notif-mark-all" onclick="markAllRead()">Marcar todas como leÃ­das</button>
+            <button class="notif-mark-all" onclick="markAllRead()">Marcar todas como leídas</button>
           </div>
           <div id="notif-list"></div>
         </div>
       </div>
       <!-- btn-entrar eliminado: login es obligatorio al entrar -->
       <div class="user-chip logged-in-only" onclick="abrirMiPerfil()" style="cursor:pointer" title="Ver mi perfil">
-        <span>ðŸ‘¤</span>
-        <strong id="user-label">â€”</strong>
-        <button class="btn-logout" onclick="event.stopPropagation();logout()" title="Cerrar sesiÃ³n">Salir</button>
+        <span>👤</span>
+        <strong id="user-label">—</strong>
+        <button class="btn-logout" onclick="event.stopPropagation();logout()" title="Cerrar sesión">Salir</button>
       </div>
-      <button class="btn-hamburger" id="btn-hamburger" onclick="toggleMenu()" aria-label="MenÃº">
+      <button class="btn-hamburger" id="btn-hamburger" onclick="toggleMenu()" aria-label="Menú">
         <span></span><span></span><span></span>
       </button>
     </div>
   </div>
 </header>
 
-<!-- â•â• VISTA: HOME â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ VISTA: HOME ═════════════════════════════════════ -->
 <div id="view-home" class="view active">
   <div class="home-page">
     <div class="home-hero">
       <img src="icon.svg" class="home-logo-img" alt="PortGo">
-      <h1 class="home-greeting" id="home-greeting">Bienvenido ðŸ‘‹</h1>
-      <p class="home-sub">Â¿QuÃ© quieres hacer hoy?</p>
+      <h1 class="home-greeting" id="home-greeting">Bienvenido 👋</h1>
+      <p class="home-sub">¿Qué quieres hacer hoy?</p>
     </div>
     <div class="home-grid" id="home-grid"></div>
   </div>
 </div>
 
-<!-- â•â• VISTA: CATÃLOGO DE EMPRESAS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ VISTA: CATÁLOGO DE EMPRESAS ══════════════════════ -->
 <div id="view-cliente" class="view">
   <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">â† Inicio</button>
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
     <div class="cat-header">
       <h1 class="cat-titulo">Directorio de Proveedores</h1>
       <p class="cat-sub">Empresas verificadas que pueden atender tus solicitudes de transporte, custodia y almacenamiento</p>
       <div class="cat-pills">
-        <button class="cat-pill active" data-filter="camion"   onclick="filtrarEmpresas('camion')">ðŸš› Camiones</button>
-        <button class="cat-pill"        data-filter="custodio" onclick="filtrarEmpresas('custodio')">ðŸ‘® Custodia</button>
-        <button class="cat-pill"        data-filter="patio"    onclick="filtrarEmpresas('patio')">ðŸ­ Patios</button>
-        <button class="cat-pill"        data-filter="lavado"   onclick="filtrarEmpresas('lavado')">ðŸš¿ Lavado</button>
+        <button class="cat-pill active" data-filter="camion"   onclick="filtrarEmpresas('camion')">🚛 Camiones</button>
+        <button class="cat-pill"        data-filter="custodio" onclick="filtrarEmpresas('custodio')">👮 Custodia</button>
+        <button class="cat-pill"        data-filter="patio"    onclick="filtrarEmpresas('patio')">🏭 Patios</button>
+        <button class="cat-pill"        data-filter="lavado"   onclick="filtrarEmpresas('lavado')">🚿 Lavado</button>
       </div>
       <div class="cat-search-wrap">
         <input type="search" id="cat-search" class="cat-search-input"
-               placeholder="ðŸ” Buscar empresa por nombre..."
+               placeholder="🔍 Buscar empresa por nombre..."
                oninput="buscarEmpresas(this.value)">
       </div>
     </div>
@@ -125,10 +125,10 @@
   </div>
 </div>
 
-<!-- â•â• VISTA: RESERVACIONES â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ VISTA: RESERVACIONES ════════════════════════════ -->
 <div id="view-reservaciones" class="view">
   <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">â† Inicio</button>
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
     <div class="section-title">Reservaciones activas</div>
     <div class="reserv-table">
       <div id="reserv-header" class="reserv-row header">
@@ -139,40 +139,40 @@
   </div>
 </div>
 
-<!-- â•â• VISTA: PEDIDOS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ VISTA: PEDIDOS ══════════════════════════════════ -->
 <div id="view-pedidos" class="view">
   <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">â† Inicio</button>
-    <div class="section-title">ðŸ“‹ Solicitudes de servicio</div>
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
+    <div class="section-title">📋 Solicitudes de servicio</div>
 
-    <!-- Botones de servicio â€” solo clientes logueados -->
+    <!-- Botones de servicio — solo clientes logueados -->
     <div class="ped-serv-grid logged-in-only" id="ped-serv-btns" style="display:none">
       <button class="ped-serv-btn" onclick="openNuevoPedido('camion')">
-        <span class="ped-serv-icon">ðŸš›</span>
-        <span class="ped-serv-label">Necesito un camiÃ³n</span>
+        <span class="ped-serv-icon">🚛</span>
+        <span class="ped-serv-label">Necesito un camión</span>
       </button>
       <button class="ped-serv-btn" onclick="openNuevoPedido('custodio')">
-        <span class="ped-serv-icon">ðŸ‘®</span>
+        <span class="ped-serv-icon">👮</span>
         <span class="ped-serv-label">Necesito custodia</span>
       </button>
       <button class="ped-serv-btn" onclick="openNuevoPedido('patio')">
-        <span class="ped-serv-icon">ðŸ­</span>
+        <span class="ped-serv-icon">🏭</span>
         <span class="ped-serv-label">Necesito un patio</span>
       </button>
       <button class="ped-serv-btn" onclick="openNuevoPedido('lavado')">
-        <span class="ped-serv-icon">ðŸš¿</span>
+        <span class="ped-serv-icon">🚿</span>
         <span class="ped-serv-label">Servicio de lavado</span>
       </button>
     </div>
 
-    <!-- Filtros â€” solo usuarios logueados -->
+    <!-- Filtros — solo usuarios logueados -->
     <div class="ped-filtros-bar" id="ped-filtros-bar" style="display:none">
       <div class="ped-filtro-pills">
         <button class="ped-filtro-pill active" data-tipo="todos"     onclick="filtrarPedidosTipo('todos')">Todos</button>
-        <button class="ped-filtro-pill"        data-tipo="camion"    onclick="filtrarPedidosTipo('camion')"><span class="pill-icon">ðŸš›</span>CamiÃ³n</button>
-        <button class="ped-filtro-pill"        data-tipo="custodio"  onclick="filtrarPedidosTipo('custodio')"><span class="pill-icon">ðŸ‘®</span>Custodia</button>
-        <button class="ped-filtro-pill"        data-tipo="patio"     onclick="filtrarPedidosTipo('patio')"><span class="pill-icon">ðŸ­</span>Patio</button>
-        <button class="ped-filtro-pill"        data-tipo="lavado"    onclick="filtrarPedidosTipo('lavado')"><span class="pill-icon">ðŸš¿</span>Lavado</button>
+        <button class="ped-filtro-pill"        data-tipo="camion"    onclick="filtrarPedidosTipo('camion')"><span class="pill-icon">🚛</span>Camión</button>
+        <button class="ped-filtro-pill"        data-tipo="custodio"  onclick="filtrarPedidosTipo('custodio')"><span class="pill-icon">👮</span>Custodia</button>
+        <button class="ped-filtro-pill"        data-tipo="patio"     onclick="filtrarPedidosTipo('patio')"><span class="pill-icon">🏭</span>Patio</button>
+        <button class="ped-filtro-pill"        data-tipo="lavado"    onclick="filtrarPedidosTipo('lavado')"><span class="pill-icon">🚿</span>Lavado</button>
       </div>
       <!-- Filtro de estado para clientes -->
       <div class="ped-filtro-pills admin-hidden" id="ped-estado-pills" style="margin-top:6px">
@@ -181,10 +181,10 @@
         <button class="ped-filtro-pill"        data-est="acordado"  onclick="filtrarPedidosEstado('acordado')">Acordados</button>
         <button class="ped-filtro-pill"        data-est="cancelado" onclick="filtrarPedidosEstado('cancelado')">Cancelados</button>
       </div>
-      <!-- Filtro geogrÃ¡fico para admin/superadmin -->
+      <!-- Filtro geográfico para admin/superadmin -->
       <div class="ped-geo-filter admin-only" id="ped-geo-wrap">
         <input type="search" id="ped-geo-input" class="ped-geo-input"
-               placeholder="ðŸ” Filtrar por origen o destinoâ€¦"
+               placeholder="🔍 Filtrar por origen o destino…"
                oninput="filtrarPedidosGeo(this.value)">
       </div>
     </div>
@@ -193,38 +193,38 @@
   </div>
 </div>
 
-<!-- â•â• VISTA: ADMIN â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ VISTA: ADMIN ════════════════════════════════════ -->
 <div id="view-admin" class="view">
   <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">â† Inicio</button>
-    <div class="section-title">Panel de AdministraciÃ³n</div>
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
+    <div class="section-title">Panel de Administración</div>
 
     <!-- Perfil de empresa (oculto para superadmin) -->
     <div class="admin-card" id="perfil-empresa-card" style="margin-bottom:20px">
       <h3 style="cursor:pointer" onclick="togglePerfilCard()">
-        ðŸ¢ Perfil de empresa
-        <span id="perfil-toggle-icon" style="margin-left:auto;font-size:0.85rem;color:var(--text-muted)">â–¼ Editar</span>
+        🏢 Perfil de empresa
+        <span id="perfil-toggle-icon" style="margin-left:auto;font-size:0.85rem;color:var(--text-muted)">▼ Editar</span>
       </h3>
       <div id="perfil-card-body" style="display:none">
         <div class="admin-grid" style="margin-top:4px">
           <div class="form-group">
-            <label>RazÃ³n social</label>
-            <input type="text" id="pe-razon" placeholder="Ej. Transportes GarcÃ­a S.A. de C.V.">
+            <label>Razón social</label>
+            <input type="text" id="pe-razon" placeholder="Ej. Transportes García S.A. de C.V.">
           </div>
           <div class="form-group">
             <label>RFC</label>
             <input type="text" id="pe-rfc" placeholder="Ej. GARM800101MC1">
           </div>
           <div class="form-group">
-            <label>TelÃ©fono de contacto</label>
+            <label>Teléfono de contacto</label>
             <input type="tel" id="pe-telefono" placeholder="+52 314 000 0000">
           </div>
           <div class="form-group">
-            <label>AÃ±os en operaciÃ³n</label>
+            <label>Años en operación</label>
             <input type="number" id="pe-anos" placeholder="Ej. 10" min="0">
           </div>
           <div class="form-group">
-            <label>NÃºmero de unidades en flota</label>
+            <label>Número de unidades en flota</label>
             <input type="number" id="pe-unidades" placeholder="Ej. 5" min="1">
           </div>
           <div class="form-group">
@@ -232,8 +232,8 @@
             <input type="text" id="pe-sct" placeholder="Ej. SCT/TPAF/MZ-0001/2024">
           </div>
           <div class="form-group" style="grid-column:1/-1">
-            <label>DescripciÃ³n de la empresa</label>
-            <textarea id="pe-desc" rows="3" placeholder="Â¿QuÃ© servicios ofrecen? Â¿Zonas que cubren? Â¿Especialidad?"></textarea>
+            <label>Descripción de la empresa</label>
+            <textarea id="pe-desc" rows="3" placeholder="¿Qué servicios ofrecen? ¿Zonas que cubren? ¿Especialidad?"></textarea>
           </div>
           <div class="form-group" style="grid-column:1/-1">
             <label>Seguros vigentes</label>
@@ -247,26 +247,26 @@
             </div>
           </div>
         </div>
-        <button class="btn-add" style="margin-top:8px" onclick="guardarPerfilEmpresa()">ðŸ’¾ Guardar perfil</button>
+        <button class="btn-add" style="margin-top:8px" onclick="guardarPerfilEmpresa()">💾 Guardar perfil</button>
       </div>
     </div>
 
     <!-- Tabs de tipo de recurso -->
     <div class="recurso-tabs" style="margin-bottom:24px">
-      <button class="recurso-tab active" id="admin-tab-camion"   onclick="cambiarAdminTab('camion')">ðŸš› Camiones</button>
-      <button class="recurso-tab"        id="admin-tab-custodio" onclick="cambiarAdminTab('custodio')">ðŸ‘® Custodios</button>
-      <button class="recurso-tab"        id="admin-tab-patio"    onclick="cambiarAdminTab('patio')">ðŸ­ Patios</button>
-      <button class="recurso-tab"        id="admin-tab-lavado"   onclick="cambiarAdminTab('lavado')">ðŸš¿ Lavado</button>
-      <button class="recurso-tab"        id="admin-tab-operador" onclick="cambiarAdminTab('operador')">ðŸ‘· Operadores</button>
+      <button class="recurso-tab active" id="admin-tab-camion"   onclick="cambiarAdminTab('camion')">🚛 Camiones</button>
+      <button class="recurso-tab"        id="admin-tab-custodio" onclick="cambiarAdminTab('custodio')">👮 Custodios</button>
+      <button class="recurso-tab"        id="admin-tab-patio"    onclick="cambiarAdminTab('patio')">🏭 Patios</button>
+      <button class="recurso-tab"        id="admin-tab-lavado"   onclick="cambiarAdminTab('lavado')">🚿 Lavado</button>
+      <button class="recurso-tab"        id="admin-tab-operador" onclick="cambiarAdminTab('operador')">👷 Operadores</button>
     </div>
 
-    <!-- â”€â”€ TAB: CAMIONES â”€â”€ -->
+    <!-- ── TAB: CAMIONES ── -->
     <div id="admin-content-camion">
     <div class="admin-grid">
       <div class="admin-card">
-        <h3>âž• Agregar unidad</h3>
+        <h3>➕ Agregar unidad</h3>
 
-        <div class="op-form-section-title" style="margin-top:4px">Datos del vehÃ­culo</div>
+        <div class="op-form-section-title" style="margin-top:4px">Datos del vehículo</div>
         <div class="form-group">
           <label>Tipo de transporte</label>
           <select id="admin-tipo" onchange="autoFillDimensiones('admin')">
@@ -277,7 +277,7 @@
               <option>Camioneta 3.5 ton plataforma</option>
             </optgroup>
             <optgroup label="Camiones">
-              <option>RabÃ³n</option>
+              <option>Rabón</option>
               <option>Torton</option>
               <option>Torton caja seca</option>
               <option>Torton plataforma</option>
@@ -301,86 +301,86 @@
         <div class="form-group">
           <label>Marca</label>
           <select id="admin-marca">
-            <option value="">â€” Seleccionar â€”</option>
+            <option value="">— Seleccionar —</option>
             <option>Kenworth</option><option>International</option><option>Freightliner</option>
             <option>Peterbilt</option><option>Volvo</option><option>Mercedes-Benz</option>
             <option>Scania</option><option>MAN</option><option>Hino</option><option>Isuzu</option><option>Otra</option>
           </select>
         </div>
         <div class="form-group">
-          <label>VersiÃ³n / Submarca</label>
+          <label>Versión / Submarca</label>
           <input type="text" id="admin-version" placeholder="Ej. T800, LT 625">
         </div>
         <div class="form-group">
-          <label>AÃ±o del modelo</label>
+          <label>Año del modelo</label>
           <input type="number" id="admin-modelo-anio" placeholder="Ej. 2022" min="1980" max="2035">
         </div>
         <div class="form-group">
           <label>Color</label>
           <select id="admin-color">
-            <option value="">â€” Seleccionar â€”</option>
+            <option value="">— Seleccionar —</option>
             <option>Blanco</option><option>Negro</option><option>Rojo</option><option>Azul</option>
             <option>Gris</option><option>Verde</option><option>Amarillo</option><option>Naranja</option>
-            <option>Plata</option><option>CafÃ©</option><option>Otro</option>
+            <option>Plata</option><option>Café</option><option>Otro</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Capacidad mÃ¡xima (toneladas) *</label>
-          <input type="number" id="admin-cap" placeholder="Se llena automÃ¡ticamente por tipo" step="0.5" min="0">
+          <label>Capacidad máxima (toneladas) *</label>
+          <input type="number" id="admin-cap" placeholder="Se llena automáticamente por tipo" step="0.5" min="0">
         </div>
         <div class="form-group">
-          <label id="admin-dim-label">Dimensiones de plataforma (L Ã— A)</label>
-          <input type="text" id="admin-dim" placeholder="Se llena automÃ¡ticamente por tipo">
+          <label id="admin-dim-label">Dimensiones de plataforma (L × A)</label>
+          <input type="text" id="admin-dim" placeholder="Se llena automáticamente por tipo">
         </div>
         <div class="form-group">
           <label>Tipo de combustible</label>
           <select id="admin-combustible">
-            <option value="">â€” Seleccionar â€”</option>
+            <option value="">— Seleccionar —</option>
             <option>Diesel</option><option>Gasolina</option>
-            <option>Gas Natural</option><option>ElÃ©ctrico</option><option>HÃ­brido</option>
+            <option>Gas Natural</option><option>Eléctrico</option><option>Híbrido</option>
           </select>
         </div>
 
-        <div class="op-form-section-title" style="margin-top:16px">IdentificaciÃ³n del vehÃ­culo</div>
+        <div class="op-form-section-title" style="margin-top:16px">Identificación del vehículo</div>
         <div class="form-group">
-          <label>NÃºmero de serie (NIV)</label>
+          <label>Número de serie (NIV)</label>
           <input type="text" id="admin-num-serie" placeholder="Ej. 3HKRM4H59KM702456">
         </div>
         <div class="form-group">
-          <label>NÃºmero de placas</label>
+          <label>Número de placas</label>
           <input type="text" id="admin-placas" placeholder="Ej. MNZ-123-A">
         </div>
         <div class="form-group">
           <label>Tipo de placa</label>
           <select id="admin-tipo-placa">
-            <option value="">â€” Seleccionar â€”</option>
+            <option value="">— Seleccionar —</option>
             <option>Federal</option><option>Estatal</option><option>Local</option>
           </select>
         </div>
         <div class="form-group">
-          <label>NÃºmero de motor</label>
+          <label>Número de motor</label>
           <input type="text" id="admin-num-motor" placeholder="Ej. CAT-123456">
         </div>
         <div class="form-group">
-          <label>NÃºmero econÃ³mico</label>
+          <label>Número económico</label>
           <input type="text" id="admin-num-economico" placeholder="Ej. ECO-001">
         </div>
 
-        <div class="op-form-section-title" style="margin-top:16px">Tarjeta de circulaciÃ³n</div>
+        <div class="op-form-section-title" style="margin-top:16px">Tarjeta de circulación</div>
         <div class="form-group">
-          <label>NÃºmero de tarjeta de circulaciÃ³n</label>
-          <input type="text" id="admin-tc" placeholder="NÃºm. de tarjeta">
+          <label>Número de tarjeta de circulación</label>
+          <input type="text" id="admin-tc" placeholder="Núm. de tarjeta">
         </div>
         <div class="form-group">
-          <label>Fecha de expediciÃ³n TC</label>
+          <label>Fecha de expedición TC</label>
           <input type="date" id="admin-fecha-tc">
         </div>
 
-        <div class="op-form-section-title" style="margin-top:16px">OperaciÃ³n</div>
+        <div class="op-form-section-title" style="margin-top:16px">Operación</div>
         <div class="form-group">
           <label>Operador asignado</label>
           <select id="admin-op">
-            <option value="">â€” Sin operador asignado â€”</option>
+            <option value="">— Sin operador asignado —</option>
           </select>
         </div>
         <div class="form-group">
@@ -397,11 +397,11 @@
             <option value="2-4 horas">2-4 horas</option>
             <option value="3-4 horas">3-4 horas</option>
             <option value="3-5 horas">3-5 horas</option>
-            <option value="Mismo dÃ­a">Mismo dÃ­a</option>
+            <option value="Mismo día">Mismo día</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Precio por dÃ­a (MXN)</label>
+          <label>Precio por día (MXN)</label>
           <input type="number" id="admin-precio" placeholder="Ej. 8500" min="0">
         </div>
         <div class="form-group">
@@ -417,7 +417,7 @@
         <div class="form-group">
           <label>Frente <span style="color:var(--danger)">*</span></label>
           <label class="file-upload-area" for="admin-foto-frente">
-            <span class="file-upload-icon">ðŸ“·</span>
+            <span class="file-upload-icon">📷</span>
             <span id="foto-frente-label" class="file-upload-text">Adjuntar foto</span>
           </label>
           <input type="file" id="admin-foto-frente" accept="image/*" style="display:none"
@@ -426,7 +426,7 @@
         <div class="form-group">
           <label>Laterales</label>
           <label class="file-upload-area" for="admin-foto-laterales">
-            <span class="file-upload-icon">ðŸ“·</span>
+            <span class="file-upload-icon">📷</span>
             <span id="foto-laterales-label" class="file-upload-text">Adjuntar fotos</span>
           </label>
           <input type="file" id="admin-foto-laterales" multiple accept="image/*" style="display:none"
@@ -435,7 +435,7 @@
         <div class="form-group">
           <label>Trasera</label>
           <label class="file-upload-area" for="admin-foto-trasera">
-            <span class="file-upload-icon">ðŸ“·</span>
+            <span class="file-upload-icon">📷</span>
             <span id="foto-trasera-label" class="file-upload-text">Adjuntar foto</span>
           </label>
           <input type="file" id="admin-foto-trasera" accept="image/*" style="display:none"
@@ -444,7 +444,7 @@
         <div class="form-group">
           <label>Foto de placa <span style="color:var(--danger)">*</span></label>
           <label class="file-upload-area" for="admin-foto-placa">
-            <span class="file-upload-icon">ðŸ“·</span>
+            <span class="file-upload-icon">📷</span>
             <span id="foto-placa-label" class="file-upload-text">Adjuntar foto</span>
           </label>
           <input type="file" id="admin-foto-placa" accept="image/*" style="display:none"
@@ -453,9 +453,9 @@
 
         <div class="op-form-section-title" style="margin-top:16px">Documentos requeridos</div>
         <div class="form-group">
-          <label>Tarjeta de circulaciÃ³n <span style="color:var(--danger)">*</span></label>
+          <label>Tarjeta de circulación <span style="color:var(--danger)">*</span></label>
           <label class="file-upload-area" for="admin-doc-tc">
-            <span class="file-upload-icon">ðŸ“„</span>
+            <span class="file-upload-icon">📄</span>
             <span id="doc-tc-label" class="file-upload-text">Adjuntar documento</span>
           </label>
           <input type="file" id="admin-doc-tc" accept="image/*,.pdf" style="display:none"
@@ -464,16 +464,16 @@
         <div class="form-group">
           <label>Permiso SCT <span style="color:var(--danger)">*</span></label>
           <label class="file-upload-area" for="admin-doc-sct">
-            <span class="file-upload-icon">ðŸ“„</span>
+            <span class="file-upload-icon">📄</span>
             <span id="doc-sct-label" class="file-upload-text">Adjuntar documento</span>
           </label>
           <input type="file" id="admin-doc-sct" accept="image/*,.pdf" style="display:none"
                  onchange="updateFileLabel('admin-doc-sct','doc-sct-label')">
         </div>
         <div class="form-group">
-          <label>PÃ³liza de seguro <span style="color:var(--danger)">*</span></label>
+          <label>Póliza de seguro <span style="color:var(--danger)">*</span></label>
           <label class="file-upload-area" for="admin-doc-seguro">
-            <span class="file-upload-icon">ðŸ“„</span>
+            <span class="file-upload-icon">📄</span>
             <span id="doc-seguro-label" class="file-upload-text">Adjuntar documento</span>
           </label>
           <input type="file" id="admin-doc-seguro" accept="image/*,.pdf" style="display:none"
@@ -482,26 +482,26 @@
 
         <div class="form-group sa-empresa-row" style="display:none">
           <label>Empresa propietaria</label>
-          <select id="sa-empresa-camion"><option value="">â€” Selecciona empresa â€”</option></select>
+          <select id="sa-empresa-camion"><option value="">— Selecciona empresa —</option></select>
         </div>
-        <button class="btn-add" id="btn-agregar-camion" onclick="agregarCamion()">âž• Enviar a aprobaciÃ³n</button>
+        <button class="btn-add" id="btn-agregar-camion" onclick="agregarCamion()">➕ Enviar a aprobación</button>
       </div>
 
       <div class="admin-card">
-        <h3>ðŸš› Unidades registradas</h3>
+        <h3>🚛 Unidades registradas</h3>
         <div class="truck-list-admin" id="admin-list"></div>
       </div>
 
     </div>
     </div><!-- /admin-content-camion -->
 
-    <!-- â”€â”€ TAB: CUSTODIOS â”€â”€ -->
+    <!-- ── TAB: CUSTODIOS ── -->
     <div id="admin-content-custodio" style="display:none">
     <div class="admin-grid">
       <div class="admin-card">
-        <h3>âž• Agregar custodio</h3>
+        <h3>➕ Agregar custodio</h3>
         <div class="form-group">
-          <label>Nombre / descripciÃ³n corta</label>
+          <label>Nombre / descripción corta</label>
           <input type="text" id="ac-nombre" placeholder="Ej. Custodio Armado A2">
         </div>
         <div class="form-group">
@@ -511,48 +511,48 @@
             <option value="Sin arma">Sin arma</option>
             <option value="Motorizado">Motorizado</option>
             <option value="K9">K9</option>
-            <option value="SupervisiÃ³n remota">SupervisiÃ³n remota</option>
+            <option value="Supervisión remota">Supervisión remota</option>
           </select>
         </div>
         <div class="form-group">
-          <label>DescripciÃ³n</label>
+          <label>Descripción</label>
           <textarea id="ac-desc" rows="3" placeholder="Experiencia, equipamiento, zonas que cubre..."></textarea>
         </div>
         <div class="form-group">
           <label>Certificaciones <span style="font-weight:400;color:var(--text-muted)">(separadas por coma)</span></label>
-          <input type="text" id="ac-certs" placeholder="Ej. PortaciÃ³n de arma, Primeros auxilios">
+          <input type="text" id="ac-certs" placeholder="Ej. Portación de arma, Primeros auxilios">
         </div>
         <div class="form-group">
           <label>Disponibilidad</label>
           <select id="ac-disp">
             <option value="24/7">24/7</option>
-            <option value="DÃ­as hÃ¡biles">DÃ­as hÃ¡biles</option>
+            <option value="Días hábiles">Días hábiles</option>
             <option value="Fines de semana">Fines de semana</option>
             <option value="Bajo demanda">Bajo demanda</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Precio por dÃ­a (MXN)</label>
+          <label>Precio por día (MXN)</label>
           <input type="number" id="ac-precio" placeholder="Ej. 1800">
         </div>
         <div class="form-group sa-empresa-row" style="display:none">
           <label>Empresa propietaria</label>
-          <select id="sa-empresa-custodio"><option value="">â€” Selecciona empresa â€”</option></select>
+          <select id="sa-empresa-custodio"><option value="">— Selecciona empresa —</option></select>
         </div>
-        <button class="btn-add" id="btn-agregar-custodio" onclick="agregarCustodio()">âž• Agregar custodio</button>
+        <button class="btn-add" id="btn-agregar-custodio" onclick="agregarCustodio()">➕ Agregar custodio</button>
       </div>
       <div class="admin-card">
-        <h3>ðŸ‘® Custodios registrados</h3>
+        <h3>👮 Custodios registrados</h3>
         <div class="truck-list-admin" id="admin-custodios-list"></div>
       </div>
     </div>
     </div><!-- /admin-content-custodio -->
 
-    <!-- â”€â”€ TAB: PATIOS â”€â”€ -->
+    <!-- ── TAB: PATIOS ── -->
     <div id="admin-content-patio" style="display:none">
     <div class="admin-grid">
       <div class="admin-card">
-        <h3>âž• Agregar patio</h3>
+        <h3>➕ Agregar patio</h3>
         <div class="form-group">
           <label>Nombre del patio</label>
           <input type="text" id="ap-nombre" placeholder="Ej. Patio Techado Norte">
@@ -568,93 +568,93 @@
           </select>
         </div>
         <div class="form-group">
-          <label>UbicaciÃ³n</label>
+          <label>Ubicación</label>
           <input type="text" id="ap-ubic" placeholder="Ej. Blvd. Costero Norte Km 4, Manzanillo">
         </div>
         <div class="form-group">
-          <label>Ãrea (mÂ²)</label>
+          <label>Área (m²)</label>
           <input type="number" id="ap-area" placeholder="Ej. 4200">
         </div>
         <div class="form-group">
-          <label>Capacidad de vehÃ­culos</label>
+          <label>Capacidad de vehículos</label>
           <input type="number" id="ap-cap" placeholder="Ej. 18">
         </div>
         <div class="form-group">
           <label>Servicios <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
-          <input type="text" id="ap-svcs" placeholder="Ej. Vigilancia 24/7, Rampa de carga, BÃ¡scula">
+          <input type="text" id="ap-svcs" placeholder="Ej. Vigilancia 24/7, Rampa de carga, Báscula">
         </div>
         <div class="form-group">
-          <label>Precio por dÃ­a (MXN)</label>
+          <label>Precio por día (MXN)</label>
           <input type="number" id="ap-precio" placeholder="Ej. 3500">
         </div>
         <div class="form-group sa-empresa-row" style="display:none">
           <label>Empresa propietaria</label>
-          <select id="sa-empresa-patio"><option value="">â€” Selecciona empresa â€”</option></select>
+          <select id="sa-empresa-patio"><option value="">— Selecciona empresa —</option></select>
         </div>
-        <button class="btn-add" id="btn-agregar-patio" onclick="agregarPatio()">âž• Agregar patio</button>
+        <button class="btn-add" id="btn-agregar-patio" onclick="agregarPatio()">➕ Agregar patio</button>
       </div>
       <div class="admin-card">
-        <h3>ðŸ­ Patios registrados</h3>
+        <h3>🏭 Patios registrados</h3>
         <div class="truck-list-admin" id="admin-patios-list"></div>
       </div>
     </div>
     </div><!-- /admin-content-patio -->
 
-    <!-- â”€â”€ TAB: LAVADO â”€â”€ -->
+    <!-- ── TAB: LAVADO ── -->
     <div id="admin-content-lavado" style="display:none">
     <div class="admin-grid">
       <div class="admin-card">
-        <h3>âž• Agregar servicio de lavado</h3>
+        <h3>➕ Agregar servicio de lavado</h3>
         <div class="form-group">
           <label>Nombre del servicio</label>
           <input type="text" id="al-nombre" placeholder="Ej. Lavado Express Norte">
         </div>
         <div class="form-group">
-          <label>Tipos de vehÃ­culo que lavan <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
-          <input type="text" id="al-tipos-vehiculo" placeholder="Ej. TractocamiÃ³n, Remolque, Contenedor, Pick-up">
+          <label>Tipos de vehículo que lavan <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
+          <input type="text" id="al-tipos-vehiculo" placeholder="Ej. Tractocamión, Remolque, Contenedor, Pick-up">
         </div>
         <div class="form-group">
           <label>Tipos de lavado que ofrecen <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
-          <input type="text" id="al-tipos-lavado" placeholder="Ej. Lavado exterior, Lavado interior, Lavado de motor, DesinfecciÃ³n">
+          <input type="text" id="al-tipos-lavado" placeholder="Ej. Lavado exterior, Lavado interior, Lavado de motor, Desinfección">
         </div>
         <div class="form-group">
-          <label>Capacidad simultÃ¡nea de vehÃ­culos</label>
+          <label>Capacidad simultánea de vehículos</label>
           <input type="number" id="al-capacidad" placeholder="Ej. 4" min="1">
         </div>
         <div class="form-group">
-          <label>UbicaciÃ³n</label>
+          <label>Ubicación</label>
           <input type="text" id="al-ubic" placeholder="Ej. Blvd. Miguel de la Madrid Km 8, Manzanillo">
         </div>
         <div class="form-group">
-          <label>Horario de atenciÃ³n</label>
-          <input type="text" id="al-horario" placeholder="Ej. Lunâ€“SÃ¡b 07:00â€“19:00">
+          <label>Horario de atención</label>
+          <input type="text" id="al-horario" placeholder="Ej. Lun–Sáb 07:00–19:00">
         </div>
         <div class="form-group">
           <label>Precio base por lavado (MXN)</label>
           <input type="number" id="al-precio" placeholder="Ej. 800" min="0">
         </div>
         <div class="form-group">
-          <label>DescripciÃ³n / servicios adicionales</label>
+          <label>Descripción / servicios adicionales</label>
           <textarea id="al-desc" rows="2" placeholder="Detalles adicionales del servicio..."></textarea>
         </div>
         <div class="form-group sa-empresa-row" style="display:none">
           <label>Empresa propietaria</label>
-          <select id="sa-empresa-lavado"><option value="">â€” Selecciona empresa â€”</option></select>
+          <select id="sa-empresa-lavado"><option value="">— Selecciona empresa —</option></select>
         </div>
-        <button class="btn-add" id="btn-agregar-lavado" onclick="agregarLavado()">âž• Agregar servicio</button>
+        <button class="btn-add" id="btn-agregar-lavado" onclick="agregarLavado()">➕ Agregar servicio</button>
       </div>
       <div class="admin-card">
-        <h3>ðŸš¿ Servicios de lavado registrados</h3>
+        <h3>🚿 Servicios de lavado registrados</h3>
         <div class="truck-list-admin" id="admin-lavados-list"></div>
       </div>
     </div>
     </div><!-- /admin-content-lavado -->
 
-    <!-- â”€â”€ TAB: OPERADORES â”€â”€ -->
+    <!-- ── TAB: OPERADORES ── -->
     <div id="admin-content-operador" style="display:none">
     <div class="admin-grid">
       <div class="admin-card">
-        <h3>âž• Agregar operador</h3>
+        <h3>➕ Agregar operador</h3>
 
         <div class="op-form-section">
           <div class="op-form-section-title">Datos personales</div>
@@ -674,7 +674,7 @@
         <div class="form-group">
           <label>Sexo</label>
           <select id="op-sexo">
-            <option value="">â€” Sin especificar â€”</option>
+            <option value="">— Sin especificar —</option>
             <option>Masculino</option>
             <option>Femenino</option>
           </select>
@@ -689,12 +689,12 @@
         </div>
         <div class="form-group">
           <label>NSS</label>
-          <input type="text" id="op-nss" placeholder="NÃºm. Seguro Social">
+          <input type="text" id="op-nss" placeholder="Núm. Seguro Social">
         </div>
         <div class="form-group">
-          <label>Tipo sanguÃ­neo</label>
+          <label>Tipo sanguíneo</label>
           <select id="op-sangre">
-            <option value="">â€” Sin especificar â€”</option>
+            <option value="">— Sin especificar —</option>
             <option>A+</option><option>A-</option>
             <option>B+</option><option>B-</option>
             <option>AB+</option><option>AB-</option>
@@ -706,39 +706,39 @@
           <div class="op-form-section-title">Datos laborales</div>
         </div>
         <div class="form-group">
-          <label>NÃºmero de trabajador</label>
+          <label>Número de trabajador</label>
           <input type="text" id="op-num-trabajador" placeholder="Ej. EMP-001">
         </div>
         <div class="form-group">
           <label>Nivel de estudio</label>
           <select id="op-nivel-estudio">
-            <option value="">â€” Sin especificar â€”</option>
+            <option value="">— Sin especificar —</option>
             <option>Primaria</option>
             <option>Secundaria</option>
             <option>Preparatoria</option>
-            <option>TÃ©cnico</option>
+            <option>Técnico</option>
             <option>Licenciatura</option>
             <option>Posgrado</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Ãrea</label>
+          <label>Área</label>
           <input type="text" id="op-area" placeholder="Ej. Operaciones">
         </div>
         <div class="form-group">
           <label>Puesto</label>
-          <input type="text" id="op-puesto" placeholder="Ej. Operador de camiÃ³n">
+          <input type="text" id="op-puesto" placeholder="Ej. Operador de camión">
         </div>
         <div class="form-group">
-          <label>Correo electrÃ³nico</label>
+          <label>Correo electrónico</label>
           <input type="email" id="op-correo" placeholder="correo@empresa.com">
         </div>
         <div class="form-group">
-          <label>TelÃ©fono</label>
+          <label>Teléfono</label>
           <input type="tel" id="op-telefono" placeholder="Ej. 612 123 4567">
         </div>
         <div class="form-group">
-          <label>Fecha examen mÃ©dico</label>
+          <label>Fecha examen médico</label>
           <input type="date" id="op-examen">
         </div>
 
@@ -746,13 +746,13 @@
           <div class="op-form-section-title">Licencia de conducir</div>
         </div>
         <div class="form-group">
-          <label>NÃºmero de licencia</label>
-          <input type="text" id="op-num-licencia" placeholder="NÃºm. de licencia">
+          <label>Número de licencia</label>
+          <input type="text" id="op-num-licencia" placeholder="Núm. de licencia">
         </div>
         <div class="form-group">
           <label>Clase de licencia</label>
           <select id="op-clase-licencia">
-            <option value="">â€” Sin especificar â€”</option>
+            <option value="">— Sin especificar —</option>
             <option>A</option><option>B</option><option>C</option>
             <option>D</option><option>E</option>
           </select>
@@ -760,13 +760,13 @@
         <div class="form-group">
           <label>Tipo de licencia</label>
           <select id="op-tipo-licencia">
-            <option value="">â€” Sin especificar â€”</option>
+            <option value="">— Sin especificar —</option>
             <option>Federal</option>
             <option>Estatal</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Fecha de expediciÃ³n</label>
+          <label>Fecha de expedición</label>
           <input type="date" id="op-fecha-expedicion">
         </div>
         <div class="form-group">
@@ -776,7 +776,7 @@
         <div class="form-group">
           <label>Foto de la licencia</label>
           <label class="file-upload-area" for="op-lic-file">
-            <span class="file-upload-icon">ðŸªª</span>
+            <span class="file-upload-icon">🪪</span>
             <span class="file-upload-text">Seleccionar imagen</span>
           </label>
           <input type="file" id="op-lic-file" accept="image/*,.pdf" style="display:none"
@@ -789,7 +789,7 @@
         </div>
         <div class="form-group">
           <label class="file-upload-area" for="op-foto-file">
-            <span class="file-upload-icon">ðŸ“·</span>
+            <span class="file-upload-icon">📷</span>
             <span class="file-upload-text">Seleccionar foto</span>
           </label>
           <input type="file" id="op-foto-file" accept="image/*" style="display:none"
@@ -799,21 +799,21 @@
 
         <div class="form-group sa-empresa-row" style="display:none">
           <label>Empresa propietaria</label>
-          <select id="sa-empresa-operador" onchange="onCambioEmpresaOperador()"><option value="">â€” Selecciona empresa â€”</option></select>
+          <select id="sa-empresa-operador" onchange="onCambioEmpresaOperador()"><option value="">— Selecciona empresa —</option></select>
         </div>
-        <button class="btn-add" onclick="agregarOperador()">Enviar a aprobaciÃ³n</button>
+        <button class="btn-add" onclick="agregarOperador()">Enviar a aprobación</button>
       </div>
 
       <div class="admin-card">
-        <h3>ðŸ‘· Operadores registrados</h3>
+        <h3>👷 Operadores registrados</h3>
         <div id="admin-operadores-list"></div>
       </div>
     </div>
     </div><!-- /admin-content-operador -->
 
-    <!-- Pendientes de aprobaciÃ³n â€” solo superadmin -->
+    <!-- Pendientes de aprobación — solo superadmin -->
     <div id="pendientes-section" style="display:none; margin-top:24px">
-      <div class="section-title">â³ Unidades pendientes de aprobaciÃ³n</div>
+      <div class="section-title">⏳ Unidades pendientes de aprobación</div>
       <div class="admin-card">
         <div class="truck-list-admin" id="pendientes-list"></div>
       </div>
@@ -822,23 +822,23 @@
   </div>
 </div>
 
-<!-- â•â• VISTA: PENDIENTES (solo superadmin) â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ VISTA: PENDIENTES (solo superadmin) ════════════ -->
 <div id="view-pendientes" class="view">
   <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">â† Inicio</button>
-    <div class="section-title">â³ Pendientes de aprobaciÃ³n</div>
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
+    <div class="section-title">⏳ Pendientes de aprobación</div>
     <div id="aprobaciones-section">
       <div id="aprobaciones-content"></div>
     </div>
   </div>
 </div>
 
-<!-- â•â• VISTA: USUARIOS (solo superadmin) â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-<!-- â•â• VISTA: REPORTES â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ VISTA: USUARIOS (solo superadmin) ══════════════ -->
+<!-- ══ VISTA: REPORTES ═════════════════════════════════ -->
 <div id="view-reportes" class="view">
   <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">â† Inicio</button>
-    <div class="section-title">ðŸ“Š Reportes del sistema</div>
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
+    <div class="section-title">📊 Reportes del sistema</div>
     <div class="rep-date-filter">
       <label>Desde</label>
       <input type="date" id="rep-fecha-desde">
@@ -850,48 +850,48 @@
   </div>
 </div>
 
-<!-- â•â• VISTA: MIS STATS (admin) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ VISTA: MIS STATS (admin) ════════════════════════ -->
 <div id="view-mis-stats" class="view">
   <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">â† Inicio</button>
-    <div class="section-title">ðŸ“ˆ Mi desempeÃ±o</div>
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
+    <div class="section-title">📈 Mi desempeño</div>
     <div id="mis-stats-content"></div>
   </div>
 </div>
 
-<!-- â•â• VISTA: HISTORIAL RESERVAS (superadmin) â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ VISTA: HISTORIAL RESERVAS (superadmin) ══════════ -->
 <div id="view-historial-reservas" class="view">
   <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">â† Inicio</button>
-    <div class="section-title">ðŸ—ƒ Historial de reservaciones archivadas</div>
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
+    <div class="section-title">🗃 Historial de reservaciones archivadas</div>
     <div id="historial-reservas-content"></div>
   </div>
 </div>
 
 <div id="view-usuarios" class="view">
   <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">â† Inicio</button>
-    <div class="section-title">GestiÃ³n de Usuarios</div>
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
+    <div class="section-title">Gestión de Usuarios</div>
     <div class="admin-grid">
 
       <div class="admin-card">
-        <h3>âž• Crear usuario</h3>
+        <h3>➕ Crear usuario</h3>
         <div class="form-group">
           <label>Nombre completo</label>
-          <input type="text" id="nu-nombre" placeholder="Ej. MarÃ­a LÃ³pez">
+          <input type="text" id="nu-nombre" placeholder="Ej. María López">
         </div>
         <div class="form-group">
-          <label>Correo electrÃ³nico</label>
+          <label>Correo electrónico</label>
           <input type="email" id="nu-email" placeholder="correo@empresa.com">
         </div>
         <div class="form-group">
-          <label>ContraseÃ±a temporal</label>
-          <input type="password" id="nu-pass" placeholder="MÃ­nimo 6 caracteres">
+          <label>Contraseña temporal</label>
+          <input type="password" id="nu-pass" placeholder="Mínimo 6 caracteres">
         </div>
         <div class="form-group">
           <label>Rol</label>
           <select id="nu-rol">
-            <option value="admin">Admin (ve panel de administraciÃ³n)</option>
+            <option value="admin">Admin (ve panel de administración)</option>
             <option value="cliente">Cliente (solo disponibilidad y reservas)</option>
           </select>
         </div>
@@ -899,9 +899,9 @@
       </div>
 
       <div class="admin-card">
-        <h3>ðŸ‘¥ Usuarios registrados</h3>
+        <h3>👥 Usuarios registrados</h3>
         <div class="truck-list-admin" id="usuarios-list">
-          <div class="empty-state"><div class="icon">â³</div>Cargando...</div>
+          <div class="empty-state"><div class="icon">⏳</div>Cargando...</div>
         </div>
       </div>
 
@@ -909,12 +909,12 @@
   </div>
 </div>
 
-<!-- â•â• MODAL EDITAR USUARIO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL EDITAR USUARIO ════════════════════════════ -->
 <div class="modal-overlay" id="modal-editar-usuario">
   <div class="modal">
     <div class="modal-header">
       <h2>Editar usuario</h2>
-      <button class="modal-close" onclick="cerrarEditarUsuario()">âœ•</button>
+      <button class="modal-close" onclick="cerrarEditarUsuario()">✕</button>
     </div>
     <input type="hidden" id="eu-id">
     <div class="form-group">
@@ -922,19 +922,19 @@
       <input type="text" id="eu-nombre" placeholder="Nombre del usuario">
     </div>
     <div class="form-group">
-      <label>Correo electrÃ³nico</label>
+      <label>Correo electrónico</label>
       <input type="email" id="eu-email" placeholder="correo@ejemplo.com">
     </div>
     <div class="form-group">
-      <label>Nueva contraseÃ±a <span style="color:var(--text-muted);font-size:0.8rem">(dejar vacÃ­o para no cambiar)</span></label>
-      <input type="password" id="eu-pass" placeholder="MÃ­nimo 6 caracteres">
+      <label>Nueva contraseña <span style="color:var(--text-muted);font-size:0.8rem">(dejar vacío para no cambiar)</span></label>
+      <input type="password" id="eu-pass" placeholder="Mínimo 6 caracteres">
     </div>
     <div class="form-group">
       <label>Rol</label>
       <select id="eu-rol">
-        <option value="superadmin">â­ Superadmin</option>
-        <option value="admin">ðŸ”§ Admin</option>
-        <option value="cliente">ðŸ‘¤ Cliente</option>
+        <option value="superadmin">⭐ Superadmin</option>
+        <option value="admin">🔧 Admin</option>
+        <option value="cliente">👤 Cliente</option>
       </select>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px">
@@ -944,21 +944,21 @@
   </div>
 </div>
 
-<!-- â•â• MODAL RESERVA â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL RESERVA ═══════════════════════════════════ -->
 <div class="modal-overlay" id="modal-reserva">
   <div class="modal">
     <h2>Agendar unidad</h2>
-    <p class="sub" id="modal-truck-name">CamiÃ³n seleccionado</p>
+    <p class="sub" id="modal-truck-name">Camión seleccionado</p>
     <div class="form-group">
       <label>Nombre / Empresa</label>
       <input type="text" id="res-nombre" placeholder="Tu nombre o empresa">
     </div>
     <div class="form-group">
-      <label>Correo electrÃ³nico <span style="color:var(--text-muted);font-weight:400">(para recibir confirmaciÃ³n)</span></label>
+      <label>Correo electrónico <span style="color:var(--text-muted);font-weight:400">(para recibir confirmación)</span></label>
       <input type="email" id="res-email" placeholder="correo@ejemplo.com">
     </div>
     <div class="form-group">
-      <label>TelÃ©fono de contacto</label>
+      <label>Teléfono de contacto</label>
       <input type="tel" id="res-tel" placeholder="+52 999 000 0000">
     </div>
     <div class="form-group">
@@ -970,8 +970,8 @@
       <input type="date" id="res-fecha-fin">
     </div>
     <div class="form-group">
-      <label>DescripciÃ³n de la carga</label>
-      <textarea id="res-desc" rows="3" placeholder="Tipo de mercancÃ­a, origen, destino..."></textarea>
+      <label>Descripción de la carga</label>
+      <textarea id="res-desc" rows="3" placeholder="Tipo de mercancía, origen, destino..."></textarea>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
@@ -980,16 +980,16 @@
   </div>
 </div>
 
-<!-- â•â• MODAL DETALLE CAMIÃ“N â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL DETALLE CAMIÓN ════════════════════════════ -->
 <div class="modal-overlay" id="modal-detalle">
   <div class="modal">
     <div class="detalle-header">
       <div class="detalle-titulo" id="detalle-titulo"></div>
       <div class="detalle-empresa-header" id="detalle-empresa-header"></div>
       <div class="detalle-tabs">
-        <button class="detalle-tab active" data-tab="unidad"     onclick="switchDetalleTab('unidad')">ðŸ“¦ Unidad</button>
-        <button class="detalle-tab"        data-tab="empresa"    onclick="switchDetalleTab('empresa')">ðŸ¢ Empresa</button>
-        <button class="detalle-tab"        data-tab="calendario" onclick="switchDetalleTab('calendario')">ðŸ“… Disponibilidad</button>
+        <button class="detalle-tab active" data-tab="unidad"     onclick="switchDetalleTab('unidad')">📦 Unidad</button>
+        <button class="detalle-tab"        data-tab="empresa"    onclick="switchDetalleTab('empresa')">🏢 Empresa</button>
+        <button class="detalle-tab"        data-tab="calendario" onclick="switchDetalleTab('calendario')">📅 Disponibilidad</button>
       </div>
     </div>
     <div class="detalle-body" id="detalle-body">
@@ -1003,7 +1003,7 @@
   </div>
 </div>
 
-<!-- â•â• MODAL SEGUIMIENTO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL SEGUIMIENTO ═══════════════════════════════ -->
 <div class="modal-overlay" id="modal-tracking">
   <div class="modal">
     <h2>Seguimiento de reserva</h2>
@@ -1016,21 +1016,21 @@
   </div>
 </div>
 
-<!-- â•â• MODAL NUEVO PEDIDO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL NUEVO PEDIDO ══════════════════════════════ -->
 <div class="modal-overlay" id="modal-nuevo-pedido">
   <div class="modal modal-np">
     <!-- Cabecera fija con X -->
     <div class="modal-np-header">
       <div>
-        <h2 style="margin:0">ðŸ“‹ Nueva solicitud</h2>
+        <h2 style="margin:0">📋 Nueva solicitud</h2>
         <p class="sub" style="margin:4px 0 0">Completa los datos para que los proveedores puedan enviarte su mejor oferta.</p>
       </div>
-      <button class="modal-close-x" onclick="closeNuevoPedido()" title="Cerrar">âœ•</button>
+      <button class="modal-close-x" onclick="closeNuevoPedido()" title="Cerrar">✕</button>
     </div>
     <!-- Cuerpo scrolleable -->
     <div class="modal-np-body">
 
-    <!-- Banner de categorÃ­a seleccionada (se muestra al abrir desde botÃ³n) -->
+    <!-- Banner de categoría seleccionada (se muestra al abrir desde botón) -->
     <div id="np-categoria-banner" style="display:none" class="np-cat-banner"></div>
 
     <!-- Tipo de servicio -->
@@ -1038,27 +1038,27 @@
       <label>Tipo de servicio *</label>
       <select id="np-tipo" onchange="actualizarSubtipoPedido()"></select>
     </div>
-    <!-- Info de capacidad â€” aparece al seleccionar tipo camiÃ³n -->
+    <!-- Info de capacidad — aparece al seleccionar tipo camión -->
     <div id="np-info-cap" style="display:none;margin-bottom:12px"></div>
 
-    <!-- â•â• CAMPOS CAMIÃ“N â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ══ CAMPOS CAMIÓN ═══════════════════════════════ -->
     <div id="np-group-camion">
-      <div class="np-section-title">ðŸ“¦ InformaciÃ³n de la carga</div>
+      <div class="np-section-title">📦 Información de la carga</div>
       <div class="admin-grid" style="gap:12px">
         <div class="form-group" id="np-cap-group">
-          <label>Capacidad mÃ­nima requerida (ton)</label>
+          <label>Capacidad mínima requerida (ton)</label>
           <input type="number" id="np-cap" min="0" placeholder="Ej. 20">
         </div>
         <div class="form-group" id="np-carga-group">
           <label>Tipo de carga *</label>
-          <input type="text" id="np-carga" placeholder="Ej. ElectrÃ³nicos, Maquinaria pesada">
+          <input type="text" id="np-carga" placeholder="Ej. Electrónicos, Maquinaria pesada">
         </div>
         <div class="form-group">
           <label>Peso real de la carga (ton)</label>
           <input type="number" id="np-peso" min="0" step="0.1" placeholder="Ej. 15.5">
         </div>
         <div class="form-group">
-          <label>NÃºmero de bultos / pallets</label>
+          <label>Número de bultos / pallets</label>
           <input type="number" id="np-bultos" min="0" placeholder="Ej. 48">
         </div>
       </div>
@@ -1069,14 +1069,14 @@
         <label class="np-check"><input type="checkbox" id="np-factura"> Requiere factura</label>
       </div>
 
-      <div class="np-section-title">ðŸ—ºï¸ Ruta</div>
+      <div class="np-section-title">🗺️ Ruta</div>
       <div class="admin-grid" style="gap:12px">
         <div class="form-group">
-          <label>Origen â€” ciudad y direcciÃ³n *</label>
+          <label>Origen — ciudad y dirección *</label>
           <input type="text" id="np-origen" placeholder="Ej. Guadalajara, Av. Industria 450">
         </div>
         <div class="form-group">
-          <label>Destino â€” ciudad y direcciÃ³n *</label>
+          <label>Destino — ciudad y dirección *</label>
           <input type="text" id="np-destino" placeholder="Ej. CDMX, Bodega Industrial Norte">
         </div>
         <div class="form-group">
@@ -1093,30 +1093,30 @@
         </div>
       </div>
 
-      <div class="np-section-title">ðŸ“ž Contacto en origen</div>
+      <div class="np-section-title">📞 Contacto en origen</div>
       <div class="admin-grid" style="gap:12px">
         <div class="form-group">
           <label>Nombre del contacto</label>
-          <input type="text" id="np-contacto-nombre" placeholder="Ej. Juan PÃ©rez">
+          <input type="text" id="np-contacto-nombre" placeholder="Ej. Juan Pérez">
         </div>
         <div class="form-group">
-          <label>TelÃ©fono del contacto</label>
+          <label>Teléfono del contacto</label>
           <input type="tel" id="np-contacto-tel" placeholder="Ej. 33 1234 5678">
         </div>
       </div>
     </div>
 
-    <!-- â•â• CAMPOS CUSTODIO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ══ CAMPOS CUSTODIO ════════════════════════════════ -->
     <div id="np-group-custodio" style="display:none">
-      <div class="np-section-title">ðŸ‘® Detalles del servicio de custodia</div>
+      <div class="np-section-title">👮 Detalles del servicio de custodia</div>
       <div class="admin-grid" style="gap:12px">
         <div class="form-group">
-          <label>NÃºmero de custodios requeridos *</label>
+          <label>Número de custodios requeridos *</label>
           <input type="number" id="np-num-custodios" min="1" placeholder="Ej. 2">
         </div>
         <div class="form-group">
           <label>Zona / lugar de cobertura *</label>
-          <input type="text" id="np-zona" placeholder="Ej. Ruta Guadalajaraâ€“CDMX">
+          <input type="text" id="np-zona" placeholder="Ej. Ruta Guadalajara–CDMX">
         </div>
         <div class="form-group">
           <label>Fecha de inicio *</label>
@@ -1128,29 +1128,29 @@
         </div>
         <div class="form-group" style="grid-column:span 2">
           <label>Horario de servicio</label>
-          <input type="text" id="np-horario" placeholder="Ej. Lunes a Viernes 08:00â€“20:00">
+          <input type="text" id="np-horario" placeholder="Ej. Lunes a Viernes 08:00–20:00">
         </div>
       </div>
     </div>
 
-    <!-- â•â• CAMPOS PATIO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ══ CAMPOS PATIO ═══════════════════════════════════ -->
     <div id="np-group-patio" style="display:none">
-      <div class="np-section-title">ðŸ­ Detalles del patio requerido</div>
+      <div class="np-section-title">🏭 Detalles del patio requerido</div>
       <div class="admin-grid" style="gap:12px">
         <div class="form-group">
-          <label>NÃºmero de vehÃ­culos a resguardar</label>
+          <label>Número de vehículos a resguardar</label>
           <input type="number" id="np-num-vehiculos" min="1" placeholder="Ej. 5">
         </div>
         <div class="form-group">
-          <label>Tipo de vehÃ­culos</label>
+          <label>Tipo de vehículos</label>
           <input type="text" id="np-tipo-vehiculos" placeholder="Ej. Tractocamiones, Remolques">
         </div>
         <div class="form-group">
-          <label>Ãrea aproximada necesaria (mÂ²)</label>
+          <label>Área aproximada necesaria (m²)</label>
           <input type="number" id="np-area" min="0" placeholder="Ej. 500">
         </div>
         <div class="form-group">
-          <label>UbicaciÃ³n preferida</label>
+          <label>Ubicación preferida</label>
           <input type="text" id="np-origen" placeholder="Ej. Zona industrial Tlaquepaque">
         </div>
         <div class="form-group">
@@ -1164,20 +1164,20 @@
       </div>
     </div>
 
-    <!-- â•â• CAMPOS LAVADO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ══ CAMPOS LAVADO ═══════════════════════════════════ -->
     <div id="np-group-lavado" style="display:none">
-      <div class="np-section-title">ðŸš¿ Detalles del servicio de lavado</div>
+      <div class="np-section-title">🚿 Detalles del servicio de lavado</div>
       <div class="admin-grid" style="gap:12px">
         <div class="form-group">
-          <label>Tipo de vehÃ­culo a lavar *</label>
-          <input type="text" id="np-vehiculo-lavar" placeholder="Ej. TractocamiÃ³n, Remolque, Contenedor">
+          <label>Tipo de vehículo a lavar *</label>
+          <input type="text" id="np-vehiculo-lavar" placeholder="Ej. Tractocamión, Remolque, Contenedor">
         </div>
         <div class="form-group">
-          <label>NÃºmero de vehÃ­culos</label>
+          <label>Número de vehículos</label>
           <input type="number" id="np-num-vehiculos-lav" min="1" placeholder="Ej. 3">
         </div>
         <div class="form-group">
-          <label>UbicaciÃ³n del vehÃ­culo *</label>
+          <label>Ubicación del vehículo *</label>
           <input type="text" id="np-ubic-lav" placeholder="Ej. Zona industrial Manzanillo">
         </div>
         <div class="form-group">
@@ -1186,30 +1186,30 @@
         </div>
         <div class="form-group" style="grid-column:span 2">
           <label>Horario preferido</label>
-          <input type="text" id="np-horario-lav" placeholder="Ej. MaÃ±ana antes de las 10:00">
+          <input type="text" id="np-horario-lav" placeholder="Ej. Mañana antes de las 10:00">
         </div>
       </div>
     </div>
 
     <!-- Campos comunes al final -->
-    <div class="np-section-title">ðŸ’¬ InformaciÃ³n adicional</div>
+    <div class="np-section-title">💬 Información adicional</div>
     <div class="form-group">
-      <label>DescripciÃ³n / instrucciones especiales</label>
-      <textarea id="np-desc" rows="3" placeholder="Detalles adicionales que ayuden al proveedor a cotizar mejorâ€¦"></textarea>
+      <label>Descripción / instrucciones especiales</label>
+      <textarea id="np-desc" rows="3" placeholder="Detalles adicionales que ayuden al proveedor a cotizar mejor…"></textarea>
     </div>
     <div class="form-group">
-      <label>Tu presupuesto (MXN) <span style="font-weight:400;color:var(--text-muted)">â€” opcional, puede quedar abierto</span></label>
+      <label>Tu presupuesto (MXN) <span style="font-weight:400;color:var(--text-muted)">— opcional, puede quedar abierto</span></label>
       <input type="number" id="np-precio" placeholder="Ej. 8000">
     </div>
 
     <div class="modal-actions">
-      <button class="btn-confirm" onclick="crearPedido()">ðŸ“‹ Publicar solicitud</button>
+      <button class="btn-confirm" onclick="crearPedido()">📋 Publicar solicitud</button>
     </div>
     </div><!-- /modal-np-body -->
   </div>
 </div>
 
-<!-- â•â• MODAL DETALLE PEDIDO (cliente ve ofertas) â•â•â•â•â•â•â• -->
+<!-- ══ MODAL DETALLE PEDIDO (cliente ve ofertas) ═══════ -->
 <div class="modal-overlay" id="modal-pedido-detalle">
   <div class="modal" style="max-width:520px">
     <h2 id="pedido-detalle-titulo">Solicitud</h2>
@@ -1221,22 +1221,22 @@
   </div>
 </div>
 
-<!-- â•â• MODAL HACER OFERTA (admin) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL HACER OFERTA (admin) ══════════════════════ -->
 <div class="modal-overlay" id="modal-hacer-oferta">
   <div class="modal" style="max-width:460px">
-    <h2>ðŸ’¼ Hacer oferta</h2>
-    <p class="sub" id="ho-pedido-info">PropÃ³n tu precio y el recurso que asignarÃ¡s.</p>
+    <h2>💼 Hacer oferta</h2>
+    <p class="sub" id="ho-pedido-info">Propón tu precio y el recurso que asignarás.</p>
     <div id="ho-sin-recursos" style="display:none;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:12px 14px;font-size:0.83rem;color:#f87171;margin-bottom:4px"></div>
     <div class="form-group">
       <label id="ho-recurso-label">Recurso que asignas *</label>
       <select id="ho-camion">
-        <option value="">Sin asignar aÃºn</option>
+        <option value="">Sin asignar aún</option>
       </select>
     </div>
     <div class="form-group" id="ho-op-row" style="display:none">
       <label>Chofer asignado *</label>
       <select id="ho-operador">
-        <option value="">â€” Selecciona un chofer â€”</option>
+        <option value="">— Selecciona un chofer —</option>
       </select>
     </div>
     <div class="form-group">
@@ -1254,26 +1254,26 @@
   </div>
 </div>
 
-<!-- â•â• MODAL RESPONDER CONTRAOFERTA (admin) â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL RESPONDER CONTRAOFERTA (admin) ════════════ -->
 <div class="modal-overlay" id="modal-responder-contra">
   <div class="modal" style="max-width:420px">
-    <h2>â†© Contraoferta del cliente</h2>
+    <h2>↩ Contraoferta del cliente</h2>
     <div id="contra-detalle-info" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;padding:14px;margin-bottom:20px;font-size:0.85rem"></div>
-    <p class="sub" style="margin-bottom:0">Â¿Aceptas la contraoferta o la rechazas?</p>
+    <p class="sub" style="margin-bottom:0">¿Aceptas la contraoferta o la rechazas?</p>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeResponderContra()">Cancelar</button>
-      <button class="btn-edit btn-rechazar" style="flex:1;padding:10px;font-size:0.85rem" onclick="responderContra('rechazar')">âœ• Rechazar</button>
-      <button class="btn-confirm" onclick="responderContra('aceptar')">âœ“ Aceptar</button>
+      <button class="btn-edit btn-rechazar" style="flex:1;padding:10px;font-size:0.85rem" onclick="responderContra('rechazar')">✕ Rechazar</button>
+      <button class="btn-confirm" onclick="responderContra('aceptar')">✓ Aceptar</button>
     </div>
   </div>
 </div>
 
-<!-- â•â• MODAL DETALLES DEL SERVICIO (post-acuerdo) â•â•â•â•â•â• -->
+<!-- ══ MODAL DETALLES DEL SERVICIO (post-acuerdo) ══════ -->
 <div class="modal-overlay" id="modal-detalles-servicio">
   <div class="modal" style="max-width:500px">
-    <h2>ðŸ“‹ Datos adicionales del servicio</h2>
+    <h2>📋 Datos adicionales del servicio</h2>
     <p id="ds-resumen" class="sub"></p>
-    <p style="font-size:0.82rem;color:var(--text-muted);margin:-4px 0 14px">Estos datos son opcionales â€” puedes coordinarlos despuÃ©s con el proveedor por el chat.</p>
+    <p style="font-size:0.82rem;color:var(--text-muted);margin:-4px 0 14px">Estos datos son opcionales — puedes coordinarlos después con el proveedor por el chat.</p>
     <div class="form-group">
       <label>Fecha del servicio</label>
       <input type="date" id="ds-fecha">
@@ -1283,25 +1283,25 @@
       <input type="time" id="ds-hora">
     </div>
     <div class="form-group">
-      <label>DirecciÃ³n / punto de encuentro</label>
-      <input type="text" id="ds-lugar" placeholder="Ej. Terminal LÃ¡zaro CÃ¡rdenas, Patio 3â€¦">
+      <label>Dirección / punto de encuentro</label>
+      <input type="text" id="ds-lugar" placeholder="Ej. Terminal Lázaro Cárdenas, Patio 3…">
     </div>
     <div class="form-group">
       <label>Nombre del contacto en sitio</label>
-      <input type="text" id="ds-contacto-nombre" placeholder="Quien recibirÃ¡ al proveedor">
+      <input type="text" id="ds-contacto-nombre" placeholder="Quien recibirá al proveedor">
     </div>
     <div class="form-group">
-      <label>TelÃ©fono de contacto</label>
+      <label>Teléfono de contacto</label>
       <input type="tel" id="ds-contacto-tel" placeholder="Ej. 314 123 4567">
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="omitirDetallesServicio()">Omitir</button>
-      <button class="btn-confirm" onclick="confirmarDetallesServicio()">âœ“ Guardar y confirmar</button>
+      <button class="btn-confirm" onclick="confirmarDetallesServicio()">✓ Guardar y confirmar</button>
     </div>
   </div>
 </div>
 
-<!-- â•â• MODAL PERFIL DE EMPRESA â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL PERFIL DE EMPRESA ════════════════════════ -->
 <div class="modal-overlay" id="modal-empresa-perfil">
   <div class="modal" style="max-width:440px">
     <h2 id="ep-titulo">Empresa</h2>
@@ -1312,10 +1312,10 @@
   </div>
 </div>
 
-<!-- â•â• MODAL VER CALIFICACIONES â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL VER CALIFICACIONES ════════════════════════ -->
 <div class="modal-overlay" id="modal-ver-calificaciones">
   <div class="modal" style="max-width:480px">
-    <h2 id="vcal-titulo">â­ Calificaciones</h2>
+    <h2 id="vcal-titulo">⭐ Calificaciones</h2>
     <div id="vcal-resumen" style="margin-bottom:14px"></div>
     <div id="vcal-lista" style="display:flex;flex-direction:column;gap:12px;max-height:340px;overflow-y:auto"></div>
     <div class="modal-actions" style="margin-top:16px">
@@ -1324,38 +1324,38 @@
   </div>
 </div>
 
-<!-- â•â• MODAL CALIFICAR SERVICIO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL CALIFICAR SERVICIO ════════════════════════ -->
 <div class="modal-overlay" id="modal-calificar">
   <div class="modal" style="max-width:400px">
-    <h2>â­ Calificar servicio</h2>
+    <h2>⭐ Calificar servicio</h2>
     <p id="cal-subtitulo" class="sub"></p>
     <input type="hidden" id="cal-reservacion-id">
     <input type="hidden" id="cal-admin-id">
     <div class="form-group" style="text-align:center;margin-bottom:0">
       <div class="star-rating" id="cal-stars">
-        <span class="star" data-val="1" onclick="seleccionarEstrella(1)">â˜…</span>
-        <span class="star" data-val="2" onclick="seleccionarEstrella(2)">â˜…</span>
-        <span class="star" data-val="3" onclick="seleccionarEstrella(3)">â˜…</span>
-        <span class="star" data-val="4" onclick="seleccionarEstrella(4)">â˜…</span>
-        <span class="star" data-val="5" onclick="seleccionarEstrella(5)">â˜…</span>
+        <span class="star" data-val="1" onclick="seleccionarEstrella(1)">★</span>
+        <span class="star" data-val="2" onclick="seleccionarEstrella(2)">★</span>
+        <span class="star" data-val="3" onclick="seleccionarEstrella(3)">★</span>
+        <span class="star" data-val="4" onclick="seleccionarEstrella(4)">★</span>
+        <span class="star" data-val="5" onclick="seleccionarEstrella(5)">★</span>
       </div>
       <div id="cal-rating-label" style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">Excelente</div>
     </div>
     <div class="form-group">
       <label>Comentario <span style="font-weight:400;color:var(--text-muted)">(opcional)</span></label>
-      <textarea id="cal-comentario" rows="2" placeholder="Â¿CÃ³mo fue el servicio?"></textarea>
+      <textarea id="cal-comentario" rows="2" placeholder="¿Cómo fue el servicio?"></textarea>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeCalificar()">Cancelar</button>
-      <button class="btn-confirm" onclick="enviarCalificacion()">â­ Enviar calificaciÃ³n</button>
+      <button class="btn-confirm" onclick="enviarCalificacion()">⭐ Enviar calificación</button>
     </div>
   </div>
 </div>
 
-<!-- â•â• MODAL EDITAR CAMIÃ“N â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL EDITAR CAMIÓN ═════════════════════════════ -->
 <div class="modal-overlay" id="modal-editar">
   <div class="modal">
-    <h2>âœ Editar unidad</h2>
+    <h2>✏ Editar unidad</h2>
     <p class="sub" id="editar-subtitulo">Modificar datos de la unidad</p>
     <input type="hidden" id="editar-id">
     <div class="form-group">
@@ -1368,7 +1368,7 @@
           <option>Camioneta 3.5 ton plataforma</option>
         </optgroup>
         <optgroup label="Camiones">
-          <option>RabÃ³n</option>
+          <option>Rabón</option>
           <option>Torton</option>
           <option>Torton caja seca</option>
           <option>Torton plataforma</option>
@@ -1390,13 +1390,13 @@
       </select>
     </div>
     <div class="form-group">
-      <label>Capacidad mÃ¡xima (toneladas)</label>
+      <label>Capacidad máxima (toneladas)</label>
       <input type="number" id="editar-cap" placeholder="Ej. 24.5" step="0.5" min="0">
     </div>
     <div class="form-group">
       <label>Operador</label>
       <select id="editar-op">
-        <option value="">â€” Sin operador asignado â€”</option>
+        <option value="">— Sin operador asignado —</option>
       </select>
     </div>
     <div class="form-group">
@@ -1405,7 +1405,7 @@
     </div>
     <div class="form-group">
       <label id="editar-dim-label">Dimensiones</label>
-      <input type="text" id="editar-dim" placeholder="Ej. 8.5m Ã— 2.4m Ã— 2.5m">
+      <input type="text" id="editar-dim" placeholder="Ej. 8.5m × 2.4m × 2.5m">
     </div>
     <div class="form-group">
       <label>Tipo de carga que maneja</label>
@@ -1421,11 +1421,11 @@
         <option value="2-4 horas">2-4 horas</option>
         <option value="3-4 horas">3-4 horas</option>
         <option value="3-5 horas">3-5 horas</option>
-        <option value="Mismo dÃ­a">Mismo dÃ­a</option>
+        <option value="Mismo día">Mismo día</option>
       </select>
     </div>
     <div class="form-group">
-      <label>Precio por dÃ­a (MXN)</label>
+      <label>Precio por día (MXN)</label>
       <input type="number" id="editar-precio" placeholder="Ej. 8500" min="0">
     </div>
     <div class="form-group">
@@ -1439,63 +1439,63 @@
     <div class="form-group">
       <label>Tipo de placa</label>
       <select id="editar-tipo-placa">
-        <option value="">â€” Seleccionar â€”</option>
+        <option value="">— Seleccionar —</option>
         <option>Federal</option><option>Estatal</option><option>Local</option>
       </select>
     </div>
     <div class="form-group">
       <label>Marca</label>
       <select id="editar-marca">
-        <option value="">â€” Seleccionar â€”</option>
+        <option value="">— Seleccionar —</option>
         <option>Kenworth</option><option>International</option><option>Freightliner</option>
         <option>Peterbilt</option><option>Volvo</option><option>Mercedes-Benz</option>
         <option>Scania</option><option>MAN</option><option>Hino</option><option>Isuzu</option><option>Otra</option>
       </select>
     </div>
     <div class="form-group">
-      <label>NÃºmero de serie (NIV)</label>
+      <label>Número de serie (NIV)</label>
       <input type="text" id="editar-num-serie" placeholder="Ej. 3HKRM4H59KM702456">
     </div>
     <div class="form-group">
-      <label>NÃºmero de motor</label>
+      <label>Número de motor</label>
       <input type="text" id="editar-num-motor" placeholder="Ej. CAT-123456">
     </div>
     <div class="form-group">
-      <label>NÃºmero econÃ³mico</label>
+      <label>Número económico</label>
       <input type="text" id="editar-num-economico" placeholder="Ej. ECO-001">
     </div>
     <div class="form-group">
       <label>Tipo de combustible</label>
       <select id="editar-combustible">
-        <option value="">â€” Seleccionar â€”</option>
+        <option value="">— Seleccionar —</option>
         <option>Diesel</option><option>Gasolina</option>
-        <option>Gas Natural</option><option>ElÃ©ctrico</option><option>HÃ­brido</option>
+        <option>Gas Natural</option><option>Eléctrico</option><option>Híbrido</option>
       </select>
     </div>
     <div class="form-group">
-      <label>Tarjeta de circulaciÃ³n</label>
-      <input type="text" id="editar-tc" placeholder="NÃºm. de tarjeta">
+      <label>Tarjeta de circulación</label>
+      <input type="text" id="editar-tc" placeholder="Núm. de tarjeta">
     </div>
     <div class="form-group">
-      <label>Fecha expediciÃ³n TC</label>
+      <label>Fecha expedición TC</label>
       <input type="date" id="editar-fecha-tc">
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeEditarCamion()">Cancelar</button>
-      <button class="btn-confirm" onclick="guardarEdicion()">ðŸ’¾ Guardar cambios</button>
+      <button class="btn-confirm" onclick="guardarEdicion()">💾 Guardar cambios</button>
     </div>
   </div>
 </div>
 
-<!-- â•â• MODAL RECHAZO OPERADOR â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL RECHAZO OPERADOR ═══════════════════════════ -->
 <div class="modal-overlay" id="modal-rechazar-operador">
   <div class="modal" style="max-width:500px">
     <div class="modal-header">
-      <h2>âœ• Rechazar con comentarios</h2>
-      <button class="modal-close" onclick="cerrarRechazarOperador()">âœ•</button>
+      <h2>✕ Rechazar con comentarios</h2>
+      <button class="modal-close" onclick="cerrarRechazarOperador()">✕</button>
     </div>
     <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:16px">
-      La empresa verÃ¡ este motivo y podrÃ¡ corregir sin perder sus datos.
+      La empresa verá este motivo y podrá corregir sin perder sus datos.
     </p>
     <input type="hidden" id="ro-operador-id">
     <div class="form-group">
@@ -1505,10 +1505,10 @@
         <label class="ro-chip"><input type="checkbox" value="CURP"> CURP</label>
         <label class="ro-chip"><input type="checkbox" value="RFC"> RFC</label>
         <label class="ro-chip"><input type="checkbox" value="NSS"> NSS</label>
-        <label class="ro-chip"><input type="checkbox" value="NÃºm. trabajador"> NÃºm. trabajador</label>
-        <label class="ro-chip"><input type="checkbox" value="Correo / TelÃ©fono"> Correo / TelÃ©fono</label>
-        <label class="ro-chip"><input type="checkbox" value="Ãrea / Puesto"> Ãrea / Puesto</label>
-        <label class="ro-chip"><input type="checkbox" value="NÃºm. de licencia"> NÃºm. de licencia</label>
+        <label class="ro-chip"><input type="checkbox" value="Núm. trabajador"> Núm. trabajador</label>
+        <label class="ro-chip"><input type="checkbox" value="Correo / Teléfono"> Correo / Teléfono</label>
+        <label class="ro-chip"><input type="checkbox" value="Área / Puesto"> Área / Puesto</label>
+        <label class="ro-chip"><input type="checkbox" value="Núm. de licencia"> Núm. de licencia</label>
         <label class="ro-chip"><input type="checkbox" value="Clase / Tipo licencia"> Clase / Tipo licencia</label>
         <label class="ro-chip"><input type="checkbox" value="Fechas de licencia"> Fechas de licencia</label>
         <label class="ro-chip"><input type="checkbox" value="Foto del operador"> Foto del operador</label>
@@ -1517,24 +1517,24 @@
     </div>
     <div class="form-group" style="margin-top:14px">
       <label>Comentario adicional</label>
-      <textarea id="ro-nota" rows="3" placeholder="Explica quÃ© debe corregir la empresaâ€¦"></textarea>
+      <textarea id="ro-nota" rows="3" placeholder="Explica qué debe corregir la empresa…"></textarea>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="cerrarRechazarOperador()">Cancelar</button>
-      <button class="btn-confirm" style="background:var(--red)" onclick="confirmarRechazarOperador()">âœ• Rechazar con comentarios</button>
+      <button class="btn-confirm" style="background:var(--red)" onclick="confirmarRechazarOperador()">✕ Rechazar con comentarios</button>
     </div>
   </div>
 </div>
 
-<!-- â•â• MODAL RECHAZO CAMIÃ“N â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL RECHAZO CAMIÓN ════════════════════════════ -->
 <div class="modal-overlay" id="modal-rechazar-camion">
   <div class="modal" style="max-width:520px">
     <div class="modal-header">
-      <h2>âœ• Rechazar unidad con comentarios</h2>
-      <button class="modal-close" onclick="cerrarRechazarCamion()">âœ•</button>
+      <h2>✕ Rechazar unidad con comentarios</h2>
+      <button class="modal-close" onclick="cerrarRechazarCamion()">✕</button>
     </div>
     <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:16px">
-      La empresa verÃ¡ el motivo y podrÃ¡ corregir sin perder sus datos.
+      La empresa verá el motivo y podrá corregir sin perder sus datos.
     </p>
     <input type="hidden" id="rc-camion-id">
     <div class="form-group">
@@ -1542,41 +1542,41 @@
       <div id="rc-campos" class="ro-campos-wrap">
         <label class="ro-chip"><input type="checkbox" value="Tipo de transporte"> Tipo</label>
         <label class="ro-chip"><input type="checkbox" value="Marca"> Marca</label>
-        <label class="ro-chip"><input type="checkbox" value="AÃ±o / VersiÃ³n"> AÃ±o / VersiÃ³n</label>
+        <label class="ro-chip"><input type="checkbox" value="Año / Versión"> Año / Versión</label>
         <label class="ro-chip"><input type="checkbox" value="Color"> Color</label>
         <label class="ro-chip"><input type="checkbox" value="Capacidad"> Capacidad</label>
         <label class="ro-chip"><input type="checkbox" value="Dimensiones"> Dimensiones</label>
-        <label class="ro-chip"><input type="checkbox" value="NÃºm. serie (NIV)"> NÃºm. serie (NIV)</label>
+        <label class="ro-chip"><input type="checkbox" value="Núm. serie (NIV)"> Núm. serie (NIV)</label>
         <label class="ro-chip"><input type="checkbox" value="Placas"> Placas</label>
-        <label class="ro-chip"><input type="checkbox" value="NÃºm. motor"> NÃºm. motor</label>
-        <label class="ro-chip"><input type="checkbox" value="NÃºm. econÃ³mico"> NÃºm. econÃ³mico</label>
-        <label class="ro-chip"><input type="checkbox" value="Tarjeta de circulaciÃ³n"> TC</label>
+        <label class="ro-chip"><input type="checkbox" value="Núm. motor"> Núm. motor</label>
+        <label class="ro-chip"><input type="checkbox" value="Núm. económico"> Núm. económico</label>
+        <label class="ro-chip"><input type="checkbox" value="Tarjeta de circulación"> TC</label>
         <label class="ro-chip"><input type="checkbox" value="Imagen TC"> Imagen TC</label>
         <label class="ro-chip"><input type="checkbox" value="CAAT"> CAAT</label>
         <label class="ro-chip"><input type="checkbox" value="Imagen CAAT"> Imagen CAAT</label>
-        <label class="ro-chip"><input type="checkbox" value="Fotos del vehÃ­culo"> Fotos</label>
+        <label class="ro-chip"><input type="checkbox" value="Fotos del vehículo"> Fotos</label>
       </div>
     </div>
     <div class="form-group" style="margin-top:14px">
       <label>Comentario adicional</label>
-      <textarea id="rc-nota" rows="3" placeholder="Explica quÃ© debe corregir la empresaâ€¦"></textarea>
+      <textarea id="rc-nota" rows="3" placeholder="Explica qué debe corregir la empresa…"></textarea>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="cerrarRechazarCamion()">Cancelar</button>
-      <button class="btn-confirm" style="background:var(--red)" onclick="confirmarRechazarCamion()">âœ• Rechazar con comentarios</button>
+      <button class="btn-confirm" style="background:var(--red)" onclick="confirmarRechazarCamion()">✕ Rechazar con comentarios</button>
     </div>
   </div>
 </div>
 
-<!-- â•â• MODAL RECHAZO RECURSO (custodio/patio/lavado) â•â• -->
+<!-- ══ MODAL RECHAZO RECURSO (custodio/patio/lavado) ══ -->
 <div class="modal-overlay" id="modal-rechazar-recurso">
   <div class="modal" style="max-width:500px">
     <div class="modal-header">
-      <h2 id="rrs-titulo">âœ• Rechazar con comentarios</h2>
-      <button class="modal-close" onclick="cerrarRechazarRecurso()">âœ•</button>
+      <h2 id="rrs-titulo">✕ Rechazar con comentarios</h2>
+      <button class="modal-close" onclick="cerrarRechazarRecurso()">✕</button>
     </div>
     <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:16px">
-      La empresa verÃ¡ el motivo y podrÃ¡ corregir sin perder sus datos.
+      La empresa verá el motivo y podrá corregir sin perder sus datos.
     </p>
     <input type="hidden" id="rrs-tabla">
     <input type="hidden" id="rrs-id">
@@ -1586,26 +1586,26 @@
     </div>
     <div class="form-group" style="margin-top:14px">
       <label>Comentario adicional</label>
-      <textarea id="rrs-nota" rows="3" placeholder="Explica quÃ© debe corregir la empresaâ€¦"></textarea>
+      <textarea id="rrs-nota" rows="3" placeholder="Explica qué debe corregir la empresa…"></textarea>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="cerrarRechazarRecurso()">Cancelar</button>
-      <button class="btn-confirm" style="background:var(--red)" onclick="confirmarRechazarRecurso()">âœ• Rechazar con comentarios</button>
+      <button class="btn-confirm" style="background:var(--red)" onclick="confirmarRechazarRecurso()">✕ Rechazar con comentarios</button>
     </div>
   </div>
 </div>
 
-<!-- â•â• MODAL EDITAR LAVADO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL EDITAR LAVADO ═══════════════════════════ -->
 <div class="modal-overlay" id="modal-editar-lavado">
   <div class="modal" style="max-width:480px">
-    <h2>âœ Editar servicio de lavado</h2>
+    <h2>✏ Editar servicio de lavado</h2>
     <input type="hidden" id="elav-id">
     <div class="form-group">
       <label>Nombre</label>
       <input type="text" id="elav-nombre">
     </div>
     <div class="form-group">
-      <label>Tipos de vehÃ­culo <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
+      <label>Tipos de vehículo <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
       <input type="text" id="elav-tipos-vehiculo">
     </div>
     <div class="form-group">
@@ -1613,11 +1613,11 @@
       <input type="text" id="elav-tipos-lavado">
     </div>
     <div class="form-group">
-      <label>Capacidad simultÃ¡nea</label>
+      <label>Capacidad simultánea</label>
       <input type="number" id="elav-capacidad" min="1">
     </div>
     <div class="form-group">
-      <label>UbicaciÃ³n</label>
+      <label>Ubicación</label>
       <input type="text" id="elav-ubic">
     </div>
     <div class="form-group">
@@ -1638,12 +1638,12 @@
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeEditarLavado()">Cancelar</button>
-      <button class="btn-confirm" onclick="guardarEdicionLavado()">ðŸ’¾ Guardar</button>
+      <button class="btn-confirm" onclick="guardarEdicionLavado()">💾 Guardar</button>
     </div>
   </div>
 </div>
 
-<!-- â•â• MODAL ARCHIVOS â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL ARCHIVOS ══════════════════════════════════ -->
 <div class="modal-overlay" id="modal-archivos">
   <div class="modal">
     <h2>Archivos adjuntos</h2>
@@ -1655,10 +1655,10 @@
   </div>
 </div>
 
-<!-- â•â• MODAL EDITAR CUSTODIO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL EDITAR CUSTODIO ══════════════════════════ -->
 <div class="modal-overlay" id="modal-editar-custodio">
   <div class="modal" style="max-width:480px">
-    <h2>âœ Editar custodio</h2>
+    <h2>✏ Editar custodio</h2>
     <input type="hidden" id="ec-id">
     <div class="form-group">
       <label>Nombre</label>
@@ -1671,11 +1671,11 @@
         <option value="Sin arma">Sin arma</option>
         <option value="Motorizado">Motorizado</option>
         <option value="K9">K9</option>
-        <option value="SupervisiÃ³n remota">SupervisiÃ³n remota</option>
+        <option value="Supervisión remota">Supervisión remota</option>
       </select>
     </div>
     <div class="form-group">
-      <label>DescripciÃ³n</label>
+      <label>Descripción</label>
       <textarea id="ec-desc" rows="3"></textarea>
     </div>
     <div class="form-group">
@@ -1686,13 +1686,13 @@
       <label>Disponibilidad</label>
       <select id="ec-disp">
         <option value="24/7">24/7</option>
-        <option value="DÃ­as hÃ¡biles">DÃ­as hÃ¡biles</option>
+        <option value="Días hábiles">Días hábiles</option>
         <option value="Fines de semana">Fines de semana</option>
         <option value="Bajo demanda">Bajo demanda</option>
       </select>
     </div>
     <div class="form-group">
-      <label>Precio por dÃ­a (MXN)</label>
+      <label>Precio por día (MXN)</label>
       <input type="number" id="ec-precio">
     </div>
     <div class="form-group">
@@ -1705,15 +1705,15 @@
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeEditarCustodio()">Cancelar</button>
-      <button class="btn-confirm" onclick="guardarEdicionCustodio()">ðŸ’¾ Guardar</button>
+      <button class="btn-confirm" onclick="guardarEdicionCustodio()">💾 Guardar</button>
     </div>
   </div>
 </div>
 
-<!-- â•â• MODAL EDITAR PATIO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL EDITAR PATIO ════════════════════════════ -->
 <div class="modal-overlay" id="modal-editar-patio">
   <div class="modal" style="max-width:480px">
-    <h2>âœ Editar patio</h2>
+    <h2>✏ Editar patio</h2>
     <input type="hidden" id="ep-id">
     <div class="form-group">
       <label>Nombre</label>
@@ -1730,15 +1730,15 @@
       </select>
     </div>
     <div class="form-group">
-      <label>UbicaciÃ³n</label>
+      <label>Ubicación</label>
       <input type="text" id="ep-ubic">
     </div>
     <div class="form-group">
-      <label>Ãrea (mÂ²)</label>
+      <label>Área (m²)</label>
       <input type="number" id="ep-area">
     </div>
     <div class="form-group">
-      <label>Capacidad de vehÃ­culos</label>
+      <label>Capacidad de vehículos</label>
       <input type="number" id="ep-cap">
     </div>
     <div class="form-group">
@@ -1746,7 +1746,7 @@
       <input type="text" id="ep-svcs">
     </div>
     <div class="form-group">
-      <label>Precio por dÃ­a (MXN)</label>
+      <label>Precio por día (MXN)</label>
       <input type="number" id="ep-precio">
     </div>
     <div class="form-group">
@@ -1759,19 +1759,19 @@
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeEditarPatio()">Cancelar</button>
-      <button class="btn-confirm" onclick="guardarEdicionPatio()">ðŸ’¾ Guardar</button>
+      <button class="btn-confirm" onclick="guardarEdicionPatio()">💾 Guardar</button>
     </div>
   </div>
 </div>
 
-<!-- â•â• BACKDROP MENÃš MÃ“VIL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ BACKDROP MENÚ MÓVIL ══════════════════════════════ -->
 <div class="menu-backdrop" id="menu-backdrop" onclick="toggleMenu()"></div>
 
-<!-- â•â• TOAST â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ TOAST ════════════════════════════════════════════ -->
 <div class="toast" id="toast"></div>
 
 
-<!-- â•â• LOGIN â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ LOGIN ════════════════════════════════════════════ -->
 <div id="login-overlay">
   <div class="login-box">
     <div class="login-logo">
@@ -1781,26 +1781,26 @@
 
     <!-- Tabs -->
     <div class="login-tabs">
-      <button class="login-tab active" id="tab-login"    onclick="switchLoginTab('login')">Iniciar sesiÃ³n</button>
+      <button class="login-tab active" id="tab-login"    onclick="switchLoginTab('login')">Iniciar sesión</button>
       <button class="login-tab"        id="tab-registro" onclick="switchLoginTab('registro')">Crear cuenta</button>
     </div>
 
     <!-- Panel login -->
     <div id="login-panel">
-      <div class="login-error" id="login-error">Correo o contraseÃ±a incorrectos</div>
+      <div class="login-error" id="login-error">Correo o contraseña incorrectos</div>
       <div class="form-group">
-        <label>Correo electrÃ³nico</label>
+        <label>Correo electrónico</label>
         <input type="email" id="login-user" placeholder="correo@empresa.com"
                autocomplete="username" onkeydown="if(event.key==='Enter') doLogin()">
       </div>
       <div class="form-group">
-        <label>ContraseÃ±a</label>
-        <input type="password" id="login-pass" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+        <label>Contraseña</label>
+        <input type="password" id="login-pass" placeholder="••••••••"
                autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
       </div>
       <button class="btn-login" onclick="doLogin()">Entrar</button>
-      <button class="btn-forgot" onclick="forgotPassword()">Â¿Olvidaste tu contraseÃ±a?</button>
-      <p class="login-soporte">Â¿Necesitas ayuda? <a href="mailto:soporte@portgo.mx">soporte@portgo.mx</a></p>
+      <button class="btn-forgot" onclick="forgotPassword()">¿Olvidaste tu contraseña?</button>
+      <p class="login-soporte">¿Necesitas ayuda? <a href="mailto:soporte@portgo.mx">soporte@portgo.mx</a></p>
     </div>
 
     <!-- Panel registro (rendered by JS) -->
@@ -1809,12 +1809,12 @@
   </div>
 </div>
 
-<!-- â•â• MODAL CORREGIR Y REENVIAR PEDIDO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL CORREGIR Y REENVIAR PEDIDO ════════════════ -->
 <div class="modal-overlay" id="modal-reenviar-pedido">
   <div class="modal">
     <div class="modal-header">
       <h2>Corregir y reenviar solicitud</h2>
-      <button class="modal-close" onclick="cerrarReenviarPedido()">âœ•</button>
+      <button class="modal-close" onclick="cerrarReenviarPedido()">✕</button>
     </div>
     <input type="hidden" id="rp-id">
     <div class="form-group">
@@ -1824,7 +1824,7 @@
     <div class="form-group">
       <label>Ruta</label>
       <div style="padding:8px 12px;background:var(--surface-2);border-radius:8px;font-size:0.9rem;color:var(--text-muted)">
-        ðŸ“ <span id="rp-origen"></span> â†’ <span id="rp-destino"></span>
+        📍 <span id="rp-origen"></span> → <span id="rp-destino"></span>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -1838,7 +1838,7 @@
       </div>
     </div>
     <div class="form-group">
-      <label>DescripciÃ³n / correcciones</label>
+      <label>Descripción / correcciones</label>
       <textarea id="rp-descripcion" rows="3" placeholder="Explica los cambios o agrega detalles relevantes" style="resize:vertical"></textarea>
     </div>
     <div class="form-group">
@@ -1846,58 +1846,58 @@
       <input type="number" id="rp-precio" placeholder="Ej. 5000" min="0">
     </div>
     <div style="display:flex;gap:10px;margin-top:4px">
-      <button class="btn-add" style="flex:1" onclick="confirmarReenviar()">ðŸ”„ Reenviar solicitud</button>
+      <button class="btn-add" style="flex:1" onclick="confirmarReenviar()">🔄 Reenviar solicitud</button>
       <button class="btn-edit" onclick="cerrarReenviarPedido()">Cancelar</button>
     </div>
   </div>
 </div>
 
-<!-- â•â• MODAL PERFIL EMPRESA (catÃ¡logo) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL PERFIL EMPRESA (catálogo) ═════════════════ -->
 <div class="modal-overlay" id="modal-emp-cat">
   <div class="modal">
     <div class="modal-header">
       <h2 id="epc-titulo">Empresa</h2>
-      <button class="modal-close" onclick="cerrarPerfilEmpresaCat()">âœ•</button>
+      <button class="modal-close" onclick="cerrarPerfilEmpresaCat()">✕</button>
     </div>
     <div id="epc-body"></div>
   </div>
 </div>
 
-<!-- â•â• MODAL HISTORIAL DE USUARIO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL HISTORIAL DE USUARIO ══════════════════════ -->
 <div class="modal-overlay" id="modal-historial-usuario">
   <div class="modal" style="max-width:680px">
     <div class="modal-header">
       <h2 id="hist-titulo">Historial</h2>
-      <button class="modal-close" onclick="cerrarHistorialUsuario()">âœ•</button>
+      <button class="modal-close" onclick="cerrarHistorialUsuario()">✕</button>
     </div>
     <div id="hist-body"></div>
   </div>
 </div>
 
-<!-- â•â• MODAL RECHAZAR CON NOTA (genÃ©rico) â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL RECHAZAR CON NOTA (genérico) ══════════════ -->
 <div class="modal-overlay" id="modal-rechazar-nota">
   <div class="modal" style="max-width:460px">
     <div class="modal-header">
       <h2 id="rn-titulo">Rechazar</h2>
-      <button class="modal-close" onclick="cerrarRechazarNota()">âœ•</button>
+      <button class="modal-close" onclick="cerrarRechazarNota()">✕</button>
     </div>
     <div class="form-group">
       <label id="rn-label">Motivo del rechazo:</label>
-      <textarea id="rn-nota" rows="3" placeholder="Escribe el motivo (opcional)â€¦" style="resize:vertical"></textarea>
+      <textarea id="rn-nota" rows="3" placeholder="Escribe el motivo (opcional)…" style="resize:vertical"></textarea>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="cerrarRechazarNota()">Cancelar</button>
-      <button class="btn-confirm" style="background:var(--danger);border-color:var(--danger)" onclick="confirmarRechazarNota()">âœ• Confirmar rechazo</button>
+      <button class="btn-confirm" style="background:var(--danger);border-color:var(--danger)" onclick="confirmarRechazarNota()">✕ Confirmar rechazo</button>
     </div>
   </div>
 </div>
 
-<!-- â•â• MODAL EDITAR PEDIDO (estado abierto) â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL EDITAR PEDIDO (estado abierto) ════════════ -->
 <div class="modal-overlay" id="modal-editar-pedido">
   <div class="modal">
     <div class="modal-header">
-      <h2>âœ Editar solicitud</h2>
-      <button class="modal-close" onclick="cerrarEditarPedido()">âœ•</button>
+      <h2>✏ Editar solicitud</h2>
+      <button class="modal-close" onclick="cerrarEditarPedido()">✕</button>
     </div>
     <input type="hidden" id="edp-id">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -1911,8 +1911,8 @@
       </div>
     </div>
     <div class="form-group">
-      <label>DescripciÃ³n <span style="color:var(--text-muted);font-size:0.8rem">(opcional)</span></label>
-      <textarea id="edp-descripcion" rows="3" style="resize:vertical" placeholder="Detalles adicionales de la solicitudâ€¦"></textarea>
+      <label>Descripción <span style="color:var(--text-muted);font-size:0.8rem">(opcional)</span></label>
+      <textarea id="edp-descripcion" rows="3" style="resize:vertical" placeholder="Detalles adicionales de la solicitud…"></textarea>
     </div>
     <div class="form-group">
       <label>Precio ofrecido (MXN) <span style="color:var(--text-muted);font-size:0.8rem">(opcional)</span></label>
@@ -1920,23 +1920,23 @@
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="cerrarEditarPedido()">Cancelar</button>
-      <button class="btn-confirm" onclick="confirmarEditarPedido()">ðŸ’¾ Guardar cambios</button>
+      <button class="btn-confirm" onclick="confirmarEditarPedido()">💾 Guardar cambios</button>
     </div>
   </div>
 </div>
 
-<!-- â•â• MODAL MI PERFIL â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL MI PERFIL ══════════════════════════════════ -->
 <div class="modal-overlay" id="modal-mi-perfil">
   <div class="modal" style="max-width:400px">
     <div class="modal-header">
       <h2>Mi perfil</h2>
-      <button class="modal-close" onclick="cerrarMiPerfil()">âœ•</button>
+      <button class="modal-close" onclick="cerrarMiPerfil()">✕</button>
     </div>
     <div id="mi-perfil-body"></div>
   </div>
 </div>
 
-<!-- â•â• MODAL CONFIRM GENÃ‰RICO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ MODAL CONFIRM GENÉRICO ═══════════════════════════ -->
 <div class="modal-overlay" id="modal-confirm">
   <div class="modal" style="max-width:400px">
     <p id="sc-msg" style="font-size:0.95rem;color:var(--text);line-height:1.5;margin-bottom:4px"></p>
@@ -1947,7 +1947,7 @@
   </div>
 </div>
 
-<!-- â•â• SCRIPTS (orden importante) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ SCRIPTS (orden importante) ══════════════════════ -->
 <script src="js/utils.js?v=2"></script>
 <script src="js/notificaciones.js?v=14"></script>
 <script src="js/detalle.js?v=12"></script>
@@ -1970,18 +1970,18 @@
 <script src="js/tracking.js?v=11"></script>
 <script src="js/main.js?v=14"></script>
 
-<!-- â•â• PANEL DE CHAT â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ PANEL DE CHAT ════════════════════════════════════ -->
 <div id="chat-panel" class="chat-panel">
   <div class="chat-header">
     <span id="chat-titulo" class="chat-titulo">Chat</span>
-    <button class="chat-close-btn" onclick="closeChat()">âœ•</button>
+    <button class="chat-close-btn" onclick="closeChat()">✕</button>
   </div>
   <div id="chat-msgs" class="chat-msgs"></div>
   <div class="chat-footer">
     <input type="text" id="chat-input" class="chat-input-field"
-           placeholder="Escribe un mensajeâ€¦"
+           placeholder="Escribe un mensaje…"
            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMensaje()}">
-    <button class="chat-send-btn" onclick="enviarMensaje()">âž¤</button>
+    <button class="chat-send-btn" onclick="enviarMensaje()">➤</button>
   </div>
 </div>
 
