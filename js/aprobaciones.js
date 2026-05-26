@@ -151,86 +151,99 @@ async function renderAprobaciones() {
     }).join('');
   }
 
-  // ── SOLICITUDES POR REVISAR ──────────────────────────
+  // ── SOLICITUDES POR REVISAR (agrupadas por cliente) ──
   const batchSol = (solicitudes||[]).length > 1
     ? `<button class="btn-apr-batch" onclick="aprobarTodasSolicitudes()">✓ Aprobar todas</button>` : '';
   html += `<div class="apr-bloque-title" style="margin-top:28px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">📋 Solicitudes por revisar <span class="apr-count">${(solicitudes||[]).length}</span>${batchSol}</div>`;
   if (!solicitudes?.length) {
     html += `<div class="apr-empty">Sin solicitudes pendientes de revisión</div>`;
   } else {
-    html += (solicitudes || []).map(p => {
-      const chips = _buildChipsSol(p);
+    const solPorCliente = {};
+    (solicitudes || []).forEach(p => {
+      const key = p.cliente_id || p.cliente_email;
+      if (!solPorCliente[key]) solPorCliente[key] = { nombre: p.cliente_nombre, email: p.cliente_email, items: [] };
+      solPorCliente[key].items.push(p);
+    });
+    html += Object.entries(solPorCliente).map(([key, grupo]) => {
+      const n = grupo.items.length;
       const header = `
         <div style="flex:1;min-width:0">
-          <div class="apr-empresa-name">👤 ${esc(p.cliente_nombre)}</div>
+          <div class="apr-empresa-name">👤 ${esc(grupo.nombre)}</div>
           <div class="apr-empresa-counts">
-            <span class="apr-ec">${TIPO_EMOJI[p.tipo_camion] || '🚛'} ${esc(p.tipo_camion)}</span>
-            ${p.fecha_ini ? `<span class="apr-ec">📅 ${fmtFecha(p.fecha_ini)}</span>` : ''}
-            ${p.precio_cliente ? `<span class="apr-ec">💰 $${Number(p.precio_cliente).toLocaleString('es-MX')}</span>` : ''}
+            <span class="apr-ec">📋 ${n} solicitud${n > 1 ? 'es' : ''}</span>
             <span class="apr-ec-total">En revisión</span>
           </div>
         </div>`;
-      const body = `
-        <div class="apr-card" id="aprsol-${p.id}" style="margin:8px 0 0;border:none;box-shadow:none">
-          ${p.origen || p.destino ? `<div class="apr-ruta">📍 ${esc(p.origen||'—')}${p.destino ? ' → '+esc(p.destino) : ''}</div>` : ''}
-          ${chips}
-          ${p.descripcion ? `<div class="apr-desc">"${esc(p.descripcion)}"</div>` : ''}
-          ${p.precio_cliente ? `<div class="apr-precio">Presupuesto: <strong>$${Number(p.precio_cliente).toLocaleString('es-MX')} MXN</strong></div>` : ''}
-          <div class="apr-sub" style="margin:6px 0 8px">${esc(p.cliente_email)}</div>
-          <div class="apr-actions">
-            <button class="btn-apr-aprobar" onclick="aprobarSolicitud('${p.id}')">✓ Aprobar y publicar</button>
-            <button class="btn-apr-rechazar" onclick="rechazarSolicitud('${p.id}')">✕ Rechazar</button>
-          </div>
-        </div>`;
-      return _colapseCard(`sol-${p.id}`, header, body);
+      const body = grupo.items.map(p => {
+        const chips = _buildChipsSol(p);
+        return `
+          <div class="apr-card" id="aprsol-${p.id}" style="margin:8px 0;border-radius:8px">
+            <div class="apr-empresa-subtitulo">${TIPO_EMOJI[p.tipo_camion] || '🚛'} ${esc(p.tipo_camion)}${p.fecha_ini ? ` · 📅 ${fmtFecha(p.fecha_ini)}` : ''}${p.precio_cliente ? ` · 💰 $${Number(p.precio_cliente).toLocaleString('es-MX')}` : ''}</div>
+            ${p.origen || p.destino ? `<div class="apr-ruta">📍 ${esc(p.origen||'—')}${p.destino ? ' → '+esc(p.destino) : ''}</div>` : ''}
+            ${chips}
+            ${p.descripcion ? `<div class="apr-desc">"${esc(p.descripcion)}"</div>` : ''}
+            <div class="apr-actions">
+              <button class="btn-apr-aprobar" onclick="aprobarSolicitud('${p.id}')">✓ Aprobar y publicar</button>
+              <button class="btn-apr-rechazar" onclick="rechazarSolicitud('${p.id}')">✕ Rechazar</button>
+            </div>
+          </div>`;
+      }).join('');
+      return _colapseCard(`solg-${key}`, header, body);
     }).join('');
   }
 
-  // ── ACUERDOS POR APROBAR ─────────────────────────────
+  // ── ACUERDOS POR APROBAR (agrupados por cliente) ─────
   const batchAcu = (acuerdos||[]).length > 1
     ? `<button class="btn-apr-batch" onclick="aprobarTodosAcuerdos()">✓ Aprobar todos</button>` : '';
   html += `<div class="apr-bloque-title" style="margin-top:28px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">🤝 Acuerdos por aprobar <span class="apr-count">${(acuerdos||[]).length}</span>${batchAcu}</div>`;
   if (!acuerdos?.length) {
     html += `<div class="apr-empty">Sin acuerdos pendientes de aprobación</div>`;
   } else {
-    html += (acuerdos || []).map(p => {
-      const oferta = p.oferta_pendiente_id ? ofertasMap[p.oferta_pendiente_id] : null;
-      const chips  = _buildChipsSol(p);
+    const acuPorCliente = {};
+    (acuerdos || []).forEach(p => {
+      const key = p.cliente_id || p.cliente_email;
+      if (!acuPorCliente[key]) acuPorCliente[key] = { nombre: p.cliente_nombre, email: p.cliente_email, items: [] };
+      acuPorCliente[key].items.push(p);
+    });
+    html += Object.entries(acuPorCliente).map(([key, grupo]) => {
+      const n = grupo.items.length;
       const header = `
         <div style="flex:1;min-width:0">
-          <div class="apr-empresa-name">👤 ${esc(p.cliente_nombre)}</div>
+          <div class="apr-empresa-name">👤 ${esc(grupo.nombre)}</div>
           <div class="apr-empresa-counts">
-            <span class="apr-ec">${TIPO_EMOJI[p.tipo_camion] || '🚛'} ${esc(p.tipo_camion)}</span>
-            ${oferta ? `<span class="apr-ec">🏢 ${esc(oferta.admin_nombre||'—')}</span>` : ''}
-            ${oferta ? `<span class="apr-ec">💰 $${Number(oferta.precio_oferta).toLocaleString('es-MX')}</span>` : ''}
-            ${p.fecha_ini ? `<span class="apr-ec">📅 ${fmtFecha(p.fecha_ini)}</span>` : ''}
-            <span class="apr-ec-total">Acuerdo en revisión</span>
+            <span class="apr-ec">🤝 ${n} acuerdo${n > 1 ? 's' : ''}</span>
+            <span class="apr-ec-total">En revisión</span>
           </div>
         </div>`;
-      const body = `
-        <div class="apr-card" id="apracu-${p.id}" style="margin:8px 0 0;border:none;box-shadow:none">
-          ${p.origen || p.destino ? `<div class="apr-ruta">📍 ${esc(p.origen||'—')}${p.destino ? ' → '+esc(p.destino) : ''}</div>` : ''}
-          ${chips}
-          ${p.descripcion ? `<div class="apr-desc">"${esc(p.descripcion)}"</div>` : ''}
-          ${oferta ? `
-            <div class="apr-oferta-box">
-              <div class="apr-oferta-title">Oferta del proveedor</div>
-              <div class="apr-oferta-row"><span>Empresa:</span><strong>${esc(oferta.admin_nombre||'—')}</strong></div>
-              ${oferta.camion_id ? `<div class="apr-oferta-row"><span>Unidad:</span><strong>${esc(oferta.camion_id)}</strong></div>` : ''}
-              ${oferta.operador_nombre ? `<div class="apr-oferta-row"><span>Chofer:</span><strong>${esc(oferta.operador_nombre)}</strong></div>` : ''}
-              <div class="apr-oferta-row"><span>Precio acordado:</span><strong class="apr-precio-acuerdo">$${Number(oferta.precio_oferta).toLocaleString('es-MX')} MXN</strong></div>
-              ${oferta.mensaje ? `<div class="apr-oferta-row"><span>Nota proveedor:</span>"${esc(oferta.mensaje)}"</div>` : ''}
-              ${p.detalles_lugar ? `<div class="apr-oferta-row"><span>Dirección:</span>${esc(p.detalles_lugar)}</div>` : ''}
-              ${p.detalles_hora  ? `<div class="apr-oferta-row"><span>Hora:</span>${esc(p.detalles_hora)}</div>` : ''}
-              ${p.detalles_contacto_nombre ? `<div class="apr-oferta-row"><span>Contacto:</span>${esc(p.detalles_contacto_nombre)} ${esc(p.detalles_contacto_tel||'')}</div>` : ''}
-              ${p.precio_cliente ? `<div class="apr-oferta-row"><span>Presupuesto original:</span>$${Number(p.precio_cliente).toLocaleString('es-MX')} MXN</div>` : ''}
-            </div>` : '<div class="apr-empty" style="margin:8px 0">⚠️ No se encontró la oferta asociada</div>'}
-          <div class="apr-actions">
-            <button class="btn-apr-aprobar" onclick="aprobarAcuerdo('${p.id}')">✓ Aprobar acuerdo</button>
-            <button class="btn-apr-rechazar" onclick="rechazarAcuerdo('${p.id}')">✕ Rechazar</button>
-          </div>
-        </div>`;
-      return _colapseCard(`acu-${p.id}`, header, body);
+      const body = grupo.items.map(p => {
+        const oferta = p.oferta_pendiente_id ? ofertasMap[p.oferta_pendiente_id] : null;
+        const chips  = _buildChipsSol(p);
+        return `
+          <div class="apr-card" id="apracu-${p.id}" style="margin:8px 0;border-radius:8px">
+            <div class="apr-empresa-subtitulo">${TIPO_EMOJI[p.tipo_camion] || '🚛'} ${esc(p.tipo_camion)}${oferta ? ` · 🏢 ${esc(oferta.admin_nombre||'—')}` : ''}${p.fecha_ini ? ` · 📅 ${fmtFecha(p.fecha_ini)}` : ''}${oferta ? ` · 💰 $${Number(oferta.precio_oferta).toLocaleString('es-MX')}` : ''}</div>
+            ${p.origen || p.destino ? `<div class="apr-ruta">📍 ${esc(p.origen||'—')}${p.destino ? ' → '+esc(p.destino) : ''}</div>` : ''}
+            ${chips}
+            ${p.descripcion ? `<div class="apr-desc">"${esc(p.descripcion)}"</div>` : ''}
+            ${oferta ? `
+              <div class="apr-oferta-box">
+                <div class="apr-oferta-title">Oferta del proveedor</div>
+                <div class="apr-oferta-row"><span>Empresa:</span><strong>${esc(oferta.admin_nombre||'—')}</strong></div>
+                ${oferta.camion_id ? `<div class="apr-oferta-row"><span>Unidad:</span><strong>${esc(oferta.camion_id)}</strong></div>` : ''}
+                ${oferta.operador_nombre ? `<div class="apr-oferta-row"><span>Chofer:</span><strong>${esc(oferta.operador_nombre)}</strong></div>` : ''}
+                <div class="apr-oferta-row"><span>Precio acordado:</span><strong class="apr-precio-acuerdo">$${Number(oferta.precio_oferta).toLocaleString('es-MX')} MXN</strong></div>
+                ${oferta.mensaje ? `<div class="apr-oferta-row"><span>Nota proveedor:</span>"${esc(oferta.mensaje)}"</div>` : ''}
+                ${p.detalles_lugar ? `<div class="apr-oferta-row"><span>Dirección:</span>${esc(p.detalles_lugar)}</div>` : ''}
+                ${p.detalles_hora  ? `<div class="apr-oferta-row"><span>Hora:</span>${esc(p.detalles_hora)}</div>` : ''}
+                ${p.detalles_contacto_nombre ? `<div class="apr-oferta-row"><span>Contacto:</span>${esc(p.detalles_contacto_nombre)} ${esc(p.detalles_contacto_tel||'')}</div>` : ''}
+                ${p.precio_cliente ? `<div class="apr-oferta-row"><span>Presupuesto original:</span>$${Number(p.precio_cliente).toLocaleString('es-MX')} MXN</div>` : ''}
+              </div>` : '<div class="apr-empty" style="margin:8px 0">⚠️ No se encontró la oferta asociada</div>'}
+            <div class="apr-actions">
+              <button class="btn-apr-aprobar" onclick="aprobarAcuerdo('${p.id}')">✓ Aprobar acuerdo</button>
+              <button class="btn-apr-rechazar" onclick="rechazarAcuerdo('${p.id}')">✕ Rechazar</button>
+            </div>
+          </div>`;
+      }).join('');
+      return _colapseCard(`acug-${key}`, header, body);
     }).join('');
   }
 
