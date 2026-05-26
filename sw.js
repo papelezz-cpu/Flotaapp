@@ -1,5 +1,5 @@
-// ── SERVICE WORKER — PortGo ────────────────────────────
-const CACHE      = 'portgo-v56';
+﻿// â”€â”€ SERVICE WORKER â€” PortGo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const CACHE      = 'portgo-v57';
 const DATA_CACHE = 'portgo-data-v1';
 
 const SHELL = [
@@ -60,10 +60,10 @@ self.addEventListener('fetch', e => {
   const isSupabaseEdge = url.hostname.endsWith('supabase.co') &&
                          url.pathname.startsWith('/functions/');
 
-  // ── Supabase Edge Functions: always network, never cache ──
+  // â”€â”€ Supabase Edge Functions: always network, never cache â”€â”€
   if (isSupabaseEdge) return;
 
-  // ── Supabase REST (data): stale-while-revalidate ──────────
+  // â”€â”€ Supabase REST (data): stale-while-revalidate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (isSupabaseRest) {
     e.respondWith(
       caches.open(DATA_CACHE).then(async cache => {
@@ -91,10 +91,10 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // ── Other Supabase calls (realtime, auth): always network ──
+  // â”€â”€ Other Supabase calls (realtime, auth): always network â”€â”€
   if (!isSameOrigin) return;
 
-  // ── App JS/CSS/HTML: network-first, fallback to cache ─────
+  // â”€â”€ App JS/CSS/HTML: network-first, fallback to cache â”€â”€â”€â”€â”€
   const isAsset = /\.(js|css|html)$/.test(url.pathname) || url.pathname === '/';
   if (isAsset) {
     e.respondWith(
@@ -108,7 +108,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // ── Images and other static assets: cache-first ───────────
+  // â”€â”€ Images and other static assets: cache-first â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   e.respondWith(
     caches.match(e.request).then(cached =>
       cached || fetch(e.request).then(res => {

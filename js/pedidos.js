@@ -98,7 +98,7 @@ async function _cargarAdminCamionTipos() {
   if (_adminCamionTipos !== null) return;
   if (currentUser.rol === 'superadmin') { _adminCamionTipos = new Set(['*']); return; }
   const { data } = await sb.from('camiones')
-    .select('tipo').eq('propietario_id', currentUser.id).eq('aprobacion', 'aprobada');
+    .select('tipo').eq('propietario_id', currentUser.id).in('aprobacion', ['aprobada', 'pendiente']);
   _adminCamionTipos = new Set((data || []).map(c => c.tipo));
 }
 
