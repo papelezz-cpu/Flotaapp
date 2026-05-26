@@ -230,6 +230,11 @@ async function renderPedidos(append = false) {
       )
     ));
 
+    const misAcuerdos = _filtrar((pedidos || []).filter(p =>
+      p.estado === 'acordado' &&
+      (ofertasMap[p.id] || []).some(o => o.admin_id === currentUser.id && o.estado === 'aceptada')
+    ));
+
     const disponibles = _filtrar((pedidos || []).filter(p =>
       p.estado === 'abierto' && !misOfertaIds.has(p.id)
     ));
@@ -241,11 +246,18 @@ async function renderPedidos(append = false) {
         return pedidoCardHTML(p, ofertasMap[p.id] || [], 'admin_propio', mia);
       }).join('');
     }
+    if (misAcuerdos.length) {
+      html += `<div class="ped-seccion-title">Acuerdos activos</div>`;
+      html += misAcuerdos.map(p => {
+        const mia = (ofertasMap[p.id] || []).find(o => o.admin_id === currentUser.id && o.estado === 'aceptada');
+        return pedidoCardHTML(p, ofertasMap[p.id] || [], 'admin_propio', mia);
+      }).join('');
+    }
     if (disponibles.length) {
-      html += `<div class="ped-seccion-title">${misNegociaciones.length ? 'Otras solicitudes disponibles' : 'Solicitudes disponibles'}</div>`;
+      html += `<div class="ped-seccion-title">${misNegociaciones.length || misAcuerdos.length ? 'Otras solicitudes disponibles' : 'Solicitudes disponibles'}</div>`;
       html += disponibles.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'admin')).join('');
     }
-    if (!misNegociaciones.length && !disponibles.length) {
+    if (!misNegociaciones.length && !misAcuerdos.length && !disponibles.length) {
       html = `<div class="empty-state"><div class="icon">📋</div>No hay solicitudes abiertas en este momento.</div>`;
     }
 
