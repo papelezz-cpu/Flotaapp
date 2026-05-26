@@ -26,6 +26,82 @@ const CAP_REGLAMENTADA = {
   'Lowboy': 40, 'Cama baja': 35,
 };
 
+// Info de capacidades por tipo — mostrada al cliente al solicitar servicio
+const _INFO_CAP = {
+  'Camioneta 1.5 ton caja seca':     { cap:1.5,  nota:'Caja cerrada. Distribución urbana, paquetería, alimentos.' },
+  'Camioneta 1.5 ton plataforma':    { cap:1.5,  nota:'Plataforma abierta. Materiales de construcción, muebles, lámina.' },
+  'Camioneta 3.5 ton caja seca':     { cap:3.5,  nota:'Caja cerrada. Mudanzas, mercancía general, electrónicos.' },
+  'Camioneta 3.5 ton plataforma':    { cap:3.5,  nota:'Plataforma abierta. Maquinaria ligera, andamios, tubería.' },
+  'Rabón':     { cap:8,  nota:'Caja de 6–7 m. Distribución regional, alimentos secos, electrónicos, textiles.' },
+  'Torton':    { cap:14, nota:'Caja de 9–10 m. Transporte regional de mercancía general, abarrotes, bebidas.' },
+  'Torton caja seca':    { cap:14, nota:'Caja cerrada. Mercancía que requiere protección climática: ropa, electrónicos, papel.' },
+  'Torton plataforma':   { cap:14, nota:'Plataforma abierta. Maquinaria, bobinas de acero, materiales de obra.' },
+  'Sencillo porta contenedor 40/20': {
+    cap: 24.5,
+    nota: 'Tractocamión sencillo (T3S2). PBV máximo: 48 ton. Límite por contenedor en navieras Manzanillo: ~26 ton.',
+    contenedores: [
+      { label:'Contenedor 20 ft', tara:2.3,  max:22,   desc:'Mercancía densa: metales, maquinaria, alimentos enlatados.' },
+      { label:'Contenedor 40 ft', tara:3.75, max:26.5, desc:'Mercancía voluminosa: electrónicos, muebles, textiles.' },
+    ],
+  },
+  'Sencillo plataforma': { cap:24.5, nota:'Plataforma de 3 ejes. Maquinaria pesada, bobinas de acero, estructuras metálicas, generadores.' },
+  'Full': {
+    cap: 49,
+    nota: 'Doble articulado (T3S2R4). PBV máximo: 75.5 ton. Requiere señalización "DOBLE SEMIRREMOLQUE".',
+    contenedores: [
+      { label:'Semirremolque 1', tara:null, max:24.5, desc:'Cualquier tipo de carga hasta 24.5 ton.' },
+      { label:'Semirremolque 2', tara:null, max:24.5, desc:'Cualquier tipo de carga hasta 24.5 ton.' },
+    ],
+  },
+  'Full porta contenedor 40/20': {
+    cap: 49,
+    nota: 'Full con contenedor 40ft + 20ft. PBV máximo: 75.5 ton. Límite por contenedor en navieras Manzanillo: ~26 ton.',
+    contenedores: [
+      { label:'Contenedor 40 ft (tara 3.75 ton)', tara:3.75, max:26.5, desc:'Mercancía voluminosa: autos, muebles, textiles, electrónicos.' },
+      { label:'Contenedor 20 ft (tara 2.3 ton)',  tara:2.3,  max:22,   desc:'Mercancía densa: metales, químicos, alimentos enlatados.' },
+    ],
+  },
+  'Full plataforma': {
+    cap: 49,
+    nota: 'Full de doble plataforma. Carga sobredimensionada, maquinaria pesada, piezas extra-largas.',
+    contenedores: [
+      { label:'Plataforma 1', tara:null, max:24.5, desc:'Maquinaria, estructuras metálicas, bobinas de acero.' },
+      { label:'Plataforma 2', tara:null, max:24.5, desc:'Maquinaria, estructuras metálicas, bobinas de acero.' },
+    ],
+  },
+  'Plataforma':                      { cap:24.5, nota:'Plataforma de 3 ejes. Carga sobredimensionada, maquinaria agrícola, equipo de construcción.' },
+  'Plataforma de 3 ejes (sobrepeso)':{ cap:35,   nota:'Requiere permiso especial SCT. Maquinaria industrial, transformadores, vigas de concreto.' },
+  'Lowboy':  { cap:40, nota:'Cama baja alta. Excavadoras, grúas, maquinaria de construcción que supera 4 m de altura.' },
+  'Cama baja':{ cap:35, nota:'Cama baja estándar. Equipo de minería, transformadores, maquinaria industrial.' },
+  'HAZMAT':  { cap:24.5, nota:'Requiere permiso HAZMAT vigente. Materiales peligrosos: inflamables, corrosivos, explosivos (clases 1–9 ONU).' },
+};
+
+// Categoría simplificada para verificar si admin tiene el tipo solicitado
+function _categoriaTipo(tipo) {
+  if (!tipo || tipo === 'Cualquiera') return null;
+  if (tipo.startsWith('Full'))              return 'full';
+  if (tipo.startsWith('Torton'))            return 'torton';
+  if (tipo.startsWith('Sencillo'))          return 'sencillo';
+  if (tipo.startsWith('Camioneta 1.5'))     return 'cam15';
+  if (tipo.startsWith('Camioneta 3.5'))     return 'cam35';
+  if (tipo === 'Rabón')                     return 'rabon';
+  if (tipo.startsWith('Plataforma'))        return 'plataforma';
+  if (tipo === 'Lowboy' || tipo === 'Cama baja') return 'lowboy';
+  if (tipo === 'HAZMAT')                    return 'hazmat';
+  return tipo;
+}
+
+// Cache de tipos de camión del admin logueado (null = no cargado aún)
+let _adminCamionTipos = null;
+
+async function _cargarAdminCamionTipos() {
+  if (_adminCamionTipos !== null) return;
+  if (currentUser.rol === 'superadmin') { _adminCamionTipos = new Set(['*']); return; }
+  const { data } = await sb.from('camiones')
+    .select('tipo').eq('propietario_id', currentUser.id).eq('aprobacion', 'aprobada');
+  _adminCamionTipos = new Set((data || []).map(c => c.tipo));
+}
+
 const TIPO_EMOJI = {
   Torton:'🚛', 'Torton caja seca':'🚛', 'Torton plataforma':'🚛',
   Rabón:'🚚',
@@ -215,6 +291,9 @@ async function renderPedidos(append = false) {
 
   // ── ADMIN / SUPERADMIN ─────────────────────────────
   } else if (currentUser.id && ['admin','superadmin'].includes(currentUser.rol)) {
+    // Cargar tipos de camión del admin (una sola vez) para restricción de oferta
+    if (_adminCamionTipos === null) await _cargarAdminCamionTipos();
+
     const misOfertaIds = new Set(
       todasOfertas.filter(o => o.admin_id === currentUser.id).map(o => o.pedido_id)
     );
@@ -344,7 +423,18 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
       <button class="btn-ofertar" onclick="abrirReenviarPedido('${p.id}')">🔄 Corregir y reenviar</button>`;
 
   } else if (vista === 'admin') {
-    acciones = `<button class="btn-ofertar" onclick="openHacerOferta('${p.id}')">Hacer oferta</button>`;
+    const tipoPed = p.tipo_camion || '';
+    const esCamionPed = !tipoPed.startsWith('Custodio') && tipoPed !== 'Supervisión remota'
+                     && !tipoPed.startsWith('Patio') && tipoPed !== 'Bodega'
+                     && !tipoPed.startsWith('Lavado') && tipoPed !== 'Desinfección';
+    let puedeOfertar = true;
+    if (esCamionPed && _adminCamionTipos && !_adminCamionTipos.has('*') && _adminCamionTipos.size > 0) {
+      const catPed = _categoriaTipo(tipoPed);
+      puedeOfertar = !catPed || [..._adminCamionTipos].some(t => _categoriaTipo(t) === catPed);
+    }
+    acciones = puedeOfertar
+      ? `<button class="btn-ofertar" onclick="openHacerOferta('${p.id}')">Hacer oferta</button>`
+      : `<div class="ped-sin-tipo">⚠ No cuentas con unidades de tipo <strong>${esc(tipoPed)}</strong></div>`;
 
   } else if (vista === 'admin_propio' && miOferta) {
     const st = miOferta.estado;
@@ -464,6 +554,34 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
 
 // ── CREAR PEDIDO ───────────────────────────────────────
 
+function _renderInfoCapacidad(tipo) {
+  const el = document.getElementById('np-info-cap');
+  if (!el) return;
+  const info = _INFO_CAP[tipo];
+  if (!info) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+  let cont = '';
+  if (info.contenedores) {
+    cont = `<div class="np-cap-cont">` + info.contenedores.map(c => `
+      <div class="np-cap-cont-item">
+        <div class="np-cap-cont-label">${esc(c.label)}</div>
+        <div class="np-cap-cont-max">Carga útil máx: <strong>${c.max} ton</strong>${c.tara ? ` <span class="np-cap-tara">(contenedor vacío: ${c.tara} ton)</span>` : ''}</div>
+        <div class="np-cap-cont-desc">${esc(c.desc)}</div>
+      </div>`).join('') + `</div>`;
+  }
+
+  el.innerHTML = `
+    <div class="np-cap-info">
+      <div class="np-cap-header">
+        <span class="np-cap-icon">ℹ️</span>
+        <span class="np-cap-title">Capacidad útil máxima: <strong>${info.cap} ton</strong></span>
+      </div>
+      ${cont}
+      <div class="np-cap-nota">${esc(info.nota)}</div>
+    </div>`;
+  el.style.display = '';
+}
+
 function actualizarSubtipoPedido() {
   const val = document.getElementById('np-tipo')?.value || '';
   const esLavado   = val.startsWith('Lavado') || val === 'Desinfección';
@@ -476,6 +594,9 @@ function actualizarSubtipoPedido() {
   if (g('np-group-custodio')) g('np-group-custodio').style.display = esCustodio ? '' : 'none';
   if (g('np-group-patio'))    g('np-group-patio').style.display    = esPatio    ? '' : 'none';
   if (g('np-group-lavado'))   g('np-group-lavado').style.display   = esLavado   ? '' : 'none';
+
+  if (esCamion) _renderInfoCapacidad(val);
+  else { const e = g('np-info-cap'); if (e) { e.style.display='none'; e.innerHTML=''; } }
 }
 
 const NP_OPCIONES = {
@@ -987,6 +1108,10 @@ async function openHacerOferta(pedidoId) {
   let recursos = [];
   let sinRecursosMsg = '';
 
+  // Ocultar selector de operador (solo visible para camiones)
+  const opRow = document.getElementById('ho-op-row');
+  if (opRow) opRow.style.display = 'none';
+
   if (esCustodio) {
     if (label) label.textContent = 'Custodio que asignas *';
     let q = sb.from('custodios').select('*').eq('estado', 'disponible');
@@ -1025,8 +1150,8 @@ async function openHacerOferta(pedidoId) {
 
   } else {
     // Camión — query directo igual que custodios/patios
-    if (label) label.textContent = 'Camión que asignas';
-    let q = sb.from('camiones').select('*').eq('estado', 'disponible');
+    if (label) label.textContent = 'Camión que asignas *';
+    let q = sb.from('camiones').select('*').eq('estado', 'disponible').eq('aprobacion', 'aprobada');
     if (currentUser.rol !== 'superadmin') q = q.eq('propietario_id', currentUser.id);
     const { data: camionesData } = await q;
     recursos = camionesData || [];
@@ -1038,10 +1163,36 @@ async function openHacerOferta(pedidoId) {
       : `<option value="">Sin camiones disponibles</option>`;
     recursos.forEach(c => {
       const opt = document.createElement('option');
-      opt.value       = c.id;
+      opt.value             = c.id;
+      opt.dataset.operador  = c.operador || '';
       opt.textContent = `${CAMION_EMOJI[c.tipo] || '🚛'} ${c.id} — ${c.tipo} (${c.capacidad} ton)`;
       select.appendChild(opt);
     });
+
+    // Cargar operadores del admin para el selector de chofer
+    const opRow = document.getElementById('ho-op-row');
+    const opSel = document.getElementById('ho-operador');
+    if (opRow && opSel) {
+      let opQ = sb.from('operadores').select('id, nombre, primer_apellido').eq('aprobacion', 'aprobada');
+      if (currentUser.rol !== 'superadmin') opQ = opQ.eq('propietario_id', currentUser.id);
+      const { data: operadoresData } = await opQ;
+      opSel.innerHTML = (operadoresData?.length)
+        ? `<option value="">— Selecciona un chofer —</option>`
+        : `<option value="">Sin operadores registrados</option>`;
+      (operadoresData || []).forEach(op => {
+        const opt = document.createElement('option');
+        opt.value = op.id;
+        opt.textContent = `${op.nombre} ${op.primer_apellido || ''}`.trim();
+        opSel.appendChild(opt);
+      });
+      opRow.style.display = '';
+      // Pre-seleccionar el operador asignado al camión elegido
+      select.addEventListener('change', () => {
+        const selOpt = select.options[select.selectedIndex];
+        const opId = selOpt?.dataset.operador || '';
+        if (opId) opSel.value = opId;
+      });
+    }
   }
 
   // Filtrar por disponibilidad real en las fechas del pedido
@@ -1094,21 +1245,33 @@ function closeHacerOferta() {
 }
 
 async function enviarOferta() {
-  const precio  = parseFloat(document.getElementById('ho-precio').value);
-  const camion  = document.getElementById('ho-camion').value || null;
-  const mensaje = document.getElementById('ho-mensaje').value.trim();
+  const precio   = parseFloat(document.getElementById('ho-precio').value);
+  const camion   = document.getElementById('ho-camion').value || null;
+  const mensaje  = document.getElementById('ho-mensaje').value.trim();
+  const opRow    = document.getElementById('ho-op-row');
+  const opSel    = document.getElementById('ho-operador');
+  const operador = opSel?.value || null;
+  const operadorNombre = opSel?.options[opSel.selectedIndex]?.textContent?.trim() || null;
+
   if (!precio || precio <= 0) { showToast('Ingresa un precio válido.', 'error'); return; }
+
+  // Validar chofer obligatorio cuando es un pedido de camión
+  if (opRow && opRow.style.display !== 'none' && !operador) {
+    showToast('Debes seleccionar un chofer para este servicio.', 'error'); return;
+  }
 
   const btnEnv = document.getElementById('btn-enviar-oferta');
   if (btnEnv) { btnEnv.disabled = true; btnEnv.textContent = 'Enviando…'; }
 
   const { error } = await sb.from('ofertas').insert({
-    pedido_id:     pedidoParaOfertar,
-    admin_id:      currentUser.id,
-    admin_nombre:  currentUser.nombre,
-    camion_id:     camion,
-    precio_oferta: precio,
-    mensaje:       mensaje || null,
+    pedido_id:      pedidoParaOfertar,
+    admin_id:       currentUser.id,
+    admin_nombre:   currentUser.nombre,
+    camion_id:      camion,
+    operador_id:    operador,
+    operador_nombre: operadorNombre,
+    precio_oferta:  precio,
+    mensaje:        mensaje || null,
   });
   if (btnEnv) { btnEnv.disabled = false; btnEnv.textContent = 'Enviar oferta'; }
   if (error) { showToast('Error al enviar: ' + (error.message || ''), 'error'); return; }

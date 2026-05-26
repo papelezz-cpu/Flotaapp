@@ -24,7 +24,7 @@
   <!-- Estilos -->
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
-  <link rel="stylesheet" href="css/components.css?v=6">
+  <link rel="stylesheet" href="css/components.css?v=7">
   <link rel="stylesheet" href="css/login.css?v=2">
   <link rel="stylesheet" href="css/detalle.css">
   <link rel="stylesheet" href="css/theme.css">
@@ -1038,6 +1038,8 @@
       <label>Tipo de servicio *</label>
       <select id="np-tipo" onchange="actualizarSubtipoPedido()"></select>
     </div>
+    <!-- Info de capacidad — aparece al seleccionar tipo camión -->
+    <div id="np-info-cap" style="display:none;margin-bottom:12px"></div>
 
     <!-- ══ CAMPOS CAMIÓN ═══════════════════════════════ -->
     <div id="np-group-camion">
@@ -1226,9 +1228,15 @@
     <p class="sub" id="ho-pedido-info">Propón tu precio y el recurso que asignarás.</p>
     <div id="ho-sin-recursos" style="display:none;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:12px 14px;font-size:0.83rem;color:#f87171;margin-bottom:4px"></div>
     <div class="form-group">
-      <label id="ho-recurso-label">Recurso que asignas</label>
+      <label id="ho-recurso-label">Recurso que asignas *</label>
       <select id="ho-camion">
         <option value="">Sin asignar aún</option>
+      </select>
+    </div>
+    <div class="form-group" id="ho-op-row" style="display:none">
+      <label>Chofer asignado *</label>
+      <select id="ho-operador">
+        <option value="">— Selecciona un chofer —</option>
       </select>
     </div>
     <div class="form-group">
@@ -1951,8 +1959,8 @@
 <script src="js/recursos.js?v=10"></script>
 <script src="js/reservaciones.js?v=17"></script>
 <script src="js/modal.js?v=10"></script>
-<script src="js/pedidos.js?v=25"></script>
-<script src="js/aprobaciones.js?v=19"></script>
+<script src="js/pedidos.js?v=26"></script>
+<script src="js/aprobaciones.js?v=20"></script>
 <script src="js/admin.js?v=19"></script>
 <script src="js/operadores.js?v=5"></script>
 <script src="js/usuarios.js?v=15"></script>

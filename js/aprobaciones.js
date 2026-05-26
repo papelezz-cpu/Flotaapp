@@ -57,6 +57,21 @@ async function renderAprobaciones() {
     }
   }
 
+  // ── AGRUPAR RECURSOS POR EMPRESA ────────────────────
+  const empresasMap = {};
+  const _addEmp = (propId, propNombre, tipo, item) => {
+    if (!propId) return;
+    if (!empresasMap[propId]) empresasMap[propId] = { nombre: propNombre || propId, camiones:[], operadores:[], custodios:[], patios:[], lavados:[] };
+    empresasMap[propId][tipo].push(item);
+  };
+  (camiones   || []).forEach(c => _addEmp(c.propietario_id, c.propietario?.nombre, 'camiones',   c));
+  (operadores || []).forEach(o => _addEmp(o.propietario_id, o.propietario?.nombre, 'operadores', o));
+  (custodios  || []).forEach(c => _addEmp(c.propietario_id, c.propietario?.nombre, 'custodios',  c));
+  (patios     || []).forEach(p => _addEmp(p.propietario_id, p.propietario?.nombre, 'patios',     p));
+  (lavados    || []).forEach(l => _addEmp(l.propietario_id, l.propietario?.nombre, 'lavados',    l));
+
+  const totalRecursos = (camiones?.length||0)+(operadores?.length||0)+(custodios?.length||0)+(patios?.length||0)+(lavados?.length||0);
+
   let html = '';
 
   // ── CUENTAS POR VERIFICAR ────────────────────────────
@@ -195,7 +210,44 @@ async function renderAprobaciones() {
     }).join('');
   }
 
-  // ── OPERADORES POR APROBAR ───────────────────────────
+  // ── RECURSOS POR EMPRESA ─────────────────────────────
+  html += `<div class="apr-bloque-title" style="margin-top:28px">📦 Recursos por aprobar <span class="apr-count">${totalRecursos}</span></div>`;
+  if (totalRecursos === 0) {
+    html += `<div class="apr-empty">Sin recursos pendientes de aprobación</div>`;
+  } else {
+    html += `<div class="apr-emp-filter"><input type="text" id="apr-emp-filter" placeholder="🔍 Filtrar por empresa…" oninput="filtrarEmpresasApr()"></div>`;
+    for (const [empId, emp] of Object.entries(empresasMap)) {
+      const total = emp.camiones.length + emp.operadores.length + emp.custodios.length + emp.patios.length + emp.lavados.length;
+      const counts = [
+        emp.camiones.length   ? `🚛 ${emp.camiones.length} unidad${emp.camiones.length>1?'es':''}` : '',
+        emp.operadores.length ? `👷 ${emp.operadores.length} operador${emp.operadores.length>1?'es':''}` : '',
+        emp.custodios.length  ? `👮 ${emp.custodios.length} custodio${emp.custodios.length>1?'s':''}` : '',
+        emp.patios.length     ? `🏭 ${emp.patios.length} patio${emp.patios.length>1?'s':''}` : '',
+        emp.lavados.length    ? `🚿 ${emp.lavados.length} lavado${emp.lavados.length>1?'s':''}` : '',
+      ].filter(Boolean);
+
+      html += `
+        <div class="apr-empresa-card" data-empresa="${esc(emp.nombre.toLowerCase())}">
+          <div class="apr-empresa-header" onclick="toggleEmpresaApr('${empId}')">
+            <div class="apr-empresa-name">🏢 ${esc(emp.nombre)}</div>
+            <div class="apr-empresa-counts">
+              ${counts.map(c => `<span class="apr-ec">${c}</span>`).join('')}
+              <span class="apr-ec-total">${total} pendiente${total>1?'s':''}</span>
+            </div>
+            <span class="apr-emp-toggle" id="apr-tog-${empId}">▼</span>
+          </div>
+          <div class="apr-empresa-items" id="apr-emp-${empId}" style="display:none">
+            ${_renderEmpresaItems(emp)}
+          </div>
+        </div>`;
+    }
+  }
+
+  // ── PLACEHOLDER: mantiene operadores en bloque empresa ─
+  html += `<!-- fin recursos por empresa -->`;
+
+  // ── OPERADORES POR APROBAR (legacy placeholder — eliminado) ───────────────────────────
+  html += ``; if (false) {
   html += `<div class="apr-bloque-title" style="margin-top:28px">👷 Operadores por aprobar <span class="apr-count">${(operadores || []).length}</span></div>`;
 
   if (!operadores?.length) {
@@ -448,8 +500,197 @@ async function renderAprobaciones() {
       </div>`;
     }).join('');
   }
+  } // fin if(false) — secciones legacy reemplazadas por empresa
 
   content.innerHTML = html;
+}
+
+function toggleEmpresaApr(empId) {
+  const el  = document.getElementById('apr-emp-' + empId);
+  const tog = document.getElementById('apr-tog-' + empId);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display  = open ? 'none' : '';
+  if (tog) tog.textContent = open ? '▼' : '▲';
+}
+
+function filtrarEmpresasApr() {
+  const q = (document.getElementById('apr-emp-filter')?.value || '').toLowerCase();
+  document.querySelectorAll('.apr-empresa-card').forEach(card => {
+    card.style.display = !q || (card.dataset.empresa || '').includes(q) ? '' : 'none';
+  });
+}
+
+function _renderEmpresaItems(emp) {
+  let html = '';
+  const secciones = [
+    { key:'camiones',   icon:'🚛', titulo:'Unidades',   render: c => _renderCamionCard(c) },
+    { key:'operadores', icon:'👷', titulo:'Operadores',  render: o => _renderOperadorCard(o) },
+    { key:'custodios',  icon:'👮', titulo:'Custodios',   render: c => _renderCustodioCard(c) },
+    { key:'patios',     icon:'🏭', titulo:'Patios',      render: p => _renderPatioCard(p) },
+    { key:'lavados',    icon:'🚿', titulo:'Lavados',     render: l => _renderLavadoCard(l) },
+  ];
+  for (const s of secciones) {
+    if (!emp[s.key]?.length) continue;
+    html += `<div class="apr-empresa-subtitulo">${s.icon} ${s.titulo} (${emp[s.key].length})</div>`;
+    html += emp[s.key].map(s.render).join('');
+  }
+  return html;
+}
+
+function _renderCamionCard(c) {
+  const campos = `
+    <div class="apr-op-detalle">
+      <div class="apr-op-section-title">Vehículo</div>
+      <div class="apr-op-grid">
+        <div class="apr-op-row"><span>Tipo</span><strong>${esc(c.tipo || '—')}</strong></div>
+        <div class="apr-op-row"><span>Marca</span><strong>${esc(c.marca || '—')}</strong></div>
+        <div class="apr-op-row"><span>Año</span><strong>${c.modelo_anio || '—'}</strong></div>
+        <div class="apr-op-row"><span>Color</span><strong>${esc(c.color || '—')}</strong></div>
+        <div class="apr-op-row"><span>Capacidad</span><strong>${c.capacidad ? c.capacidad + ' ton' : '—'}</strong></div>
+        <div class="apr-op-row"><span>Combustible</span><strong>${esc(c.tipo_combustible || '—')}</strong></div>
+      </div>
+      <div class="apr-op-section-title">Identificación</div>
+      <div class="apr-op-grid">
+        <div class="apr-op-row"><span>Placas</span><strong>${esc(c.placas || '—')}</strong></div>
+        <div class="apr-op-row"><span>Núm. serie (NIV)</span><strong>${esc(c.num_serie || '—')}</strong></div>
+        <div class="apr-op-row"><span>Núm. motor</span><strong>${esc(c.num_motor || '—')}</strong></div>
+        <div class="apr-op-row"><span>Núm. económico</span><strong>${esc(c.num_economico || '—')}</strong></div>
+      </div>
+      <div class="apr-op-section-title">Tarjeta de circulación</div>
+      <div class="apr-op-grid">
+        <div class="apr-op-row"><span>Número TC</span><strong>${esc(c.tarjeta_circulacion || '—')}</strong></div>
+        <div class="apr-op-row"><span>Fecha expedición</span><strong>${c.fecha_expedicion_tc ? fmtFecha(c.fecha_expedicion_tc) : '—'}</strong></div>
+      </div>
+      ${c.imagen_tc ? `<a href="#" onclick="verArchivoPublico('${esc(c.imagen_tc)}')" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:4px 0">🪪 Ver imagen TC</a>` : ''}
+      <div class="apr-op-section-title">CAAT</div>
+      <div class="apr-op-grid">
+        <div class="apr-op-row"><span>Número CAAT</span><strong>${esc(c.caat || '—')}</strong></div>
+        <div class="apr-op-row"><span>Vigencia</span><strong>${c.vigencia_caat ? fmtFecha(c.vigencia_caat) : '—'}</strong></div>
+      </div>
+      ${(c.archivos || []).length ? `<div style="margin-top:6px"><button class="btn-edit" onclick="verArchivos('${c.id}')">📎 Ver fotos/documentos</button></div>` : ''}
+    </div>`;
+  const diffHtml = _diffHtml(c, {
+    tipo:'Tipo', marca:'Marca', version:'Versión', modelo_anio:'Año',
+    color:'Color', capacidad:'Capacidad (ton)', dimensiones:'Dimensiones',
+    tipo_combustible:'Combustible', placas:'Placas', tipo_placa:'Tipo placa',
+    num_serie:'Núm. serie', num_motor:'Núm. motor', num_economico:'Núm. económico',
+    tarjeta_circulacion:'Núm. TC', fecha_expedicion_tc:'Fecha TC',
+    caat:'CAAT', vigencia_caat:'Vigencia CAAT', precio_dia:'Precio/día',
+  });
+  return `
+    <div class="apr-card" id="aprcam-${c.id}">
+      <div class="apr-card-header">
+        <div>
+          <div class="apr-tipo">${c.emoji || '🚛'} ${c.id} — ${esc(c.tipo)}</div>
+          <div class="apr-sub">${c.capacidad || '—'} ton</div>
+        </div>
+        ${c.es_edicion ? '<span class="apr-edicion-tag">✏️ Edición</span>' : '<span class="badge badge-revision">Pendiente</span>'}
+      </div>
+      ${diffHtml}${campos}
+      <div class="apr-actions">
+        <button class="btn-apr-aprobar"  onclick="aprobarCamion('${c.id}')">✓ Aprobar</button>
+        <button class="btn-apr-rechazar" onclick="rechazarCamion('${c.id}')">✕ Rechazar con comentarios</button>
+      </div>
+    </div>`;
+}
+
+function _renderOperadorCard(op) {
+  const nombre = [op.nombre, op.primer_apellido, op.segundo_apellido].filter(Boolean).join(' ');
+  const foto   = op.foto_operador
+    ? `<img src="${esc(op.foto_operador)}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--border)" alt="foto">`
+    : `<div style="width:48px;height:48px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700">${(op.nombre||'?')[0].toUpperCase()}</div>`;
+  const venceColor = op.fecha_vencimiento && new Date(op.fecha_vencimiento) < new Date() ? 'var(--danger)' : 'inherit';
+  const diffHtml = _diffHtml(op, {
+    nombre:'Nombre', primer_apellido:'Primer apellido',
+    curp:'CURP', nss:'NSS', num_licencia:'Núm. licencia', clase_licencia:'Clase licencia',
+    fecha_vencimiento:'Vencimiento', fecha_examen_medico:'Examen médico',
+  });
+  return `
+    <div class="apr-card" id="aprop-${op.id}">
+      <div class="apr-card-header">
+        <div style="display:flex;align-items:center;gap:12px">
+          ${foto}
+          <div>
+            <div class="apr-tipo">👷 ${esc(nombre)}</div>
+            <div class="apr-sub">${esc(op.id)} · Lic: ${esc(op.clase_licencia||'—')} · Vence: <span style="color:${venceColor}">${op.fecha_vencimiento ? fmtFecha(op.fecha_vencimiento) : '—'}</span></div>
+          </div>
+        </div>
+        ${op.es_edicion ? '<span class="apr-edicion-tag">✏️ Edición</span>' : '<span class="badge badge-revision">Pendiente</span>'}
+      </div>
+      ${diffHtml}
+      <div class="apr-op-detalle">
+        <div class="apr-op-grid">
+          <div class="apr-op-row"><span>CURP</span><strong>${esc(op.curp||'—')}</strong></div>
+          <div class="apr-op-row"><span>NSS</span><strong>${esc(op.nss||'—')}</strong></div>
+          <div class="apr-op-row"><span>Núm. licencia</span><strong>${esc(op.num_licencia||'—')}</strong></div>
+          <div class="apr-op-row"><span>Clase</span><strong>${esc(op.clase_licencia||'—')}</strong></div>
+          <div class="apr-op-row"><span>Examen médico</span><strong>${op.fecha_examen_medico ? fmtFecha(op.fecha_examen_medico) : '—'}</strong></div>
+        </div>
+        ${op.foto_licencia ? `<a href="${esc(op.foto_licencia)}" target="_blank" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">🪪 Ver foto de licencia</a>` : ''}
+      </div>
+      <div class="apr-actions">
+        <button class="btn-apr-aprobar"  onclick="aprobarOperador('${op.id}')">✓ Aprobar</button>
+        <button class="btn-apr-rechazar" onclick="rechazarOperador('${op.id}')">✕ Rechazar con comentarios</button>
+      </div>
+    </div>`;
+}
+
+function _renderCustodioCard(c) {
+  const diffHtml = _diffHtml(c, { nombre:'Nombre', tipo:'Tipo', descripcion:'Descripción', disponibilidad:'Disponibilidad', precio_dia:'Precio/día', certificaciones:'Certificaciones' });
+  return `
+    <div class="apr-card" id="aprec-${c.id}">
+      <div class="apr-card-header">
+        <div>
+          <div class="apr-tipo">👮 ${c.id} — ${esc(c.nombre)}</div>
+          <div class="apr-sub">${esc(c.tipo||'—')} · ${c.precio_dia ? '$'+Number(c.precio_dia).toLocaleString('es-MX')+'/día' : '—'}</div>
+        </div>
+        ${c.es_edicion ? '<span class="apr-edicion-tag">✏️ Edición</span>' : '<span class="badge badge-revision">Pendiente</span>'}
+      </div>
+      ${diffHtml}
+      <div class="apr-actions">
+        <button class="btn-apr-aprobar"  onclick="aprobarRecurso('custodios','${c.id}')">✓ Aprobar</button>
+        <button class="btn-apr-rechazar" onclick="rechazarRecursoCompleto('custodios','${c.id}')">✕ Rechazar</button>
+      </div>
+    </div>`;
+}
+
+function _renderPatioCard(p) {
+  const diffHtml = _diffHtml(p, { nombre:'Nombre', tipo:'Tipo', ubicacion:'Ubicación', area_m2:'Área (m²)', capacidad_vehiculos:'Capacidad (veh.)', precio_dia:'Precio/día', servicios:'Servicios' });
+  return `
+    <div class="apr-card" id="aprec-${p.id}">
+      <div class="apr-card-header">
+        <div>
+          <div class="apr-tipo">🏭 ${p.id} — ${esc(p.nombre)}</div>
+          <div class="apr-sub">${esc(p.tipo||'—')} · ${esc(p.ubicacion||'—')}</div>
+        </div>
+        ${p.es_edicion ? '<span class="apr-edicion-tag">✏️ Edición</span>' : '<span class="badge badge-revision">Pendiente</span>'}
+      </div>
+      ${diffHtml}
+      <div class="apr-actions">
+        <button class="btn-apr-aprobar"  onclick="aprobarRecurso('patios','${p.id}')">✓ Aprobar</button>
+        <button class="btn-apr-rechazar" onclick="rechazarRecursoCompleto('patios','${p.id}')">✕ Rechazar</button>
+      </div>
+    </div>`;
+}
+
+function _renderLavadoCard(l) {
+  const diffHtml = _diffHtml(l, { nombre:'Nombre', ubicacion:'Ubicación', capacidad:'Cap. simultánea', horario:'Horario', precio_lavado:'Precio', tipos_vehiculo:'Tipos vehículo', tipos_lavado:'Tipos lavado' });
+  return `
+    <div class="apr-card" id="aprec-${l.id}">
+      <div class="apr-card-header">
+        <div>
+          <div class="apr-tipo">🚿 ${l.id} — ${esc(l.nombre)}</div>
+          <div class="apr-sub">${esc(l.ubicacion||'—')}</div>
+        </div>
+        ${l.es_edicion ? '<span class="apr-edicion-tag">✏️ Edición</span>' : '<span class="badge badge-revision">Pendiente</span>'}
+      </div>
+      ${diffHtml}
+      <div class="apr-actions">
+        <button class="btn-apr-aprobar"  onclick="aprobarRecurso('lavados','${l.id}')">✓ Aprobar</button>
+        <button class="btn-apr-rechazar" onclick="rechazarRecursoCompleto('lavados','${l.id}')">✕ Rechazar</button>
+      </div>
+    </div>`;
 }
 
 function verArchivoPublico(path) {
