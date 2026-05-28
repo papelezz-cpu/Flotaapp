@@ -696,6 +696,16 @@
           <label>Vencimiento del permiso operativo</label>
           <input type="date" id="ap-vence-permiso">
         </div>
+        <div class="form-group">
+          <label>Permiso operativo — documento</label>
+          <label class="file-upload-area" for="ap-doc-permiso">
+            <span class="file-upload-icon">📄</span>
+            <span class="file-upload-text">PDF o imagen</span>
+          </label>
+          <input type="file" id="ap-doc-permiso" accept="image/*,.pdf" style="display:none"
+                 onchange="previewDocNombre(this,'ap-doc-permiso-preview')">
+          <div id="ap-doc-permiso-preview"></div>
+        </div>
         <div class="form-group sa-empresa-row" style="display:none">
           <label>Empresa propietaria</label>
           <select id="sa-empresa-patio"><option value="">— Selecciona empresa —</option></select>
@@ -1373,6 +1383,7 @@
     <h2>💼 Hacer oferta</h2>
     <p class="sub" id="ho-pedido-info">Propón tu precio y el recurso que asignarás.</p>
     <div id="ho-sin-recursos" style="display:none;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:12px 14px;font-size:0.83rem;color:#f87171;margin-bottom:4px"></div>
+    <div id="ho-recurso-warn" style="display:none;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.4);border-radius:10px;padding:10px 14px;font-size:0.82rem;color:#d97706;margin-bottom:4px"></div>
     <div class="form-group">
       <label id="ho-recurso-label">Recurso que asignas *</label>
       <select id="ho-camion">
@@ -1829,6 +1840,31 @@
       <input type="text" id="ec-certs">
     </div>
     <div class="form-group">
+      <label>Vencimiento de certificaciones</label>
+      <input type="date" id="ec-vence-cert">
+    </div>
+    <div id="ec-sedena-group">
+      <div class="form-group">
+        <label>Núm. licencia SEDENA</label>
+        <input type="text" id="ec-num-sedena" placeholder="Ej. SEDENA-2024-00001">
+      </div>
+      <div class="form-group">
+        <label>Vencimiento licencia SEDENA</label>
+        <input type="date" id="ec-vence-sedena">
+      </div>
+      <div class="form-group">
+        <label>Documento licencia SEDENA</label>
+        <label class="file-upload-area" for="ec-doc-sedena">
+          <span class="file-upload-icon">📄</span>
+          <span class="file-upload-text">PDF o imagen</span>
+        </label>
+        <input type="file" id="ec-doc-sedena" accept="image/*,.pdf" style="display:none"
+               onchange="previewDocNombre(this,'ec-doc-sedena-preview')">
+        <div id="ec-doc-sedena-preview"></div>
+        <div id="ec-doc-sedena-actual" style="font-size:0.78rem;margin-top:4px"></div>
+      </div>
+    </div>
+    <div class="form-group">
       <label>Disponibilidad</label>
       <select id="ec-disp">
         <option value="24/7">24/7</option>
@@ -2109,9 +2145,9 @@
 <script src="js/recursos.js?v=10"></script>
 <script src="js/reservaciones.js?v=17"></script>
 <script src="js/modal.js?v=10"></script>
-<script src="js/pedidos.js?v=29"></script>
+<script src="js/pedidos.js?v=30"></script>
 <script src="js/aprobaciones.js?v=21"></script>
-<script src="js/admin.js?v=22"></script>
+<script src="js/admin.js?v=23"></script>
 <script src="js/operadores.js?v=6"></script>
 <script src="js/usuarios.js?v=15"></script>
 <script src="js/reportes.js?v=2"></script>

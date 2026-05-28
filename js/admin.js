@@ -752,7 +752,9 @@ async function agregarCamion() {
   const _getFile = elId => document.getElementById(elId)?.files?.[0];
   const _getFiles = elId => Array.from(document.getElementById(elId)?.files || []);
   const archivos   = [];
-  let   imagenTc = null;
+  let   imagenTc   = null;
+  let   docSctPath = null;
+  let   docSegPath = null;
 
   const fotoEntradas = [
     { prefix: 'frente',   file: _getFile('admin-foto-frente') },
@@ -773,7 +775,9 @@ async function agregarCamion() {
     const { data: up, error: upErr } = await sb.storage.from('unidades').upload(path, file);
     if (!upErr && up) {
       archivos.push(up.path);
-      if (prefix === 'tc') imagenTc = up.path;
+      if (prefix === 'tc')     imagenTc   = up.path;
+      if (prefix === 'sct')    docSctPath = up.path;
+      if (prefix === 'seguro') docSegPath = up.path;
     }
   }
 
@@ -819,7 +823,9 @@ async function agregarCamion() {
     caat:                          document.getElementById('admin-caat')?.value               || null,
     vigencia_caat:                    document.getElementById('admin-vigencia-caat')?.value         || null,
     fecha_vencimiento_verificacion:   document.getElementById('admin-vence-verificacion')?.value    || null,
-    imagen_tc:                     imagenTc,
+    imagen_tc:  imagenTc,
+    doc_sct:    docSctPath,
+    doc_seguro: docSegPath,
   };
 
   let error;
@@ -912,6 +918,11 @@ function toggleSedenaFields(tipo) {
   if (grp) grp.style.display = tipo === 'Armado' ? '' : 'none';
 }
 
+function toggleSedenaEditFields(tipo) {
+  const grp = document.getElementById('ec-sedena-group');
+  if (grp) grp.style.display = tipo === 'Armado' ? '' : 'none';
+}
+
 async function agregarCustodio() {
   const nombre = document.getElementById('ac-nombre').value.trim();
   const tipo   = document.getElementById('ac-tipo').value;
@@ -983,14 +994,27 @@ async function agregarCustodio() {
 async function editarCustodio(id) {
   const { data: c } = await sb.from('custodios').select('*').eq('id', id).single();
   if (!c) return;
-  document.getElementById('ec-id').value     = c.id;
-  document.getElementById('ec-nombre').value = c.nombre;
-  document.getElementById('ec-tipo').value   = c.tipo;
-  document.getElementById('ec-desc').value   = c.descripcion || '';
-  document.getElementById('ec-disp').value   = c.disponibilidad || '24/7';
-  document.getElementById('ec-precio').value = c.precio_dia || '';
-  document.getElementById('ec-certs').value  = (c.certificaciones || []).join(', ');
-  document.getElementById('ec-estado').value = c.estado;
+  const setVal = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val ?? ''; };
+  setVal('ec-id',     c.id);
+  setVal('ec-nombre', c.nombre);
+  setVal('ec-tipo',   c.tipo);
+  setVal('ec-desc',   c.descripcion || '');
+  setVal('ec-disp',   c.disponibilidad || '24/7');
+  setVal('ec-precio', c.precio_dia || '');
+  setVal('ec-certs',  (c.certificaciones || []).join(', '));
+  setVal('ec-estado', c.estado);
+  setVal('ec-vence-cert',  c.fecha_vencimiento_cert);
+  setVal('ec-num-sedena',  c.num_licencia_sedena);
+  setVal('ec-vence-sedena', c.fecha_vencimiento_licencia_sedena);
+
+  const docEl = document.getElementById('ec-doc-sedena-actual');
+  if (docEl) {
+    docEl.innerHTML = c.doc_licencia_sedena
+      ? `<a href="${c.doc_licencia_sedena}" target="_blank" style="font-size:0.78rem;color:var(--primary)">📄 Ver licencia SEDENA actual</a>`
+      : '';
+  }
+
+  toggleSedenaEditFields(c.tipo);
   document.getElementById('modal-editar-custodio').classList.add('open');
 }
 
@@ -999,17 +1023,37 @@ function closeEditarCustodio() {
 }
 
 async function guardarEdicionCustodio() {
-  const id = document.getElementById('ec-id').value;
+  const id   = document.getElementById('ec-id').value;
+  const tipo = document.getElementById('ec-tipo').value;
   const certs = document.getElementById('ec-certs').value.trim();
+
+  // Upload SEDENA doc if a new file was selected
+  let docSedenaUrl = null;
+  if (tipo === 'Armado') {
+    const sedenaFile = document.getElementById('ec-doc-sedena')?.files?.[0];
+    if (sedenaFile) {
+      const ext  = sedenaFile.name.split('.').pop();
+      const path = `${currentUser.id}/${id}/licencia_sedena_${Date.now()}.${ext}`;
+      const { error: upErr } = await sb.storage.from('custodios').upload(path, sedenaFile, { upsert: true });
+      if (!upErr) docSedenaUrl = sb.storage.from('custodios').getPublicUrl(path).data?.publicUrl || null;
+    }
+  }
+
   const payload = {
     nombre:          document.getElementById('ec-nombre').value.trim(),
-    tipo:            document.getElementById('ec-tipo').value,
+    tipo,
     descripcion:     document.getElementById('ec-desc').value.trim() || null,
     disponibilidad:  document.getElementById('ec-disp').value,
     precio_dia:      parseFloat(document.getElementById('ec-precio').value) || null,
     certificaciones: certs ? certs.split(',').map(s => s.trim()).filter(Boolean) : [],
     estado:          document.getElementById('ec-estado').value,
+    fecha_vencimiento_cert:            document.getElementById('ec-vence-cert')?.value    || null,
+    porta_arma:                        tipo === 'Armado',
+    num_licencia_sedena:               document.getElementById('ec-num-sedena')?.value.trim() || null,
+    fecha_vencimiento_licencia_sedena: document.getElementById('ec-vence-sedena')?.value  || null,
   };
+  if (docSedenaUrl) payload.doc_licencia_sedena = docSedenaUrl;
+
   const esSA = currentUser.rol === 'superadmin';
   let upd = payload;
   if (!esSA) {
@@ -1095,6 +1139,20 @@ async function agregarPatio() {
   const esSuperAdmin = currentUser.rol === 'superadmin';
   const propietarioId = _getPropietarioId('patio');
   if (!propietarioId) { _done(); return; }
+
+  // Upload permiso doc if provided
+  let docPermisoUrl = null;
+  const permisoFile = document.getElementById('ap-doc-permiso')?.files?.[0];
+  if (permisoFile) {
+    const ext  = permisoFile.name.split('.').pop();
+    const path = `${propietarioId}/${id}/permiso_${Date.now()}.${ext}`;
+    const { error: upErr } = await sb.storage.from('unidades').upload(path, permisoFile, { upsert: true });
+    if (!upErr) {
+      const { data: signed } = await sb.storage.from('unidades').createSignedUrl(path, 60 * 60 * 24 * 365);
+      docPermisoUrl = signed?.signedUrl || null;
+    }
+  }
+
   const { error } = await sb.from('patios').insert({
     id, nombre, tipo,
     ubicacion: ubic || null,
@@ -1103,6 +1161,7 @@ async function agregarPatio() {
     servicios: svcsRaw ? svcsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
     fecha_vencimiento_permiso: document.getElementById('ap-vence-permiso')?.value || null,
+    doc_permiso: docPermisoUrl,
   });
   if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
@@ -1116,7 +1175,7 @@ async function agregarPatio() {
     })));
   }
 
-  ['ap-nombre','ap-ubic','ap-area','ap-cap','ap-precio','ap-svcs'].forEach(i => {
+  ['ap-nombre','ap-ubic','ap-area','ap-cap','ap-precio','ap-svcs','ap-vence-permiso','ap-doc-permiso'].forEach(i => {
     const el = document.getElementById(i); if (el) el.value = '';
   });
   _done();

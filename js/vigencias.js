@@ -183,7 +183,7 @@ function toggleVigEmpresa(uid) {
   if (tog) tog.textContent = open ? '▼' : '▲';
 }
 
-// Badge: cuenta empresas/recursos únicos afectados, no violaciones
+// Badge: cuenta recursos únicos afectados (vencidos o próximos a vencer)
 async function actualizarBadgeVigencias() {
   const esSA    = currentUser?.rol === 'superadmin';
   const esAdmin = currentUser?.rol === 'admin';
@@ -194,36 +194,49 @@ async function actualizarBadgeVigencias() {
   const limite = new Date(hoy);
   limite.setDate(limite.getDate() + DIAS_ALERTA);
   const limiStr = limite.toISOString().slice(0, 10);
+  // Para docs con vigencia virtual de 1 año (examen médico, tox, antecedentes)
+  // Expirado en 30 días si: exam_date + 365 <= hoy + 30 → exam_date <= hoy - 335
+  const anioAtras = new Date(hoy);
+  anioAtras.setDate(anioAtras.getDate() - (365 - DIAS_ALERTA));
+  const anioAtrasStr = anioAtras.toISOString().slice(0, 10);
   const uid = currentUser.id;
 
-  // Cuenta IDs únicos de camiones con ALGÚN campo vencido/próximo
-  const _qCamion = () => {
-    let q = sb.from('camiones')
-      .select('id')
-      .or(`vigencia_caat.lte.${limiStr},fecha_vencimiento_tc.lte.${limiStr},fecha_vencimiento_seguro.lte.${limiStr},fecha_vencimiento_permiso_sct.lte.${limiStr}`)
-      .not('id', 'is', null);
-    if (!esSA) q = q.eq('propietario_id', uid);
-    return q;
-  };
-
-  const _q = (tabla, campo) => {
-    let q = sb.from(tabla).select('id', { count: 'exact', head: true })
-      .lte(campo, limiStr).not(campo, 'is', null);
-    if (!esSA && tabla !== 'perfiles') q = q.eq('propietario_id', uid);
-    if (!esSA && tabla === 'perfiles')  q = q.eq('user_id', uid);
-    return q;
+  const _f = (q, tabla) => {
+    if (esSA) return q;
+    return tabla === 'perfiles' ? q.eq('user_id', uid) : q.eq('propietario_id', uid);
   };
 
   try {
-    const [{ data: camIds }, { count: cOp }, { count: cCus }, { count: cPat }] = await Promise.all([
-      _qCamion(),
-      _q('operadores', 'fecha_vencimiento'),
-      _q('custodios',  'fecha_vencimiento_cert'),
-      _q('patios',     'fecha_vencimiento_permiso'),
+    const [camData, opData, cusData, { count: cPat }, empData] = await Promise.all([
+      // Camiones: único por id con cualquier doc vencido/próximo
+      _f(sb.from('camiones').select('id')
+        .or(`vigencia_caat.lte.${limiStr},fecha_vencimiento_tc.lte.${limiStr},fecha_vencimiento_seguro.lte.${limiStr},fecha_vencimiento_permiso_sct.lte.${limiStr},fecha_vencimiento_verificacion.lte.${limiStr}`)
+        .not('id', 'is', null), 'camiones'),
+      // Operadores: único por id — licencia, tox (1yr virtual), antecedentes (1yr virtual)
+      _f(sb.from('operadores').select('id')
+        .or(`fecha_vencimiento.lte.${limiStr},fecha_examen_toxicologico.lte.${anioAtrasStr},fecha_carta_antecedentes.lte.${anioAtrasStr}`)
+        .not('id', 'is', null), 'operadores'),
+      // Custodios: único por id — certificación o licencia SEDENA
+      _f(sb.from('custodios').select('id')
+        .or(`fecha_vencimiento_cert.lte.${limiStr},fecha_vencimiento_licencia_sedena.lte.${limiStr}`)
+        .not('id', 'is', null), 'custodios'),
+      // Patios
+      _f(sb.from('patios').select('id', { count: 'exact', head: true })
+        .lte('fecha_vencimiento_permiso', limiStr).not('fecha_vencimiento_permiso', 'is', null), 'patios'),
+      // Empresa propia del admin (0 o 1)
+      esAdmin
+        ? sb.from('perfiles').select('user_id', { count: 'exact', head: true })
+            .eq('user_id', uid)
+            .or(`fecha_vencimiento_permiso_sct.lte.${limiStr},fecha_vencimiento_seguro_rc.lte.${limiStr},fecha_vencimiento_seguro_carga.lte.${limiStr}`)
+        : Promise.resolve({ count: 0 }),
     ]);
-    const camUniq = new Set((camIds || []).map(c => c.id)).size;
-    const total   = camUniq + (cOp || 0) + (cCus || 0) + (cPat || 0);
-    const badge   = document.getElementById('home-vig-badge');
+
+    const camUniq = new Set((camData.data || []).map(c => c.id)).size;
+    const opUniq  = new Set((opData.data  || []).map(o => o.id)).size;
+    const cusUniq = new Set((cusData.data || []).map(c => c.id)).size;
+    const total   = camUniq + opUniq + cusUniq + (cPat || 0) + (empData.count || 0);
+
+    const badge = document.getElementById('home-vig-badge');
     if (badge) badge.textContent = total > 0 ? total : '';
   } catch (_) {}
 }

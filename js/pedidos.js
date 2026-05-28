@@ -1097,6 +1097,9 @@ async function openHacerOferta(pedidoId) {
   select.innerHTML = '<option value="">Cargando…</option>';
   if (warn)   { warn.style.display = 'none'; warn.textContent = ''; }
   if (btnEnv) btnEnv.disabled = false;
+  const recursoWarnEl = document.getElementById('ho-recurso-warn');
+  if (recursoWarnEl) { recursoWarnEl.style.display = 'none'; recursoWarnEl.textContent = ''; }
+  select.onchange = null;
 
   // ── Verificar documentos legales de empresa (bloqueo por vencimiento) ──
   if (currentUser.rol === 'admin') {
@@ -1185,8 +1188,13 @@ async function openHacerOferta(pedidoId) {
       : `<option value="">Sin camiones disponibles</option>`;
     recursos.forEach(c => {
       const opt = document.createElement('option');
-      opt.value             = c.id;
-      opt.dataset.operador  = c.operador || '';
+      opt.value                  = c.id;
+      opt.dataset.operador       = c.operador || '';
+      opt.dataset.venceTc        = c.fecha_vencimiento_tc                || '';
+      opt.dataset.venceSeguro    = c.fecha_vencimiento_seguro            || '';
+      opt.dataset.venceSct       = c.fecha_vencimiento_permiso_sct       || '';
+      opt.dataset.venceCaat      = c.vigencia_caat                       || '';
+      opt.dataset.venceVerif     = c.fecha_vencimiento_verificacion      || '';
       opt.textContent = `${CAMION_EMOJI[c.tipo] || '🚛'} ${c.id} — ${c.tipo} (${c.capacidad} ton)`;
       select.appendChild(opt);
     });
@@ -1208,13 +1216,32 @@ async function openHacerOferta(pedidoId) {
         opSel.appendChild(opt);
       });
       opRow.style.display = '';
-      // Pre-seleccionar el operador asignado al camión elegido
-      select.addEventListener('change', () => {
-        const selOpt = select.options[select.selectedIndex];
+    }
+
+    // Unified change handler: pre-select operator + show expiry warning
+    const recursoWarn = document.getElementById('ho-recurso-warn');
+    select.onchange = () => {
+      const selOpt = select.options[select.selectedIndex];
+      // Pre-select operator assigned to this truck
+      if (opSel) {
         const opId = selOpt?.dataset.operador || '';
         if (opId) opSel.value = opId;
-      });
-    }
+      }
+      // Expiry check
+      if (recursoWarn) {
+        const hoy = new Date().toISOString().slice(0, 10);
+        const vencidos = [];
+        if (selOpt?.dataset.venceTc     && selOpt.dataset.venceTc     < hoy) vencidos.push('Tarjeta de circulación');
+        if (selOpt?.dataset.venceSeguro && selOpt.dataset.venceSeguro < hoy) vencidos.push('Seguro');
+        if (selOpt?.dataset.venceSct    && selOpt.dataset.venceSct    < hoy) vencidos.push('Permiso SCT');
+        if (selOpt?.dataset.venceCaat   && selOpt.dataset.venceCaat   < hoy) vencidos.push('CAAT');
+        if (selOpt?.dataset.venceVerif  && selOpt.dataset.venceVerif  < hoy) vencidos.push('Verificación vehicular');
+        recursoWarn.textContent = vencidos.length
+          ? `⚠ Esta unidad tiene documentos vencidos: ${vencidos.join(', ')}. El cliente podría rechazar la oferta.`
+          : '';
+        recursoWarn.style.display = vencidos.length ? 'block' : 'none';
+      }
+    };
   }
 
   // Filtrar por disponibilidad real en las fechas del pedido
