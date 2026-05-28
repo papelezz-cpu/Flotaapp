@@ -155,6 +155,8 @@ async function editarOperadorRechazado(id) {
   set('op-area',             op.area);
   set('op-puesto',           op.puesto);
   set('op-examen',           op.fecha_examen_medico);
+  set('op-examen-tox',      op.fecha_examen_toxicologico);
+  set('op-antecedentes',    op.fecha_carta_antecedentes);
   set('op-num-licencia',     op.num_licencia);
   set('op-fecha-expedicion', op.fecha_expedicion);
   set('op-fecha-vencimiento',op.fecha_vencimiento);
@@ -292,7 +294,9 @@ async function agregarOperador() {
     telefono:             v('op-telefono')          || null,
     area:                 v('op-area')              || null,
     puesto:               v('op-puesto')            || null,
-    fecha_examen_medico:  v('op-examen')            || null,
+    fecha_examen_medico:         v('op-examen')            || null,
+    fecha_examen_toxicologico:   v('op-examen-tox')        || null,
+    fecha_carta_antecedentes:    v('op-antecedentes')      || null,
     num_licencia:         v('op-num-licencia')      || null,
     clase_licencia:       v('op-clase-licencia')    || null,
     tipo_licencia:        v('op-tipo-licencia')     || null,

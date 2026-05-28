@@ -743,7 +743,8 @@ async function agregarCamion() {
     fecha_vencimiento_seguro:      document.getElementById('admin-vence-seguro')?.value       || null,
     fecha_vencimiento_permiso_sct: document.getElementById('admin-vence-permiso-sct')?.value  || null,
     caat:                          document.getElementById('admin-caat')?.value               || null,
-    vigencia_caat:                 document.getElementById('admin-vigencia-caat')?.value      || null,
+    vigencia_caat:                    document.getElementById('admin-vigencia-caat')?.value         || null,
+    fecha_vencimiento_verificacion:   document.getElementById('admin-vence-verificacion')?.value    || null,
     imagen_tc:                     imagenTc,
   };
 
@@ -770,7 +771,7 @@ async function agregarCamion() {
   // Limpiar formulario
   ['admin-cap','admin-precio','admin-placas','admin-dim','admin-version','admin-modelo-anio',
    'admin-num-serie','admin-num-motor','admin-num-economico','admin-tc','admin-fecha-tc',
-   'admin-vence-tc','admin-vence-seguro','admin-vence-permiso-sct','admin-caat','admin-vigencia-caat'].forEach(fid => {
+   'admin-vence-tc','admin-vence-seguro','admin-vence-permiso-sct','admin-caat','admin-vigencia-caat','admin-vence-verificacion'].forEach(fid => {
     const el = document.getElementById(fid); if (el) el.value = '';
   });
   ['admin-foto-frente','admin-foto-laterales','admin-foto-trasera','admin-foto-placa',
@@ -832,6 +833,11 @@ async function renderAdminCustodios() {
   }).join('');
 }
 
+function toggleSedenaFields(tipo) {
+  const grp = document.getElementById('ac-sedena-group');
+  if (grp) grp.style.display = tipo === 'Armado' ? '' : 'none';
+}
+
 async function agregarCustodio() {
   const nombre = document.getElementById('ac-nombre').value.trim();
   const tipo   = document.getElementById('ac-tipo').value;
@@ -857,7 +863,10 @@ async function agregarCustodio() {
     precio_dia: precio,
     propietario_id: propietarioId,
     certificaciones: certs ? certs.split(',').map(s => s.trim()).filter(Boolean) : [],
-    fecha_vencimiento_cert: document.getElementById('ac-vence-cert')?.value || null,
+    fecha_vencimiento_cert:            document.getElementById('ac-vence-cert')?.value    || null,
+    porta_arma:                        document.getElementById('ac-tipo').value === 'Armado',
+    num_licencia_sedena:               document.getElementById('ac-num-sedena')?.value.trim() || null,
+    fecha_vencimiento_licencia_sedena: document.getElementById('ac-vence-sedena')?.value  || null,
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
   });
   if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
@@ -872,9 +881,11 @@ async function agregarCustodio() {
     })));
   }
 
-  ['ac-nombre','ac-desc','ac-precio','ac-certs','ac-vence-cert'].forEach(i => {
+  ['ac-nombre','ac-desc','ac-precio','ac-certs','ac-vence-cert','ac-num-sedena','ac-vence-sedena'].forEach(i => {
     const el = document.getElementById(i); if (el) el.value = '';
   });
+  document.getElementById('ac-tipo').value = 'Armado';
+  toggleSedenaFields('Armado');
   _done();
   await renderAdminCustodios();
   await renderMisPendientes();

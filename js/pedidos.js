@@ -1098,6 +1098,28 @@ async function openHacerOferta(pedidoId) {
   if (warn)   { warn.style.display = 'none'; warn.textContent = ''; }
   if (btnEnv) btnEnv.disabled = false;
 
+  // ── Verificar documentos legales de empresa (bloqueo por vencimiento) ──
+  if (currentUser.rol === 'admin') {
+    const hoy = new Date().toISOString().slice(0, 10);
+    const { data: perfil } = await sb.from('perfiles')
+      .select('fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga')
+      .eq('user_id', currentUser.id)
+      .single();
+    if (perfil) {
+      const expirados = [];
+      if (perfil.fecha_vencimiento_permiso_sct  && perfil.fecha_vencimiento_permiso_sct  < hoy) expirados.push('Permiso SCT');
+      if (perfil.fecha_vencimiento_seguro_rc    && perfil.fecha_vencimiento_seguro_rc    < hoy) expirados.push('Seguro RC');
+      if (perfil.fecha_vencimiento_seguro_carga && perfil.fecha_vencimiento_seguro_carga < hoy) expirados.push('Seguro de carga');
+      if (expirados.length) {
+        select.innerHTML = '<option value="">—</option>';
+        if (warn) { warn.textContent = `⛔ No puedes hacer ofertas — documentos de empresa vencidos: ${expirados.join(', ')}. Actualiza tus vigencias para continuar.`; warn.style.display = 'block'; }
+        if (btnEnv) btnEnv.disabled = true;
+        document.getElementById('modal-hacer-oferta').classList.add('open');
+        return;
+      }
+    }
+  }
+
   // Leer el pedido para saber qué tipo de recurso y fechas
   const { data: pedido } = await sb.from('pedidos').select('tipo_camion, fecha_ini, fecha_fin').eq('id', pedidoId).single();
   const tipo = pedido?.tipo_camion || '';

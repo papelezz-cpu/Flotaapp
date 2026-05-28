@@ -409,6 +409,10 @@
           <label>Vigencia CAAT</label>
           <input type="date" id="admin-vigencia-caat">
         </div>
+        <div class="form-group">
+          <label>Vencimiento verificación vehicular</label>
+          <input type="date" id="admin-vence-verificacion">
+        </div>
 
         <div class="op-form-section-title" style="margin-top:16px">Operación</div>
         <div class="form-group">
@@ -540,7 +544,7 @@
         </div>
         <div class="form-group">
           <label>Tipo</label>
-          <select id="ac-tipo">
+          <select id="ac-tipo" onchange="toggleSedenaFields(this.value)">
             <option value="Armado">Armado</option>
             <option value="Sin arma">Sin arma</option>
             <option value="Motorizado">Motorizado</option>
@@ -559,6 +563,16 @@
         <div class="form-group">
           <label>Vencimiento de certificaciones</label>
           <input type="date" id="ac-vence-cert">
+        </div>
+        <div id="ac-sedena-group">
+          <div class="form-group">
+            <label>Núm. licencia SEDENA <span style="font-weight:400;color:var(--text-muted)">(portación de arma)</span></label>
+            <input type="text" id="ac-num-sedena" placeholder="Ej. SEDENA-2024-00001">
+          </div>
+          <div class="form-group">
+            <label>Vencimiento licencia SEDENA</label>
+            <input type="date" id="ac-vence-sedena">
+          </div>
         </div>
         <div class="form-group">
           <label>Disponibilidad</label>
@@ -782,6 +796,14 @@
         <div class="form-group">
           <label>Fecha examen médico</label>
           <input type="date" id="op-examen">
+        </div>
+        <div class="form-group">
+          <label>Fecha examen toxicológico <span style="font-weight:400;color:var(--text-muted)">(NOM-087)</span></label>
+          <input type="date" id="op-examen-tox">
+        </div>
+        <div class="form-group">
+          <label>Fecha carta de no antecedentes penales</label>
+          <input type="date" id="op-antecedentes">
         </div>
 
         <div class="op-form-section">
@@ -2014,16 +2036,16 @@
 <script src="js/recursos.js?v=10"></script>
 <script src="js/reservaciones.js?v=17"></script>
 <script src="js/modal.js?v=10"></script>
-<script src="js/pedidos.js?v=28"></script>
+<script src="js/pedidos.js?v=29"></script>
 <script src="js/aprobaciones.js?v=20"></script>
-<script src="js/admin.js?v=21"></script>
-<script src="js/operadores.js?v=5"></script>
+<script src="js/admin.js?v=22"></script>
+<script src="js/operadores.js?v=6"></script>
 <script src="js/usuarios.js?v=15"></script>
 <script src="js/reportes.js?v=2"></script>
 <script src="js/chat.js?v=11"></script>
 <script src="js/catalogo.js?v=16"></script>
 <script src="js/tracking.js?v=11"></script>
-<script src="js/vigencias.js?v=1"></script>
+<script src="js/vigencias.js?v=2"></script>
 <script src="js/main.js?v=14"></script>
 
 <!-- ══ PANEL DE CHAT ════════════════════════════════════ -->

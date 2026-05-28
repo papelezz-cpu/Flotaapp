@@ -18,9 +18,9 @@ async function renderVigencias() {
   const esSA = currentUser.rol === 'superadmin';
   const uid  = currentUser.id;
 
-  let camQ  = sb.from('camiones').select('id, tipo, propietario_id, propietario:perfiles(nombre), vigencia_caat, fecha_vencimiento_tc, fecha_vencimiento_seguro, fecha_vencimiento_permiso_sct').in('aprobacion', ['aprobada', 'pendiente']);
-  let opQ   = sb.from('operadores').select('id, nombre, primer_apellido, propietario_id, propietario:perfiles(nombre), fecha_vencimiento, fecha_examen_medico').in('aprobacion', ['aprobada', 'pendiente']);
-  let cusQ  = sb.from('custodios').select('id, nombre, propietario_id, propietario:perfiles(nombre), fecha_vencimiento_cert').in('aprobacion', ['aprobada', 'pendiente']);
+  let camQ  = sb.from('camiones').select('id, tipo, propietario_id, propietario:perfiles(nombre), vigencia_caat, fecha_vencimiento_tc, fecha_vencimiento_seguro, fecha_vencimiento_permiso_sct, fecha_vencimiento_verificacion').in('aprobacion', ['aprobada', 'pendiente']);
+  let opQ   = sb.from('operadores').select('id, nombre, primer_apellido, propietario_id, propietario:perfiles(nombre), fecha_vencimiento, fecha_examen_medico, fecha_examen_toxicologico, fecha_carta_antecedentes').in('aprobacion', ['aprobada', 'pendiente']);
+  let cusQ  = sb.from('custodios').select('id, nombre, propietario_id, propietario:perfiles(nombre), fecha_vencimiento_cert, porta_arma, fecha_vencimiento_licencia_sedena').in('aprobacion', ['aprobada', 'pendiente']);
   let patQ  = sb.from('patios').select('id, nombre, propietario_id, propietario:perfiles(nombre), fecha_vencimiento_permiso').in('aprobacion', ['aprobada', 'pendiente']);
   let perfQ = sb.from('perfiles').select('user_id, nombre, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga').eq('rol', 'admin');
 
@@ -55,6 +55,7 @@ async function renderVigencias() {
     _add(c.propietario_id, emp, 'Camión', nom, 'Seguro',                  c.fecha_vencimiento_seguro);
     _add(c.propietario_id, emp, 'Camión', nom, 'Permiso SCT',             c.fecha_vencimiento_permiso_sct);
     _add(c.propietario_id, emp, 'Camión', nom, 'CAAT',                    c.vigencia_caat);
+    _add(c.propietario_id, emp, 'Camión', nom, 'Verificación vehicular',  c.fecha_vencimiento_verificacion);
   });
 
   (operadores || []).forEach(o => {
@@ -66,11 +67,24 @@ async function renderVigencias() {
       dEx.setFullYear(dEx.getFullYear() + 1);
       _add(o.propietario_id, emp, 'Operador', nom, 'Examen médico (1 año)', dEx.toISOString().slice(0, 10));
     }
+    if (o.fecha_examen_toxicologico) {
+      const dTox = new Date(o.fecha_examen_toxicologico + 'T00:00:00');
+      dTox.setFullYear(dTox.getFullYear() + 1);
+      _add(o.propietario_id, emp, 'Operador', nom, 'Examen toxicológico (1 año)', dTox.toISOString().slice(0, 10));
+    }
+    if (o.fecha_carta_antecedentes) {
+      const dAnt = new Date(o.fecha_carta_antecedentes + 'T00:00:00');
+      dAnt.setFullYear(dAnt.getFullYear() + 1);
+      _add(o.propietario_id, emp, 'Operador', nom, 'Carta de no antecedentes (1 año)', dAnt.toISOString().slice(0, 10));
+    }
   });
 
   (custodios || []).forEach(c => {
     const emp = c.propietario?.nombre || c.propietario_id;
     _add(c.propietario_id, emp, 'Custodio', esc(c.nombre || c.id), 'Certificación', c.fecha_vencimiento_cert);
+    if (c.porta_arma) {
+      _add(c.propietario_id, emp, 'Custodio', esc(c.nombre || c.id), 'Licencia SEDENA (portación de arma)', c.fecha_vencimiento_licencia_sedena);
+    }
   });
 
   (patios || []).forEach(p => {
