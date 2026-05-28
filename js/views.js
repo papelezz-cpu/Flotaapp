@@ -106,6 +106,7 @@ async function _loadAprBadge() {
     sb.from('patios'    ).select('id',{count:'exact',head:true}).eq('aprobacion','pendiente'),
     sb.from('lavados'   ).select('id',{count:'exact',head:true}).eq('aprobacion','pendiente'),
     sb.from('pedidos'   ).select('id',{count:'exact',head:true}).eq('estado','pendiente_revision'),
+    sb.from('pedidos'   ).select('id',{count:'exact',head:true}).eq('estado','pendiente_acuerdo'),
     sb.from('perfiles'  ).select('user_id',{count:'exact',head:true}).eq('aprobacion_cuenta','pendiente'),
     sb.from('perfiles'  ).select('user_id',{count:'exact',head:true}).eq('perfil_docs_pendiente',true),
   ]);

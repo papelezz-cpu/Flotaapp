@@ -20,7 +20,7 @@ async function renderCatalogo() {
   grid.innerHTML = skeletonGrid(3);
 
   const { data: perfiles } = await sb.from('perfiles')
-    .select('user_id, nombre, rfc, razon_social, anos_operacion, num_unidades, seguro_rc, seguro_carga, permiso_sct, descripcion, telefono')
+    .select('user_id, nombre, rfc, razon_social, anos_operacion, num_unidades, seguro_rc, seguro_carga, permiso_sct, descripcion, telefono, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga')
     .eq('rol', 'admin')
     .order('nombre');
 
@@ -120,6 +120,15 @@ function _empresaCardHTML(e) {
   if (e.patios.length)    bloques += _bloqueEstandar ('patio',    '🏭', 'Patios',    e.patios);
   if (e.lavados.length)   bloques += _bloqueLavado   (e.lavados);
 
+  // Docs vigentes badge: every claimed doc has a non-expired date
+  const hoy      = new Date().toISOString().slice(0, 10);
+  const claimed  = [
+    e.permiso_sct  ? e.fecha_vencimiento_permiso_sct  : undefined,
+    e.seguro_rc    ? e.fecha_vencimiento_seguro_rc    : undefined,
+    e.seguro_carga ? e.fecha_vencimiento_seguro_carga : undefined,
+  ].filter(v => v !== undefined);
+  const docsAlDia = claimed.length > 0 && claimed.every(f => f && f >= hoy);
+
   const chips = [];
   if (e.razon_social)    chips.push(`🏢 ${esc(e.razon_social)}`);
   if (e.rfc)             chips.push(`RFC: ${esc(e.rfc)}`);
@@ -127,6 +136,7 @@ function _empresaCardHTML(e) {
   if (e.permiso_sct)     chips.push('SCT ✓');
   if (e.seguro_rc)       chips.push('Seg. RC ✓');
   if (e.seguro_carga)    chips.push('Seg. Carga ✓');
+  if (docsAlDia)         chips.push('✅ Docs al día');
   const infoChips = chips.length
     ? `<div class="emp-info-chips">${chips.map(c => `<span class="emp-info-chip">${c}</span>`).join('')}</div>`
     : '';
@@ -262,22 +272,29 @@ async function abrirPerfilEmpresaCat(adminId, adminNombre) {
 
   const [{ data: p }, { data: cals }] = await Promise.all([
     sb.from('perfiles')
-      .select('rfc, razon_social, anos_operacion, num_unidades, seguro_rc, seguro_carga, permiso_sct, descripcion, telefono')
+      .select('rfc, razon_social, anos_operacion, num_unidades, seguro_rc, seguro_carga, permiso_sct, descripcion, telefono, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga')
       .eq('user_id', adminId).single(),
     sb.from('calificaciones').select('rating, comentario, created_at').eq('admin_id', adminId).order('created_at', { ascending: false }).limit(5),
   ]);
 
   const avg = cals?.length ? (cals.reduce((s, c) => s + c.rating, 0) / cals.length).toFixed(1) : null;
 
+  const hoyEpc = new Date().toISOString().slice(0, 10);
+  const _fmtDoc = (fecha) => {
+    if (!fecha) return '<span style="color:var(--text-muted)">Sin fecha registrada</span>';
+    const vencido = fecha < hoyEpc;
+    return `<span style="color:${vencido ? 'var(--danger)' : 'inherit'}">${fmtFecha(fecha)}${vencido ? ' ⛔' : ' ✓'}</span>`;
+  };
+
   const rows = [
     p?.razon_social  && ['🏢', 'Razón social',        esc(p.razon_social)],
     p?.rfc           && ['📄', 'RFC',                  esc(p.rfc)],
     p?.telefono      && ['📞', 'Teléfono',              esc(p.telefono)],
-    p?.permiso_sct   && ['📋', 'Permiso SCT',          esc(p.permiso_sct)],
+    p?.permiso_sct   && ['📋', 'Permiso SCT',          `${esc(p.permiso_sct)} — Vence: ${_fmtDoc(p.fecha_vencimiento_permiso_sct)}`],
     p?.anos_operacion && ['⏱️', 'Años de operación',   `${p.anos_operacion} años`],
     p?.num_unidades  && ['🚛', 'Unidades en flota',    `${p.num_unidades}`],
-    (p?.seguro_rc || p?.seguro_carga) && ['🛡️', 'Seguros',
-      [p.seguro_rc && 'Responsabilidad Civil', p.seguro_carga && 'Carga'].filter(Boolean).join(' · ')],
+    p?.seguro_rc     && ['🛡️', 'Seguro RC',            _fmtDoc(p.fecha_vencimiento_seguro_rc)],
+    p?.seguro_carga  && ['📦', 'Seguro de carga',      _fmtDoc(p.fecha_vencimiento_seguro_carga)],
   ].filter(Boolean);
 
   const recientes = (cals || []).slice(0, 3).map(c => `

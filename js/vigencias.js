@@ -207,28 +207,41 @@ async function actualizarBadgeVigencias() {
   };
 
   try {
-    const [camData, opData, cusData, { count: cPat }, empData] = await Promise.all([
-      // Camiones: único por id con cualquier doc vencido/próximo
+    // Empresa query: admin ve sólo la suya; SA ve todas las empresas admin
+  let empQ;
+  if (esAdmin) {
+    empQ = sb.from('perfiles').select('user_id', { count: 'exact', head: true })
+      .eq('user_id', uid)
+      .or(`fecha_vencimiento_permiso_sct.lte.${limiStr},fecha_vencimiento_seguro_rc.lte.${limiStr},fecha_vencimiento_seguro_carga.lte.${limiStr}`);
+  } else if (esSA) {
+    empQ = sb.from('perfiles').select('user_id', { count: 'exact', head: true })
+      .eq('rol', 'admin')
+      .or(`fecha_vencimiento_permiso_sct.lte.${limiStr},fecha_vencimiento_seguro_rc.lte.${limiStr},fecha_vencimiento_seguro_carga.lte.${limiStr}`);
+  } else {
+    empQ = Promise.resolve({ count: 0 });
+  }
+
+  const [camData, opData, cusData, { count: cPat }, empData] = await Promise.all([
+      // Camiones: único por id con cualquier doc vencido/próximo (solo aprobados/pendientes)
       _f(sb.from('camiones').select('id')
+        .in('aprobacion', ['aprobada', 'pendiente'])
         .or(`vigencia_caat.lte.${limiStr},fecha_vencimiento_tc.lte.${limiStr},fecha_vencimiento_seguro.lte.${limiStr},fecha_vencimiento_permiso_sct.lte.${limiStr},fecha_vencimiento_verificacion.lte.${limiStr}`)
         .not('id', 'is', null), 'camiones'),
-      // Operadores: único por id — licencia, tox (1yr virtual), antecedentes (1yr virtual)
+      // Operadores: licencia, médico (1yr virtual), tox (1yr virtual), antecedentes (1yr virtual)
       _f(sb.from('operadores').select('id')
-        .or(`fecha_vencimiento.lte.${limiStr},fecha_examen_toxicologico.lte.${anioAtrasStr},fecha_carta_antecedentes.lte.${anioAtrasStr}`)
+        .in('aprobacion', ['aprobada', 'pendiente'])
+        .or(`fecha_vencimiento.lte.${limiStr},fecha_examen_medico.lte.${anioAtrasStr},fecha_examen_toxicologico.lte.${anioAtrasStr},fecha_carta_antecedentes.lte.${anioAtrasStr}`)
         .not('id', 'is', null), 'operadores'),
       // Custodios: único por id — certificación o licencia SEDENA
       _f(sb.from('custodios').select('id')
+        .in('aprobacion', ['aprobada', 'pendiente'])
         .or(`fecha_vencimiento_cert.lte.${limiStr},fecha_vencimiento_licencia_sedena.lte.${limiStr}`)
         .not('id', 'is', null), 'custodios'),
       // Patios
       _f(sb.from('patios').select('id', { count: 'exact', head: true })
+        .in('aprobacion', ['aprobada', 'pendiente'])
         .lte('fecha_vencimiento_permiso', limiStr).not('fecha_vencimiento_permiso', 'is', null), 'patios'),
-      // Empresa propia del admin (0 o 1)
-      esAdmin
-        ? sb.from('perfiles').select('user_id', { count: 'exact', head: true })
-            .eq('user_id', uid)
-            .or(`fecha_vencimiento_permiso_sct.lte.${limiStr},fecha_vencimiento_seguro_rc.lte.${limiStr},fecha_vencimiento_seguro_carga.lte.${limiStr}`)
-        : Promise.resolve({ count: 0 }),
+      empQ,
     ]);
 
     const camUniq = new Set((camData.data || []).map(c => c.id)).size;

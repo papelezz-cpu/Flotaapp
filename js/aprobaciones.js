@@ -614,6 +614,13 @@ function _renderEmpresaItems(emp) {
 }
 
 function _renderCamionCard(c) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const _vence = (fecha, label) => {
+    if (!fecha) return `<div class="apr-op-row"><span>${label}</span><strong style="color:var(--text-muted)">— Sin fecha</strong></div>`;
+    const vencido = fecha < hoy;
+    const color   = vencido ? 'var(--danger)' : 'inherit';
+    return `<div class="apr-op-row"><span>${label}</span><strong style="color:${color}">${fmtFecha(fecha)}${vencido ? ' ⛔' : ''}</strong></div>`;
+  };
   const campos = `
     <div class="apr-op-detalle">
       <div class="apr-op-section-title">Vehículo</div>
@@ -632,18 +639,25 @@ function _renderCamionCard(c) {
         <div class="apr-op-row"><span>Núm. motor</span><strong>${esc(c.num_motor || '—')}</strong></div>
         <div class="apr-op-row"><span>Núm. económico</span><strong>${esc(c.num_economico || '—')}</strong></div>
       </div>
-      <div class="apr-op-section-title">Tarjeta de circulación</div>
+      <div class="apr-op-section-title">Vigencias de documentos</div>
       <div class="apr-op-grid">
-        <div class="apr-op-row"><span>Número TC</span><strong>${esc(c.tarjeta_circulacion || '—')}</strong></div>
-        <div class="apr-op-row"><span>Fecha expedición</span><strong>${c.fecha_expedicion_tc ? fmtFecha(c.fecha_expedicion_tc) : '—'}</strong></div>
+        ${_vence(c.fecha_vencimiento_tc,           'Tarjeta de circulación')}
+        ${_vence(c.fecha_vencimiento_seguro,        'Seguro')}
+        ${_vence(c.fecha_vencimiento_permiso_sct,   'Permiso SCT')}
+        ${_vence(c.vigencia_caat,                   'CAAT')}
+        ${_vence(c.fecha_vencimiento_verificacion,  'Verificación vehicular')}
       </div>
-      ${c.imagen_tc ? `<a href="#" onclick="verArchivoPublico('${esc(c.imagen_tc)}')" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:4px 0">🪪 Ver imagen TC</a>` : ''}
-      <div class="apr-op-section-title">CAAT</div>
+      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
+        ${c.imagen_tc  ? `<a href="#" onclick="verArchivoPublico('${esc(c.imagen_tc)}')"  class="btn-edit" style="font-size:0.75rem">🪪 TC</a>` : ''}
+        ${c.doc_sct    ? `<a href="#" onclick="verArchivoPublico('${esc(c.doc_sct)}')"    class="btn-edit" style="font-size:0.75rem">📄 SCT</a>` : ''}
+        ${c.doc_seguro ? `<a href="#" onclick="verArchivoPublico('${esc(c.doc_seguro)}')" class="btn-edit" style="font-size:0.75rem">📄 Seguro</a>` : ''}
+        ${(c.archivos||[]).length ? `<button class="btn-edit" style="font-size:0.75rem" onclick="verArchivos('${c.id}')">📎 Todos los archivos</button>` : ''}
+      </div>
+      <div class="apr-op-section-title" style="margin-top:10px">Núm. CAAT</div>
       <div class="apr-op-grid">
         <div class="apr-op-row"><span>Número CAAT</span><strong>${esc(c.caat || '—')}</strong></div>
-        <div class="apr-op-row"><span>Vigencia</span><strong>${c.vigencia_caat ? fmtFecha(c.vigencia_caat) : '—'}</strong></div>
+        <div class="apr-op-row"><span>TC expedición</span><strong>${c.fecha_expedicion_tc ? fmtFecha(c.fecha_expedicion_tc) : '—'}</strong></div>
       </div>
-      ${(c.archivos || []).length ? `<div style="margin-top:6px"><button class="btn-edit" onclick="verArchivos('${c.id}')">📎 Ver fotos/documentos</button></div>` : ''}
     </div>`;
   const diffHtml = _diffHtml(c, {
     tipo:'Tipo', marca:'Marca', version:'Versión', modelo_anio:'Año',
@@ -652,6 +666,8 @@ function _renderCamionCard(c) {
     num_serie:'Núm. serie', num_motor:'Núm. motor', num_economico:'Núm. económico',
     tarjeta_circulacion:'Núm. TC', fecha_expedicion_tc:'Fecha TC',
     caat:'CAAT', vigencia_caat:'Vigencia CAAT', precio_dia:'Precio/día',
+    fecha_vencimiento_tc:'Vence TC', fecha_vencimiento_seguro:'Vence Seguro',
+    fecha_vencimiento_permiso_sct:'Vence SCT', fecha_vencimiento_verificacion:'Vence Verificación',
   });
   return `
     <div class="apr-card" id="aprcam-${c.id}">
@@ -671,15 +687,31 @@ function _renderCamionCard(c) {
 }
 
 function _renderOperadorCard(op) {
+  const hoy    = new Date().toISOString().slice(0, 10);
   const nombre = [op.nombre, op.primer_apellido, op.segundo_apellido].filter(Boolean).join(' ');
   const foto   = op.foto_operador
     ? `<img src="${esc(op.foto_operador)}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--border)" alt="foto">`
     : `<div style="width:48px;height:48px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700">${(op.nombre||'?')[0].toUpperCase()}</div>`;
-  const venceColor = op.fecha_vencimiento && new Date(op.fecha_vencimiento) < new Date() ? 'var(--danger)' : 'inherit';
+
+  const _vence = (fecha, label) => {
+    if (!fecha) return `<div class="apr-op-row"><span>${label}</span><strong style="color:var(--text-muted)">— Sin fecha</strong></div>`;
+    const vencido = fecha < hoy;
+    return `<div class="apr-op-row"><span>${label}</span><strong style="color:${vencido ? 'var(--danger)' : 'inherit'}">${fmtFecha(fecha)}${vencido ? ' ⛔' : ''}</strong></div>`;
+  };
+  const _venceAnual = (fechaExamen, label) => {
+    if (!fechaExamen) return `<div class="apr-op-row"><span>${label}</span><strong style="color:var(--text-muted)">— Sin fecha</strong></div>`;
+    const d = new Date(fechaExamen + 'T00:00:00');
+    d.setFullYear(d.getFullYear() + 1);
+    const expStr  = d.toISOString().slice(0, 10);
+    const vencido = expStr < hoy;
+    return `<div class="apr-op-row"><span>${label}</span><strong style="color:${vencido ? 'var(--danger)' : 'inherit'}">${fmtFecha(fechaExamen)} → vence ${fmtFecha(expStr)}${vencido ? ' ⛔' : ''}</strong></div>`;
+  };
+
   const diffHtml = _diffHtml(op, {
-    nombre:'Nombre', primer_apellido:'Primer apellido',
+    nombre:'Nombre', primer_apellido:'Primer apellido', segundo_apellido:'Segundo apellido',
     curp:'CURP', nss:'NSS', num_licencia:'Núm. licencia', clase_licencia:'Clase licencia',
-    fecha_vencimiento:'Vencimiento', fecha_examen_medico:'Examen médico',
+    fecha_vencimiento:'Vencimiento licencia', fecha_examen_medico:'Examen médico',
+    fecha_examen_toxicologico:'Examen toxicológico', fecha_carta_antecedentes:'Carta antecedentes',
   });
   return `
     <div class="apr-card" id="aprop-${op.id}">
@@ -688,21 +720,31 @@ function _renderOperadorCard(op) {
           ${foto}
           <div>
             <div class="apr-tipo">👷 ${esc(nombre)}</div>
-            <div class="apr-sub">${esc(op.id)} · Lic: ${esc(op.clase_licencia||'—')} · Vence: <span style="color:${venceColor}">${op.fecha_vencimiento ? fmtFecha(op.fecha_vencimiento) : '—'}</span></div>
+            <div class="apr-sub">${esc(op.id)} · Lic: ${esc(op.clase_licencia||'—')}</div>
           </div>
         </div>
         ${op.es_edicion ? '<span class="apr-edicion-tag">✏️ Edición</span>' : '<span class="badge badge-revision">Pendiente</span>'}
       </div>
       ${diffHtml}
       <div class="apr-op-detalle">
+        <div class="apr-op-section-title">Identificación</div>
         <div class="apr-op-grid">
           <div class="apr-op-row"><span>CURP</span><strong>${esc(op.curp||'—')}</strong></div>
           <div class="apr-op-row"><span>NSS</span><strong>${esc(op.nss||'—')}</strong></div>
           <div class="apr-op-row"><span>Núm. licencia</span><strong>${esc(op.num_licencia||'—')}</strong></div>
           <div class="apr-op-row"><span>Clase</span><strong>${esc(op.clase_licencia||'—')}</strong></div>
-          <div class="apr-op-row"><span>Examen médico</span><strong>${op.fecha_examen_medico ? fmtFecha(op.fecha_examen_medico) : '—'}</strong></div>
         </div>
-        ${op.foto_licencia ? `<a href="${esc(op.foto_licencia)}" target="_blank" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">🪪 Ver foto de licencia</a>` : ''}
+        <div class="apr-op-section-title">Vigencias</div>
+        <div class="apr-op-grid">
+          ${_vence(op.fecha_vencimiento, 'Licencia de conducir')}
+          ${_venceAnual(op.fecha_examen_medico, 'Examen médico (1 año)')}
+          ${_venceAnual(op.fecha_examen_toxicologico, 'Examen toxicológico (1 año)')}
+          ${_venceAnual(op.fecha_carta_antecedentes, 'Carta antecedentes (1 año)')}
+        </div>
+        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
+          ${op.foto_licencia    ? `<a href="${esc(op.foto_licencia)}"    target="_blank" class="btn-edit" style="font-size:0.75rem">🪪 Licencia</a>` : ''}
+          ${op.doc_examen_medico ? `<a href="${esc(op.doc_examen_medico)}" target="_blank" class="btn-edit" style="font-size:0.75rem">📄 Examen médico</a>` : ''}
+        </div>
       </div>
       <div class="apr-actions">
         <button class="btn-apr-aprobar"  onclick="aprobarOperador('${op.id}')">✓ Aprobar</button>
@@ -712,7 +754,18 @@ function _renderOperadorCard(op) {
 }
 
 function _renderCustodioCard(c) {
-  const diffHtml = _diffHtml(c, { nombre:'Nombre', tipo:'Tipo', descripcion:'Descripción', disponibilidad:'Disponibilidad', precio_dia:'Precio/día', certificaciones:'Certificaciones' });
+  const hoy = new Date().toISOString().slice(0, 10);
+  const _vence = (fecha, label) => {
+    if (!fecha) return `<div class="apr-op-row"><span>${label}</span><strong style="color:var(--text-muted)">— Sin fecha</strong></div>`;
+    const vencido = fecha < hoy;
+    return `<div class="apr-op-row"><span>${label}</span><strong style="color:${vencido ? 'var(--danger)' : 'inherit'}">${fmtFecha(fecha)}${vencido ? ' ⛔' : ''}</strong></div>`;
+  };
+  const diffHtml = _diffHtml(c, {
+    nombre:'Nombre', tipo:'Tipo', descripcion:'Descripción',
+    disponibilidad:'Disponibilidad', precio_dia:'Precio/día', certificaciones:'Certificaciones',
+    porta_arma:'Porta arma', num_licencia_sedena:'Núm. lic. SEDENA',
+    fecha_vencimiento_cert:'Vence certificación', fecha_vencimiento_licencia_sedena:'Vence lic. SEDENA',
+  });
   return `
     <div class="apr-card" id="aprec-${c.id}">
       <div class="apr-card-header">
@@ -723,6 +776,16 @@ function _renderCustodioCard(c) {
         ${c.es_edicion ? '<span class="apr-edicion-tag">✏️ Edición</span>' : '<span class="badge badge-revision">Pendiente</span>'}
       </div>
       ${diffHtml}
+      <div class="apr-op-detalle">
+        <div class="apr-op-section-title">Vigencias</div>
+        <div class="apr-op-grid">
+          ${_vence(c.fecha_vencimiento_cert, 'Certificación')}
+          ${c.porta_arma ? _vence(c.fecha_vencimiento_licencia_sedena, 'Licencia SEDENA') : ''}
+          ${c.porta_arma && c.num_licencia_sedena ? `<div class="apr-op-row"><span>Núm. lic. SEDENA</span><strong>${esc(c.num_licencia_sedena)}</strong></div>` : ''}
+        </div>
+        ${c.doc_licencia_sedena ? `<a href="${esc(c.doc_licencia_sedena)}" target="_blank" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Licencia SEDENA</a>` : ''}
+        ${(c.certificaciones||[]).length ? `<div class="apr-op-section-title">Certificaciones</div><div class="pedido-chips">${(c.certificaciones||[]).map(x=>`<span class="cargo-chip">${esc(x)}</span>`).join('')}</div>` : ''}
+      </div>
       <div class="apr-actions">
         <button class="btn-apr-aprobar"  onclick="aprobarRecurso('custodios','${c.id}')">✓ Aprobar</button>
         <button class="btn-apr-rechazar" onclick="rechazarRecursoCompleto('custodios','${c.id}')">✕ Rechazar</button>
@@ -731,7 +794,18 @@ function _renderCustodioCard(c) {
 }
 
 function _renderPatioCard(p) {
-  const diffHtml = _diffHtml(p, { nombre:'Nombre', tipo:'Tipo', ubicacion:'Ubicación', area_m2:'Área (m²)', capacidad_vehiculos:'Capacidad (veh.)', precio_dia:'Precio/día', servicios:'Servicios' });
+  const hoy = new Date().toISOString().slice(0, 10);
+  const _vence = (fecha, label) => {
+    if (!fecha) return `<div class="apr-op-row"><span>${label}</span><strong style="color:var(--text-muted)">— Sin fecha</strong></div>`;
+    const vencido = fecha < hoy;
+    return `<div class="apr-op-row"><span>${label}</span><strong style="color:${vencido ? 'var(--danger)' : 'inherit'}">${fmtFecha(fecha)}${vencido ? ' ⛔' : ''}</strong></div>`;
+  };
+  const diffHtml = _diffHtml(p, {
+    nombre:'Nombre', tipo:'Tipo', ubicacion:'Ubicación',
+    area_m2:'Área (m²)', capacidad_vehiculos:'Capacidad (veh.)',
+    precio_dia:'Precio/día', servicios:'Servicios',
+    fecha_vencimiento_permiso:'Vence permiso operativo',
+  });
   return `
     <div class="apr-card" id="aprec-${p.id}">
       <div class="apr-card-header">
@@ -742,6 +816,12 @@ function _renderPatioCard(p) {
         ${p.es_edicion ? '<span class="apr-edicion-tag">✏️ Edición</span>' : '<span class="badge badge-revision">Pendiente</span>'}
       </div>
       ${diffHtml}
+      <div class="apr-op-detalle">
+        <div class="apr-op-grid">
+          ${_vence(p.fecha_vencimiento_permiso, 'Permiso operativo')}
+        </div>
+        ${p.doc_permiso ? `<a href="#" onclick="verArchivoPublico('${esc(p.doc_permiso)}');return false" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Ver permiso operativo</a>` : ''}
+      </div>
       <div class="apr-actions">
         <button class="btn-apr-aprobar"  onclick="aprobarRecurso('patios','${p.id}')">✓ Aprobar</button>
         <button class="btn-apr-rechazar" onclick="rechazarRecursoCompleto('patios','${p.id}')">✕ Rechazar</button>
@@ -1305,6 +1385,8 @@ async function aprobarDocsEmpresa(userId) {
     doc_permiso_sct_pendiente:   null,
     doc_seguro_rc_pendiente:     null,
     doc_seguro_carga_pendiente:  null,
+    docs_aprobados_en:  new Date().toISOString(),
+    docs_aprobados_por: currentUser.id,
   };
   if (p.fecha_vencimiento_permiso_sct_pendiente)  upd.fecha_vencimiento_permiso_sct  = p.fecha_vencimiento_permiso_sct_pendiente;
   if (p.fecha_vencimiento_seguro_rc_pendiente)    upd.fecha_vencimiento_seguro_rc    = p.fecha_vencimiento_seguro_rc_pendiente;

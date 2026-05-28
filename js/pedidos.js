@@ -1105,7 +1105,7 @@ async function openHacerOferta(pedidoId) {
   if (currentUser.rol === 'admin') {
     const hoy = new Date().toISOString().slice(0, 10);
     const { data: perfil } = await sb.from('perfiles')
-      .select('fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga')
+      .select('permiso_sct, seguro_rc, seguro_carga, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga')
       .eq('user_id', currentUser.id)
       .single();
     if (perfil) {
@@ -1119,6 +1119,15 @@ async function openHacerOferta(pedidoId) {
         if (btnEnv) btnEnv.disabled = true;
         document.getElementById('modal-hacer-oferta').classList.add('open');
         return;
+      }
+      // Advisory: docs claimed but no expiry date registered
+      const sinFecha = [];
+      if (perfil.permiso_sct  && !perfil.fecha_vencimiento_permiso_sct)  sinFecha.push('Permiso SCT');
+      if (perfil.seguro_rc    && !perfil.fecha_vencimiento_seguro_rc)    sinFecha.push('Seguro RC');
+      if (perfil.seguro_carga && !perfil.fecha_vencimiento_seguro_carga) sinFecha.push('Seguro de carga');
+      if (sinFecha.length && recursoWarnEl) {
+        recursoWarnEl.textContent = `⚠ Tu empresa declara ${sinFecha.join(', ')} pero no tiene fecha de vencimiento registrada. Registra la vigencia en tu perfil para que el cliente pueda verificarlo.`;
+        recursoWarnEl.style.display = 'block';
       }
     }
   }
@@ -1293,7 +1302,20 @@ function closeHacerOferta() {
   pedidoParaOfertar = null;
 }
 
-async function enviarOferta() {
+function enviarOferta() {
+  const warnEl = document.getElementById('ho-recurso-warn');
+  if (warnEl && warnEl.style.display !== 'none' && warnEl.textContent.includes('documentos vencidos')) {
+    showConfirm(
+      'La unidad seleccionada tiene documentos vencidos. ¿Deseas enviar la oferta de todas formas?',
+      () => _enviarOfertaCore(),
+      { danger: true, confirmLabel: 'Sí, enviar igual', cancelLabel: 'Cancelar' }
+    );
+    return;
+  }
+  _enviarOfertaCore();
+}
+
+async function _enviarOfertaCore() {
   const precio   = parseFloat(document.getElementById('ho-precio').value);
   const camion   = document.getElementById('ho-camion').value || null;
   const mensaje  = document.getElementById('ho-mensaje').value.trim();

@@ -189,7 +189,7 @@ function _limpiarFormOperador() {
   if (!contenedor) return;
   contenedor.querySelectorAll('input:not([type=file])').forEach(el => { el.value = ''; });
   contenedor.querySelectorAll('select').forEach(el => { el.selectedIndex = 0; });
-  ['op-foto-file', 'op-lic-file'].forEach(id => {
+  ['op-foto-file', 'op-lic-file', 'op-doc-medico', 'op-doc-tox', 'op-doc-antecedentes'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -287,7 +287,8 @@ async function agregarOperador() {
     if (error) return null;
     return sb.storage.from('operadores').getPublicUrl(path).data?.publicUrl || null;
   };
-  const [docToxUrl, docAntUrl] = await Promise.all([
+  const [docMedUrl, docToxUrl, docAntUrl] = await Promise.all([
+    _uploadOpDoc('op-doc-medico',       'examen_medico'),
     _uploadOpDoc('op-doc-tox',          'examen_tox'),
     _uploadOpDoc('op-doc-antecedentes', 'antecedentes'),
   ]);
@@ -312,6 +313,7 @@ async function agregarOperador() {
     fecha_examen_medico:         v('op-examen')            || null,
     fecha_examen_toxicologico:   v('op-examen-tox')        || null,
     fecha_carta_antecedentes:    v('op-antecedentes')      || null,
+    doc_examen_medico:           docMedUrl,
     doc_examen_toxicologico:     docToxUrl,
     doc_carta_antecedentes:      docAntUrl,
     num_licencia:         v('op-num-licencia')      || null,
