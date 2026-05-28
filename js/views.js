@@ -107,6 +107,7 @@ async function _loadAprBadge() {
     sb.from('lavados'   ).select('id',{count:'exact',head:true}).eq('aprobacion','pendiente'),
     sb.from('pedidos'   ).select('id',{count:'exact',head:true}).eq('estado','pendiente_revision'),
     sb.from('perfiles'  ).select('user_id',{count:'exact',head:true}).eq('aprobacion_cuenta','pendiente'),
+    sb.from('perfiles'  ).select('user_id',{count:'exact',head:true}).eq('perfil_docs_pendiente',true),
   ]);
   const total = counts.reduce((s,r) => s + (r.count||0), 0);
   if (total > 0) {

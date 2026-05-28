@@ -36,7 +36,7 @@ async function renderAprobaciones() {
 
   const [{ data: solicitudes }, { data: acuerdos }, { data: operadores },
          { data: camiones }, { data: custodios }, { data: patios }, { data: lavados },
-         { data: cuentasPend }] = await Promise.all([
+         { data: cuentasPend }, { data: docsEmpresa }] = await Promise.all([
     sb.from('pedidos').select('*').eq('estado', 'pendiente_revision').order('created_at'),
     sb.from('pedidos').select('*').eq('estado', 'pendiente_acuerdo').order('created_at'),
     sb.from('operadores').select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at'),
@@ -45,6 +45,7 @@ async function renderAprobaciones() {
     sb.from('patios'    ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at', { ascending: false }),
     sb.from('lavados'   ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('id', { ascending: false }),
     sb.from('solicitudes_cuenta').select('*').eq('estado', 'pendiente').order('created_at', { ascending: false }),
+    sb.from('perfiles').select('user_id, nombre, fecha_vencimiento_permiso_sct, fecha_vencimiento_permiso_sct_pendiente, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_rc_pendiente, fecha_vencimiento_seguro_carga, fecha_vencimiento_seguro_carga_pendiente, doc_permiso_sct, doc_permiso_sct_pendiente, doc_seguro_rc, doc_seguro_rc_pendiente, doc_seguro_carga, doc_seguro_carga_pendiente').eq('perfil_docs_pendiente', true),
   ]);
 
   // Cargar ofertas pendientes para los acuerdos
@@ -85,6 +86,43 @@ async function renderAprobaciones() {
     </div>`;
 
   let html = '';
+
+  // ── DOCUMENTOS DE EMPRESA PENDIENTES ─────────────────
+  if (docsEmpresa?.length) {
+    html += `<div class="apr-bloque-title">📋 Documentos de empresa <span class="apr-count">${docsEmpresa.length}</span></div>`;
+    const _verDoc = (url, label) => url
+      ? `<a href="${url}" target="_blank" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:2px 4px 2px 0">📄 ${label}</a>`
+      : `<span style="font-size:0.75rem;color:var(--text-muted)">Sin archivo</span>`;
+    const _fecha = (act, pend) => {
+      const linea = `${fmtFecha(pend) || '—'}`;
+      const prev  = act ? `<span style="text-decoration:line-through;color:var(--text-muted);margin-left:6px;font-size:0.8rem">${fmtFecha(act)}</span>` : '';
+      return linea + prev;
+    };
+    html += docsEmpresa.map(p => `
+      <div class="apr-card" id="apr-docs-${p.user_id}">
+        <div class="apr-card-header">
+          <div>
+            <div class="apr-tipo">🏢 ${esc(p.nombre || p.user_id)}</div>
+            <div class="apr-sub">Actualización de documentos legales</div>
+          </div>
+          <span class="apr-edicion-tag">📤 Enviado</span>
+        </div>
+        <div class="apr-op-detalle">
+          <div class="apr-op-grid">
+            <div class="apr-op-row"><span>Permiso SCT</span><strong>${_fecha(p.fecha_vencimiento_permiso_sct, p.fecha_vencimiento_permiso_sct_pendiente)}</strong></div>
+            <div class="apr-op-row" style="grid-column:1/-1">${_verDoc(p.doc_permiso_sct_pendiente, 'Ver permiso SCT')}</div>
+            <div class="apr-op-row"><span>Seguro RC</span><strong>${_fecha(p.fecha_vencimiento_seguro_rc, p.fecha_vencimiento_seguro_rc_pendiente)}</strong></div>
+            <div class="apr-op-row" style="grid-column:1/-1">${_verDoc(p.doc_seguro_rc_pendiente, 'Ver seguro RC')}</div>
+            <div class="apr-op-row"><span>Seguro de carga</span><strong>${_fecha(p.fecha_vencimiento_seguro_carga, p.fecha_vencimiento_seguro_carga_pendiente)}</strong></div>
+            <div class="apr-op-row" style="grid-column:1/-1">${_verDoc(p.doc_seguro_carga_pendiente, 'Ver seguro carga')}</div>
+          </div>
+        </div>
+        <div class="apr-actions">
+          <button class="btn-apr-aprobar"  onclick="aprobarDocsEmpresa('${p.user_id}')">✓ Aprobar documentos</button>
+          <button class="btn-apr-rechazar" onclick="rechazarDocsEmpresa('${p.user_id}','${esc(p.nombre || '')}')">✕ Rechazar</button>
+        </div>
+      </div>`).join('');
+  }
 
   // ── CUENTAS POR VERIFICAR ────────────────────────────
   html += `<div class="apr-bloque-title">👤 Cuentas por verificar <span class="apr-count">${cuentasPend.length}</span></div>`;
@@ -1249,4 +1287,70 @@ function aprobarTodosAcuerdos() {
     }
     showToast(`✓ ${ok} acuerdo${ok !== 1 ? 's' : ''} aprobado${ok !== 1 ? 's' : ''}${err ? ` · ${err} con error` : ''}`);
   }, { confirmLabel: 'Aprobar todos' });
+}
+
+// ── APROBAR / RECHAZAR DOCUMENTOS DE EMPRESA ─────────────
+
+async function aprobarDocsEmpresa(userId) {
+  const { data: p } = await sb.from('perfiles')
+    .select('nombre, fecha_vencimiento_permiso_sct_pendiente, fecha_vencimiento_seguro_rc_pendiente, fecha_vencimiento_seguro_carga_pendiente, doc_permiso_sct_pendiente, doc_seguro_rc_pendiente, doc_seguro_carga_pendiente')
+    .eq('user_id', userId).single();
+  if (!p) { showToast('Error al obtener el perfil', 'error'); return; }
+
+  const upd = {
+    perfil_docs_pendiente:              false,
+    fecha_vencimiento_permiso_sct_pendiente:  null,
+    fecha_vencimiento_seguro_rc_pendiente:    null,
+    fecha_vencimiento_seguro_carga_pendiente: null,
+    doc_permiso_sct_pendiente:   null,
+    doc_seguro_rc_pendiente:     null,
+    doc_seguro_carga_pendiente:  null,
+  };
+  if (p.fecha_vencimiento_permiso_sct_pendiente)  upd.fecha_vencimiento_permiso_sct  = p.fecha_vencimiento_permiso_sct_pendiente;
+  if (p.fecha_vencimiento_seguro_rc_pendiente)    upd.fecha_vencimiento_seguro_rc    = p.fecha_vencimiento_seguro_rc_pendiente;
+  if (p.fecha_vencimiento_seguro_carga_pendiente) upd.fecha_vencimiento_seguro_carga = p.fecha_vencimiento_seguro_carga_pendiente;
+  if (p.doc_permiso_sct_pendiente)  upd.doc_permiso_sct  = p.doc_permiso_sct_pendiente;
+  if (p.doc_seguro_rc_pendiente)    upd.doc_seguro_rc    = p.doc_seguro_rc_pendiente;
+  if (p.doc_seguro_carga_pendiente) upd.doc_seguro_carga = p.doc_seguro_carga_pendiente;
+
+  const { error } = await sb.from('perfiles').update(upd).eq('user_id', userId);
+  if (error) { showToast('Error al aprobar: ' + error.message, 'error'); return; }
+
+  await sb.from('notificaciones').insert({
+    user_id: userId, tipo: 'docs_empresa_aprobados',
+    titulo:  '✅ Documentos aprobados',
+    mensaje: 'El superadmin aprobó tus documentos legales de empresa. Ya están vigentes en la plataforma.',
+    leido:   false,
+  });
+
+  document.getElementById(`apr-docs-${userId}`)?.remove();
+  showToast(`✓ Documentos de ${esc(p.nombre || 'empresa')} aprobados`);
+  _loadAprBadge();
+}
+
+function rechazarDocsEmpresa(userId, nombre) {
+  _abrirRechazarNota(
+    `Rechazar documentos de ${nombre || 'empresa'}`,
+    'Motivo del rechazo (visible para la empresa)',
+    async nota => {
+      await sb.from('perfiles').update({
+        perfil_docs_pendiente:                    false,
+        fecha_vencimiento_permiso_sct_pendiente:  null,
+        fecha_vencimiento_seguro_rc_pendiente:    null,
+        fecha_vencimiento_seguro_carga_pendiente: null,
+        doc_permiso_sct_pendiente:   null,
+        doc_seguro_rc_pendiente:     null,
+        doc_seguro_carga_pendiente:  null,
+      }).eq('user_id', userId);
+      await sb.from('notificaciones').insert({
+        user_id: userId, tipo: 'docs_empresa_rechazados',
+        titulo:  '⚠ Documentos rechazados',
+        mensaje: `El superadmin rechazó tus documentos de empresa.${nota ? ' Motivo: ' + nota : ''} Corrígelos y vuelve a enviarlos.`,
+        leido:   false,
+      });
+      document.getElementById(`apr-docs-${userId}`)?.remove();
+      showToast('Documentos rechazados y notificados');
+      _loadAprBadge();
+    }
+  );
 }

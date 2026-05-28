@@ -277,6 +277,21 @@ async function agregarOperador() {
     }
   }
 
+  // Subir documentos legales opcionales
+  const _uploadOpDoc = async (inputId, nombre) => {
+    const file = document.getElementById(inputId)?.files?.[0];
+    if (!file) return null;
+    const ext  = file.name.split('.').pop();
+    const path = `${propietarioId}/${id}/${nombre}_${Date.now()}.${ext}`;
+    const { error } = await sb.storage.from('operadores').upload(path, file, { upsert: true });
+    if (error) return null;
+    return sb.storage.from('operadores').getPublicUrl(path).data?.publicUrl || null;
+  };
+  const [docToxUrl, docAntUrl] = await Promise.all([
+    _uploadOpDoc('op-doc-tox',          'examen_tox'),
+    _uploadOpDoc('op-doc-antecedentes', 'antecedentes'),
+  ]);
+
   const payload = {
     id,
     propietario_id:       propietarioId,
@@ -297,6 +312,8 @@ async function agregarOperador() {
     fecha_examen_medico:         v('op-examen')            || null,
     fecha_examen_toxicologico:   v('op-examen-tox')        || null,
     fecha_carta_antecedentes:    v('op-antecedentes')      || null,
+    doc_examen_toxicologico:     docToxUrl,
+    doc_carta_antecedentes:      docAntUrl,
     num_licencia:         v('op-num-licencia')      || null,
     clase_licencia:       v('op-clase-licencia')    || null,
     tipo_licencia:        v('op-tipo-licencia')     || null,

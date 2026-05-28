@@ -202,6 +202,12 @@ function togglePerfilCard() {
   icon.textContent   = isOpen ? '▼ Editar' : '▲ Ocultar';
 }
 
+function previewDocNombre(input, previewId) {
+  const el = document.getElementById(previewId);
+  if (!el) return;
+  el.textContent = input.files?.[0] ? '📎 ' + input.files[0].name : '';
+}
+
 async function renderPerfilEmpresa() {
   if (!currentUser.id) return;
   const { data: p } = await sb.from('perfiles').select('*').eq('user_id', currentUser.id).single();
@@ -214,13 +220,30 @@ async function renderPerfilEmpresa() {
   set('pe-unidades', p.num_unidades);
   set('pe-sct',       p.permiso_sct);
   set('pe-desc',      p.descripcion);
-  set('pe-vence-sct',   p.fecha_vencimiento_permiso_sct);
-  set('pe-vence-rc',    p.fecha_vencimiento_seguro_rc);
-  set('pe-vence-carga', p.fecha_vencimiento_seguro_carga);
   const rc    = document.getElementById('pe-rc');
   const carga = document.getElementById('pe-carga');
   if (rc)    rc.checked    = !!p.seguro_rc;
   if (carga) carga.checked = !!p.seguro_carga;
+
+  // Mostrar fechas pendientes o aprobadas en los campos de documentos
+  const hayPend = !!p.perfil_docs_pendiente;
+  set('pe-vence-sct',   hayPend ? p.fecha_vencimiento_permiso_sct_pendiente  : p.fecha_vencimiento_permiso_sct);
+  set('pe-vence-rc',    hayPend ? p.fecha_vencimiento_seguro_rc_pendiente    : p.fecha_vencimiento_seguro_rc);
+  set('pe-vence-carga', hayPend ? p.fecha_vencimiento_seguro_carga_pendiente : p.fecha_vencimiento_seguro_carga);
+
+  const banner = document.getElementById('pe-docs-pendiente-banner');
+  if (banner) banner.style.display = hayPend ? '' : 'none';
+
+  const _docLink = (elId, url, label) => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.innerHTML = url
+      ? `<a href="${url}" target="_blank" style="font-size:0.78rem;color:var(--primary)">📄 Ver ${label}${hayPend ? ' (pendiente)' : ''}</a>`
+      : '';
+  };
+  _docLink('pe-doc-sct-actual',   hayPend ? p.doc_permiso_sct_pendiente  : p.doc_permiso_sct,   'permiso SCT');
+  _docLink('pe-doc-rc-actual',    hayPend ? p.doc_seguro_rc_pendiente     : p.doc_seguro_rc,     'seguro RC');
+  _docLink('pe-doc-carga-actual', hayPend ? p.doc_seguro_carga_pendiente  : p.doc_seguro_carga,  'seguro de carga');
 }
 
 async function guardarPerfilEmpresa() {
@@ -234,14 +257,65 @@ async function guardarPerfilEmpresa() {
     descripcion:    document.getElementById('pe-desc').value.trim(),
     seguro_rc:      document.getElementById('pe-rc').checked,
     seguro_carga:   document.getElementById('pe-carga').checked,
-    fecha_vencimiento_permiso_sct:  document.getElementById('pe-vence-sct')?.value   || null,
-    fecha_vencimiento_seguro_rc:    document.getElementById('pe-vence-rc')?.value    || null,
-    fecha_vencimiento_seguro_carga: document.getElementById('pe-vence-carga')?.value || null,
   };
   const { error } = await sb.from('perfiles').update(payload).eq('user_id', currentUser.id);
   if (error) { showToast('Error al guardar perfil'); return; }
   showToast('✓ Perfil actualizado');
   togglePerfilCard();
+}
+
+async function solicitarActualizacionDocs() {
+  const sctDate   = document.getElementById('pe-vence-sct')?.value   || null;
+  const rcDate    = document.getElementById('pe-vence-rc')?.value    || null;
+  const cargaDate = document.getElementById('pe-vence-carga')?.value || null;
+  if (!sctDate && !rcDate && !cargaDate) {
+    showToast('Ingresa al menos una fecha de vencimiento', 'error'); return;
+  }
+
+  const _done = _btnLoading('btn-solicitar-docs');
+  const uid = currentUser.id;
+  const ts  = Date.now();
+
+  const _uploadDoc = async (inputId, nombre) => {
+    const file = document.getElementById(inputId)?.files?.[0];
+    if (!file) return null;
+    const ext  = file.name.split('.').pop();
+    const path = `${uid}/${nombre}_${ts}.${ext}`;
+    const { error } = await sb.storage.from('documentos-empresa').upload(path, file, { upsert: true });
+    if (error) return null;
+    return sb.storage.from('documentos-empresa').getPublicUrl(path).data?.publicUrl || null;
+  };
+
+  const [docSct, docRc, docCarga] = await Promise.all([
+    _uploadDoc('pe-doc-sct',   'permiso_sct'),
+    _uploadDoc('pe-doc-rc',    'seguro_rc'),
+    _uploadDoc('pe-doc-carga', 'seguro_carga'),
+  ]);
+
+  const payload = {
+    perfil_docs_pendiente:                    true,
+    fecha_vencimiento_permiso_sct_pendiente:  sctDate,
+    fecha_vencimiento_seguro_rc_pendiente:    rcDate,
+    fecha_vencimiento_seguro_carga_pendiente: cargaDate,
+  };
+  if (docSct)   payload.doc_permiso_sct_pendiente  = docSct;
+  if (docRc)    payload.doc_seguro_rc_pendiente     = docRc;
+  if (docCarga) payload.doc_seguro_carga_pendiente  = docCarga;
+
+  const { error } = await sb.from('perfiles').update(payload).eq('user_id', uid);
+  if (error) { _done(); showToast('Error al enviar: ' + error.message, 'error'); return; }
+
+  const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+  if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
+    user_id: sa.user_id, tipo: 'docs_empresa_pendientes',
+    titulo:  '📋 Documentos de empresa para revisar',
+    mensaje: `${esc(currentUser.nombre || '')} envió documentos de empresa para actualización.`,
+    leido:   false,
+  })));
+
+  _done();
+  showToast('✓ Documentos enviados — pendientes de aprobación');
+  await renderPerfilEmpresa();
 }
 
 // ── CHIPS DE TIPO DE CARGA ────────────────────────────
@@ -857,6 +931,19 @@ async function agregarCustodio() {
   const esSuperAdmin = currentUser.rol === 'superadmin';
   const propietarioId = _getPropietarioId('custodio');
   if (!propietarioId) { _done(); return; }
+
+  // Subir documento SEDENA si es custodio armado
+  let docSedenaUrl = null;
+  if (tipo === 'Armado') {
+    const sedenaFile = document.getElementById('ac-doc-sedena')?.files?.[0];
+    if (sedenaFile) {
+      const ext  = sedenaFile.name.split('.').pop();
+      const path = `${propietarioId}/${id}/licencia_sedena_${Date.now()}.${ext}`;
+      const { error: upErr } = await sb.storage.from('custodios').upload(path, sedenaFile, { upsert: true });
+      if (!upErr) docSedenaUrl = sb.storage.from('custodios').getPublicUrl(path).data?.publicUrl || null;
+    }
+  }
+
   const { error } = await sb.from('custodios').insert({
     id, nombre, tipo, descripcion: desc || null,
     disponibilidad: disp,
@@ -864,9 +951,10 @@ async function agregarCustodio() {
     propietario_id: propietarioId,
     certificaciones: certs ? certs.split(',').map(s => s.trim()).filter(Boolean) : [],
     fecha_vencimiento_cert:            document.getElementById('ac-vence-cert')?.value    || null,
-    porta_arma:                        document.getElementById('ac-tipo').value === 'Armado',
+    porta_arma:                        tipo === 'Armado',
     num_licencia_sedena:               document.getElementById('ac-num-sedena')?.value.trim() || null,
     fecha_vencimiento_licencia_sedena: document.getElementById('ac-vence-sedena')?.value  || null,
+    doc_licencia_sedena:               docSedenaUrl,
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
   });
   if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }

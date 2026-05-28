@@ -206,6 +206,7 @@
         <span id="perfil-toggle-icon" style="margin-left:auto;font-size:0.85rem;color:var(--text-muted)">▼ Editar</span>
       </h3>
       <div id="perfil-card-body" style="display:none">
+        <!-- ── Datos generales ─────────────────────────────── -->
         <div class="admin-grid" style="margin-top:4px">
           <div class="form-group">
             <label>Razón social</label>
@@ -228,16 +229,12 @@
             <input type="number" id="pe-unidades" placeholder="Ej. 5" min="1">
           </div>
           <div class="form-group">
-            <label>Permiso SCT</label>
+            <label>Núm. permiso SCT</label>
             <input type="text" id="pe-sct" placeholder="Ej. SCT/TPAF/MZ-0001/2024">
           </div>
           <div class="form-group" style="grid-column:1/-1">
             <label>Descripción de la empresa</label>
             <textarea id="pe-desc" rows="3" placeholder="¿Qué servicios ofrecen? ¿Zonas que cubren? ¿Especialidad?"></textarea>
-          </div>
-          <div class="form-group">
-            <label>Vencimiento permiso SCT</label>
-            <input type="date" id="pe-vence-sct">
           </div>
           <div class="form-group" style="grid-column:1/-1">
             <label>Seguros vigentes</label>
@@ -250,16 +247,62 @@
               </label>
             </div>
           </div>
-          <div class="form-group">
-            <label>Vencimiento seguro RC</label>
-            <input type="date" id="pe-vence-rc">
-          </div>
-          <div class="form-group">
-            <label>Vencimiento seguro de carga</label>
-            <input type="date" id="pe-vence-carga">
-          </div>
         </div>
         <button class="btn-add" style="margin-top:8px" onclick="guardarPerfilEmpresa()">💾 Guardar perfil</button>
+
+        <!-- ── Documentos legales (requieren aprobación) ───── -->
+        <div class="op-form-section-title" style="margin-top:24px">📋 Documentos legales <span style="font-weight:400;font-size:0.8rem;color:var(--text-muted)">— requieren revisión del superadmin</span></div>
+        <div id="pe-docs-pendiente-banner" style="display:none;background:var(--surface-2,#fef3c7);border:1px solid var(--warn-border,#f59e0b);border-radius:8px;padding:10px 14px;margin:10px 0 0;font-size:0.85rem;color:var(--text,#92400e)">
+          ⏳ Tienes cambios de documentos pendientes de aprobación por el superadmin
+        </div>
+        <div class="admin-grid" style="margin-top:12px">
+          <div class="form-group">
+            <label>Permiso SCT — vencimiento</label>
+            <input type="date" id="pe-vence-sct">
+            <div id="pe-doc-sct-actual" style="font-size:0.78rem;margin-top:4px"></div>
+          </div>
+          <div class="form-group">
+            <label>Permiso SCT — documento</label>
+            <label class="file-upload-area" for="pe-doc-sct">
+              <span class="file-upload-icon">📄</span>
+              <span class="file-upload-text">PDF o imagen</span>
+            </label>
+            <input type="file" id="pe-doc-sct" accept="image/*,.pdf" style="display:none"
+                   onchange="previewDocNombre(this,'pe-doc-sct-preview')">
+            <div id="pe-doc-sct-preview"></div>
+          </div>
+          <div class="form-group">
+            <label>Seguro RC — vencimiento</label>
+            <input type="date" id="pe-vence-rc">
+            <div id="pe-doc-rc-actual" style="font-size:0.78rem;margin-top:4px"></div>
+          </div>
+          <div class="form-group">
+            <label>Seguro RC — póliza</label>
+            <label class="file-upload-area" for="pe-doc-rc">
+              <span class="file-upload-icon">📄</span>
+              <span class="file-upload-text">PDF o imagen</span>
+            </label>
+            <input type="file" id="pe-doc-rc" accept="image/*,.pdf" style="display:none"
+                   onchange="previewDocNombre(this,'pe-doc-rc-preview')">
+            <div id="pe-doc-rc-preview"></div>
+          </div>
+          <div class="form-group">
+            <label>Seguro de carga — vencimiento</label>
+            <input type="date" id="pe-vence-carga">
+            <div id="pe-doc-carga-actual" style="font-size:0.78rem;margin-top:4px"></div>
+          </div>
+          <div class="form-group">
+            <label>Seguro de carga — póliza</label>
+            <label class="file-upload-area" for="pe-doc-carga">
+              <span class="file-upload-icon">📄</span>
+              <span class="file-upload-text">PDF o imagen</span>
+            </label>
+            <input type="file" id="pe-doc-carga" accept="image/*,.pdf" style="display:none"
+                   onchange="previewDocNombre(this,'pe-doc-carga-preview')">
+            <div id="pe-doc-carga-preview"></div>
+          </div>
+        </div>
+        <button class="btn-add" id="btn-solicitar-docs" style="margin-top:10px" onclick="solicitarActualizacionDocs()">📤 Enviar documentos para aprobación</button>
       </div>
     </div>
 
@@ -573,6 +616,16 @@
             <label>Vencimiento licencia SEDENA</label>
             <input type="date" id="ac-vence-sedena">
           </div>
+          <div class="form-group">
+            <label>Documento licencia SEDENA</label>
+            <label class="file-upload-area" for="ac-doc-sedena">
+              <span class="file-upload-icon">📄</span>
+              <span class="file-upload-text">PDF o imagen</span>
+            </label>
+            <input type="file" id="ac-doc-sedena" accept="image/*,.pdf" style="display:none"
+                   onchange="previewDocNombre(this,'ac-doc-sedena-preview')">
+            <div id="ac-doc-sedena-preview"></div>
+          </div>
         </div>
         <div class="form-group">
           <label>Disponibilidad</label>
@@ -802,8 +855,28 @@
           <input type="date" id="op-examen-tox">
         </div>
         <div class="form-group">
+          <label>Documento — examen toxicológico</label>
+          <label class="file-upload-area" for="op-doc-tox">
+            <span class="file-upload-icon">📄</span>
+            <span class="file-upload-text">PDF o imagen</span>
+          </label>
+          <input type="file" id="op-doc-tox" accept="image/*,.pdf" style="display:none"
+                 onchange="previewDocNombre(this,'op-doc-tox-preview')">
+          <div id="op-doc-tox-preview"></div>
+        </div>
+        <div class="form-group">
           <label>Fecha carta de no antecedentes penales</label>
           <input type="date" id="op-antecedentes">
+        </div>
+        <div class="form-group">
+          <label>Documento — carta de no antecedentes</label>
+          <label class="file-upload-area" for="op-doc-antecedentes">
+            <span class="file-upload-icon">📄</span>
+            <span class="file-upload-text">PDF o imagen</span>
+          </label>
+          <input type="file" id="op-doc-antecedentes" accept="image/*,.pdf" style="display:none"
+                 onchange="previewDocNombre(this,'op-doc-antecedentes-preview')">
+          <div id="op-doc-antecedentes-preview"></div>
         </div>
 
         <div class="op-form-section">
@@ -2031,13 +2104,13 @@
 <script src="js/config.js?v=12"></script>
 <script src="js/auth.js?v=16"></script>
 <script src="js/theme.js?v=10"></script>
-<script src="js/views.js?v=16"></script>
+<script src="js/views.js?v=17"></script>
 <script src="js/camiones.js?v=10"></script>
 <script src="js/recursos.js?v=10"></script>
 <script src="js/reservaciones.js?v=17"></script>
 <script src="js/modal.js?v=10"></script>
 <script src="js/pedidos.js?v=29"></script>
-<script src="js/aprobaciones.js?v=20"></script>
+<script src="js/aprobaciones.js?v=21"></script>
 <script src="js/admin.js?v=22"></script>
 <script src="js/operadores.js?v=6"></script>
 <script src="js/usuarios.js?v=15"></script>
