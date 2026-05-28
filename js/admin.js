@@ -731,9 +731,12 @@ async function agregarCamion() {
     num_motor:           g('admin-num-motor'),
     num_economico:       g('admin-num-economico'),
     tipo_combustible:    g('admin-combustible'),
-    tarjeta_circulacion: g('admin-tc'),
-    fecha_expedicion_tc: document.getElementById('admin-fecha-tc')?.value  || null,
-    imagen_tc:           imagenTc,
+    tarjeta_circulacion:          g('admin-tc'),
+    fecha_expedicion_tc:          document.getElementById('admin-fecha-tc')?.value          || null,
+    fecha_vencimiento_tc:         document.getElementById('admin-vence-tc')?.value          || null,
+    fecha_vencimiento_seguro:     document.getElementById('admin-vence-seguro')?.value      || null,
+    fecha_vencimiento_permiso_sct:document.getElementById('admin-vence-permiso-sct')?.value || null,
+    imagen_tc:                    imagenTc,
   };
 
   let error;
@@ -758,7 +761,8 @@ async function agregarCamion() {
 
   // Limpiar formulario
   ['admin-cap','admin-precio','admin-placas','admin-dim','admin-version','admin-modelo-anio',
-   'admin-num-serie','admin-num-motor','admin-num-economico','admin-tc','admin-fecha-tc'].forEach(fid => {
+   'admin-num-serie','admin-num-motor','admin-num-economico','admin-tc','admin-fecha-tc',
+   'admin-vence-tc','admin-vence-seguro','admin-vence-permiso-sct'].forEach(fid => {
     const el = document.getElementById(fid); if (el) el.value = '';
   });
   ['admin-foto-frente','admin-foto-laterales','admin-foto-trasera','admin-foto-placa',
@@ -845,6 +849,7 @@ async function agregarCustodio() {
     precio_dia: precio,
     propietario_id: propietarioId,
     certificaciones: certs ? certs.split(',').map(s => s.trim()).filter(Boolean) : [],
+    fecha_vencimiento_cert: document.getElementById('ac-vence-cert')?.value || null,
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
   });
   if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
@@ -859,7 +864,7 @@ async function agregarCustodio() {
     })));
   }
 
-  ['ac-nombre','ac-desc','ac-precio','ac-certs'].forEach(i => {
+  ['ac-nombre','ac-desc','ac-precio','ac-certs','ac-vence-cert'].forEach(i => {
     const el = document.getElementById(i); if (el) el.value = '';
   });
   _done();

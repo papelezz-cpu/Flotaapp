@@ -22,6 +22,7 @@ function showView(v, btn) {
   if (v === 'reportes')           renderReportes();
   if (v === 'mis-stats')          renderMisStats();
   if (v === 'historial-reservas') renderHistorialReservas();
+  if (v === 'vigencias')         renderVigencias();
 }
 
 function toggleMenu() {
@@ -57,6 +58,7 @@ function renderHome() {
       { e:'👮', bg:'hc-teal',   t:'Custodios',     d:'Servicios de seguridad',           fn:`_irAdmin('custodio')` },
       { e:'🏭', bg:'hc-orange', t:'Patios',        d:'Almacenamiento y estacionamiento', fn:`_irAdmin('patio')` },
       { e:'🚿', bg:'hc-green',  t:'Lavados',       d:'Limpieza vehicular',               fn:`_irAdmin('lavado')` },
+      { e:'📅', bg:'hc-red',    t:'Vigencias',     d:'Documentos por vencer o vencidos', fn:`showView('vigencias',null)`, badge:'home-vig-badge' },
       { e:'📈', bg:'hc-purple', t:'Mi desempeño',  d:'Estadísticas personales',          fn:`showView('mis-stats',null)` },
     ],
     superadmin: [
@@ -65,6 +67,7 @@ function renderHome() {
       { e:'📋', bg:'hc-slate',  t:'Solicitudes',   d:'Pedidos en el sistema',            fn:`showView('pedidos',null)` },
       { e:'📊', bg:'hc-amber',  t:'Reportes',      d:'Métricas y estadísticas',          fn:`showView('reportes',null)` },
       { e:'📚', bg:'hc-teal',   t:'Catálogo',      d:'Directorio de proveedores',        fn:`showView('cliente',null)` },
+      { e:'📅', bg:'hc-red',    t:'Vigencias',     d:'Documentos vencidos o por vencer', fn:`showView('vigencias',null)`, badge:'home-vig-badge' },
       { e:'🗓️', bg:'hc-purple', t:'Reservaciones', d:'Reservas activas',                 fn:`showView('reservaciones',null)` },
       { e:'🗃',  bg:'hc-orange', t:'Historial',     d:'Reservaciones archivadas',         fn:`showView('historial-reservas',null)` },
     ],
@@ -81,6 +84,7 @@ function renderHome() {
     </div>`).join('');
 
   if (currentUser?.rol === 'superadmin') _loadAprBadge();
+  if (['admin','superadmin'].includes(currentUser?.rol)) actualizarBadgeVigencias();
 }
 
 function _navTab(view) {

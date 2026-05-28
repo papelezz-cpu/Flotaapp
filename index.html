@@ -24,7 +24,7 @@
   <!-- Estilos -->
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
-  <link rel="stylesheet" href="css/components.css?v=8">
+  <link rel="stylesheet" href="css/components.css?v=9">
   <link rel="stylesheet" href="css/login.css?v=2">
   <link rel="stylesheet" href="css/detalle.css">
   <link rel="stylesheet" href="css/theme.css">
@@ -375,6 +375,20 @@
           <label>Fecha de expedición TC</label>
           <input type="date" id="admin-fecha-tc">
         </div>
+        <div class="form-group">
+          <label>Fecha de vencimiento TC</label>
+          <input type="date" id="admin-vence-tc">
+        </div>
+
+        <div class="op-form-section-title" style="margin-top:16px">Seguro y permisos</div>
+        <div class="form-group">
+          <label>Vencimiento del seguro</label>
+          <input type="date" id="admin-vence-seguro">
+        </div>
+        <div class="form-group">
+          <label>Vencimiento del permiso SCT</label>
+          <input type="date" id="admin-vence-permiso-sct">
+        </div>
 
         <div class="op-form-section-title" style="margin-top:16px">Operación</div>
         <div class="form-group">
@@ -521,6 +535,10 @@
         <div class="form-group">
           <label>Certificaciones <span style="font-weight:400;color:var(--text-muted)">(separadas por coma)</span></label>
           <input type="text" id="ac-certs" placeholder="Ej. Portación de arma, Primeros auxilios">
+        </div>
+        <div class="form-group">
+          <label>Vencimiento de certificaciones</label>
+          <input type="date" id="ac-vence-cert">
         </div>
         <div class="form-group">
           <label>Disponibilidad</label>
@@ -830,6 +848,15 @@
     <div id="aprobaciones-section">
       <div id="aprobaciones-content"></div>
     </div>
+  </div>
+</div>
+
+<!-- ══ VISTA: VIGENCIAS (admin + superadmin) ══════════ -->
+<div id="view-vigencias" class="view">
+  <div class="page">
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
+    <div class="section-title">📅 Vigencias y vencimientos</div>
+    <div id="vigencias-content"></div>
   </div>
 </div>
 
@@ -1954,20 +1981,21 @@
 <script src="js/config.js?v=12"></script>
 <script src="js/auth.js?v=16"></script>
 <script src="js/theme.js?v=10"></script>
-<script src="js/views.js?v=15"></script>
+<script src="js/views.js?v=16"></script>
 <script src="js/camiones.js?v=10"></script>
 <script src="js/recursos.js?v=10"></script>
 <script src="js/reservaciones.js?v=17"></script>
 <script src="js/modal.js?v=10"></script>
 <script src="js/pedidos.js?v=28"></script>
 <script src="js/aprobaciones.js?v=20"></script>
-<script src="js/admin.js?v=19"></script>
+<script src="js/admin.js?v=20"></script>
 <script src="js/operadores.js?v=5"></script>
 <script src="js/usuarios.js?v=15"></script>
 <script src="js/reportes.js?v=2"></script>
 <script src="js/chat.js?v=11"></script>
 <script src="js/catalogo.js?v=16"></script>
 <script src="js/tracking.js?v=11"></script>
+<script src="js/vigencias.js?v=1"></script>
 <script src="js/main.js?v=14"></script>
 
 <!-- ══ PANEL DE CHAT ════════════════════════════════════ -->

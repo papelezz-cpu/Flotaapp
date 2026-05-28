@@ -1553,4 +1553,64 @@ body:not(.role-admin):not(.role-superadmin) .admin-hidden { display: flex; }
   padding: 10px 4px 4px; text-transform: uppercase; letter-spacing: 0.05em;
 }
 
+/* ── VIGENCIAS ───────────────────────────────────────── */
+.vig-empty {
+  text-align: center; padding: 40px 20px;
+  color: var(--text-muted); font-size: 0.95rem;
+}
+.vig-seccion-title {
+  font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em;
+  text-transform: uppercase; padding: 6px 4px 10px;
+}
+.vig-seccion--danger { color: #f87171; }
+.vig-seccion--warn   { color: #fb923c; }
 
+.vig-empresa-card {
+  border-radius: 12px; border: 1px solid var(--border);
+  margin-bottom: 10px; overflow: hidden;
+  background: var(--navy-mid);
+}
+.vig-empresa-card--danger { border-color: rgba(239,68,68,0.35); }
+.vig-empresa-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; cursor: pointer; user-select: none;
+  transition: background 0.15s;
+}
+.vig-empresa-header:hover { background: rgba(255,255,255,0.04); }
+.vig-empresa-name { font-weight: 700; font-size: 0.93rem; flex: 1; }
+.vig-empresa-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.vig-badge {
+  font-size: 0.72rem; font-weight: 700; padding: 2px 9px;
+  border-radius: 20px;
+}
+.vig-badge--danger { background: rgba(239,68,68,0.15); color: #f87171; }
+.vig-badge--warn   { background: rgba(251,146,60,0.15); color: #fb923c; }
+.vig-empresa-items { padding: 0 12px 12px; }
+
+.vig-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-radius: 9px; margin-bottom: 6px;
+  border: 1px solid var(--border);
+}
+.vig-item--vencido {
+  background: rgba(239,68,68,0.07); border-color: rgba(239,68,68,0.25);
+}
+.vig-item--proximo {
+  background: rgba(251,146,60,0.07); border-color: rgba(251,146,60,0.25);
+}
+.vig-item-left  { flex: 1; min-width: 0; }
+.vig-item-right { text-align: right; flex-shrink: 0; margin-left: 12px; }
+.vig-item-nombre {
+  font-size: 0.88rem; font-weight: 700; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.vig-item-doc   { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+.vig-item-fecha { font-size: 0.8rem; color: var(--text-muted); }
+.vig-item-dias  { font-size: 0.78rem; font-weight: 700; margin-top: 2px; }
+.vig-item-dias--vencido { color: #f87171; }
+.vig-item-dias--proximo { color: #fb923c; }
+
+body.light .vig-empresa-card    { background: #fff; }
+body.light .vig-item--vencido   { background: rgba(239,68,68,0.05); }
+body.light .vig-item--proximo   { background: rgba(251,146,60,0.05); }
+body.light .vig-empresa-header:hover { background: rgba(0,0,0,0.03); }
