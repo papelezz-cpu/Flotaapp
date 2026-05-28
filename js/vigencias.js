@@ -169,6 +169,7 @@ function toggleVigEmpresa(uid) {
   if (tog) tog.textContent = open ? '▼' : '▲';
 }
 
+// Badge: cuenta empresas/recursos únicos afectados, no violaciones
 async function actualizarBadgeVigencias() {
   const esSA    = currentUser?.rol === 'superadmin';
   const esAdmin = currentUser?.rol === 'admin';
@@ -181,25 +182,35 @@ async function actualizarBadgeVigencias() {
   const limiStr = limite.toISOString().slice(0, 10);
   const uid = currentUser.id;
 
-  const _q = (tabla, campo) => {
-    let q = sb.from(tabla).select('id', { count: 'exact', head: true })
-      .lte(campo, limiStr).not(campo, 'is', null);
+  // Cuenta IDs únicos de camiones con ALGÚN campo vencido/próximo
+  const _qCamion = () => {
+    let q = sb.from('camiones')
+      .select('id')
+      .or(`vigencia_caat.lte.${limiStr},fecha_vencimiento_tc.lte.${limiStr},fecha_vencimiento_seguro.lte.${limiStr},fecha_vencimiento_permiso_sct.lte.${limiStr}`)
+      .not('id', 'is', null);
     if (!esSA) q = q.eq('propietario_id', uid);
     return q;
   };
 
-  const resultados = await Promise.all([
-    _q('camiones',   'vigencia_caat'),
-    _q('camiones',   'fecha_vencimiento_tc'),
-    _q('camiones',   'fecha_vencimiento_seguro'),
-    _q('camiones',   'fecha_vencimiento_permiso_sct'),
-    _q('operadores', 'fecha_vencimiento'),
-    _q('custodios',  'fecha_vencimiento_cert'),
-    _q('patios',     'fecha_vencimiento_permiso'),
-  ]);
+  const _q = (tabla, campo) => {
+    let q = sb.from(tabla).select('id', { count: 'exact', head: true })
+      .lte(campo, limiStr).not(campo, 'is', null);
+    if (!esSA && tabla !== 'perfiles') q = q.eq('propietario_id', uid);
+    if (!esSA && tabla === 'perfiles')  q = q.eq('user_id', uid);
+    return q;
+  };
 
-  // Contar filas únicas (pueden solaparse por camión con varios campos vencidos)
-  const total = resultados.reduce((acc, { count }) => acc + (count || 0), 0);
-  const badge = document.getElementById('home-vig-badge');
-  if (badge) badge.textContent = total > 0 ? total : '';
+  try {
+    const [{ data: camIds }, { count: cOp }, { count: cCus }, { count: cPat }] = await Promise.all([
+      _qCamion(),
+      _q('operadores', 'fecha_vencimiento'),
+      _q('custodios',  'fecha_vencimiento_cert'),
+      _q('patios',     'fecha_vencimiento_permiso'),
+    ]);
+    const camUniq = new Set((camIds || []).map(c => c.id)).size;
+    const total   = camUniq + (cOp || 0) + (cCus || 0) + (cPat || 0);
+    const badge   = document.getElementById('home-vig-badge');
+    if (badge) badge.textContent = total > 0 ? total : '';
+  } catch (_) {}
 }
+

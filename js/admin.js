@@ -212,8 +212,11 @@ async function renderPerfilEmpresa() {
   set('pe-telefono', p.telefono);
   set('pe-anos',     p.anos_operacion);
   set('pe-unidades', p.num_unidades);
-  set('pe-sct',      p.permiso_sct);
-  set('pe-desc',     p.descripcion);
+  set('pe-sct',       p.permiso_sct);
+  set('pe-desc',      p.descripcion);
+  set('pe-vence-sct',   p.fecha_vencimiento_permiso_sct);
+  set('pe-vence-rc',    p.fecha_vencimiento_seguro_rc);
+  set('pe-vence-carga', p.fecha_vencimiento_seguro_carga);
   const rc    = document.getElementById('pe-rc');
   const carga = document.getElementById('pe-carga');
   if (rc)    rc.checked    = !!p.seguro_rc;
@@ -231,6 +234,9 @@ async function guardarPerfilEmpresa() {
     descripcion:    document.getElementById('pe-desc').value.trim(),
     seguro_rc:      document.getElementById('pe-rc').checked,
     seguro_carga:   document.getElementById('pe-carga').checked,
+    fecha_vencimiento_permiso_sct:  document.getElementById('pe-vence-sct')?.value   || null,
+    fecha_vencimiento_seguro_rc:    document.getElementById('pe-vence-rc')?.value    || null,
+    fecha_vencimiento_seguro_carga: document.getElementById('pe-vence-carga')?.value || null,
   };
   const { error } = await sb.from('perfiles').update(payload).eq('user_id', currentUser.id);
   if (error) { showToast('Error al guardar perfil'); return; }
@@ -733,10 +739,12 @@ async function agregarCamion() {
     tipo_combustible:    g('admin-combustible'),
     tarjeta_circulacion:          g('admin-tc'),
     fecha_expedicion_tc:          document.getElementById('admin-fecha-tc')?.value          || null,
-    fecha_vencimiento_tc:         document.getElementById('admin-vence-tc')?.value          || null,
-    fecha_vencimiento_seguro:     document.getElementById('admin-vence-seguro')?.value      || null,
-    fecha_vencimiento_permiso_sct:document.getElementById('admin-vence-permiso-sct')?.value || null,
-    imagen_tc:                    imagenTc,
+    fecha_vencimiento_tc:          document.getElementById('admin-vence-tc')?.value           || null,
+    fecha_vencimiento_seguro:      document.getElementById('admin-vence-seguro')?.value       || null,
+    fecha_vencimiento_permiso_sct: document.getElementById('admin-vence-permiso-sct')?.value  || null,
+    caat:                          document.getElementById('admin-caat')?.value               || null,
+    vigencia_caat:                 document.getElementById('admin-vigencia-caat')?.value      || null,
+    imagen_tc:                     imagenTc,
   };
 
   let error;
@@ -762,7 +770,7 @@ async function agregarCamion() {
   // Limpiar formulario
   ['admin-cap','admin-precio','admin-placas','admin-dim','admin-version','admin-modelo-anio',
    'admin-num-serie','admin-num-motor','admin-num-economico','admin-tc','admin-fecha-tc',
-   'admin-vence-tc','admin-vence-seguro','admin-vence-permiso-sct'].forEach(fid => {
+   'admin-vence-tc','admin-vence-seguro','admin-vence-permiso-sct','admin-caat','admin-vigencia-caat'].forEach(fid => {
     const el = document.getElementById(fid); if (el) el.value = '';
   });
   ['admin-foto-frente','admin-foto-laterales','admin-foto-trasera','admin-foto-placa',
@@ -995,6 +1003,7 @@ async function agregarPatio() {
     propietario_id: propietarioId,
     servicios: svcsRaw ? svcsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
     aprobacion: esSuperAdmin ? 'aprobada' : 'pendiente',
+    fecha_vencimiento_permiso: document.getElementById('ap-vence-permiso')?.value || null,
   });
   if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
@@ -1027,8 +1036,9 @@ async function editarPatio(id) {
   document.getElementById('ep-area').value   = p.area_m2 || '';
   document.getElementById('ep-cap').value    = p.capacidad_vehiculos || '';
   document.getElementById('ep-precio').value = p.precio_dia || '';
-  document.getElementById('ep-svcs').value   = (p.servicios || []).join(', ');
-  document.getElementById('ep-estado').value = p.estado;
+  document.getElementById('ep-svcs').value         = (p.servicios || []).join(', ');
+  document.getElementById('ep-vence-permiso').value = p.fecha_vencimiento_permiso || '';
+  document.getElementById('ep-estado').value        = p.estado;
   document.getElementById('modal-editar-patio').classList.add('open');
 }
 
@@ -1046,8 +1056,9 @@ async function guardarEdicionPatio() {
     area_m2:             parseFloat(document.getElementById('ep-area').value)   || null,
     capacidad_vehiculos: parseInt(document.getElementById('ep-cap').value)      || null,
     precio_dia:          parseFloat(document.getElementById('ep-precio').value) || null,
-    servicios:           svcsRaw ? svcsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
-    estado:              document.getElementById('ep-estado').value,
+    servicios:                svcsRaw ? svcsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+    fecha_vencimiento_permiso: document.getElementById('ep-vence-permiso')?.value || null,
+    estado:                   document.getElementById('ep-estado').value,
   };
   const esSA = currentUser.rol === 'superadmin';
   let upd = payload;
