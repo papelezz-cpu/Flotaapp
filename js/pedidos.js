@@ -381,7 +381,8 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
     rechazado:           'badge-maint',
   }[p.estado] || 'badge-maint';
 
-  const ofertasVivaz   = ofertas.filter(o => o.estado !== 'rechazada');
+  const _ahora         = new Date().toISOString();
+  const ofertasVivaz   = ofertas.filter(o => o.estado !== 'rechazada' && (!o.expira_en || o.expira_en >= _ahora));
   const hayAceptada    = ofertas.some(o => o.estado === 'aceptada');
   const estadoLabel = (p.estado === 'abierto' || (p.estado === 'en_negociacion' && !ofertasVivaz.length))
     ? (ofertasVivaz.length ? `${ofertasVivaz.length} oferta${ofertasVivaz.length > 1 ? 's' : ''}` : 'Sin ofertas aún')
@@ -1514,9 +1515,13 @@ async function cerrarAcuerdo(oferta, pedido) {
     throw new Error(error.message || 'Error al crear reservación');
   }
 
-  // Marcar camión como ocupado solo si la reserva ya inició (solo aplica a camiones)
-  if (recursoTipo === 'camion' && oferta.camion_id && pedido.fecha_ini <= today()) {
-    await sb.from('camiones').update({ estado: 'ocupado' }).eq('id', oferta.camion_id);
+  // Marcar recurso como ocupado si la reserva ya inició
+  if (oferta.camion_id && pedido.fecha_ini <= today()) {
+    const tablaRecurso = recursoTipo === 'custodio' ? 'custodios'
+      : recursoTipo === 'patio' ? 'patios'
+      : recursoTipo === 'lavado' ? 'lavados'
+      : 'camiones';
+    await sb.from(tablaRecurso).update({ estado: 'ocupado' }).eq('id', oferta.camion_id);
   }
 }
 

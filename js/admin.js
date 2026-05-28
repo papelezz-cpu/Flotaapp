@@ -1147,10 +1147,7 @@ async function agregarPatio() {
     const ext  = permisoFile.name.split('.').pop();
     const path = `${propietarioId}/${id}/permiso_${Date.now()}.${ext}`;
     const { error: upErr } = await sb.storage.from('unidades').upload(path, permisoFile, { upsert: true });
-    if (!upErr) {
-      const { data: signed } = await sb.storage.from('unidades').createSignedUrl(path, 60 * 60 * 24 * 365);
-      docPermisoUrl = signed?.signedUrl || null;
-    }
+    if (!upErr) docPermisoUrl = path;
   }
 
   const { error } = await sb.from('patios').insert({

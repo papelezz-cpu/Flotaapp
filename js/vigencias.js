@@ -38,9 +38,13 @@ async function renderVigencias() {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   const items = [];
+  const sinFecha = []; // recursos con fecha requerida pero no registrada
 
-  const _add = (empId, empNombre, tipo, nombre, docLabel, fecha) => {
-    if (!fecha) return;
+  const _add = (empId, empNombre, tipo, nombre, docLabel, fecha, requerido = false) => {
+    if (!fecha) {
+      if (requerido) sinFecha.push({ empId, empNombre, tipo, nombre, docLabel });
+      return;
+    }
     const d = new Date(fecha + 'T00:00:00');
     const dias = Math.ceil((d - hoy) / 86400000);
     const estado = dias < 0 ? 'vencido' : dias <= DIAS_ALERTA ? 'proximo' : 'vigente';
@@ -51,45 +55,51 @@ async function renderVigencias() {
   (camiones || []).forEach(c => {
     const emp = c.propietario?.nombre || c.propietario_id;
     const nom = `${c.tipo} (${c.id})`;
-    _add(c.propietario_id, emp, 'Camión', nom, 'Tarjeta de Circulación',  c.fecha_vencimiento_tc);
-    _add(c.propietario_id, emp, 'Camión', nom, 'Seguro',                  c.fecha_vencimiento_seguro);
-    _add(c.propietario_id, emp, 'Camión', nom, 'Permiso SCT',             c.fecha_vencimiento_permiso_sct);
-    _add(c.propietario_id, emp, 'Camión', nom, 'CAAT',                    c.vigencia_caat);
-    _add(c.propietario_id, emp, 'Camión', nom, 'Verificación vehicular',  c.fecha_vencimiento_verificacion);
+    _add(c.propietario_id, emp, 'Camión', nom, 'Tarjeta de Circulación',  c.fecha_vencimiento_tc,            true);
+    _add(c.propietario_id, emp, 'Camión', nom, 'Seguro',                  c.fecha_vencimiento_seguro,         true);
+    _add(c.propietario_id, emp, 'Camión', nom, 'Permiso SCT',             c.fecha_vencimiento_permiso_sct,    true);
+    _add(c.propietario_id, emp, 'Camión', nom, 'CAAT',                    c.vigencia_caat,                    false);
+    _add(c.propietario_id, emp, 'Camión', nom, 'Verificación vehicular',  c.fecha_vencimiento_verificacion,   false);
   });
 
   (operadores || []).forEach(o => {
     const emp = o.propietario?.nombre || o.propietario_id;
     const nom = [o.nombre, o.primer_apellido].filter(Boolean).join(' ') || o.id;
-    _add(o.propietario_id, emp, 'Operador', nom, 'Licencia de conducir', o.fecha_vencimiento);
+    _add(o.propietario_id, emp, 'Operador', nom, 'Licencia de conducir', o.fecha_vencimiento, true);
     if (o.fecha_examen_medico) {
       const dEx = new Date(o.fecha_examen_medico + 'T00:00:00');
       dEx.setFullYear(dEx.getFullYear() + 1);
       _add(o.propietario_id, emp, 'Operador', nom, 'Examen médico (1 año)', dEx.toISOString().slice(0, 10));
+    } else {
+      sinFecha.push({ empId: o.propietario_id, empNombre: emp, tipo: 'Operador', nombre: nom, docLabel: 'Examen médico' });
     }
     if (o.fecha_examen_toxicologico) {
       const dTox = new Date(o.fecha_examen_toxicologico + 'T00:00:00');
       dTox.setFullYear(dTox.getFullYear() + 1);
       _add(o.propietario_id, emp, 'Operador', nom, 'Examen toxicológico (1 año)', dTox.toISOString().slice(0, 10));
+    } else {
+      sinFecha.push({ empId: o.propietario_id, empNombre: emp, tipo: 'Operador', nombre: nom, docLabel: 'Examen toxicológico' });
     }
     if (o.fecha_carta_antecedentes) {
       const dAnt = new Date(o.fecha_carta_antecedentes + 'T00:00:00');
       dAnt.setFullYear(dAnt.getFullYear() + 1);
       _add(o.propietario_id, emp, 'Operador', nom, 'Carta de no antecedentes (1 año)', dAnt.toISOString().slice(0, 10));
+    } else {
+      sinFecha.push({ empId: o.propietario_id, empNombre: emp, tipo: 'Operador', nombre: nom, docLabel: 'Carta de antecedentes' });
     }
   });
 
   (custodios || []).forEach(c => {
     const emp = c.propietario?.nombre || c.propietario_id;
-    _add(c.propietario_id, emp, 'Custodio', esc(c.nombre || c.id), 'Certificación', c.fecha_vencimiento_cert);
+    _add(c.propietario_id, emp, 'Custodio', esc(c.nombre || c.id), 'Certificación', c.fecha_vencimiento_cert, true);
     if (c.porta_arma) {
-      _add(c.propietario_id, emp, 'Custodio', esc(c.nombre || c.id), 'Licencia SEDENA (portación de arma)', c.fecha_vencimiento_licencia_sedena);
+      _add(c.propietario_id, emp, 'Custodio', esc(c.nombre || c.id), 'Licencia SEDENA (portación de arma)', c.fecha_vencimiento_licencia_sedena, true);
     }
   });
 
   (patios || []).forEach(p => {
     const emp = p.propietario?.nombre || p.propietario_id;
-    _add(p.propietario_id, emp, 'Patio', esc(p.nombre || p.id), 'Permiso operativo', p.fecha_vencimiento_permiso);
+    _add(p.propietario_id, emp, 'Patio', esc(p.nombre || p.id), 'Permiso operativo', p.fecha_vencimiento_permiso, true);
   });
 
   (perfiles || []).forEach(p => {
@@ -98,7 +108,7 @@ async function renderVigencias() {
     _add(p.user_id, p.nombre, 'Empresa', p.nombre, 'Seguro de carga',   p.fecha_vencimiento_seguro_carga);
   });
 
-  if (!items.length) {
+  if (!items.length && !sinFecha.length) {
     content.innerHTML = `<div class="vig-empty">✅ Todo en orden — no hay documentos vencidos ni próximos a vencer en los próximos ${DIAS_ALERTA} días.</div>`;
     return;
   }
@@ -147,6 +157,49 @@ async function renderVigencias() {
     if (nP) {
       html += `<div class="vig-seccion-title vig-seccion--warn" style="margin-top:20px">⚠ Próximos a vencer — menos de ${DIAS_ALERTA} días (${nP})</div>`;
       html += items.filter(i => i.estado === 'proximo').map(_vigItemHTML).join('');
+    }
+  }
+
+  // ── Documentos sin fecha registrada ──────────────────
+  if (sinFecha.length) {
+    if (esSA) {
+      const sinFechaPorEmp = {};
+      sinFecha.forEach(sf => {
+        if (!sinFechaPorEmp[sf.empId]) sinFechaPorEmp[sf.empId] = { nombre: sf.empNombre, items: [] };
+        sinFechaPorEmp[sf.empId].items.push(sf);
+      });
+      html += `<div class="vig-seccion-title" style="margin-top:28px;color:var(--text-muted)">⚠ Documentos sin fecha — no pueden ser monitoreados (${sinFecha.length})</div>`;
+      for (const [empId, grupo] of Object.entries(sinFechaPorEmp)) {
+        const uid_safe = empId.replace(/[^a-z0-9]/gi, '');
+        html += `
+          <div class="vig-empresa-card" style="opacity:0.75">
+            <div class="vig-empresa-header" onclick="toggleVigEmpresa('sf-${uid_safe}')">
+              <div class="vig-empresa-name">🏢 ${esc(grupo.nombre)}</div>
+              <div class="vig-empresa-badges"><span class="vig-badge" style="background:var(--bg-muted);color:var(--text-muted)">📋 ${grupo.items.length} sin fecha</span></div>
+              <span class="apr-emp-toggle" id="vig-tog-sf-${uid_safe}">▼</span>
+            </div>
+            <div class="vig-empresa-items" id="vig-items-sf-${uid_safe}" style="display:none">
+              ${grupo.items.map(sf => `
+                <div class="vig-item" style="border-left:3px solid var(--text-muted)">
+                  <div class="vig-item-left">
+                    <div class="vig-item-nombre">${_VIG_EMOJI[sf.tipo] || '📄'} ${esc(sf.nombre)}</div>
+                    <div class="vig-item-doc">${esc(sf.tipo)} · ${esc(sf.docLabel)}</div>
+                  </div>
+                  <div class="vig-item-right"><div class="vig-item-dias" style="color:var(--text-muted)">Sin fecha</div></div>
+                </div>`).join('')}
+            </div>
+          </div>`;
+      }
+    } else {
+      html += `<div class="vig-seccion-title" style="margin-top:${items.length ? '28px' : '0'};color:var(--text-muted)">⚠ Documentos sin fecha registrada (${sinFecha.length})</div>`;
+      html += sinFecha.map(sf => `
+        <div class="vig-item" style="border-left:3px solid var(--text-muted)">
+          <div class="vig-item-left">
+            <div class="vig-item-nombre">${_VIG_EMOJI[sf.tipo] || '📄'} ${esc(sf.nombre)}</div>
+            <div class="vig-item-doc">${esc(sf.tipo)} · ${esc(sf.docLabel)}</div>
+          </div>
+          <div class="vig-item-right"><div class="vig-item-dias" style="color:var(--text-muted)">Sin fecha</div></div>
+        </div>`).join('');
     }
   }
 

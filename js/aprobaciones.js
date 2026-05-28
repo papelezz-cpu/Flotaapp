@@ -58,6 +58,27 @@ async function renderAprobaciones() {
     }
   }
 
+  // Compliance de empresa para cada admin con acuerdo pendiente
+  const empresaComplianceMap = {};
+  if (acuerdos?.length) {
+    const _hoyAcu = new Date().toISOString().slice(0, 10);
+    const adminIds = [...new Set(
+      acuerdos.map(p => p.oferta_pendiente_id && ofertasMap[p.oferta_pendiente_id]?.admin_id).filter(Boolean)
+    )];
+    if (adminIds.length) {
+      const { data: perfilesEmp } = await sb.from('perfiles')
+        .select('user_id, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga')
+        .in('user_id', adminIds);
+      (perfilesEmp || []).forEach(p => {
+        const exp = [];
+        if (p.fecha_vencimiento_permiso_sct  && p.fecha_vencimiento_permiso_sct  < _hoyAcu) exp.push('SCT');
+        if (p.fecha_vencimiento_seguro_rc    && p.fecha_vencimiento_seguro_rc    < _hoyAcu) exp.push('RC');
+        if (p.fecha_vencimiento_seguro_carga && p.fecha_vencimiento_seguro_carga < _hoyAcu) exp.push('Carga');
+        empresaComplianceMap[p.user_id] = exp;
+      });
+    }
+  }
+
   // ── AGRUPAR RECURSOS POR EMPRESA ────────────────────
   const empresasMap = {};
   const _addEmp = (propId, propNombre, tipo, item) => {
@@ -262,10 +283,12 @@ async function renderAprobaciones() {
             ${p.origen || p.destino ? `<div class="apr-ruta">📍 ${esc(p.origen||'—')}${p.destino ? ' → '+esc(p.destino) : ''}</div>` : ''}
             ${chips}
             ${p.descripcion ? `<div class="apr-desc">"${esc(p.descripcion)}"</div>` : ''}
-            ${oferta ? `
+            ${oferta ? (() => {
+                const docsVen = empresaComplianceMap[oferta.admin_id] || [];
+                return `
               <div class="apr-oferta-box">
                 <div class="apr-oferta-title">Oferta del proveedor</div>
-                <div class="apr-oferta-row"><span>Empresa:</span><strong>${esc(oferta.admin_nombre||'—')}</strong></div>
+                <div class="apr-oferta-row"><span>Empresa:</span><strong>${esc(oferta.admin_nombre||'—')}${docsVen.length ? ` <span style="color:var(--danger);font-size:0.8rem">⛔ Docs vencidos: ${docsVen.join(', ')}</span>` : ' <span style="color:var(--success,#22c55e);font-size:0.8rem">✅</span>'}</strong></div>
                 ${oferta.camion_id ? `<div class="apr-oferta-row"><span>Unidad:</span><strong>${esc(oferta.camion_id)}</strong></div>` : ''}
                 ${oferta.operador_nombre ? `<div class="apr-oferta-row"><span>Chofer:</span><strong>${esc(oferta.operador_nombre)}</strong></div>` : ''}
                 <div class="apr-oferta-row"><span>Precio acordado:</span><strong class="apr-precio-acuerdo">$${Number(oferta.precio_oferta).toLocaleString('es-MX')} MXN</strong></div>
@@ -274,7 +297,8 @@ async function renderAprobaciones() {
                 ${p.detalles_hora  ? `<div class="apr-oferta-row"><span>Hora:</span>${esc(p.detalles_hora)}</div>` : ''}
                 ${p.detalles_contacto_nombre ? `<div class="apr-oferta-row"><span>Contacto:</span>${esc(p.detalles_contacto_nombre)} ${esc(p.detalles_contacto_tel||'')}</div>` : ''}
                 ${p.precio_cliente ? `<div class="apr-oferta-row"><span>Presupuesto original:</span>$${Number(p.precio_cliente).toLocaleString('es-MX')} MXN</div>` : ''}
-              </div>` : '<div class="apr-empty" style="margin:8px 0">⚠️ No se encontró la oferta asociada</div>'}
+              </div>`;
+              })() : '<div class="apr-empty" style="margin:8px 0">⚠️ No se encontró la oferta asociada</div>'}
             <div class="apr-actions">
               <button class="btn-apr-aprobar" onclick="aprobarAcuerdo('${p.id}')">✓ Aprobar acuerdo</button>
               <button class="btn-apr-rechazar" onclick="rechazarAcuerdo('${p.id}')">✕ Rechazar</button>
@@ -820,7 +844,9 @@ function _renderPatioCard(p) {
         <div class="apr-op-grid">
           ${_vence(p.fecha_vencimiento_permiso, 'Permiso operativo')}
         </div>
-        ${p.doc_permiso ? `<a href="#" onclick="verArchivoPublico('${esc(p.doc_permiso)}');return false" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Ver permiso operativo</a>` : ''}
+        ${p.doc_permiso ? (p.doc_permiso.startsWith('http')
+          ? `<a href="${esc(p.doc_permiso)}" target="_blank" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Ver permiso operativo</a>`
+          : `<a href="#" onclick="verArchivoPublico('${esc(p.doc_permiso)}');return false" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Ver permiso operativo</a>`) : ''}
       </div>
       <div class="apr-actions">
         <button class="btn-apr-aprobar"  onclick="aprobarRecurso('patios','${p.id}')">✓ Aprobar</button>
@@ -903,7 +929,13 @@ function rechazarCuenta(userId) {
 
 function _diffHtml(recurso, labels) {
   if (!recurso.es_edicion || !recurso.campos_editados?.length || !recurso.snapshot_anterior) return '';
-  const dateFields  = new Set(['fecha_expedicion_tc','vigencia_caat','fecha_vencimiento','fecha_expedicion','fecha_examen_medico']);
+  const dateFields  = new Set([
+    'fecha_expedicion_tc','vigencia_caat','fecha_vencimiento','fecha_expedicion',
+    'fecha_examen_medico','fecha_examen_toxicologico','fecha_carta_antecedentes',
+    'fecha_vencimiento_cert','fecha_vencimiento_licencia_sedena','fecha_vencimiento_permiso',
+    'fecha_vencimiento_tc','fecha_vencimiento_seguro','fecha_vencimiento_permiso_sct',
+    'fecha_vencimiento_verificacion',
+  ]);
   const priceFields = new Set(['precio_dia','precio_lavado']);
 
   const fmt = (key, val) => {
@@ -1022,7 +1054,34 @@ async function aprobarAcuerdo(pedidoId) {
   const { data: oferta } = await sb.from('ofertas').select('*').eq('id', ped.oferta_pendiente_id).single();
   if (!oferta) { showToast('Error: oferta no encontrada', 'error'); return; }
 
-  // Ejecutar el cierre real (rechaza otras ofertas, crea reservación, marca camión ocupado)
+  // Verificar documentos de empresa del proveedor
+  const hoy = new Date().toISOString().slice(0, 10);
+  const { data: ep } = await sb.from('perfiles')
+    .select('nombre, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga')
+    .eq('user_id', oferta.admin_id).single();
+
+  const docsVencidos = [];
+  if (ep) {
+    if (ep.fecha_vencimiento_permiso_sct  && ep.fecha_vencimiento_permiso_sct  < hoy) docsVencidos.push('Permiso SCT');
+    if (ep.fecha_vencimiento_seguro_rc    && ep.fecha_vencimiento_seguro_rc    < hoy) docsVencidos.push('Seguro RC');
+    if (ep.fecha_vencimiento_seguro_carga && ep.fecha_vencimiento_seguro_carga < hoy) docsVencidos.push('Seguro de carga');
+  }
+
+  const ejecutar = () => _ejecutarAprobarAcuerdo(ped, oferta);
+
+  if (docsVencidos.length) {
+    showConfirm(
+      `⚠️ La empresa "${esc(ep.nombre || oferta.admin_nombre)}" tiene documentos vencidos: ${docsVencidos.join(', ')}. ¿Aprobar el acuerdo de todas formas?`,
+      ejecutar,
+      { danger: true, confirmLabel: 'Aprobar igualmente', cancelLabel: 'Cancelar' }
+    );
+  } else {
+    ejecutar();
+  }
+}
+
+async function _ejecutarAprobarAcuerdo(ped, oferta) {
+  // Ejecutar el cierre real (rechaza otras ofertas, crea reservación, marca recurso ocupado)
   try {
     await cerrarAcuerdo(oferta, ped);
   } catch (e) {
@@ -1359,11 +1418,18 @@ function aprobarTodasSolicitudes() {
 
 function aprobarTodosAcuerdos() {
   showConfirm('¿Aprobar todos los acuerdos pendientes? Se crearán reservaciones para cada uno.', async () => {
-    const { data: acuerdos } = await sb.from('pedidos').select('id').eq('estado', 'pendiente_acuerdo');
+    const { data: acuerdos } = await sb.from('pedidos').select('id, oferta_pendiente_id').eq('estado', 'pendiente_acuerdo');
     if (!acuerdos?.length) { showToast('No hay acuerdos pendientes'); return; }
     let ok = 0, err = 0;
     for (const a of acuerdos) {
-      try { await aprobarAcuerdo(a.id); ok++; } catch (_) { err++; }
+      try {
+        const { data: ped } = await sb.from('pedidos').select('*').eq('id', a.id).single();
+        if (!ped?.oferta_pendiente_id) { err++; continue; }
+        const { data: oferta } = await sb.from('ofertas').select('*').eq('id', ped.oferta_pendiente_id).single();
+        if (!oferta) { err++; continue; }
+        await _ejecutarAprobarAcuerdo(ped, oferta);
+        ok++;
+      } catch (_) { err++; }
     }
     showToast(`✓ ${ok} acuerdo${ok !== 1 ? 's' : ''} aprobado${ok !== 1 ? 's' : ''}${err ? ` · ${err} con error` : ''}`);
   }, { confirmLabel: 'Aprobar todos' });
