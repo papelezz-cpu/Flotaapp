@@ -70,3 +70,21 @@ body.logged-in .user-chip { display: flex; }
 /* Entrar button: visible until logged in */
 .btn-entrar { display: inline-flex; }
 body.logged-in .btn-entrar { display: none; }
+
+/* ── Custodios / Patios / Lavados — deshabilitados temporalmente ── */
+/* Catálogo: pills de filtro */
+[data-filter="custodio"], [data-filter="patio"], [data-filter="lavado"],
+/* Pedidos: pills de filtro de tipo */
+[data-tipo="custodio"], [data-tipo="patio"], [data-tipo="lavado"],
+/* Nuevo pedido: botones de tipo de servicio */
+button[onclick*="openNuevoPedido('custodio')"],
+button[onclick*="openNuevoPedido('patio')"],
+button[onclick*="openNuevoPedido('lavado')"],
+/* Admin: tabs de recursos */
+#admin-tab-custodio, #admin-tab-patio, #admin-tab-lavado,
+/* Admin: paneles de contenido */
+#admin-content-custodio, #admin-content-patio, #admin-content-lavado,
+/* Modales de edición */
+#modal-editar-custodio, #modal-editar-patio, #modal-editar-lavado,
+/* Modal rechazo recurso (custodio/patio/lavado) */
+#modal-rechazar-recurso { display: none !important; }
