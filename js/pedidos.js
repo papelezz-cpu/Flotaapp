@@ -289,9 +289,8 @@ async function renderPedidos(append = false) {
       html = `<div class="empty-state"><div class="icon">📋</div>Sin solicitudes activas.<br><small style="color:var(--text-muted)">Publica la primera con el botón de arriba.</small></div>`;
     }
 
-  // ── ADMIN / SUPERADMIN ─────────────────────────────
-  } else if (currentUser.id && ['admin','superadmin'].includes(currentUser.rol)) {
-    // Cargar tipos de camión del admin (una sola vez) para restricción de oferta
+  // ── ADMIN ──────────────────────────────────────────
+  } else if (currentUser.id && currentUser.rol === 'admin') {
     if (_adminCamionTipos === null) await _cargarAdminCamionTipos();
 
     const misOfertaIds = new Set(
@@ -338,6 +337,35 @@ async function renderPedidos(append = false) {
     }
     if (!disponibles.length && !misNegociaciones.length && !misAcuerdos.length) {
       html = `<div class="empty-state"><div class="icon">📋</div>No hay solicitudes abiertas en este momento.</div>`;
+    }
+
+  // ── SUPERADMIN — vista de monitor (sin hacer ofertas) ─
+  } else if (currentUser.id && currentUser.rol === 'superadmin') {
+    const ESTADOS_ACTIVOS = ['abierto','en_negociacion','pendiente_revision','pendiente_acuerdo'];
+    const activos = _filtrar((pedidos || []).filter(p => ESTADOS_ACTIVOS.includes(p.estado)));
+    const acordados = _filtrar((pedidos || []).filter(p => p.estado === 'acordado'));
+
+    // Agrupar activos por cliente
+    const porCliente = {};
+    activos.forEach(p => {
+      const key = p.cliente_id || p.cliente_email;
+      if (!porCliente[key]) porCliente[key] = { nombre: p.cliente_nombre, items: [] };
+      porCliente[key].items.push(p);
+    });
+
+    if (Object.keys(porCliente).length) {
+      html += `<div class="ped-seccion-title">Solicitudes activas</div>`;
+      for (const [, grupo] of Object.entries(porCliente)) {
+        html += `<div class="ped-cliente-grupo-title">👤 ${esc(grupo.nombre)}</div>`;
+        html += grupo.items.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'superadmin')).join('');
+      }
+    }
+    if (acordados.length) {
+      html += `<div class="ped-seccion-title" style="margin-top:24px">Acuerdos activos</div>`;
+      html += acordados.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'superadmin')).join('');
+    }
+    if (!activos.length && !acordados.length) {
+      html = `<div class="empty-state"><div class="icon">📋</div>No hay solicitudes activas.</div>`;
     }
 
   // ── PÚBLICO / GUEST ────────────────────────────────
@@ -423,6 +451,17 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
       ${p.rechazo_nota ? `<div class="apr-rechazo-nota" style="margin-bottom:8px">Motivo: ${esc(p.rechazo_nota)}</div>` : ''}
       <button class="btn-ofertar" onclick="abrirReenviarPedido('${p.id}')">🔄 Corregir y reenviar</button>`;
 
+  } else if (vista === 'superadmin') {
+    const ofertasActivas = (ofertasMap?.[p.id] || ofertas).filter(o => o.estado !== 'rechazada');
+    if (ofertasActivas.length) {
+      const resumen = ofertasActivas.map(o =>
+        `<span class="cargo-chip" style="font-size:0.74rem">${esc(o.admin_nombre||'—')} · $${Number(o.precio_oferta).toLocaleString('es-MX')}</span>`
+      ).join('');
+      acciones = `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${resumen}</div>`;
+    } else {
+      acciones = `<span style="font-size:0.78rem;color:var(--text-muted)">Sin ofertas aún</span>`;
+    }
+
   } else if (vista === 'admin') {
     const tipoPed = p.tipo_camion || '';
     const esCamionPed = !tipoPed.startsWith('Custodio') && tipoPed !== 'Supervisión remota'
@@ -470,9 +509,10 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
 
   const chips = [];
   if (esCamionCard) {
-    if (p.tipo_carga)    chips.push(`📦 ${esc(p.tipo_carga)}`);
-    if (p.peso_carga)    chips.push(`⚖️ ${p.peso_carga} ton`);
-    if (p.capacidad_min) chips.push(`🚛 Mín ${p.capacidad_min} ton`);
+    if (p.tipo_carga)       chips.push(`📦 ${esc(p.tipo_carga)}`);
+    if (p.tipo_contenedor)  chips.push(`📦 ${esc(p.tipo_contenedor)}`);
+    if (p.peso_carga)       chips.push(`⚖️ ${p.peso_carga} ton`);
+    if (p.capacidad_min)    chips.push(`🚛 Mín ${p.capacidad_min} ton`);
     if (p.carga_peligrosa)  chips.push('⚠️ Peligrosa');
     if (p.temp_controlada)  chips.push('❄️ Temp. controlada');
     if (p.requiere_seguro)  chips.push('🛡️ Seguro');
@@ -491,6 +531,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
     if (p.area_necesaria) chips.push(`📐 ${p.area_necesaria} m²`);
     if (p.tipo_vehiculos) chips.push(esc(p.tipo_vehiculos));
   }
+  if (p.plazo_pago) chips.push(`💳 ${esc(p.plazo_pago)}`);
   const chipsHTML = chips.length
     ? `<div class="pedido-chips">${chips.map(c => `<span class="cargo-chip">${c}</span>`).join('')}</div>` : '';
 
@@ -767,6 +808,7 @@ async function crearPedido() {
     temp_controlada:  esCamion ? vb('np-temp')           : false,
     requiere_seguro:  esCamion ? vb('np-seguro')         : false,
     requiere_factura: esCamion ? vb('np-factura')        : false,
+    tipo_contenedor:  esCamion ? (v('np-contenedor') || null) : null,
     // Custodio
     num_custodios:    esCustodio ? vi('np-num-custodios') : null,
     zona_cobertura:   esCustodio ? v('np-zona')           : null,
@@ -775,6 +817,7 @@ async function crearPedido() {
     num_vehiculos:   esPatio ? vi('np-num-vehiculos')  : esLavado ? vi('np-num-vehiculos-lav') : null,
     tipo_vehiculos:  esPatio ? v('np-tipo-vehiculos')  : esLavado ? v('np-vehiculo-lavar')     : null,
     area_necesaria:  esPatio ? vn('np-area')           : null,
+    plazo_pago:      v('np-plazo-pago') || null,
   };
 
   // Estado inicial: pendiente de revisión por superadmin

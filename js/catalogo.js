@@ -20,7 +20,7 @@ async function renderCatalogo() {
   grid.innerHTML = skeletonGrid(3);
 
   const { data: perfiles } = await sb.from('perfiles')
-    .select('user_id, nombre, rfc, razon_social, anos_operacion, num_unidades, seguro_rc, seguro_carga, permiso_sct, descripcion, telefono, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga')
+    .select('user_id, nombre, rfc, razon_social, anos_operacion, num_unidades, seguro_rc, seguro_carga, permiso_sct, descripcion, telefono, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga, verificado')
     .eq('rol', 'admin')
     .order('nombre');
 
@@ -141,12 +141,16 @@ function _empresaCardHTML(e) {
     ? `<div class="emp-info-chips">${chips.map(c => `<span class="emp-info-chip">${c}</span>`).join('')}</div>`
     : '';
 
+  const verBadge = e.verificado
+    ? `<span style="display:inline-block;font-size:0.7rem;font-weight:700;background:rgba(34,197,94,0.15);color:#16a34a;border:1px solid rgba(34,197,94,0.4);border-radius:10px;padding:1px 8px;margin-left:6px;vertical-align:middle">✓ Verificado</span>`
+    : '';
+
   return `
     <div class="empresa-card" data-servicios="${servicios.join(' ')}">
       <div class="empresa-card-top">
         <div class="empresa-avatar" style="--av-color:${color}">${inicial}</div>
         <div class="empresa-header-info">
-          <div class="empresa-nombre">${esc(e.nombre)}</div>
+          <div class="empresa-nombre">${esc(e.nombre)}${verBadge}</div>
           <div class="empresa-serv-icons">${iconBadges}</div>
         </div>
       </div>

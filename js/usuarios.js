@@ -36,23 +36,47 @@ async function renderUsuarios() {
     suspendida: `<span style="display:inline-block;font-size:0.68rem;font-weight:700;background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.35);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">Suspendida</span>`,
   };
 
-  list.innerHTML = json.lista.map(u => `
+  // Cargar estados verificado desde perfiles
+  const userIds = json.lista.map(u => u.user_id).filter(Boolean);
+  let verificadoMap = {};
+  if (userIds.length) {
+    const { data: perfs } = await sb.from('perfiles').select('user_id, verificado').in('user_id', userIds);
+    (perfs || []).forEach(p => { verificadoMap[p.user_id] = !!p.verificado; });
+  }
+
+  list.innerHTML = json.lista.map(u => {
+    const verificado = verificadoMap[u.user_id] || false;
+    const verBadge   = verificado
+      ? `<span title="Usuario verificado" style="display:inline-block;font-size:0.7rem;font-weight:700;background:rgba(34,197,94,0.15);color:var(--green,#22c55e);border:1px solid rgba(34,197,94,0.4);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">✓ Verificado</span>`
+      : '';
+    return `
     <div class="truck-list-item">
       <div class="truck-list-item-info">
         <div class="truck-list-item-name">
-          ${esc(u.nombre)}${APR_BADGE[u.aprobacion_cuenta] || ''}
+          ${esc(u.nombre)}${APR_BADGE[u.aprobacion_cuenta] || ''}${verBadge}
         </div>
         <div class="truck-list-item-sub">${esc(u.email)} · ${ROL_LABEL[u.rol] || u.rol}</div>
       </div>
       <button class="btn-edit" onclick="abrirHistorialUsuario('${u.user_id}','${esc(u.nombre)}','${u.rol}')">📋</button>
       <button class="btn-edit" onclick="abrirEditarUsuario('${u.user_id}','${esc(u.nombre)}','${esc(u.email)}','${u.rol}')">✏ Editar</button>
       ${u.rol !== 'superadmin' ? `
+        <button class="btn-edit" style="font-size:0.72rem;${verificado ? 'color:var(--green,#22c55e);border-color:rgba(34,197,94,0.4)' : ''}"
+          onclick="toggleVerificado('${u.user_id}','${esc(u.nombre)}',${verificado})">${verificado ? '✓ Verificado' : '✓ Verificar'}</button>
         ${u.aprobacion_cuenta === 'suspendida'
           ? `<button class="btn-edit" style="color:var(--green);border-color:rgba(34,197,94,0.3)" onclick="reactivarUsuario('${u.user_id}','${esc(u.nombre)}')">↑ Activar</button>`
           : `<button class="btn-edit" style="color:var(--amber);border-color:rgba(245,158,11,0.3)" onclick="suspenderUsuario('${u.user_id}','${esc(u.nombre)}')">🚫</button>`}
         <button class="btn-edit btn-rechazar" onclick="eliminarUsuario('${u.user_id}','${esc(u.nombre)}')">🗑</button>
       ` : ''}
-    </div>`).join('');
+    </div>`;
+  }).join('');
+}
+
+async function toggleVerificado(userId, nombre, actualmente) {
+  const nuevoValor = !actualmente;
+  const { error } = await sb.from('perfiles').update({ verificado: nuevoValor }).eq('user_id', userId);
+  if (error) { showToast('Error al actualizar verificación', 'error'); return; }
+  showToast(nuevoValor ? `✓ ${esc(nombre)} marcado como verificado` : `${esc(nombre)} desmarcado como verificado`);
+  renderUsuarios();
 }
 
 async function crearUsuario() {

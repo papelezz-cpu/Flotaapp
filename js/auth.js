@@ -466,7 +466,7 @@ function _regFormHTML(rol) {
     </div>
     <div id="reg-moral-section" style="display:none">
       <div class="form-group">
-        <label>Acta constitutiva <span class="reg-optional">(opcional)</span></label>
+        <label>Acta constitutiva <span style="color:var(--danger)">*</span></label>
         <label class="reg-file-label" for="reg-acta">
           <span id="reg-acta-name">Seleccionar archivo…</span>
           <input type="file" id="reg-acta" accept="image/*,.pdf" onchange="updateRegFileLabel('reg-acta')">
@@ -515,7 +515,7 @@ function _regFormHTML(rol) {
       </label>
     </div>
     <div class="form-group">
-      <label>Opinión de cumplimiento SAT <span class="reg-optional">(opcional)</span></label>
+      <label>Opinión de cumplimiento SAT <span style="color:var(--danger)">*</span></label>
       <label class="reg-file-label" for="reg-opinion">
         <span id="reg-opinion-name">Seleccionar archivo…</span>
         <input type="file" id="reg-opinion" accept="image/*,.pdf" onchange="updateRegFileLabel('reg-opinion')">
@@ -618,6 +618,8 @@ async function doRegistro() {
     actaFile    = document.getElementById('reg-acta')?.files[0];
     if (!razonSocial) { showErr('La razón social es requerida.'); return; }
     if (!csfFile) { showErr('La Constancia de Situación Fiscal (SAT) es requerida.'); return; }
+    if (!actaFile) { showErr('El Acta constitutiva es requerida.'); return; }
+    if (!opinionFile) { showErr('La Opinión de cumplimiento SAT es requerida.'); return; }
   }
 
   const numOpsMensuales = _regRol === 'admin'

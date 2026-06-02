@@ -331,6 +331,10 @@ function renderCargoChipsSelect(containerId, selected = []) {
 
 function toggleCargaChip(btn) {
   btn.classList.toggle('selected');
+  // Mostrar sección hazmat si se selecciona Peligroso o HAZMAT
+  const sel = getSelectedCargo('admin-tipo-carga');
+  const sec = document.getElementById('admin-hazmat-docs');
+  if (sec) sec.style.display = sel.some(t => t === 'Peligroso' || t === 'HAZMAT') ? '' : 'none';
 }
 
 function getSelectedCargo(containerId) {
@@ -725,6 +729,13 @@ async function agregarCamion() {
   if (!document.getElementById('admin-doc-tc')?.files?.[0])       { _done(); showToast('Debes adjuntar la Tarjeta de Circulación', 'error'); return; }
   if (!document.getElementById('admin-doc-sct')?.files?.[0])      { _done(); showToast('Debes adjuntar el Permiso SCT', 'error'); return; }
   if (!document.getElementById('admin-doc-seguro')?.files?.[0])   { _done(); showToast('Debes adjuntar la Póliza de seguro', 'error'); return; }
+  const esHazmat = tipoCarga.some(t => t === 'Peligroso' || t === 'HAZMAT');
+  if (esHazmat && !document.getElementById('admin-doc-peligrosa')?.files?.[0]) {
+    _done(); showToast('Debes adjuntar el permiso de materiales peligrosos', 'error'); return;
+  }
+  if (esHazmat && !g('admin-vence-peligrosa')) {
+    _done(); showToast('Indica la fecha de vencimiento del permiso de carga peligrosa', 'error'); return;
+  }
 
   const prefijos = {
     'Torton': 'T', 'Torton caja seca': 'T', 'Torton plataforma': 'T',
@@ -762,10 +773,12 @@ async function agregarCamion() {
     { prefix: 'placa',    file: _getFile('admin-foto-placa') },
     ..._getFiles('admin-foto-laterales').map((f, i) => ({ prefix: `lat${i + 1}`, file: f })),
   ];
+  let docPeligrosaPath = null;
   const docEntradas = [
-    { prefix: 'tc',     file: _getFile('admin-doc-tc') },
-    { prefix: 'sct',    file: _getFile('admin-doc-sct') },
-    { prefix: 'seguro', file: _getFile('admin-doc-seguro') },
+    { prefix: 'tc',        file: _getFile('admin-doc-tc') },
+    { prefix: 'sct',       file: _getFile('admin-doc-sct') },
+    { prefix: 'seguro',    file: _getFile('admin-doc-seguro') },
+    { prefix: 'peligrosa', file: esHazmat ? _getFile('admin-doc-peligrosa') : null },
   ];
 
   for (const { prefix, file } of [...fotoEntradas, ...docEntradas]) {
@@ -775,9 +788,10 @@ async function agregarCamion() {
     const { data: up, error: upErr } = await sb.storage.from('unidades').upload(path, file);
     if (!upErr && up) {
       archivos.push(up.path);
-      if (prefix === 'tc')     imagenTc   = up.path;
-      if (prefix === 'sct')    docSctPath = up.path;
-      if (prefix === 'seguro') docSegPath = up.path;
+      if (prefix === 'tc')        imagenTc        = up.path;
+      if (prefix === 'sct')       docSctPath      = up.path;
+      if (prefix === 'seguro')    docSegPath      = up.path;
+      if (prefix === 'peligrosa') docPeligrosaPath = up.path;
     }
   }
 
@@ -826,6 +840,8 @@ async function agregarCamion() {
     imagen_tc:  imagenTc,
     doc_sct:    docSctPath,
     doc_seguro: docSegPath,
+    ...(esHazmat && docPeligrosaPath && { doc_permiso_peligrosa: docPeligrosaPath }),
+    ...(esHazmat && { fecha_vencimiento_permiso_peligrosa: g('admin-vence-peligrosa') || null }),
   };
 
   let error;

@@ -783,6 +783,11 @@ body.light .ped-serv-btn:hover { border-color: rgba(37,99,235,0.4); }
   margin: 22px 0 10px;
 }
 .ped-seccion-title:first-child { margin-top: 0; }
+.ped-cliente-grupo-title {
+  font-size: 0.78rem; font-weight: 600; color: var(--accent);
+  padding: 4px 0 2px; margin: 8px 0 2px;
+  border-left: 3px solid var(--accent); padding-left: 8px;
+}
 .ped-badge-count {
   display: inline-flex; align-items: center; justify-content: center;
   width: 18px; height: 18px; border-radius: 50%;

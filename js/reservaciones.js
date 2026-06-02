@@ -207,9 +207,17 @@ async function renderReserv() {
         <button class="btn-completar-reserva" onclick="marcarCompletado('${r.id}')">✓ Completar</button>
         <button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${esc(r.unidad)}')">Cancelar</button>`;
     } else if (esDueno && esCompletada) {
-      acciones = r.pagado
+      const diasPasados = r.completado_en
+        ? Math.floor((new Date() - new Date(r.completado_en)) / 86400000) : 99;
+      const numEv = r.evidencias?.length || 0;
+      const evBtnLabel = numEv > 0 ? `📎 Evidencias (${numEv})` : '📎 Subir evidencias';
+      const evBtn = diasPasados <= 5 || numEv > 0
+        ? `<button class="btn-edit" style="font-size:0.72rem" onclick="abrirEvidencias('${r.id}')">${evBtnLabel}</button>`
+        : '';
+      acciones = (r.pagado
         ? `<span style="font-size:0.72rem;color:var(--green);font-weight:600">💰 Pagado</span>`
-        : `<button class="btn-edit" style="font-size:0.72rem;color:var(--amber);border-color:rgba(245,158,11,0.4)" onclick="marcarPagado('${r.id}')">💰 Marcar pagado</button>`;
+        : `<button class="btn-edit" style="font-size:0.72rem;color:var(--amber);border-color:rgba(245,158,11,0.4)" onclick="marcarPagado('${r.id}')">💰 Marcar pagado</button>`)
+        + evBtn;
     }
 
     const cartaPorteBtnAdmin = (esActiva || esCompletada)
@@ -398,6 +406,73 @@ function marcarCompletado(reservaId) {
     await renderReserv();
     showToast('✓ Servicio marcado como completado');
   });
+}
+
+// ── EVIDENCIAS DE SERVICIO ────────────────────────────
+
+async function abrirEvidencias(reservaId) {
+  document.getElementById('ev-reserva-id').value = reservaId;
+  document.getElementById('ev-files').value = '';
+  document.getElementById('ev-lista-actual').innerHTML = '<span style="color:var(--text-muted);font-size:0.82rem">Cargando…</span>';
+  document.getElementById('modal-evidencias').classList.add('open');
+
+  const { data: r } = await sb.from('reservaciones').select('completado_en, evidencias').eq('id', reservaId).single();
+  const hoy = new Date();
+  const fechaComp = r?.completado_en ? new Date(r.completado_en) : hoy;
+  const diasRestantes = 5 - Math.floor((hoy - fechaComp) / 86400000);
+
+  const infoEl = document.getElementById('ev-plazo-info');
+  if (infoEl) infoEl.textContent = diasRestantes > 0
+    ? `Tienes ${diasRestantes} día${diasRestantes !== 1 ? 's' : ''} para subir evidencias (máx. 5 archivos en total).`
+    : 'El plazo de 5 días para subir evidencias ha vencido.';
+
+  const existentes = r?.evidencias || [];
+  const listaEl = document.getElementById('ev-lista-actual');
+  listaEl.innerHTML = existentes.length
+    ? existentes.map((url, i) =>
+        `<a href="${esc(url)}" target="_blank" class="btn-edit" style="font-size:0.75rem">📎 Evidencia ${i + 1}</a>`
+      ).join('')
+    : '<span style="font-size:0.78rem;color:var(--text-muted)">Sin evidencias aún</span>';
+
+  const fileInput = document.getElementById('ev-files');
+  if (fileInput) fileInput.disabled = diasRestantes <= 0;
+}
+
+function cerrarEvidencias() {
+  document.getElementById('modal-evidencias').classList.remove('open');
+}
+
+async function subirEvidencias() {
+  const reservaId = document.getElementById('ev-reserva-id').value;
+  const files = Array.from(document.getElementById('ev-files')?.files || []);
+  if (!files.length) { showToast('Selecciona al menos un archivo', 'error'); return; }
+
+  // Verificar plazo (5 días)
+  const { data: r } = await sb.from('reservaciones').select('completado_en, evidencias').eq('id', reservaId).single();
+  const diasPasados = r?.completado_en
+    ? Math.floor((new Date() - new Date(r.completado_en)) / 86400000)
+    : 0;
+  if (diasPasados > 5) { showToast('El plazo de 5 días para subir evidencias ha vencido.', 'error'); return; }
+
+  const existentes = r?.evidencias || [];
+  if (existentes.length + files.length > 5) {
+    showToast(`Solo puedes tener 5 evidencias. Ya tienes ${existentes.length}.`, 'error'); return;
+  }
+
+  const nuevasUrls = [];
+  for (const f of files) {
+    const ext  = f.name.split('.').pop();
+    const path = `evidencias/${reservaId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: upErr } = await sb.storage.from('unidades').upload(path, f);
+    if (upErr) { showToast('Error al subir: ' + upErr.message, 'error'); return; }
+    const { data: pub } = sb.storage.from('unidades').getPublicUrl(path);
+    nuevasUrls.push(pub.publicUrl);
+  }
+
+  await sb.from('reservaciones').update({ evidencias: [...existentes, ...nuevasUrls] }).eq('id', reservaId);
+  cerrarEvidencias();
+  await renderReserv();
+  showToast(`✓ ${nuevasUrls.length} evidencia${nuevasUrls.length !== 1 ? 's' : ''} subida${nuevasUrls.length !== 1 ? 's' : ''}`);
 }
 
 // ── CALIFICAR SERVICIO (cliente) ───────────────────────
