@@ -378,6 +378,7 @@ function eliminarReserva(reservaId) {
       tracking_estado: r.tracking_estado,
       created_at:      r.created_at,
       archivado_por:   currentUser.id,
+      archivado_at:    new Date().toISOString(),
     });
     if (insertErr) { showToast('Error al archivar: ' + (insertErr.message || '')); return; }
 
@@ -394,7 +395,9 @@ function eliminarReserva(reservaId) {
 
 function marcarCompletado(reservaId) {
   showConfirm('¿Marcar este servicio como completado? El cliente podrá calificarlo.', async () => {
-    const { data: r } = await sb.from('reservaciones').select('unidad, recurso_tipo').eq('id', reservaId).single();
+    const { data: r } = await sb.from('reservaciones')
+      .select('unidad, recurso_tipo, cliente_user_id, cliente, propietario_id')
+      .eq('id', reservaId).single();
     await sb.from('reservaciones').update({
       estado:        'Completada',
       completado_en: new Date().toISOString(),
@@ -402,6 +405,16 @@ function marcarCompletado(reservaId) {
     if (r?.unidad) {
       const tabla = r.recurso_tipo === 'custodio' ? 'custodios' : r.recurso_tipo === 'patio' ? 'patios' : 'camiones';
       await sb.from(tabla).update({ estado: 'disponible' }).eq('id', r.unidad);
+    }
+    // Notificar al cliente
+    if (r?.cliente_user_id) {
+      await sb.from('notificaciones').insert({
+        user_id: r.cliente_user_id,
+        tipo:    'servicio_completado',
+        titulo:  '✅ Servicio completado',
+        mensaje: `Tu servicio fue marcado como completado. Ya puedes calificarlo y tienes 5 días para subir evidencias si las necesitas.`,
+        leido:   false,
+      });
     }
     await renderReserv();
     showToast('✓ Servicio marcado como completado');

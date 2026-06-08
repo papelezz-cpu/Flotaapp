@@ -574,6 +574,18 @@ async function editarCamionRechazado(id) {
   const { data: c } = await sb.from('camiones').select('*').eq('id', id).single();
   if (!c) { showToast('No se encontró la unidad', 'error'); return; }
 
+  // Limpiar form antes de rellenar para evitar datos sucios de una alta a medias
+  ['admin-cap','admin-precio','admin-placas','admin-dim','admin-version','admin-modelo-anio',
+   'admin-num-serie','admin-num-motor','admin-num-economico','admin-tc','admin-fecha-tc',
+   'admin-vence-tc','admin-vence-seguro','admin-vence-permiso-sct','admin-caat',
+   'admin-vigencia-caat','admin-vence-verificacion','admin-vence-peligrosa'].forEach(fid => {
+    const el = document.getElementById(fid); if (el) el.value = '';
+  });
+  ['admin-foto-frente','admin-foto-laterales','admin-foto-trasera','admin-foto-placa',
+   'admin-doc-tc','admin-doc-sct','admin-doc-seguro','admin-doc-peligrosa'].forEach(fid => {
+    const el = document.getElementById(fid); if (el) el.value = '';
+  });
+
   // Switch to camion tab
   cambiarAdminTab('camion');
 
@@ -651,16 +663,25 @@ async function aprobarUnidad(id) {
     });
   }
 
-  renderAdmin(); renderPendientes();
+  renderAdmin(); renderMisPendientes();
   showToast(`✓ Unidad ${id} aprobada y publicada`);
 }
 
 function rechazarUnidad(id) {
-  showConfirm(`¿Rechazar la unidad ${id}? Se eliminará del sistema.`, async () => {
-    const { data: c } = await sb.from('camiones').select('archivos').eq('id', id).single();
-    if (c?.archivos?.length) await sb.storage.from('unidades').remove(c.archivos);
-    await sb.from('camiones').delete().eq('id', id);
+  showConfirm(`¿Rechazar la unidad ${id}? Se notificará al proveedor.`, async () => {
+    const { data: c } = await sb.from('camiones').select('propietario_id').eq('id', id).single();
+    await sb.from('camiones').update({ aprobacion: 'rechazada' }).eq('id', id);
+    if (c?.propietario_id) {
+      await sb.from('notificaciones').insert({
+        user_id: c.propietario_id,
+        tipo:    'recurso_rechazado',
+        titulo:  'Unidad rechazada',
+        mensaje: `Tu unidad ${id} fue rechazada. Revisa los comentarios en el panel Admin y corrígela.`,
+        leido:   false,
+      });
+    }
     await renderAdmin();
+    renderMisPendientes();
     showToast(`Unidad ${id} rechazada`);
   }, { danger: true, confirmLabel: 'Rechazar' });
 }
@@ -871,9 +892,13 @@ async function agregarCamion() {
     const el = document.getElementById(fid); if (el) el.value = '';
   });
   ['admin-foto-frente','admin-foto-laterales','admin-foto-trasera','admin-foto-placa',
-   'admin-doc-tc','admin-doc-sct','admin-doc-seguro'].forEach(fid => {
+   'admin-doc-tc','admin-doc-sct','admin-doc-seguro','admin-doc-peligrosa'].forEach(fid => {
     const el = document.getElementById(fid); if (el) el.value = '';
   });
+  const elVencePelig = document.getElementById('admin-vence-peligrosa');
+  if (elVencePelig) elVencePelig.value = '';
+  const hazmatSec = document.getElementById('admin-hazmat-docs');
+  if (hazmatSec) hazmatSec.style.display = 'none';
   [['foto-frente-label','Adjuntar foto'],['foto-laterales-label','Adjuntar fotos'],
    ['foto-trasera-label','Adjuntar foto'],['foto-placa-label','Adjuntar foto'],
    ['doc-tc-label','Adjuntar documento'],['doc-sct-label','Adjuntar documento'],

@@ -1182,6 +1182,7 @@ async function openHacerOferta(pedidoId) {
 
   const esCustodio = tipo.startsWith('Custodio') || tipo === 'Supervisión remota';
   const esPatio    = tipo.startsWith('Patio')    || tipo === 'Bodega';
+  const esLavadoOf = tipo.startsWith('Lavado')   || tipo === 'Desinfección' || tipo === 'Lavado Contenedor';
 
   let recursos = [];
   let sinRecursosMsg = '';
@@ -1252,10 +1253,10 @@ async function openHacerOferta(pedidoId) {
       select.appendChild(opt);
     });
 
-    // Cargar operadores del admin para el selector de chofer
+    // Cargar operadores del admin — solo para camiones, no para lavados
     const opRow = document.getElementById('ho-op-row');
     const opSel = document.getElementById('ho-operador');
-    if (opRow && opSel) {
+    if (opRow && opSel && !esLavadoOf) {
       let opQ = sb.from('operadores').select('id, nombre, primer_apellido').eq('aprobacion', 'aprobada');
       if (currentUser.rol !== 'superadmin') opQ = opQ.eq('propietario_id', currentUser.id);
       const { data: operadoresData } = await opQ;
@@ -1369,6 +1370,7 @@ async function _enviarOfertaCore() {
   const operadorNombre = opSel?.options[opSel.selectedIndex]?.textContent?.trim() || null;
 
   if (!precio || precio <= 0) { showToast('Ingresa un precio válido.', 'error'); return; }
+  if (!camion) { showToast('Debes seleccionar el recurso que asignarás.', 'error'); return; }
 
   // Validar chofer obligatorio cuando es un pedido de camión
   if (opRow && opRow.style.display !== 'none' && !operador) {
@@ -1702,7 +1704,7 @@ async function confirmarReenviar() {
   if (!fechaIni) { showToast('Ingresa la fecha de inicio.'); return; }
 
   const { error } = await sb.from('pedidos').update({
-    estado:         'abierto',
+    estado:         'pendiente_revision',
     rechazo_nota:   null,
     descripcion:    desc,
     fecha_ini:      fechaIni,

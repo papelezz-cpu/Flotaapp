@@ -976,7 +976,10 @@
           <label>Empresa propietaria</label>
           <select id="sa-empresa-operador" onchange="onCambioEmpresaOperador()"><option value="">— Selecciona empresa —</option></select>
         </div>
-        <button class="btn-add" onclick="agregarOperador()">Enviar a aprobación</button>
+        <div style="display:flex;gap:10px;margin-top:4px">
+          <button class="btn-add" onclick="agregarOperador()" style="flex:1">Enviar a aprobación</button>
+          <button class="btn-cancel" onclick="closeAgregarOperador()" style="flex:0 0 auto">Limpiar</button>
+        </div>
       </div>
 
       <div class="admin-card">
@@ -2216,11 +2219,11 @@
 <script src="js/views.js?v=19"></script>
 <script src="js/camiones.js?v=10"></script>
 <script src="js/recursos.js?v=10"></script>
-<script src="js/reservaciones.js?v=18"></script>
+<script src="js/reservaciones.js?v=19"></script>
 <script src="js/modal.js?v=10"></script>
-<script src="js/pedidos.js?v=33"></script>
+<script src="js/pedidos.js?v=34"></script>
 <script src="js/aprobaciones.js?v=23"></script>
-<script src="js/admin.js?v=25"></script>
+<script src="js/admin.js?v=26"></script>
 <script src="js/operadores.js?v=7"></script>
 <script src="js/usuarios.js?v=16"></script>
 <script src="js/reportes.js?v=2"></script>
