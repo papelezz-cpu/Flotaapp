@@ -97,4 +97,6 @@ button[onclick*="openNuevoPedido('lavado')"],
 .emp-rec-bloque[data-tipo="patio"],
 .emp-rec-bloque[data-tipo="lavado"],
 /* Catálogo: chips de cumplimiento empresa (SCT, RC, Carga, Docs al día) */
-.emp-info-chips { display: none !important; }
+.emp-info-chips,
+/* Nuevo pedido: secciones de formulario custodio/patio/lavado */
+#np-group-custodio, #np-group-patio, #np-group-lavado { display: none !important; }

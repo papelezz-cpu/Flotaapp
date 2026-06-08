@@ -705,6 +705,8 @@ const NP_OPCIONES = {
 
 function openNuevoPedido(servicio) {
   if (!currentUser.id) { showLoginOverlay(); return; }
+  // Si no se especifica servicio, defaultear a camion (solo transporte disponible)
+  if (!servicio || !NP_OPCIONES[servicio]) servicio = 'camion';
 
   const banner = document.getElementById('np-categoria-banner');
   const select = document.getElementById('np-tipo');

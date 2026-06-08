@@ -160,7 +160,7 @@ function _empresaCardHTML(e) {
       <div class="empresa-recursos-list">${bloques}</div>
       <div class="empresa-card-footer">
         ${currentUser.rol === 'cliente' || !currentUser.id
-          ? `<button class="btn-emp-solicitar" onclick="openNuevoPedido()">📋 Publicar solicitud</button>`
+          ? `<button class="btn-emp-solicitar" onclick="openNuevoPedido('camion')">📋 Publicar solicitud</button>`
           : ''}
         ${e.telefono || e.descripcion || e.rfc
           ? `<button class="btn-emp-perfil" onclick="abrirPerfilEmpresaCat('${e.user_id}','${esc(e.nombre)}')">Ver empresa</button>`
