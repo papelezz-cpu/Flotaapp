@@ -242,10 +242,16 @@ async function agregarOperador() {
   if (!propietarioId) { showToast('Selecciona una empresa propietaria', 'error'); restore(); return; }
 
   // Validar archivos obligatorios
-  const fotoFile = document.getElementById('op-foto-file')?.files?.[0];
-  const licFile  = document.getElementById('op-lic-file')?.files?.[0];
-  if (!fotoFile) { showToast('Debes adjuntar la foto del operador', 'error'); restore(); return; }
-  if (!licFile)  { showToast('Debes adjuntar la foto de la licencia de conducir', 'error'); restore(); return; }
+  const fotoFile    = document.getElementById('op-foto-file')?.files?.[0];
+  const licFile     = document.getElementById('op-lic-file')?.files?.[0];
+  const docMedFile  = document.getElementById('op-doc-medico')?.files?.[0];
+  const docToxFile  = document.getElementById('op-doc-tox')?.files?.[0];
+  const docAntFile  = document.getElementById('op-doc-antecedentes')?.files?.[0];
+  if (!fotoFile)   { showToast('Debes adjuntar la foto del operador', 'error'); restore(); return; }
+  if (!licFile)    { showToast('Debes adjuntar la foto de la licencia de conducir', 'error'); restore(); return; }
+  if (!docMedFile) { showToast('Debes adjuntar el documento del examen médico', 'error'); restore(); return; }
+  if (!docToxFile) { showToast('Debes adjuntar el documento del examen toxicológico', 'error'); restore(); return; }
+  if (!docAntFile) { showToast('Debes adjuntar la carta de no antecedentes penales', 'error'); restore(); return; }
 
   const isEdit = !!_operadorEditId;
   const id = isEdit ? _operadorEditId : _autoIdOperador();
