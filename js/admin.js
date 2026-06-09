@@ -777,14 +777,7 @@ async function agregarCamion() {
   const esSuperAdmin  = currentUser.rol === 'superadmin';
   const propietarioId = _getPropietarioId('camion');
   if (!propietarioId) { _done(); return; }
-  const ownerTag = propietarioId.slice(-4).toUpperCase();
-  const { data: existentes } = await sb.from('camiones').select('id').eq('propietario_id', propietarioId).like('id', `${letra}-${ownerTag}-%`);
-  const maxNum = (existentes || []).reduce((max, c) => {
-    const parts = c.id.split('-');
-    const n = parseInt(parts[parts.length - 1]) || 0;
-    return Math.max(max, n);
-  }, 0);
-  const id = `${letra}-${ownerTag}-${String(maxNum + 1).padStart(3, '0')}`;
+  const id = `${letra}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
 
   // Subir archivos al storage
   const _getFile = elId => document.getElementById(elId)?.files?.[0];
@@ -983,13 +976,7 @@ async function agregarCustodio() {
   const esSuperAdmin = currentUser.rol === 'superadmin';
   const propietarioId = _getPropietarioId('custodio');
   if (!propietarioId) { _done(); return; }
-  const ownerTagCus = propietarioId.slice(-4).toUpperCase();
-  const { data: existentes } = await sb.from('custodios').select('id').eq('propietario_id', propietarioId).like('id', `CUS-${ownerTagCus}-%`);
-  const maxNum = (existentes || []).reduce((max, c) => {
-    const parts = c.id.split('-');
-    const n = parseInt(parts[parts.length - 1]) || 0; return Math.max(max, n);
-  }, 0);
-  const id = `CUS-${ownerTagCus}-${String(maxNum + 1).padStart(3,'0')}`;
+  const id = `CUS-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
 
   // Subir documento SEDENA si es custodio armado
   let docSedenaUrl = null;
@@ -1181,13 +1168,7 @@ async function agregarPatio() {
   const esSuperAdmin = currentUser.rol === 'superadmin';
   const propietarioId = _getPropietarioId('patio');
   if (!propietarioId) { _done(); return; }
-  const ownerTagPat = propietarioId.slice(-4).toUpperCase();
-  const { data: existentes } = await sb.from('patios').select('id').eq('propietario_id', propietarioId).like('id', `PAT-${ownerTagPat}-%`);
-  const maxNum = (existentes || []).reduce((max, p) => {
-    const parts = p.id.split('-');
-    const n = parseInt(parts[parts.length - 1]) || 0; return Math.max(max, n);
-  }, 0);
-  const id = `PAT-${ownerTagPat}-${String(maxNum + 1).padStart(3,'0')}`;
+  const id = `PAT-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
 
   // Upload permiso doc if provided
   let docPermisoUrl = null;
@@ -1346,13 +1327,7 @@ async function agregarLavado() {
   const propietarioId = _getPropietarioId('lavado');
   if (!propietarioId) { _done(); return; }
 
-  const ownerTagLav = propietarioId.slice(-4).toUpperCase();
-  const { data: existentes } = await sb.from('lavados').select('id').eq('propietario_id', propietarioId).like('id', `LAV-${ownerTagLav}-%`);
-  const maxNum = (existentes || []).reduce((max, l) => {
-    const parts = l.id.split('-');
-    const n = parseInt(parts[parts.length - 1]) || 0; return Math.max(max, n);
-  }, 0);
-  const id = `LAV-${ownerTagLav}-${String(maxNum + 1).padStart(3,'0')}`;
+  const id = `LAV-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
 
   const { error } = await sb.from('lavados').insert({
     id, nombre,

@@ -1,17 +1,8 @@
 // ── MÓDULO DE OPERADORES ───────────────────────────────
 let _operadorEditId = null;
 
-async function _autoIdOperador(propietarioId) {
-  const ownerTag = propietarioId.slice(-4).toUpperCase();
-  const { data } = await sb.from('operadores').select('id')
-    .eq('propietario_id', propietarioId)
-    .like('id', `OP-${ownerTag}-%`);
-  const nums = (data || []).map(o => {
-    const parts = (o.id || '').split('-');
-    return parseInt(parts[parts.length - 1]) || 0;
-  });
-  const max = nums.length ? Math.max(...nums) : 0;
-  return `OP-${ownerTag}-${String(max + 1).padStart(3, '0')}`;
+function _autoIdOperador() {
+  return `OP-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
 }
 
 // Número de trabajador automático, secuencial por empresa
@@ -257,7 +248,7 @@ async function agregarOperador() {
   if (!licFile)  { showToast('Debes adjuntar la foto de la licencia de conducir', 'error'); restore(); return; }
 
   const isEdit = !!_operadorEditId;
-  const id = isEdit ? _operadorEditId : await _autoIdOperador(propietarioId);
+  const id = isEdit ? _operadorEditId : _autoIdOperador();
 
   // Subir foto del operador
   let fotoOperadorUrl = null;
