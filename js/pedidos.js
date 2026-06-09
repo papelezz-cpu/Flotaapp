@@ -254,7 +254,9 @@ async function renderPedidos(append = false) {
   const _filtrarEstadoCli = lista => {
     if (_filtroEstadoCli === 'todos') return lista;
     if (_filtroEstadoCli === 'activo')
-      return lista.filter(p => ['abierto','en_negociacion','pendiente_revision','pendiente_acuerdo','rechazado'].includes(p.estado));
+      return lista.filter(p => ['abierto','en_negociacion','pendiente_acuerdo','rechazado'].includes(p.estado));
+    if (_filtroEstadoCli === 'revision')
+      return lista.filter(p => p.estado === 'pendiente_revision');
     if (_filtroEstadoCli === 'acordado')
       return lista.filter(p => p.estado === 'acordado');
     if (_filtroEstadoCli === 'cancelado')
