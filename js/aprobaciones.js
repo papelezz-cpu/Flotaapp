@@ -765,9 +765,13 @@ function _renderOperadorCard(op) {
           ${_venceAnual(op.fecha_examen_toxicologico, 'Examen toxicológico (1 año)')}
           ${_venceAnual(op.fecha_carta_antecedentes, 'Carta antecedentes (1 año)')}
         </div>
-        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
-          ${op.foto_licencia    ? `<a href="${esc(op.foto_licencia)}"    target="_blank" class="btn-edit" style="font-size:0.75rem">🪪 Licencia</a>` : ''}
-          ${op.doc_examen_medico ? `<a href="${esc(op.doc_examen_medico)}" target="_blank" class="btn-edit" style="font-size:0.75rem">📄 Examen médico</a>` : ''}
+        <div class="apr-op-section-title" style="margin-top:10px">Documentos</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+          ${op.foto_operador         ? `<a href="${esc(op.foto_operador)}"              target="_blank" class="btn-edit" style="font-size:0.75rem">📷 Foto operador</a>`       : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin foto operador</span>'}
+          ${op.foto_licencia         ? `<a href="${esc(op.foto_licencia)}"              target="_blank" class="btn-edit" style="font-size:0.75rem">🪪 Licencia</a>`            : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin foto licencia</span>'}
+          ${op.doc_examen_medico     ? `<a href="${esc(op.doc_examen_medico)}"          target="_blank" class="btn-edit" style="font-size:0.75rem">📄 Examen médico</a>`       : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin examen médico</span>'}
+          ${op.doc_examen_toxicologico ? `<a href="${esc(op.doc_examen_toxicologico)}"  target="_blank" class="btn-edit" style="font-size:0.75rem">🧪 Examen toxicológico</a>` : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin examen tox.</span>'}
+          ${op.doc_carta_antecedentes  ? `<a href="${esc(op.doc_carta_antecedentes)}"   target="_blank" class="btn-edit" style="font-size:0.75rem">📋 No antecedentes</a>`     : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin carta antecedentes</span>'}
         </div>
       </div>
       <div class="apr-actions">
