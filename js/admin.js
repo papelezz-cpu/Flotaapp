@@ -391,7 +391,6 @@ async function editarCamion(id) {
   set('editar-placas', c.placas || '');
   set('editar-tipo-placa', c.tipo_placa || '');
   set('editar-dim', c.dimensiones || '');
-  set('editar-tiempo', c.tiempo_respuesta || '');
   set('editar-precio', c.precio_dia || '');
   set('editar-estado', c.estado);
   set('editar-marca', c.marca || '');
@@ -423,7 +422,6 @@ async function guardarEdicion() {
     tipo_placa:          g('editar-tipo-placa'),
     dimensiones:         g('editar-dim'),
     tipo_carga:          getSelectedCargo('editar-tipo-carga'),
-    tiempo_respuesta:    document.getElementById('editar-tiempo').value             || null,
     precio_dia:          parseFloat(document.getElementById('editar-precio').value) || null,
     estado:              document.getElementById('editar-estado').value,
     emoji:               { Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️' }[tipo] || '🚛',
@@ -619,7 +617,6 @@ async function editarCamionRechazado(id) {
   setSelect('admin-tipo-placa',  c.tipo_placa);
   setSelect('admin-combustible', c.tipo_combustible);
   setSelect('admin-estado',      c.estado);
-  setSelect('admin-tiempo',      c.tiempo_respuesta);
   renderCargoChipsSelect('admin-tipo-carga', c.tipo_carga || []);
   autoFillDimensiones('admin');
 
@@ -742,7 +739,6 @@ async function agregarCamion() {
   const precio = parseFloat(document.getElementById('admin-precio').value) || null;
   const placas = document.getElementById('admin-placas').value.trim() || null;
   const dim    = document.getElementById('admin-dim').value.trim()    || null;
-  const tiempo = document.getElementById('admin-tiempo').value        || null;
   const tipoCarga = getSelectedCargo('admin-tipo-carga');
   const g = elId => document.getElementById(elId)?.value?.trim() || null;
 
@@ -837,7 +833,6 @@ async function agregarCamion() {
     ...(isEdit && { rechazo_nota: null, rechazo_campos: null }),
     ...(placas         && { placas }),
     ...(dim            && { dimensiones: dim }),
-    ...(tiempo         && { tiempo_respuesta: tiempo }),
     ...(tipoCarga.length && { tipo_carga: tipoCarga }),
     ...(precio         && { precio_dia: precio }),
     marca:               g('admin-marca'),

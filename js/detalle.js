@@ -80,8 +80,6 @@ async function renderDetalleTab() {
           <div class="detalle-val">${esc(String(c.capacidad))} toneladas</div></div>
         <div class="detalle-item"><div class="detalle-lbl">Placas</div>
           <div class="detalle-val">${esc(c.placas || '—')}</div></div>
-        <div class="detalle-item"><div class="detalle-lbl">Tiempo de respuesta</div>
-          <div class="detalle-val">⏱ ${esc(c.tiempo_respuesta || '—')}</div></div>
         <div class="detalle-item detalle-full"><div class="detalle-lbl">Dimensiones del vehículo</div>
           <div class="detalle-val">📐 ${esc(c.dimensiones || '—')}</div></div>
         <div class="detalle-item detalle-full"><div class="detalle-lbl">Operador asignado</div>
