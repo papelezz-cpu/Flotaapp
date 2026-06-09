@@ -455,7 +455,7 @@ function _regFormHTML(rol) {
     </div>
     <div class="form-group">
       <label>RFC de la empresa *</label>
-      <input type="text" id="reg-rfc" placeholder="TACM9001ABC" maxlength="12" oninput="this.value=this.value.toUpperCase()">
+      <input type="text" id="reg-rfc" placeholder="TACM900101AB" maxlength="13" oninput="this.value=this.value.toUpperCase()">
     </div>
     <div class="form-group">
       <label>Tipo de persona *</label>
