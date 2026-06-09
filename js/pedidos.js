@@ -158,22 +158,30 @@ async function renderPedidos(append = false) {
     .range(_pedidosOffset, _pedidosOffset + PEDIDOS_PAGE - 1);
   if (esCliente) pedidosQ = pedidosQ.in('estado', ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado', 'acordado', 'cancelado']);
 
-  const { data: pedidosPage, error } = await pedidosQ;
+  // Superadmin: query paralela para acordados (no están en la paginación por ser más viejos)
+  const esSuperAdmin = currentUser.rol === 'superadmin';
+  const acordadosExtraQ = (!append && esSuperAdmin)
+    ? sb.from('pedidos').select('*').eq('estado', 'acordado').order('created_at', { ascending: false }).limit(100)
+    : Promise.resolve({ data: [] });
+
+  const [{ data: pedidosPage, error }, { data: acordadosSA }] = await Promise.all([pedidosQ, acordadosExtraQ]);
 
   if (error) {
     container.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar solicitudes.</div>`;
     return;
   }
 
-  // Accumulate new pedidos (skip duplicates)
+  // Accumulate new pedidos (skip duplicates); merge acordados SA
   const existingIds = new Set(_pedidosAccum.map(p => p.id));
-  (pedidosPage || []).forEach(p => { if (!existingIds.has(p.id)) _pedidosAccum.push(p); });
+  (pedidosPage || []).forEach(p => { if (!existingIds.has(p.id)) { _pedidosAccum.push(p); existingIds.add(p.id); } });
+  (acordadosSA  || []).forEach(p => { if (!existingIds.has(p.id)) { _pedidosAccum.push(p); existingIds.add(p.id); } });
 
   // Fetch ofertas only for the new pedido IDs
-  if (pedidosPage?.length) {
+  const todosNuevosIds = [...(pedidosPage || []), ...(acordadosSA || [])].map(p => p.id);
+  if (todosNuevosIds.length) {
     const { data: nuevasOfertas } = await sb.from('ofertas')
       .select('*').order('created_at', { ascending: true })
-      .in('pedido_id', pedidosPage.map(p => p.id));
+      .in('pedido_id', todosNuevosIds);
 
     (nuevasOfertas || []).forEach(o => {
       if (!_ofertasAccum[o.pedido_id]) _ofertasAccum[o.pedido_id] = [];
