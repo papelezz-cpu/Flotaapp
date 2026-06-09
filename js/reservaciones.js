@@ -349,6 +349,13 @@ function cancelarReserva(reservaId, unidad) {
         estado:              'abierto',
         oferta_pendiente_id: null,
       }).eq('id', rv.pedido_id);
+
+      // Invalidar todas las ofertas aceptadas anteriores para que no interfieran
+      // con el nuevo ciclo de negociación
+      await sb.from('ofertas')
+        .update({ estado: 'rechazada' })
+        .eq('pedido_id', rv.pedido_id)
+        .in('estado', ['aceptada', 'enviada', 'contra_oferta']);
     }
 
     // Notificar al cliente
