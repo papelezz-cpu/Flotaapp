@@ -28,6 +28,12 @@
   <link rel="stylesheet" href="css/login.css?v=2">
   <link rel="stylesheet" href="css/detalle.css?v=2">
   <link rel="stylesheet" href="css/theme.css?v=3">
+  <style>
+    /* Botones de confirmación — forzados para ambos modos */
+    .btn-confirm { color: #fff !important; }
+    body.light .btn-confirm { background: #2563eb !important; border-color: #2563eb !important; color: #fff !important; }
+    body.light #sc-confirm  { background: #2563eb !important; border-color: #2563eb !important; color: #fff !important; }
+  </style>
 
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
