@@ -78,10 +78,12 @@ function formatPrecio(num) {
 let _confirmCb = null;
 
 function showConfirm(msg, onConfirm, { danger = false, confirmLabel = 'Confirmar', cancelLabel = 'Cancelar' } = {}) {
-  document.getElementById('sc-msg').textContent   = msg;
-  document.getElementById('sc-confirm').textContent = confirmLabel;
-  document.getElementById('sc-confirm').style.background = danger ? 'var(--danger)' : '';
-  document.getElementById('sc-confirm').style.borderColor = danger ? 'var(--danger)' : '';
+  const btn = document.getElementById('sc-confirm');
+  document.getElementById('sc-msg').textContent = msg;
+  btn.textContent = confirmLabel;
+  btn.style.cssText = danger
+    ? 'background:#ef4444;border-color:#ef4444;color:#fff'
+    : 'background:#2563eb;border-color:#2563eb;color:#fff';
   _confirmCb = onConfirm;
   document.getElementById('modal-confirm').classList.add('open');
 }
