@@ -149,6 +149,10 @@ body.light .apr-oferta-box { background: rgba(37,99,235,0.04); border-color: rgb
 body.light .apr-desc { background: rgba(0,0,0,0.03); }
 body.light .badge-revision    { background: rgba(217,119,6,0.1);  color: #b45309; }
 body.light .badge-acuerdo-rev { background: rgba(109,40,217,0.1); color: #7c3aed; }
+body.light .btn-apr-rechazar  { color: #dc2626; border-color: rgba(220,38,38,0.55); background: rgba(220,38,38,0.07); }
+body.light .btn-apr-rechazar:hover { background: rgba(220,38,38,0.14); }
+body.light .btn-apr-aprobar   { color: #16a34a; border-color: rgba(22,163,74,0.5);  background: rgba(22,163,74,0.07); }
+body.light .btn-apr-aprobar:hover  { background: rgba(22,163,74,0.14); }
 
 /* ── OFERTA EMPRESA LINK ─────────────────────────────── */
 .oferta-empresa-link { cursor: pointer; }
