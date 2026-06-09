@@ -618,7 +618,7 @@ async function doRegistro() {
     actaFile    = document.getElementById('reg-acta')?.files[0];
     if (!razonSocial) { showErr('La razón social es requerida.'); return; }
     if (!csfFile) { showErr('La Constancia de Situación Fiscal (SAT) es requerida.'); return; }
-    if (!actaFile) { showErr('El Acta constitutiva es requerida.'); return; }
+    if (_regTipoPersona === 'moral' && !actaFile) { showErr('El Acta constitutiva es requerida.'); return; }
     if (!opinionFile) { showErr('La Opinión de cumplimiento SAT es requerida.'); return; }
   }
 
