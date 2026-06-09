@@ -1554,6 +1554,7 @@ async function cerrarAcuerdo(oferta, pedido) {
 
   // Crear reservación automáticamente
   const { error } = await sb.from('reservaciones').insert({
+    pedido_id:       pedido.id,
     unidad:          oferta.camion_id || null,
     recurso_tipo:    recursoTipo,
     cliente:         pedido.cliente_nombre,

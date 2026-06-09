@@ -329,28 +329,41 @@ function rechazarReserva(reservaId, unidad) {
 
 function cancelarReserva(reservaId, unidad) {
   if (_reservaActiva) return;
-  showConfirm('¿Cancelar esta reserva? El recurso volverá a estar disponible.', async () => {
+  showConfirm('¿Cancelar esta reserva? El recurso volverá a estar disponible y la solicitud se reabrirá para nuevas ofertas.', async () => {
     _reservaActiva = true;
     const { data: rv } = await sb.from('reservaciones').select('*').eq('id', reservaId).single();
     const tipoFinal = rv?.recurso_tipo || 'camion';
+
+    // Cancelar la reserva
     await sb.from('reservaciones').update({ estado: 'Cancelada' }).eq('id', reservaId);
+
+    // Liberar el recurso
     if (unidad) {
       const tabla = tipoFinal === 'custodio' ? 'custodios' : tipoFinal === 'patio' ? 'patios' : 'camiones';
       await sb.from(tabla).update({ estado: 'disponible' }).eq('id', unidad);
     }
+
+    // Regresar el pedido a abierto para que puedan ofertar de nuevo
+    if (rv?.pedido_id) {
+      await sb.from('pedidos').update({
+        estado:              'abierto',
+        oferta_pendiente_id: null,
+      }).eq('id', rv.pedido_id);
+    }
+
     // Notificar al cliente
     if (rv?.cliente_user_id) {
       await sb.from('notificaciones').insert({
         user_id: rv.cliente_user_id,
         tipo:    'reserva_cancelada',
         titulo:  'Reserva cancelada',
-        mensaje: `Tu reserva de "${rv.unidad || unidad}" fue cancelada por el proveedor.`,
+        mensaje: `Tu reserva fue cancelada por el proveedor. Tu solicitud está abierta de nuevo para recibir ofertas.`,
         leido:   false,
       });
     }
     _reservaActiva = false;
     await renderReserv();
-    showToast('Reserva cancelada — recurso disponible de nuevo');
+    showToast('Reserva cancelada — solicitud reabierta para nuevas ofertas');
   }, { danger: true, confirmLabel: 'Sí, cancelar' });
 }
 
