@@ -78,7 +78,9 @@ body.light .form-group select option { background: #fff; }
 
 body.light .modal         { background: #fff; border-color: rgba(37,99,235,0.3); }
 body.light .modal-overlay { background: rgba(190,220,245,0.75); }
-body.light .btn-cancel    { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); color: #4a6fa5; }
+body.light .btn-cancel         { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); color: #4a6fa5; }
+body.light .btn-confirm        { background: #2563eb; color: #fff; border-color: #2563eb; }
+body.light .btn-confirm:hover  { background: #1d4ed8; }
 
 body.light .truck-list-item { background: rgba(232,244,253,0.7); }
 body.light .btn-detail { background: rgba(37,99,235,0.1); border-color: rgba(37,99,235,0.3); }
