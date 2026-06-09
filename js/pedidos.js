@@ -1539,7 +1539,8 @@ async function cerrarAcuerdo(oferta, pedido) {
   }
 
   // Marcar pedido como acordado
-  await sb.from('pedidos').update({ estado: 'acordado' }).eq('id', pedido.id);
+  const { error: errAcuerdo } = await sb.from('pedidos').update({ estado: 'acordado' }).eq('id', pedido.id);
+  if (errAcuerdo) throw new Error(errAcuerdo.message || 'Error al marcar pedido como acordado');
 
   // Detectar tipo de recurso del pedido para guardarlo en la reservación
   const tipoPedido = pedido.tipo_camion || '';

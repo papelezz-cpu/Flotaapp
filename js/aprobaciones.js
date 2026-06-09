@@ -1218,15 +1218,17 @@ async function _ejecutarRechazarAcuerdo(pedidoId, nota) {
   const ofertaId = ped?.oferta_pendiente_id;
 
   // Regresar pedido a negociación
-  await sb.from('pedidos').update({
+  const { error: errPed } = await sb.from('pedidos').update({
     estado:              'en_negociacion',
     oferta_pendiente_id: null,
     rechazo_nota:        nota || null,
   }).eq('id', pedidoId);
+  if (errPed) { showToast('Error al rechazar acuerdo: ' + errPed.message, 'error'); return; }
 
   // Revertir oferta a enviada para que el cliente la vuelva a ver
   if (ofertaId) {
-    await sb.from('ofertas').update({ estado: 'enviada' }).eq('id', ofertaId);
+    const { error: errOf } = await sb.from('ofertas').update({ estado: 'enviada' }).eq('id', ofertaId);
+    if (errOf) console.warn('No se pudo revertir estado de oferta:', errOf.message);
   }
 
   // Notificar a cliente y proveedor
