@@ -1240,13 +1240,16 @@ async function openHacerOferta(pedidoId) {
     });
 
   } else {
-    // Camión — query directo igual que custodios/patios
+    // Camión — filtrar por tipo exacto que solicita el pedido
     if (label) label.textContent = 'Camión que asignas *';
     let q = sb.from('camiones').select('*').eq('estado', 'disponible').eq('aprobacion', 'aprobada');
     if (currentUser.rol !== 'superadmin') q = q.eq('propietario_id', currentUser.id);
+    if (tipo) q = q.eq('tipo', tipo);
     const { data: camionesData } = await q;
     recursos = camionesData || [];
-    sinRecursosMsg = '⚠ No tienes camiones disponibles. Verifica el estado de tus unidades en el panel Admin.';
+    sinRecursosMsg = tipo
+      ? `⚠ No tienes camiones de tipo "${tipo}" disponibles. Solo puedes ofertar con la unidad del tipo solicitado.`
+      : '⚠ No tienes camiones disponibles. Verifica el estado de tus unidades en el panel Admin.';
 
     const CAMION_EMOJI = { Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️' };
     select.innerHTML = recursos.length
@@ -1383,6 +1386,16 @@ async function _enviarOfertaCore() {
 
   if (!precio || precio <= 0) { showToast('Ingresa un precio válido.', 'error'); return; }
   if (!camion) { showToast('Debes seleccionar el recurso que asignarás.', 'error'); return; }
+
+  // Verificar que el camión seleccionado sea del tipo requerido
+  const pedParaValidar = _pedidosAccum.find(p => p.id === pedidoParaOfertar);
+  if (pedParaValidar?.tipo_camion && !['Custodio','Patio','Lavado','Supervisión'].some(t => pedParaValidar.tipo_camion.startsWith(t))) {
+    const { data: camionSel } = await sb.from('camiones').select('tipo').eq('id', camion).single();
+    if (camionSel && camionSel.tipo !== pedParaValidar.tipo_camion) {
+      showToast(`El camión seleccionado es tipo "${camionSel.tipo}" pero la solicitud requiere "${pedParaValidar.tipo_camion}".`, 'error');
+      return;
+    }
+  }
 
   // Validar chofer obligatorio cuando es un pedido de camión
   if (opRow && opRow.style.display !== 'none' && !operador) {
