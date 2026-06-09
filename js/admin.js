@@ -72,9 +72,10 @@ function _dbError(error) {
   }
   if (msg.includes('unique') || msg.includes('duplicate key')) {
     const col = error?.details?.match(/Key \(([^)]+)\)/)?.[1];
+    const val = error?.details?.match(/\)=\(([^)]+)\)/)?.[1];
     if (!col || col === 'id') return 'Error al generar el ID del registro. Intenta de nuevo.';
-    if (col === 'placas') return 'Ya existe un camión con esas placas en el sistema.';
-    return `Ya existe un registro con ese valor en el campo "${col}".`;
+    if (col === 'placas') return `Ya existe un camión con placas "${val}" en el sistema.`;
+    return `Ya existe un registro con ese valor en el campo "${col}"${val ? ` (valor: ${val})` : ''}.`;
   }
   if (msg.includes('foreign key') || msg.includes('violates foreign key'))
     return 'Referencia inválida: uno de los valores seleccionados no existe en el sistema.';
