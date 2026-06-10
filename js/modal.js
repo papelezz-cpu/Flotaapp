@@ -81,8 +81,11 @@ async function confirmarReserva() {
     }
   }
 
+  // propietario_id es indispensable: renderReserv filtra por él, sin él la
+  // empresa dueña nunca vería la solicitud para aceptarla.
   const { error: errRes } = await sb.from('reservaciones').insert({
     unidad:          currentRecurso?.id   || null,
+    propietario_id:  currentRecurso?.propietario_id || null,
     recurso_tipo:    currentRecurso?.tipo_recurso || 'camion',
     cliente:         nombre,
     cliente_email:   email,
