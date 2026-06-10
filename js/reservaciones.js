@@ -416,12 +416,16 @@ function eliminarReserva(reservaId) {
 function marcarCompletado(reservaId) {
   showConfirm('¿Marcar este servicio como completado? El cliente podrá calificarlo.', async () => {
     const { data: r } = await sb.from('reservaciones')
-      .select('unidad, recurso_tipo, cliente_user_id, cliente, propietario_id')
+      .select('unidad, recurso_tipo, cliente_user_id, cliente, propietario_id, pedido_id')
       .eq('id', reservaId).single();
     await sb.from('reservaciones').update({
       estado:        'Completada',
       completado_en: new Date().toISOString(),
     }).eq('id', reservaId);
+    // Cerrar el ciclo del pedido: el acuerdo queda finalizado y deja de figurar como activo
+    if (r?.pedido_id) {
+      await sb.from('pedidos').update({ estado: 'finalizado' }).eq('id', r.pedido_id);
+    }
     if (r?.unidad) {
       const tabla = r.recurso_tipo === 'custodio' ? 'custodios' : r.recurso_tipo === 'patio' ? 'patios' : 'camiones';
       await sb.from(tabla).update({ estado: 'disponible' }).eq('id', r.unidad);

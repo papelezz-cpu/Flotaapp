@@ -182,11 +182,13 @@ async function abrirHistorialUsuario(userId, nombre, rol) {
 
     const ESTADO_LABEL = {
       abierto: 'Abierto', en_negociacion: 'En negociación', acordado: '✓ Acordado',
+      finalizado: '✓ Finalizado', expirado: '⌛ Expirado',
       cancelado: 'Cancelado', rechazado: 'Rechazado', pendiente_revision: 'En revisión',
       pendiente_acuerdo: 'Acuerdo en revisión',
     };
     const ESTADO_COLOR = {
-      acordado: 'var(--green)', cancelado: 'var(--text-muted)', rechazado: 'var(--danger)',
+      acordado: 'var(--green)', finalizado: 'var(--green)', expirado: 'var(--text-muted)',
+      cancelado: 'var(--text-muted)', rechazado: 'var(--danger)',
       abierto: 'var(--accent)', en_negociacion: 'var(--amber)',
     };
 

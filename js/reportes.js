@@ -42,7 +42,7 @@ async function renderReportes() {
 
   // ── Totales ────────────────────────────────────────
   const totalPedidos   = pedidos.length;
-  const acordados      = pedidos.filter(p => p.estado === 'acordado').length;
+  const acordados      = pedidos.filter(p => ['acordado','finalizado','expirado'].includes(p.estado)).length;
   const cancelados     = pedidos.filter(p => p.estado === 'cancelado').length;
   const abiertos       = pedidos.filter(p => p.estado === 'abierto').length;
   const totalReservas  = reservas.length;

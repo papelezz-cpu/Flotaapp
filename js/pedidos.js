@@ -156,12 +156,12 @@ async function renderPedidos(append = false) {
 
   let pedidosQ = sb.from('pedidos').select('*').order('created_at', { ascending: false })
     .range(_pedidosOffset, _pedidosOffset + PEDIDOS_PAGE - 1);
-  if (esCliente) pedidosQ = pedidosQ.in('estado', ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado', 'acordado', 'cancelado']);
+  if (esCliente) pedidosQ = pedidosQ.in('estado', ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado', 'acordado', 'cancelado', 'finalizado', 'expirado']);
 
   // Superadmin: query paralela para acordados (no están en la paginación por ser más viejos)
   const esSuperAdmin = currentUser.rol === 'superadmin';
   const acordadosExtraQ = (!append && esSuperAdmin)
-    ? sb.from('pedidos').select('*').eq('estado', 'acordado').order('created_at', { ascending: false }).limit(100)
+    ? sb.from('pedidos').select('*').in('estado', ['acordado', 'finalizado', 'expirado']).order('created_at', { ascending: false }).limit(100)
     : Promise.resolve({ data: [] });
 
   const [{ data: pedidosPage, error }, { data: acordadosSA }] = await Promise.all([pedidosQ, acordadosExtraQ]);
@@ -232,6 +232,18 @@ async function renderPedidos(append = false) {
     }
   }
 
+  // Estado lazy: acuerdos cuya fecha_fin ya pasó y nunca se completaron → expirado
+  // (los completados pasan a 'finalizado' al marcar el servicio como completado)
+  const _hoy = today();
+  const aExpirar = (pedidosPage || []).filter(p =>
+    p.estado === 'acordado' && p.fecha_fin && p.fecha_fin < _hoy
+  );
+  if (aExpirar.length) {
+    sb.from('pedidos').update({ estado: 'expirado' })
+      .in('id', aExpirar.map(p => p.id)).then(() => {});
+    aExpirar.forEach(p => { p.estado = 'expirado'; });
+  }
+
   const pedidos      = _pedidosAccum;
   const ofertasMap   = _ofertasAccum;
   const todasOfertas = Object.values(_ofertasAccum).flat();
@@ -266,7 +278,7 @@ async function renderPedidos(append = false) {
     if (_filtroEstadoCli === 'revision')
       return lista.filter(p => p.estado === 'pendiente_revision');
     if (_filtroEstadoCli === 'acordado')
-      return lista.filter(p => p.estado === 'acordado');
+      return lista.filter(p => ['acordado','finalizado','expirado'].includes(p.estado));
     if (_filtroEstadoCli === 'cancelado')
       return lista.filter(p => p.estado === 'cancelado');
     return lista;
@@ -277,7 +289,7 @@ async function renderPedidos(append = false) {
   // ── CLIENTE ────────────────────────────────────────
   if (currentUser.id && currentUser.rol === 'cliente') {
     const ESTADOS_ACTIVOS = ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado'];
-    const ESTADOS_HIST    = ['acordado', 'cancelado'];
+    const ESTADOS_HIST    = ['acordado', 'cancelado', 'finalizado', 'expirado'];
     const todosMios = _filtrar((pedidos || []).filter(p => p.cliente_id === currentUser.id));
     const misPedidos   = _filtrarEstadoCli(todosMios.filter(p => ESTADOS_ACTIVOS.includes(p.estado)));
     const misHistorial = _filtrarEstadoCli(todosMios.filter(p => ESTADOS_HIST.includes(p.estado)));
@@ -354,6 +366,7 @@ async function renderPedidos(append = false) {
     const ESTADOS_ACTIVOS = ['abierto','en_negociacion','pendiente_revision','pendiente_acuerdo'];
     const activos = _filtrar((pedidos || []).filter(p => ESTADOS_ACTIVOS.includes(p.estado)));
     const acordados = _filtrar((pedidos || []).filter(p => p.estado === 'acordado'));
+    const cerrados = _filtrar((pedidos || []).filter(p => ['finalizado','expirado'].includes(p.estado)));
 
     // Agrupar activos por cliente
     const porCliente = {};
@@ -374,7 +387,11 @@ async function renderPedidos(append = false) {
       html += `<div class="ped-seccion-title" style="margin-top:24px">Acuerdos activos</div>`;
       html += acordados.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'superadmin')).join('');
     }
-    if (!activos.length && !acordados.length) {
+    if (cerrados.length) {
+      html += `<div class="ped-seccion-title" style="margin-top:24px">Finalizados y expirados</div>`;
+      html += cerrados.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'superadmin')).join('');
+    }
+    if (!activos.length && !acordados.length && !cerrados.length) {
       html = `<div class="empty-state"><div class="icon">📋</div>No hay solicitudes activas.</div>`;
     }
 
@@ -417,6 +434,8 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
     pendiente_revision:  'badge-revision',
     pendiente_acuerdo:   'badge-acuerdo-rev',
     rechazado:           'badge-maint',
+    finalizado:          'badge-completado',
+    expirado:            'badge-expirado',
   }[p.estado] || 'badge-maint';
 
   const _ahora         = new Date().toISOString();
@@ -427,6 +446,8 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
     : (p.estado === 'en_negociacion' && hayAceptada) ? '⏳ Acuerdo en revisión'
     : p.estado === 'en_negociacion'     ? 'En negociación'
     : p.estado === 'acordado'           ? '✓ Acordado'
+    : p.estado === 'finalizado'         ? '✓ Finalizado'
+    : p.estado === 'expirado'           ? '⌛ Expirado'
     : p.estado === 'cancelado'          ? 'Cancelado'
     : p.estado === 'pendiente_revision' ? '⏳ En revisión'
     : p.estado === 'pendiente_acuerdo'  ? '⏳ Acuerdo en revisión'
@@ -447,7 +468,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
 
   let acciones = '';
 
-  if (vista === 'cliente' && !['cancelado','pendiente_revision','pendiente_acuerdo','rechazado'].includes(p.estado)) {
+  if (vista === 'cliente' && !['cancelado','pendiente_revision','pendiente_acuerdo','rechazado','finalizado','expirado'].includes(p.estado)) {
     acciones = `
       <button class="btn-ver-pedido" onclick="openPedidoDetalle('${p.id}')">
         Ver ofertas${pendientes.length ? `<span class="ped-badge-count">${pendientes.length}</span>` : ''}
@@ -560,9 +581,9 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
   let timelineHTML = '';
   if (vista === 'cliente') {
     const TL_STEPS = ['Publicada', 'Negociando', 'En revisión', 'Acordada'];
-    const TL_POS = { abierto:0, en_negociacion:1, pendiente_revision:2, pendiente_acuerdo:2, acordado:3 };
+    const TL_POS = { abierto:0, en_negociacion:1, pendiente_revision:2, pendiente_acuerdo:2, acordado:3, finalizado:3 };
     const cur = TL_POS[p.estado] ?? -1;
-    const isFailed = p.estado === 'rechazado' || p.estado === 'cancelado';
+    const isFailed = p.estado === 'rechazado' || p.estado === 'cancelado' || p.estado === 'expirado';
     timelineHTML = `<div class="ped-timeline">` +
       TL_STEPS.map((label, i) => {
         const done   = !isFailed && i < cur;

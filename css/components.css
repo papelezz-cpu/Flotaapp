@@ -825,6 +825,8 @@ body.light .ped-serv-btn:hover { border-color: rgba(37,99,235,0.4); }
 .badge-acordado  { background: rgba(78,142,247,0.15);  color: var(--accent); }
 .badge-completado { background: rgba(34,197,94,0.13); color: #22c55e; }
 body.light .badge-completado { background: rgba(21,128,61,0.1); color: #15803d; }
+.badge-expirado  { background: rgba(148,163,184,0.15); color: #94a3b8; }
+body.light .badge-expirado { background: rgba(100,116,139,0.12); color: #64748b; }
 
 /* ── OFERTA ITEMS (en modal detalle pedido) ──────────── */
 .oferta-item {
