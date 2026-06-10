@@ -78,7 +78,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (accion === 'listar') {
-      const { data: perfiles } = await sbAdmin.from('perfiles').select('user_id, nombre, rol, created_at').order('created_at')
+      const { data: perfiles } = await sbAdmin.from('perfiles').select('user_id, nombre, rol, aprobacion_cuenta, created_at').order('created_at')
       const { data: { users } } = await sbAdmin.auth.admin.listUsers()
       const ROL_ORDER: Record<string, number> = { superadmin: 0, admin: 1, cliente: 2 }
       const lista = (perfiles || [])

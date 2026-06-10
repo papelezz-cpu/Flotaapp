@@ -140,7 +140,7 @@ async function renderAprobaciones() {
         </div>
         <div class="apr-actions">
           <button class="btn-apr-aprobar"  onclick="aprobarDocsEmpresa('${p.user_id}')">✓ Aprobar documentos</button>
-          <button class="btn-apr-rechazar" onclick="rechazarDocsEmpresa('${p.user_id}','${esc(p.nombre || '')}')">✕ Rechazar</button>
+          <button class="btn-apr-rechazar" onclick="rechazarDocsEmpresa('${p.user_id}','${escJs(p.nombre || '')}')">✕ Rechazar</button>
         </div>
       </div>`).join('');
   }
@@ -151,7 +151,7 @@ async function renderAprobaciones() {
     html += `<div class="apr-empty">Sin solicitudes de cuenta pendientes</div>`;
   } else {
     const verDoc = (path, label) => path
-      ? `<a href="#" onclick="verDocRegistro('${esc(path)}');return false" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:2px 4px 2px 0">📄 ${label}</a>`
+      ? `<a href="#" onclick="verDocRegistro('${escJs(path)}');return false" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:2px 4px 2px 0">📄 ${label}</a>`
       : '';
     html += cuentasPend.map(s => {
       const rolLabel = s.rol === 'cliente' ? '🛒 Cliente' : '🏢 Empresa';
@@ -449,13 +449,13 @@ async function renderAprobaciones() {
             <div class="apr-op-row"><span>Número TC</span><strong>${esc(c.tarjeta_circulacion || '—')}</strong></div>
             <div class="apr-op-row"><span>Fecha expedición</span><strong>${c.fecha_expedicion_tc ? fmtFecha(c.fecha_expedicion_tc) : '—'}</strong></div>
           </div>
-          ${c.imagen_tc ? `<a href="#" onclick="verArchivoPublico('${esc(c.imagen_tc)}')" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:4px 0">🪪 Ver imagen TC</a>` : ''}
+          ${c.imagen_tc ? `<a href="#" onclick="verArchivoPublico('${escJs(c.imagen_tc)}')" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:4px 0">🪪 Ver imagen TC</a>` : ''}
           <div class="apr-op-section-title">CAAT</div>
           <div class="apr-op-grid">
             <div class="apr-op-row"><span>Número CAAT</span><strong>${esc(c.caat || '—')}</strong></div>
             <div class="apr-op-row"><span>Vigencia</span><strong>${c.vigencia_caat ? fmtFecha(c.vigencia_caat) : '—'}</strong></div>
           </div>
-          ${c.imagen_caat ? `<a href="#" onclick="verArchivoPublico('${esc(c.imagen_caat)}')" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:4px 0">📄 Ver imagen CAAT</a>` : ''}
+          ${c.imagen_caat ? `<a href="#" onclick="verArchivoPublico('${escJs(c.imagen_caat)}')" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:4px 0">📄 Ver imagen CAAT</a>` : ''}
           ${(c.archivos || []).length ? `<div style="margin-top:6px"><button class="btn-edit" onclick="verArchivos('${c.id}')">📎 Ver fotos/documentos</button></div>` : ''}
         </div>`;
       const diffHtml = _diffHtml(c, {
@@ -672,9 +672,9 @@ function _renderCamionCard(c) {
         ${_vence(c.fecha_vencimiento_verificacion,  'Verificación vehicular')}
       </div>
       <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
-        ${c.imagen_tc  ? `<a href="#" onclick="verArchivoPublico('${esc(c.imagen_tc)}')"  class="btn-edit" style="font-size:0.75rem">🪪 TC</a>` : ''}
-        ${c.doc_sct    ? `<a href="#" onclick="verArchivoPublico('${esc(c.doc_sct)}')"    class="btn-edit" style="font-size:0.75rem">📄 SCT</a>` : ''}
-        ${c.doc_seguro ? `<a href="#" onclick="verArchivoPublico('${esc(c.doc_seguro)}')" class="btn-edit" style="font-size:0.75rem">📄 Seguro</a>` : ''}
+        ${c.imagen_tc  ? `<a href="#" onclick="verArchivoPublico('${escJs(c.imagen_tc)}')"  class="btn-edit" style="font-size:0.75rem">🪪 TC</a>` : ''}
+        ${c.doc_sct    ? `<a href="#" onclick="verArchivoPublico('${escJs(c.doc_sct)}')"    class="btn-edit" style="font-size:0.75rem">📄 SCT</a>` : ''}
+        ${c.doc_seguro ? `<a href="#" onclick="verArchivoPublico('${escJs(c.doc_seguro)}')" class="btn-edit" style="font-size:0.75rem">📄 Seguro</a>` : ''}
         ${(c.archivos||[]).length ? `<button class="btn-edit" style="font-size:0.75rem" onclick="verArchivos('${c.id}')">📎 Todos los archivos</button>` : ''}
       </div>
       <div class="apr-op-section-title" style="margin-top:10px">Núm. CAAT</div>
@@ -850,7 +850,7 @@ function _renderPatioCard(p) {
         </div>
         ${p.doc_permiso ? (p.doc_permiso.startsWith('http')
           ? `<a href="${esc(p.doc_permiso)}" target="_blank" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Ver permiso operativo</a>`
-          : `<a href="#" onclick="verArchivoPublico('${esc(p.doc_permiso)}');return false" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Ver permiso operativo</a>`) : ''}
+          : `<a href="#" onclick="verArchivoPublico('${escJs(p.doc_permiso)}');return false" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Ver permiso operativo</a>`) : ''}
       </div>
       <div class="apr-actions">
         <button class="btn-apr-aprobar"  onclick="aprobarRecurso('patios','${p.id}')">✓ Aprobar</button>

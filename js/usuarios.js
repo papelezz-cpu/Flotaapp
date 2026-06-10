@@ -57,15 +57,15 @@ async function renderUsuarios() {
         </div>
         <div class="truck-list-item-sub">${esc(u.email)} · ${ROL_LABEL[u.rol] || u.rol}</div>
       </div>
-      <button class="btn-edit" onclick="abrirHistorialUsuario('${u.user_id}','${esc(u.nombre)}','${u.rol}')">📋</button>
-      <button class="btn-edit" onclick="abrirEditarUsuario('${u.user_id}','${esc(u.nombre)}','${esc(u.email)}','${u.rol}')">✏ Editar</button>
+      <button class="btn-edit" onclick="abrirHistorialUsuario('${u.user_id}','${escJs(u.nombre)}','${u.rol}')">📋</button>
+      <button class="btn-edit" onclick="abrirEditarUsuario('${u.user_id}','${escJs(u.nombre)}','${escJs(u.email)}','${u.rol}')">✏ Editar</button>
       ${u.rol !== 'superadmin' ? `
         <button class="btn-edit" style="font-size:0.72rem;${verificado ? 'color:var(--green,#22c55e);border-color:rgba(34,197,94,0.4)' : ''}"
-          onclick="toggleVerificado('${u.user_id}','${esc(u.nombre)}',${verificado})">${verificado ? '✓ Verificado' : '✓ Verificar'}</button>
+          onclick="toggleVerificado('${u.user_id}','${escJs(u.nombre)}',${verificado})">${verificado ? '✓ Verificado' : '✓ Verificar'}</button>
         ${u.aprobacion_cuenta === 'suspendida'
-          ? `<button class="btn-edit" style="color:var(--green);border-color:rgba(34,197,94,0.3)" onclick="reactivarUsuario('${u.user_id}','${esc(u.nombre)}')">↑ Activar</button>`
-          : `<button class="btn-edit" style="color:var(--amber);border-color:rgba(245,158,11,0.3)" onclick="suspenderUsuario('${u.user_id}','${esc(u.nombre)}')">🚫</button>`}
-        <button class="btn-edit btn-rechazar" onclick="eliminarUsuario('${u.user_id}','${esc(u.nombre)}')">🗑</button>
+          ? `<button class="btn-edit" style="color:var(--green);border-color:rgba(34,197,94,0.3)" onclick="reactivarUsuario('${u.user_id}','${escJs(u.nombre)}')">↑ Activar</button>`
+          : `<button class="btn-edit" style="color:var(--amber);border-color:rgba(245,158,11,0.3)" onclick="suspenderUsuario('${u.user_id}','${escJs(u.nombre)}')">🚫</button>`}
+        <button class="btn-edit btn-rechazar" onclick="eliminarUsuario('${u.user_id}','${escJs(u.nombre)}')">🗑</button>
       ` : ''}
     </div>`;
   }).join('');
@@ -86,7 +86,7 @@ async function crearUsuario() {
   const rol    = document.getElementById('nu-rol').value;
 
   if (!nombre || !email || !pass) { showToast('Completa todos los campos.', 'error'); return; }
-  if (pass.length < 6) { showToast('La contraseña debe tener al menos 6 caracteres.', 'error'); return; }
+  if (pass.length < 8) { showToast('La contraseña debe tener al menos 8 caracteres.', 'error'); return; }
 
   const { data: { session } } = await sb.auth.getSession();
   const res = await fetch(FN_URL, {
@@ -128,7 +128,7 @@ async function guardarEdicionUsuario() {
   const rol    = document.getElementById('eu-rol').value;
 
   if (!nombre || !email) { showToast('Completa nombre y correo.'); return; }
-  if (pass && pass.length < 6) { showToast('La contraseña debe tener al menos 6 caracteres.'); return; }
+  if (pass && pass.length < 8) { showToast('La contraseña debe tener al menos 8 caracteres.'); return; }
 
   const body = { accion: 'editar', user_id: userId, nombre, email, rol };
   if (pass) body.password = pass;

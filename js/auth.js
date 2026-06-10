@@ -366,7 +366,7 @@ function _regFormHTML(rol) {
         <input type="email" id="reg-email" placeholder="correo@empresa.com">
       </div>
       <div class="form-group">
-        <label>Contraseña * <span class="reg-optional">mínimo 6 caracteres</span></label>
+        <label>Contraseña * <span class="reg-optional">mínimo 8 caracteres</span></label>
         <input type="password" id="reg-pass" placeholder="••••••••">
       </div>
       <div class="form-group">
@@ -437,7 +437,7 @@ function _regFormHTML(rol) {
       <input type="email" id="reg-email" placeholder="contacto@empresa.com">
     </div>
     <div class="form-group">
-      <label>Contraseña * <span class="reg-optional">mínimo 6 caracteres</span></label>
+      <label>Contraseña * <span class="reg-optional">mínimo 8 caracteres</span></label>
       <input type="password" id="reg-pass" placeholder="••••••••">
     </div>
     <div class="form-group">
@@ -552,7 +552,7 @@ async function doRegistro() {
     showErr('Completa todos los campos requeridos (*).'); return;
   }
   const passConfirm = document.getElementById('reg-pass-confirm')?.value || '';
-  if (pass.length < 6) { showErr('La contraseña debe tener al menos 6 caracteres.'); return; }
+  if (pass.length < 8) { showErr('La contraseña debe tener al menos 8 caracteres.'); return; }
   if (pass !== passConfirm) { showErr('Las contraseñas no coinciden.'); return; }
   if (_regRol === 'admin' && (!ineFile || !compDomFile || !fotoDomFile)) {
     showErr('Adjunta todos los documentos requeridos.'); return;
@@ -839,8 +839,8 @@ async function doPasswordReset() {
 
   errEl.style.display = 'none';
 
-  if (pass.length < 6) {
-    errEl.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+  if (pass.length < 8) {
+    errEl.textContent = 'La contraseña debe tener al menos 8 caracteres.';
     errEl.style.display = 'block'; return;
   }
   if (pass !== confirm) {

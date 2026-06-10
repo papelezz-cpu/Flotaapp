@@ -80,10 +80,10 @@ async function renderReserv() {
       const unidadLabel = recursoNombreMap[r.unidad] || esc(r.unidad) || '—';
       const propId = ownerIdMap[r.unidad] || r.propietario_id || '';
       const chatBtn = propId
-        ? `<button class="btn-chat-hilo" onclick="openChatReserva('${r.id}','${propId}','${esc(empresaMap[r.unidad]||'')}')">💬</button>`
+        ? `<button class="btn-chat-hilo" onclick="openChatReserva('${r.id}','${propId}','${escJs(empresaMap[r.unidad]||'')}')">💬</button>`
         : '';
       const calBtn = (r.estado === 'Completada' && !r.calificado && propId)
-        ? `<button class="btn-calificar" onclick="openCalificar('${r.id}','${propId}','${esc(empresaMap[r.unidad]||'')}')">⭐ Calificar</button>`
+        ? `<button class="btn-calificar" onclick="openCalificar('${r.id}','${propId}','${escJs(empresaMap[r.unidad]||'')}')">⭐ Calificar</button>`
         : '';
       const pagoLbl = (r.estado === 'Completada' && r.pagado)
         ? `<span style="font-size:0.7rem;color:var(--green);font-weight:600">💰 Pagado</span>`
@@ -198,14 +198,14 @@ async function renderReserv() {
     let acciones = '';
     if (esDueno && esPendiente) {
       acciones = `
-        <button class="btn-aceptar-reserva"  onclick="aceptarReserva('${r.id}','${esc(r.unidad)}','${r.recurso_tipo||'camion'}')">✓ Aceptar</button>
-        <button class="btn-rechazar-reserva" onclick="rechazarReserva('${r.id}','${esc(r.unidad)}')">✕ Rechazar</button>`;
+        <button class="btn-aceptar-reserva"  onclick="aceptarReserva('${r.id}','${escJs(r.unidad)}','${r.recurso_tipo||'camion'}')">✓ Aceptar</button>
+        <button class="btn-rechazar-reserva" onclick="rechazarReserva('${r.id}','${escJs(r.unidad)}')">✕ Rechazar</button>`;
     } else if (esDueno && esActiva) {
       const trackStep = r.tracking_estado || 'Confirmado';
       acciones = `
         <button class="btn-edit" onclick="openTracking('${r.id}')" title="Ver seguimiento">📍 ${esc(trackStep)}</button>
         <button class="btn-completar-reserva" onclick="marcarCompletado('${r.id}')">✓ Completar</button>
-        <button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${esc(r.unidad)}')">Cancelar</button>`;
+        <button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${escJs(r.unidad)}')">Cancelar</button>`;
     } else if (esDueno && esCompletada) {
       const diasPasados = r.completado_en
         ? Math.floor((new Date() - new Date(r.completado_en)) / 86400000) : 99;
@@ -227,7 +227,7 @@ async function renderReserv() {
     const unidadLabel = recursoLabelMap[r.unidad] || esc(r.unidad) || '—';
     // Chat con el cliente (solo si hay cliente_user_id y la reserva está activa/pendiente)
     const chatBtn = (esDueno && r.cliente_user_id && !inactiva)
-      ? `<button class="btn-chat-hilo" onclick="openChatReserva('${r.id}','${r.cliente_user_id}','${esc(r.cliente||'')}')">💬</button>`
+      ? `<button class="btn-chat-hilo" onclick="openChatReserva('${r.id}','${r.cliente_user_id}','${escJs(r.cliente||'')}')">💬</button>`
       : '';
     // Eliminar (mover a histórico) — solo superadmin
     const elimBtn = currentUser.rol === 'superadmin'
@@ -459,13 +459,23 @@ async function abrirEvidencias(reservaId) {
     ? `Tienes ${diasRestantes} día${diasRestantes !== 1 ? 's' : ''} para subir evidencias (máx. 5 archivos en total).`
     : 'El plazo de 5 días para subir evidencias ha vencido.';
 
+  // El bucket es privado: se guardan paths y se firman URLs al momento de ver.
+  // Entradas legadas con URL completa se muestran tal cual.
   const existentes = r?.evidencias || [];
   const listaEl = document.getElementById('ev-lista-actual');
-  listaEl.innerHTML = existentes.length
-    ? existentes.map((url, i) =>
-        `<a href="${esc(url)}" target="_blank" class="btn-edit" style="font-size:0.75rem">📎 Evidencia ${i + 1}</a>`
-      ).join('')
-    : '<span style="font-size:0.78rem;color:var(--text-muted)">Sin evidencias aún</span>';
+  if (existentes.length) {
+    const enlaces = await Promise.all(existentes.map(async (e) => {
+      if (String(e).startsWith('http')) return e;
+      const { data } = await sb.storage.from('unidades').createSignedUrl(e, 3600);
+      return data?.signedUrl || null;
+    }));
+    listaEl.innerHTML = enlaces.map((url, i) => url
+      ? `<a href="${esc(url)}" target="_blank" class="btn-edit" style="font-size:0.75rem">📎 Evidencia ${i + 1}</a>`
+      : `<span style="font-size:0.75rem;color:var(--text-muted)">📎 Evidencia ${i + 1} (no disponible)</span>`
+    ).join('');
+  } else {
+    listaEl.innerHTML = '<span style="font-size:0.78rem;color:var(--text-muted)">Sin evidencias aún</span>';
+  }
 
   const fileInput = document.getElementById('ev-files');
   if (fileInput) fileInput.disabled = diasRestantes <= 0;
@@ -492,20 +502,21 @@ async function subirEvidencias() {
     showToast(`Solo puedes tener 5 evidencias. Ya tienes ${existentes.length}.`, 'error'); return;
   }
 
-  const nuevasUrls = [];
+  // Se guarda el path (no una URL pública): el bucket es privado y los
+  // enlaces se firman al verlos en abrirEvidencias().
+  const nuevosPaths = [];
   for (const f of files) {
     const ext  = f.name.split('.').pop();
     const path = `${currentUser.id}/evidencias/${reservaId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
     const { error: upErr } = await sb.storage.from('unidades').upload(path, f);
     if (upErr) { showToast('Error al subir: ' + upErr.message, 'error'); return; }
-    const { data: pub } = sb.storage.from('unidades').getPublicUrl(path);
-    nuevasUrls.push(pub.publicUrl);
+    nuevosPaths.push(path);
   }
 
-  await sb.from('reservaciones').update({ evidencias: [...existentes, ...nuevasUrls] }).eq('id', reservaId);
+  await sb.from('reservaciones').update({ evidencias: [...existentes, ...nuevosPaths] }).eq('id', reservaId);
   cerrarEvidencias();
   await renderReserv();
-  showToast(`✓ ${nuevasUrls.length} evidencia${nuevasUrls.length !== 1 ? 's' : ''} subida${nuevasUrls.length !== 1 ? 's' : ''}`);
+  showToast(`✓ ${nuevosPaths.length} evidencia${nuevosPaths.length !== 1 ? 's' : ''} subida${nuevosPaths.length !== 1 ? 's' : ''}`);
 }
 
 // ── CALIFICAR SERVICIO (cliente) ───────────────────────

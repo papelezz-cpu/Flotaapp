@@ -496,7 +496,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
               : 'Rechazada';
     const bdg = enRevision ? 'badge-revision' : st === 'aceptada' ? 'badge-avail' : st === 'rechazada' ? 'badge-maint' : 'badge-busy';
     const chatAdminBtn = (p.cliente_id && st !== 'rechazada')
-      ? `<button class="btn-chat-hilo" onclick="openChatPedido('${p.id}','${p.cliente_id}','${esc(p.cliente_nombre||'')}')">💬 Chat</button>`
+      ? `<button class="btn-chat-hilo" onclick="openChatPedido('${p.id}','${p.cliente_id}','${escJs(p.cliente_nombre||'')}')">💬 Chat</button>`
       : '';
     acciones = `
       <span class="badge ${bdg}" style="font-size:0.72rem">${etq}</span>
@@ -927,7 +927,7 @@ function ofertaItemHTML(o) {
 
   // Botón de chat con el admin que ofertó (solo cliente)
   const chatOfertaBtn = (currentUser.rol === 'cliente' && o.admin_id && o.estado !== 'rechazada')
-    ? `<button class="btn-chat-hilo" onclick="openChatPedido('${o.pedido_id}','${o.admin_id}','${esc(o.admin_nombre||'')}')">💬 Chat</button>`
+    ? `<button class="btn-chat-hilo" onclick="openChatPedido('${o.pedido_id}','${o.admin_id}','${escJs(o.admin_nombre||'')}')">💬 Chat</button>`
     : '';
 
   let acciones = '';
@@ -949,7 +949,7 @@ function ofertaItemHTML(o) {
     <div class="oferta-item" id="of-${o.id}">
       <div class="oferta-top">
         <div>
-          <div class="oferta-empresa oferta-empresa-link" onclick="openEmpresaPerfil('${esc(o.admin_id||'')}','${esc(o.admin_nombre||'')}')">
+          <div class="oferta-empresa oferta-empresa-link" onclick="openEmpresaPerfil('${escJs(o.admin_id||'')}','${escJs(o.admin_nombre||'')}')">
             ${esc(o.admin_nombre)}<span class="oferta-ver-link"> Ver →</span>
           </div>
           ${o.camion_id ? `<div class="oferta-camion">🚛 ${esc(o.camion_id)}</div>` : ''}

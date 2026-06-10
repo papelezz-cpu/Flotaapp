@@ -88,7 +88,7 @@ async function renderCustodios(filtroTipo = '') {
         <div class="truck-footer">
           ${currentUser.rol === 'cliente' || !currentUser.id
             ? `<button class="btn-reservar" onclick="openNuevoPedido()" title="Publica una solicitud y los proveedores te harán ofertas">📋 Solicitar</button>`
-            : `<button class="btn-reservar" ${disabled} onclick="openReservaRecurso('custodio','${esc(c.id)}','${esc(c.nombre)}','${c.propietario_id||''}')">Reservar</button>`
+            : `<button class="btn-reservar" ${disabled} onclick="openReservaRecurso('custodio','${escJs(c.id)}','${escJs(c.nombre)}','${c.propietario_id||''}')">Reservar</button>`
           }
         </div>
       </div>`;
@@ -166,7 +166,7 @@ async function renderPatios(filtroTipo = '') {
         <div class="truck-footer">
           ${currentUser.rol === 'cliente' || !currentUser.id
             ? `<button class="btn-reservar" onclick="openNuevoPedido()" title="Publica una solicitud y los proveedores te harán ofertas">📋 Solicitar</button>`
-            : `<button class="btn-reservar" ${disabled} onclick="openReservaRecurso('patio','${esc(p.id)}','${esc(p.nombre)}','${p.propietario_id||''}')">Reservar</button>`
+            : `<button class="btn-reservar" ${disabled} onclick="openReservaRecurso('patio','${escJs(p.id)}','${escJs(p.nombre)}','${p.propietario_id||''}')">Reservar</button>`
           }
         </div>
       </div>`;

@@ -6,30 +6,27 @@ This file provides guidance to Claude Code when working with the **PortGo** code
 
 ## Project Overview
 
-**PortGo** is a PWA logistics platform for port transport services built as a fully client-side app with Supabase as the backend (PostgreSQL + Auth + Realtime).
+**PortGo** is a PWA logistics platform for port transport services built as a fully client-side app with Supabase as the backend (PostgreSQL + Auth + Realtime + Storage).
 
-**Business flow:** Clients post transport requests → Admins (vendors) bid on them → Client accepts a bid → Shipment is tracked to completion. Superadmins manage the full system (users, fleet, patios).
+**Business flow:** Client posts a transport request (`pedido`) → superadmin reviews and publishes it → companies (`admin`) bid (`ofertas`) → client accepts a bid → superadmin approves the agreement → a `reservación` is created and tracked to completion → client rates the service.
 
-**Stack:** Vanilla JS (ES modules via `<script type="module">`), plain CSS, Supabase JS SDK v2, no build tooling.
+**Stack:** Vanilla JS (plain `<script>` tags, global scope, loaded in order), plain CSS, Supabase JS SDK v2 from CDN, no build tooling, no package manager, no tests.
 
 ---
 
-## Development Setup
+## ⚡ Deployment Checklist — DO THIS EVERY TIME
 
-No build system, no package manager, no test suite. All dependencies load from CDN in `index.html`.
+The app is served from **GitHub Pages** (`https://github.com/papelezz-cpu/Flotaapp.git`). Nothing is live until pushed. After ANY change:
 
-```bash
-# Quickest way to run locally
-npx serve .
+1. **Bump the `?v=` param in `index.html`** for every JS/CSS file you changed (e.g. `js/pedidos.js?v=36` → `?v=37`). If you skip this, browsers serve the old cached file and the user reports "it's not fixed".
+2. **Bump the cache version in `sw.js`**: `const CACHE = 'portgo-vXX'` → `vXX+1`.
+3. **Commit AND `git push`** — a commit alone deploys nothing.
+4. Schema changes: `mcp__supabase__apply_migration`. Edge Functions: `mcp__supabase__deploy_edge_function`. Both hit **production immediately** — there is no staging.
+5. Tell the user to hard-refresh (**Ctrl+Shift+R**) if they're testing right away.
 
-# Or just open index.html directly in a browser
-```
+To run locally: `npx serve .` (connects to the live Supabase project; credentials in `js/config.js`).
 
-- The app connects to the **live Supabase project** on load — credentials are in `js/config.js`.
-- Supabase CLI is configured in `.claude/settings.local.json` for migrations, edge function deploys, and direct SQL execution.
-- There is no staging environment — changes to schema or Edge Functions affect production immediately.
-
-> ⚠️ Never commit secrets. `js/config.js` contains the Supabase anon key (safe to expose) and the project URL. The service role key lives only in Edge Functions, never in client code.
+> ⚠️ Never commit secrets. `js/config.js` contains the anon key (safe to expose). The service role key lives only in Edge Function secrets, never in client code.
 
 ---
 
@@ -37,336 +34,162 @@ npx serve .
 
 ```
 /
-├── index.html              # Production entry point
-├── flota-app.html          # Alternate shell (same structure, fleet-focused)
-├── sw.js                   # Service worker
-├── css/
-│   ├── base.css
-│   ├── layout.css
-│   ├── components.css
-│   ├── login.css
-│   ├── detalle.css
-│   └── theme.css
-├── js/
-│   ├── config.js
-│   ├── auth.js
-│   ├── main.js
-│   ├── views.js
-│   ├── utils.js
-│   ├── pedidos.js
-│   ├── detalle.js
-│   ├── reservaciones.js
-│   ├── camiones.js
-│   ├── catalogo.js
-│   ├── admin.js
-│   ├── usuarios.js
-│   ├── chat.js
-│   ├── notificaciones.js
-│   ├── tracking.js
-│   ├── modal.js
-│   └── theme.js
-└── supabase/
-    └── functions/
-        └── gestionar-usuario/
+├── index.html              # Single entry point — all views, modals, script/link tags
+├── sw.js                   # Service worker (bump CACHE version on every deploy)
+├── css/                    # base → layout → components → login → detalle → theme (load order matters)
+├── js/                     # Classic scripts, global scope, order defined in index.html
+└── supabase/functions/
+    ├── gestionar-usuario/  # Privileged user CRUD (superadmin only, service role key)
+    └── enviar-notificacion/ # Email notifications
 ```
-
----
-
-## Architecture
-
-### Entry Points
-
-- `index.html` — loads all JS/CSS in order, registers the service worker, defines all `<section id="view-*">` DOM sections.
-- `flota-app.html` — alternate shell with same structure, focused on fleet management.
-- `sw.js` — cache-first strategy for local assets; network-first for Supabase API calls.
 
 ### JS Module Responsibilities
 
 | File | Role |
 |---|---|
-| `js/config.js` | Initializes Supabase client; exports `supabase` and `EDGE_URL` |
-| `js/auth.js` | Login / signup / logout; populates `currentUser = { id, email, nombre, rol }` |
-| `js/main.js` | App bootstrap: `checkExistingSession()`, Supabase realtime subscriptions, SW registration |
-| `js/views.js` | Manual SPA router — `showView(viewId, btn)` toggles `<section>` visibility by ID |
-| `js/utils.js` | `esc()` XSS sanitizer, `fmtFecha()`, `formatPrecio()`, skeleton loader helpers |
-| `js/pedidos.js` | Full order lifecycle — create, list, bid, accept, complete |
-| `js/detalle.js` | Order detail modal with status transition controls |
-| `js/reservaciones.js` | Reservation booking view (distinct from on-demand orders) |
-| `js/camiones.js` | Truck catalog with filters |
-| `js/catalogo.js` | Service/rate catalog |
-| `js/admin.js` | Admin dashboard — manage trucks, custodians, patios |
-| `js/usuarios.js` | Superadmin user management (calls `gestionar-usuario` Edge Function) |
-| `js/chat.js` | Real-time per-order messaging via Supabase Realtime |
-| `js/notificaciones.js` | Notification panel |
-| `js/tracking.js` | Shipment tracking view |
-| `js/modal.js` | Generic modal open/close helpers |
-| `js/theme.js` | Dark/light theme toggle; persists preference to `localStorage` |
+| `js/config.js` | Creates Supabase client → exports globals `sb`, `FN_URL`, `FN_NOTIFICACION`, `SOPORTE_EMAIL` |
+| `js/utils.js` | `esc()` HTML escape, `escJs()` for onclick strings, `fmtFecha()`, `formatPrecio()`, `showConfirm()`, skeletons, geo-autocomplete |
+| `js/auth.js` | Login / registro (cliente & empresa with document upload) / logout / password reset; sets `currentUser = {id, email, nombre, rol}` |
+| `js/main.js` | Bootstrap: session check, realtime subscriptions, `showToast()`, SW registration |
+| `js/views.js` | Manual SPA router — `showView(viewId, btn)` toggles `<section id="view-*">` |
+| `js/pedidos.js` | Order lifecycle: create, list, bid (`openHacerOferta`), counter-offers, accept, `cerrarAcuerdo` |
+| `js/aprobaciones.js` | Superadmin approval panel: accounts, resources, pedidos, agreements, company docs |
+| `js/reservaciones.js` | Reservations table, cancel/complete, evidencias (signed URLs), ratings |
+| `js/admin.js` | Company dashboard: fleet CRUD, company documents |
+| `js/usuarios.js` | Superadmin user management (calls `gestionar-usuario` Edge Function via `FN_URL`) |
+| `js/operadores.js` | Driver registration with approval workflow |
+| `js/camiones.js` / `js/recursos.js` / `js/catalogo.js` | Truck/resource catalogs with filters |
+| `js/chat.js` | Per-pedido/per-reserva realtime chat (`mensajes` table, `participantes` array) |
+| `js/notificaciones.js` | Notification bell panel |
+| `js/tracking.js` | Shipment tracking state machine |
+| `js/detalle.js` | Order detail modal |
+| `js/modal.js` | Direct reservation booking modal |
+| `js/reportes.js` | Superadmin KPI reports |
+| `js/vigencias.js` | Document expiry monitoring |
+| `js/theme.js` | Dark/light toggle (persists in `localStorage` — theme only, never auth) |
 
-### State Management
+### State
 
-No state library. State lives in module-level globals and is refreshed via Supabase queries:
-
-```js
-// Key globals (defined in their respective modules)
-currentUser        // auth.js   — logged-in user object
-pedidoDetalle      // detalle.js — currently open order
-ofertaDetalleId    // detalle.js — currently focused bid
-```
-
-Realtime subscriptions in `main.js` watch key tables (`pedidos`, `ofertas`, `mensajes`, `notificaciones`) and call the relevant module's render function when rows change.
+No state library. Globals refreshed via Supabase queries: `currentUser` (auth.js), `_pedidosAccum` (pedidos.js), per-module caches. Realtime subscriptions in `main.js` re-render the active view when `pedidos`, `ofertas`, `mensajes`, `notificaciones`, fleet tables change.
 
 ### Auth & Roles
 
-`currentUser.rol` drives all UI visibility. Set by `applyUserUI()` in `auth.js` which adds/removes CSS classes on `<body>`:
+- Sessions use **`sessionStorage`** (intentional: closing the browser logs out). Never switch to `localStorage`.
+- `currentUser.rol` ∈ `cliente` | `admin` (= empresa/proveedor) | `superadmin`.
+- `applyUserUI()` puts **`role-admin`** / **`role-superadmin`** / **`logged-in`** classes on `<body>` (note: `role-`, not `rol-`).
+- CSS gates visibility: `.admin-only`, `.superadmin-only`, `.admin-hidden`. Never gate roles with inline `display:none`.
+- New accounts go through `solicitudes_cuenta` review; `perfiles.aprobacion_cuenta` ∈ `null` (active) | `pendiente` | `rechazada` | `suspendida`.
+- Passwords: minimum **8** characters (validated client-side in registro, reset, and user management).
 
-| Role | Capabilities |
-|---|---|
-| `cliente` | Create requests, track shipments, chat |
-| `admin` | Bid on requests, manage own fleet (trucks, custodians, patios) |
-| `superadmin` | Full access — all of the above + user management |
+---
 
-> Auth uses `sessionStorage` (not `localStorage`). The Supabase client is explicitly initialized with `storage: window.sessionStorage` in `js/config.js`. Sessions survive page refreshes within the same tab but are destroyed when the tab or browser is closed. This is intentional — closing the browser = automatic logout. Do not change this to `localStorage`.
+## Security Conventions
 
-### CSS Architecture
+### Escaping — two different helpers
+```js
+// HTML body/attribute context:
+el.innerHTML = `<p>${esc(pedido.descripcion)}</p>`;
 
-Six files loaded in strict order — later files override earlier ones:
-
+// Inside a JS string in an inline handler — esc() alone is NOT enough
+// (the browser decodes entities before the JS runs):
+`<button onclick="abrirX('${u.id}','${escJs(u.nombre)}')">`
 ```
-base.css → layout.css → components.css → login.css → detalle.css → theme.css
-```
+Any user-controlled value interpolated into `onclick="...'${...}'..."` MUST use `escJs()`.
 
-Role-based visibility uses CSS class selectors on `<body>`:
-- `.admin-only` — visible only when `<body>` has class `rol-admin` or `rol-superadmin`
-- `.superadmin-only` — visible only when `<body>` has class `rol-superadmin`
+### Storage buckets
+| Bucket | Public | Path rule / access |
+|---|---|---|
+| `unidades` | ❌ private | First path segment must be `auth.uid()`. Read with `createSignedUrl(path, 3600)` — **never `getPublicUrl`** |
+| `registros` | ❌ private | Same path rule; signed URLs only |
+| `operadores` | ✅ public | `getPublicUrl` OK |
+| `custodios` | ✅ public | `getPublicUrl` OK |
+| `documentos-empresa` | ✅ public | `getPublicUrl` OK |
 
-Do not use `display:none` inline for role gating — always rely on these CSS classes.
+Store **paths** in the DB for private buckets and sign at display time (see `abrirEvidencias` in `reservaciones.js`).
 
-### Supabase Edge Function
-
-`gestionar-usuario` handles privileged user operations that must bypass Row Level Security (RLS):
-- Creating accounts on behalf of clients (admin-initiated onboarding)
-- Updating roles
-- Deleting users from `auth.users`
-
-Called exclusively from `js/usuarios.js`. The function URL is exported from `js/config.js` as `EDGE_URL`.
+### RLS (the real security boundary — client checks are cosmetic)
+- Every table has RLS. If a query unexpectedly returns empty or an insert/update silently fails, **check RLS first**, then code.
+- `is_superadmin()` is a `SECURITY DEFINER` helper used in policies; executable by `authenticated` only.
+- `notificaciones` INSERT is relationship-restricted: you can only notify yourself, superadmins, or the counterparty of your reservación/oferta. New notification flows must fit one of those, or use a DB trigger.
+- `reservaciones` INSERT requires the creator to be the cliente, the propietario, or superadmin.
+- `perfiles` is NOT readable by `anon` (fiscal data). Authenticated users can read all rows (for display names).
+- Always surface RLS errors: check `error` from every mutating call and `showToast(...)` it — silent failures cost hours of debugging.
 
 ---
 
 ## Key Conventions
 
-### Security — always sanitize user output
-```js
-// ✅ Correct — always use esc() for user-generated content in template literals
-container.innerHTML = `<p>${esc(pedido.descripcion)}</p>`;
-
-// ❌ Wrong — XSS risk
-container.innerHTML = `<p>${pedido.descripcion}</p>`;
-```
-
-### Adding a new view
-1. Add `<section id="view-X" class="view">` in `index.html`.
-2. Add a `case 'X':` in `views.js` inside `showView()`.
-3. Create `js/X.js` with an exported `renderX()` function.
-4. Import and call `renderX()` from the appropriate trigger (nav click, role gate, etc.).
-5. Add role-gating CSS classes if needed (`.admin-only`, `.superadmin-only`).
-
-### Supabase queries — always use the JS SDK
-```js
-// ✅ Correct
-const { data, error } = await supabase
-  .from('pedidos')
-  .select('*, ofertas(*)')
-  .eq('estado', 'activo');
-
-// ❌ Never use raw SQL in client code
-```
-
-### Error handling pattern
-```js
-const { data, error } = await supabase.from('pedidos').select('*');
-if (error) {
-  console.error('pedidos fetch:', error.message);
-  // Show user-facing feedback — use toast or modal, not alert()
-  return;
-}
-```
-
-### Date and price formatting
-Always use the helpers from `utils.js` — never format inline:
-```js
-fmtFecha(row.created_at)   // → "12 may 2025"
-formatPrecio(row.monto)    // → "$1,250.00"
-```
-
----
-
-## Supabase / Database Notes
-
-- All client queries go through RLS policies. If a query returns empty unexpectedly, check RLS before assuming a code bug.
-- The `gestionar-usuario` Edge Function uses the **service role key** (set as a Supabase secret) to bypass RLS — never pass the service role key to the client.
-- Run migrations with the Supabase CLI: `supabase db push` or `supabase migration new <name>`.
-- To inspect live data during debugging: `supabase db studio` or the Supabase dashboard Table Editor.
+- **Supabase access:** always through the SDK global `sb` (`const { data, error } = await sb.from(...)`), never raw SQL in the client.
+- **Errors:** check `error`, `console.error` + `showToast(msg, 'error')`. Never `alert()`.
+- **Formatting:** `fmtFecha(row.created_at)` → "12/05/2025", `formatPrecio(n)` → "$1,250 MXN/día". Never inline.
+- **Confirmations:** `showConfirm(msg, cb, { danger, confirmLabel })` — never `window.confirm`.
+- **Scripts are NOT ES modules.** Everything is global scope; load order in `index.html` matters (utils → config → auth → … → main last). New functions are global — avoid name collisions.
+- **New view:** add `<section id="view-X" class="view">` in `index.html` → case in `showView()` → `js/X.js` with `renderX()` → `<script>` tag with `?v=1` → add to `sw.js` SHELL list → role-gate with CSS classes.
+- **No npm packages** — CDN `<script>` tags only if truly needed.
 
 ---
 
 ## Database Schema
 
-All tables are in the `public` schema with RLS enabled.
+All tables in `public` with RLS enabled.
 
-### `perfiles`
-User profile — one row per `auth.users` entry. PK: `user_id`.
+### `perfiles` — one row per auth user. PK `user_id`
+`nombre`, `rol`, `aprobacion_cuenta`, `nota_rechazo_cuenta`, `verificado`, fiscal data (`rfc`, `razon_social`, `regimen_fiscal`, `tipo_persona`), company docs + expiry dates (`doc_permiso_sct`, `doc_seguro_rc`, `doc_seguro_carga` + `*_pendiente` variants for the edit-approval flow), `telefono`, `descripcion`.
 
-| Column | Type | Notes |
-|---|---|---|
-| `user_id` | uuid | FK → `auth.users.id` |
-| `nombre` | text | Display name |
-| `rol` | text | `superadmin` \| `admin` \| `cliente` |
-| `aprobacion_cuenta` | text | `null` (active) \| `pendiente` \| `rechazada` \| `suspendida` |
-| `rfc`, `razon_social` | text | Fiscal data (admins) |
-| `anos_operacion`, `num_unidades` | int | Fleet info (admins) |
-| `seguro_rc`, `seguro_carga` | bool | Insurance flags (admins) |
-| `permiso_sct` | text | SCT permit number (admins) |
-| `telefono`, `descripcion` | text | Contact / bio |
+### `pedidos` — client transport requests. PK `id` (uuid)
+`cliente_id/_nombre/_email` (denormalized), `tipo_camion`, `tipo_carga`, `origen`, `destino`, `fecha_ini/_fin`, `precio_cliente`, `oferta_pendiente_id`, `rechazo_nota`, special-requirement bools.
+**`estado` flow:** `pendiente_revision` → (SA approves) → `abierto` → `en_negociacion` → (client accepts, SA reviews) → `pendiente_acuerdo` → `acordado`. Also `cancelado`, `rechazado`. Cancelling a reservation returns the pedido to `abierto` and invalidates its ofertas.
 
----
+### `ofertas` — company bids. PK `id` (uuid)
+`pedido_id`, `admin_id/_nombre`, `precio_oferta`, `contra_precio` (client counter), `ronda` (1|2), `camion_id`, `estado` (`enviada` | `contra_oferta` | `aceptada` | `rechazada`), `expira_en` (now + 2 days). The offered truck's `tipo` must match `pedidos.tipo_camion` (validated in `openHacerOferta` + `_enviarOfertaCore`).
 
-### `pedidos`
-Transport requests posted by clients. PK: `id` (uuid).
+### `reservaciones` — active bookings. PK `id` (uuid)
+`pedido_id` (links back for cancel-reopen), `propietario_id`, `cliente_user_id`, `cliente/_email`, `unidad`, `recurso_tipo` (`camion`|`custodio`|`patio`|`lavado`), `fecha_ini/_fin`, `precio_acordado`, `tracking_estado` (`Confirmado`→`En camino`→`En puerto`→`Cargando`→`En tránsito`→`Entregado`), `estado` (`Pendiente`|`Activa`|`Completada`|`Cancelada`), `completado_en`, `evidencias` (array of storage **paths**), `pagado`, `calificado`.
+`reservaciones_historico`: archived rows + `archivado_at/_por`.
 
-| Column | Type | Notes |
-|---|---|---|
-| `cliente_id` | uuid | FK → `auth.users.id` |
-| `cliente_nombre`, `cliente_email` | text | Denormalized for display |
-| `tipo_camion` | text | Requested truck type |
-| `tipo_carga` | text | Cargo type |
-| `origen`, `destino` | text | Route |
-| `fecha_ini`, `fecha_fin` | date | Service window |
-| `precio_cliente` | numeric | Client's target price |
-| `estado` | text | `abierto` \| `en_negociacion` \| `acordado` \| `cancelado` \| `pendiente_revision` \| `pendiente_acuerdo` \| `rechazado` |
-| `oferta_pendiente_id` | uuid | FK → `ofertas.id` — the offer under superadmin review |
-| `detalles_completados` | bool | Whether client filled in operational details |
-| `carga_peligrosa`, `temp_controlada`, `requiere_seguro`, `requiere_factura` | bool | Special requirements |
+### `mensajes` — chat. PK `id` (uuid)
+`de_user_id/_nombre`, `texto`, `pedido_id` | `reserva_id` (one set), `participantes uuid[]` (RLS checks membership), `leido`.
+
+### `notificaciones` — PK `id` (uuid)
+`user_id` (recipient), `tipo`, `titulo`, `mensaje`, `leido`, `meta jsonb`. INSERT restricted by relationship (see RLS section).
+
+### Fleet tables — `camiones`, `custodios`, `patios`, `lavados` (PK text) and `operadores`
+Shared pattern: `propietario_id`, `estado` (`disponible`|`ocupado`|`no_disponible`), `aprobacion` (`pendiente`|`aprobada`|`rechazada`), plus `rechazo_nota`, `rechazo_campos`, `es_edicion`, `campos_editados`, `snapshot_anterior` for the edit-approval workflow. Per-table extras: camiones (`tipo`, `placas`, `precio_dia`, `caat`…), custodios (`certificaciones[]`…), patios (`area_m2`…), lavados (`tipos_lavado[]`…), operadores (`curp`, `num_licencia`, fotos…).
+
+### Other tables
+- `calificaciones`: `reservacion_id`, `admin_id`, `cliente_id`, `rating` 1–5, `comentario`.
+- `solicitudes_cuenta`: signup requests with fiscal data + document paths, `estado` (`pendiente`|`aprobada`|`rechazada`), `nota_rechazo`. Rejected users can re-apply with the same account.
+- `pagos`, `documentos_fiscales`: payment/invoice records tied to reservaciones.
+
+### DB functions & triggers
+`is_superadmin()` (RLS helper) · `notificar_nueva_oferta`, `notificar_respuesta_oferta`, `fn_notificar_nuevo_mensaje`, `notificar_nueva_reserva`, `notificar_cambio_reserva` (notification triggers) · `expire_stale_offers`, `check_reservacion_disponibilidad`. All `SECURITY DEFINER` with pinned `search_path`, not callable via REST.
 
 ---
 
-### `ofertas`
-Bids placed by admins on pedidos. PK: `id` (uuid).
+## Edge Functions
 
-| Column | Type | Notes |
-|---|---|---|
-| `pedido_id` | uuid | FK → `pedidos.id` |
-| `admin_id` | uuid | FK → `auth.users.id` |
-| `admin_nombre` | text | Denormalized |
-| `precio_oferta` | numeric | Admin's offered price |
-| `contra_precio` | numeric | Client counter-offer |
-| `ronda` | int | `1` (admin offer) or `2` (client counter) |
-| `estado` | text | `enviada` \| `contra_oferta` \| `aceptada` \| `rechazada` |
-| `expira_en` | timestamptz | Defaults to now + 2 days |
+- **`gestionar-usuario`** — superadmin-only user CRUD (`crear`/`editar`/`eliminar`/`listar`). Verifies the caller's JWT server-side and requires `rol = 'superadmin'`. Uses service role key from secrets. Called from `js/usuarios.js` with `FN_URL`.
+- **`enviar-notificacion`** — transactional emails (reservas, acuerdos). Called fire-and-forget with `FN_NOTIFICACION`.
 
----
-
-### `reservaciones`
-Active service bookings (created when a pedido is acordado, or booked directly). PK: `id` (uuid).
-
-| Column | Type | Notes |
-|---|---|---|
-| `propietario_id` | uuid | Admin who owns the reservation |
-| `cliente_user_id` | uuid | Client's auth user id |
-| `cliente`, `cliente_email` | text | Denormalized |
-| `unidad` | text | Truck / resource name |
-| `recurso_tipo` | text | `camion` \| `custodio` \| `patio` \| `lavado` |
-| `fecha_ini`, `fecha_fin` | date | Service period |
-| `precio_acordado` | numeric | Agreed price |
-| `tracking_estado` | text | `Confirmado` → `En camino` → `En puerto` → `Cargando` → `En tránsito` → `Entregado` |
-| `estado` | text | `Activa` \| `Completada` \| `Cancelada` |
-| `pagado`, `calificado` | bool | Payment and rating flags |
-
-### `reservaciones_historico`
-Archived completed/cancelled reservations (moved from `reservaciones` by superadmin). Same shape minus operational fields; adds `archivado_at` and `archivado_por`.
-
----
-
-### `mensajes`
-Real-time chat messages. PK: `id` (uuid).
-
-| Column | Type | Notes |
-|---|---|---|
-| `de_user_id` | uuid | Sender |
-| `de_nombre` | text | Sender display name |
-| `texto` | text | Message body |
-| `pedido_id` | uuid | FK → `pedidos.id` (nullable) |
-| `reserva_id` | uuid | FK → `reservaciones.id` (nullable) |
-| `participantes` | uuid[] | Array of allowed viewer UUIDs |
-| `leido` | bool | Read flag |
-
----
-
-### `notificaciones`
-In-app notifications. PK: `id` (uuid).
-
-| Column | Type | Notes |
-|---|---|---|
-| `user_id` | uuid | Recipient |
-| `tipo` | text | e.g. `reserva`, `pedido_cancelado`, `tracking_actualizado`, `reserva_cancelada` |
-| `titulo`, `mensaje` | text | Display text |
-| `leido` | bool | |
-| `meta` | jsonb | Optional extra payload |
-
----
-
-### Fleet / Resource tables
-
-All four follow the same pattern: `propietario_id` (FK → `perfiles.user_id`), `estado` (`disponible` \| `ocupado` \| `no_disponible`), `aprobacion` (`pendiente` \| `aprobada` \| `rechazada`), plus `rechazo_nota`, `rechazo_campos`, `es_edicion`, `campos_editados`, `snapshot_anterior` for the edit-approval workflow.
-
-| Table | PK type | Extra key columns |
-|---|---|---|
-| `camiones` | text | `tipo`, `capacidad`, `placas`, `marca`, `modelo_anio`, `precio_dia`, `tipo_carga[]`, `caat`, `vigencia_caat` |
-| `custodios` | text | `tipo`, `certificaciones[]`, `disponibilidad`, `precio_dia` |
-| `patios` | text | `tipo`, `ubicacion`, `area_m2`, `capacidad_vehiculos`, `servicios[]`, `precio_dia` |
-| `lavados` | text | `tipos_vehiculo[]`, `tipos_lavado[]`, `precio_lavado`, `capacidad`, `ubicacion`, `horario` |
-
----
-
-### `operadores`
-Truck drivers registered by admins. PK: `id` (text). Same approval workflow as fleet tables.
-
-Key columns: `propietario_id`, `curp`, `nombre`, `primer_apellido`, `nss`, `num_licencia`, `clase_licencia`, `fecha_vencimiento`, `foto_operador`, `foto_licencia`.
-
----
-
-### `calificaciones`
-Post-service ratings left by clients. PK: `id` (uuid).
-
-| Column | Type | Notes |
-|---|---|---|
-| `reservacion_id` | uuid | FK → `reservaciones.id` |
-| `admin_id`, `cliente_id` | uuid | Both parties recorded |
-| `rating` | int | 1–5 |
-| `comentario` | text | Optional |
-
----
-
-### `solicitudes_cuenta`
-Account registration requests submitted via the signup form. PK: `id` (uuid). Reviewed by superadmin before the account is activated.
-
-Key columns: `user_id`, `rol` (`cliente` \| `admin`), `email`, `nombre`, fiscal data (same as `perfiles`), document storage paths (`doc_id_oficial`, `doc_constancia_fiscal`, etc.), `estado` (`pendiente` \| `aprobada` \| `rechazada`), `nota_rechazo`.
+Deploy with `mcp__supabase__deploy_edge_function` (or `supabase functions deploy`). Keep the local copy in `supabase/functions/` in sync with what you deploy.
 
 ---
 
 ## PWA / Service Worker
 
-- `sw.js` uses a **cache-first** strategy for static assets (JS, CSS, fonts, images).
-- Supabase REST/Realtime calls always go **network-first** — never cache auth or data responses.
-- When adding new static assets, add them to the SW cache list in `sw.js`.
-- The SW is registered in `main.js` on app init.
+- `sw.js`: **network-first** for JS/CSS/HTML (falls back to cache offline), **stale-while-revalidate** for Supabase REST GETs, network-only for auth/realtime/Edge Functions, cache-first for images.
+- New static assets → add to the `SHELL` list in `sw.js`.
+- Bumping `CACHE` (`portgo-vXX`) purges all old caches on activate — required on every deploy.
 
 ---
 
 ## What to Avoid
 
-- **Don't use `localStorage` for auth state** — the app intentionally uses `sessionStorage`.
-- **Don't add `<script>` tags without `type="module"`** — all JS uses ES module scope.
-- **Don't inline role-visibility logic with `display:none`** — use the CSS class system.
-- **Don't call the Supabase service role key from client code** — Edge Functions only.
-- **Don't use `alert()`** — use the existing modal or toast helpers.
-- **Don't add npm packages** — there is no bundler; add CDN links to `index.html` if a new library is truly needed.
+- **Don't use `localStorage` for auth** — `sessionStorage` is intentional (theme preference is the only `localStorage` use).
+- **Don't add `type="module"` to script tags** — the codebase is classic globals; modules would break cross-file calls.
+- **Don't use `getPublicUrl` on `unidades`/`registros`** — private buckets, signed URLs only.
+- **Don't interpolate user data into `onclick` with plain `esc()`** — use `escJs()`.
+- **Don't gate roles with inline styles** — use the `<body>` class system.
+- **Don't use `alert()`/`confirm()`** — `showToast()` / `showConfirm()`.
+- **Don't ship without bumping `?v=` + sw.js cache + pushing** — see the deployment checklist.
+- **Don't put the service role key anywhere near client code.**

@@ -221,7 +221,7 @@ async function _renderChatBubblePanel() {
     const ctxTipo = h.reserva_id ? 'reserva' : 'pedido';
     const preview = h.texto.length > 55 ? h.texto.slice(0, 55) + '…' : h.texto;
     return `
-      <div class="notif-item" onclick="_abrirDesdeGlobo('${ctxTipo}','${ctxId}','${h.de_user_id}','${esc(h.de_nombre)}')">
+      <div class="notif-item" onclick="_abrirDesdeGlobo('${ctxTipo}','${ctxId}','${h.de_user_id}','${escJs(h.de_nombre)}')">
         <div class="notif-dot"></div>
         <div class="notif-content">
           <div class="notif-titulo">${esc(h.de_nombre)} <span style="font-weight:400;color:var(--text-muted)">${ctx}</span></div>

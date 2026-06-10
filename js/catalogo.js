@@ -108,7 +108,7 @@ function _empresaCardHTML(e) {
     ? `<div class="emp-rating">
          <span class="emp-stars">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5 - Math.round(avg))}</span>
          <span class="emp-rating-num">${avgStr}</span>
-         <button class="emp-btn-resenas" onclick="openVerCalificaciones('${e.user_id}','${esc(e.nombre)}')">
+         <button class="emp-btn-resenas" onclick="openVerCalificaciones('${e.user_id}','${escJs(e.nombre)}')">
            Ver ${numCal} reseña${numCal !== 1 ? 's' : ''}
          </button>
        </div>`
@@ -163,7 +163,7 @@ function _empresaCardHTML(e) {
           ? `<button class="btn-emp-solicitar" onclick="openNuevoPedido('camion')">📋 Publicar solicitud</button>`
           : ''}
         ${e.telefono || e.descripcion || e.rfc
-          ? `<button class="btn-emp-perfil" onclick="abrirPerfilEmpresaCat('${e.user_id}','${esc(e.nombre)}')">Ver empresa</button>`
+          ? `<button class="btn-emp-perfil" onclick="abrirPerfilEmpresaCat('${e.user_id}','${escJs(e.nombre)}')">Ver empresa</button>`
           : ''}
       </div>
     </div>`;

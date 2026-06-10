@@ -81,7 +81,7 @@ function _operadorCardHTML(op) {
     ? `<div class="op-sub" style="color:${new Date(op.fecha_vencimiento) < new Date() ? 'var(--danger)' : 'var(--text-muted)'}">Vence: ${fmtFecha(op.fecha_vencimiento)}</div>`
     : '';
   const licFotoBtn = op.foto_licencia
-    ? `<button class="btn-edit" style="font-size:0.7rem" onclick="window.open('${esc(op.foto_licencia)}','_blank')">🪪 Ver licencia</button>`
+    ? `<button class="btn-edit" style="font-size:0.7rem" onclick="window.open('${escJs(op.foto_licencia)}','_blank')">🪪 Ver licencia</button>`
     : '';
 
   return `

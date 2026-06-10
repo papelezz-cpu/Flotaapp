@@ -7,6 +7,18 @@ function esc(str) {
   );
 }
 
+// Escapar un valor que va dentro de un string JS en un atributo onclick.
+// esc() solo no basta: el navegador decodifica las entidades HTML antes de
+// ejecutar el JS, así que una comilla simple rompería el string y permitiría
+// inyectar código. Aquí se escapa primero para JS y después para HTML.
+function escJs(str) {
+  return esc(String(str ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+    .replace(/\r?\n/g, '\\n'));
+}
+
 // Fecha de hoy YYYY-MM-DD
 function today() {
   return new Date().toISOString().split('T')[0];
@@ -136,7 +148,7 @@ async function _geoFetch(query, inputEl, dd) {
     if (!data.length) return;
     dd.innerHTML = data.map(r => {
       const label = r.display_name.split(',').slice(0, 3).join(',');
-      return `<div class="geo-item" onclick="_geoSelect(this, '${label.replace(/'/g,"&#39;")}', event)">${esc(label)}</div>`;
+      return `<div class="geo-item" onclick="_geoSelect(this, '${escJs(label)}', event)">${esc(label)}</div>`;
     }).join('');
     dd.style.display = 'block';
     // Store reference to input
