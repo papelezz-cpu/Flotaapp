@@ -1,10 +1,11 @@
 // ── SERVICE WORKER — PortGo ────────────────────────────
-const CACHE      = 'portgo-v85';
+const CACHE      = 'portgo-v86';
 const DATA_CACHE = 'portgo-data-v1';
 
 const SHELL = [
   '/',
   '/index.html',
+  '/app.html',
   '/manifest.json',
   '/icon.svg',
   '/icon-light.svg',

@@ -18,7 +18,7 @@ This file provides guidance to Claude Code when working with the **PortGo** code
 
 The app is served from **GitHub Pages** (`https://github.com/papelezz-cpu/Flotaapp.git`). Nothing is live until pushed. After ANY change:
 
-1. **Bump the `?v=` param in `index.html`** for every JS/CSS file you changed (e.g. `js/pedidos.js?v=36` → `?v=37`). If you skip this, browsers serve the old cached file and the user reports "it's not fixed".
+1. **Bump the `?v=` param in `app.html`** for every JS/CSS file you changed (e.g. `js/pedidos.js?v=36` → `?v=37`). `app.html` is the application; `index.html` is the static marketing landing. If you skip this, browsers serve the old cached file and the user reports "it's not fixed".
 2. **Bump the cache version in `sw.js`**: `const CACHE = 'portgo-vXX'` → `vXX+1`.
 3. **Commit AND `git push`** — a commit alone deploys nothing.
 4. Schema changes: `mcp__supabase__apply_migration`. Edge Functions: `mcp__supabase__deploy_edge_function`. Both hit **production immediately** — there is no staging.
@@ -34,10 +34,11 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
 
 ```
 /
-├── index.html              # Single entry point — all views, modals, script/link tags
+├── index.html              # Static marketing landing (self-contained: inline CSS, Lucide CDN). CTAs → app.html
+├── app.html                # The application — all views, modals, script/link tags (formerly index.html)
 ├── sw.js                   # Service worker (bump CACHE version on every deploy)
 ├── css/                    # base → layout → components → login → detalle → theme (load order matters)
-├── js/                     # Classic scripts, global scope, order defined in index.html
+├── js/                     # Classic scripts, global scope, order defined in app.html
 └── supabase/functions/
     ├── gestionar-usuario/  # Privileged user CRUD (superadmin only, service role key)
     └── enviar-notificacion/ # Email notifications
@@ -123,8 +124,8 @@ Store **paths** in the DB for private buckets and sign at display time (see `abr
 - **Errors:** check `error`, `console.error` + `showToast(msg, 'error')`. Never `alert()`.
 - **Formatting:** `fmtFecha(row.created_at)` → "12/05/2025", `formatPrecio(n)` → "$1,250 MXN/día". Never inline.
 - **Confirmations:** `showConfirm(msg, cb, { danger, confirmLabel })` — never `window.confirm`.
-- **Scripts are NOT ES modules.** Everything is global scope; load order in `index.html` matters (utils → config → auth → … → main last). New functions are global — avoid name collisions.
-- **New view:** add `<section id="view-X" class="view">` in `index.html` → case in `showView()` → `js/X.js` with `renderX()` → `<script>` tag with `?v=1` → add to `sw.js` SHELL list → role-gate with CSS classes.
+- **Scripts are NOT ES modules.** Everything is global scope; load order in `app.html` matters (utils → config → auth → … → main last). New functions are global — avoid name collisions.
+- **New view:** add `<section id="view-X" class="view">` in `app.html` → case in `showView()` → `js/X.js` with `renderX()` → `<script>` tag with `?v=1` → add to `sw.js` SHELL list → role-gate with CSS classes.
 - **No npm packages** — CDN `<script>` tags only if truly needed.
 
 ---

@@ -1,2233 +1,424 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0a1628">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>PortGo — Logística Conectada</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0d9488">
+<title>PortGo — La logística del puerto, por fin clara</title>
+<meta name="description" content="Conecta con transportistas verificados, compara ofertas reales y rastrea cada embarque del puerto de Manzanillo. Una plataforma, cero llamadas a ciegas.">
+<link rel="icon" href="icon-light.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sand:#faf8f3; --surface:#ffffff; --ink:#102a26; --muted:#4f6661; --muted2:#7c8a85;
+    --teal:#0d9488; --teal-dark:#0f766e; --teal-soft:#e3f1ee; --line:#e6e1d6; --line2:#ece7da;
+    --ink-deep:#102a26; --coral:#c0573a; --coral-soft:#fbeee8;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  body{ font-family:'DM Sans',sans-serif; color:var(--ink); background:var(--sand); -webkit-font-smoothing:antialiased; }
+  a{ color:inherit; text-decoration:none; }
+  .lucide{ display:block; }
+  h1,h2,h3{ font-family:'Space Grotesk',sans-serif; letter-spacing:-.015em; }
+  .wrap{ max-width:1180px; margin:0 auto; padding:0 32px; }
+  @keyframes fadeUp{ from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
 
-  <!-- #7 Favicon -->
-  <link rel="icon" href="icon-light.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="icon-light.svg">
+  /* buttons */
+  .btn{ display:inline-flex; align-items:center; gap:8px; font-weight:600; border-radius:12px; cursor:pointer; border:none; transition:background .18s, border-color .18s, color .18s; }
+  .btn-primary{ background:var(--teal); color:#fff; }
+  .btn-primary:hover{ background:var(--teal-dark); }
+  .btn-ghost{ background:#fff; color:var(--ink); border:1.5px solid var(--line); }
+  .btn-ghost:hover{ border-color:var(--teal); color:var(--teal); }
+  .btn-lg{ font-size:16px; padding:16px 28px; }
 
-  <!-- #4 PWA Manifest -->
-  <link rel="manifest" href="manifest.json">
+  /* nav */
+  .nav{ position:sticky; top:0; z-index:50; background:rgba(250,248,243,.85); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-bottom:1px solid var(--line2); }
+  .nav-inner{ display:flex; align-items:center; justify-content:space-between; padding:16px 32px; max-width:1180px; margin:0 auto; }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand-mark{ width:36px; height:36px; border-radius:50%; background:var(--teal); display:flex; align-items:center; justify-content:center; color:#fff; }
+  .brand-name{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:22px; }
+  .nav-links{ display:flex; align-items:center; gap:32px; font-size:14.5px; color:var(--muted); }
+  .nav-cta{ display:flex; align-items:center; gap:14px; }
+  .nav-enter{ font-size:14.5px; color:var(--muted); cursor:pointer; }
+  .nav-pub{ display:inline-flex; align-items:center; gap:7px; background:var(--teal); color:#fff; font-weight:600; font-size:14px; padding:11px 20px; border-radius:999px; cursor:pointer; transition:background .18s; }
+  .nav-pub:hover{ background:var(--teal-dark); }
 
-  <!-- Fuentes -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  /* hero */
+  .hero{ display:grid; grid-template-columns:1.05fr .95fr; gap:56px; align-items:center; padding:84px 32px 72px; max-width:1180px; margin:0 auto; }
+  .pill{ display:inline-flex; align-items:center; gap:8px; background:var(--teal-soft); color:var(--teal-dark); font-weight:600; font-size:13px; padding:7px 14px; border-radius:8px; }
+  .hero h1{ font-weight:700; font-size:62px; line-height:1.03; letter-spacing:-.025em; margin:26px 0 24px; }
+  .hero h1 .accent{ color:var(--teal); }
+  .hero p{ font-size:19px; line-height:1.6; color:var(--muted); max-width:500px; margin-bottom:34px; }
+  .hero-actions{ display:flex; gap:14px; flex-wrap:wrap; }
+  .hero-stats{ display:flex; gap:32px; margin-top:40px; }
+  .stat-n{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:30px; color:var(--teal); }
+  .stat-l{ font-size:13px; color:var(--muted2); }
+  .hero-visual{ position:relative; }
+  .ph{ border-radius:24px; border:1px solid var(--line); background-image:repeating-linear-gradient(135deg,#f1efe9,#f1efe9 14px,#e9e4d8 14px,#e9e4d8 28px); display:flex; align-items:center; justify-content:center; }
+  .ph-label{ font-family:'DM Sans',monospace; font-size:12.5px; color:#9a9583; background:var(--sand); padding:9px 15px; border-radius:8px; border:1px solid var(--line); text-align:center; }
+  .float-card{ position:absolute; bottom:-22px; left:-26px; background:#fff; border-radius:16px; padding:16px 18px; box-shadow:0 14px 40px rgba(16,42,38,.16); display:flex; align-items:center; gap:13px; width:300px; max-width:88%; }
+  .float-ico{ width:42px; height:42px; border-radius:11px; background:var(--teal-soft); color:var(--teal); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .float-offer{ position:absolute; top:-18px; right:-18px; background:var(--ink-deep); color:#fff; border-radius:14px; padding:13px 17px; box-shadow:0 12px 32px rgba(16,42,38,.22); }
 
-  <!-- Estilos -->
-  <link rel="stylesheet" href="css/base.css?v=5">
-  <link rel="stylesheet" href="css/layout.css?v=2">
-  <link rel="stylesheet" href="css/components.css?v=12">
-  <link rel="stylesheet" href="css/login.css?v=2">
-  <link rel="stylesheet" href="css/detalle.css?v=2">
-  <link rel="stylesheet" href="css/theme.css?v=3">
-  <style>
-    /* Botones de confirmación — forzados para ambos modos */
-    .btn-confirm { color: #fff !important; }
-    body.light .btn-confirm { background: #2563eb !important; border-color: #2563eb !important; color: #fff !important; }
-    body.light #sc-confirm  { background: #2563eb !important; border-color: #2563eb !important; color: #fff !important; }
-  </style>
+  /* sections */
+  .band{ background:#fff; border-top:1px solid var(--line2); border-bottom:1px solid var(--line2); }
+  .sec{ padding:80px 32px; max-width:1180px; margin:0 auto; }
+  .sec-72{ padding:72px 32px; max-width:1180px; margin:0 auto; }
+  .eyebrow{ font-size:13px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--teal); margin-bottom:12px; }
+  .h2{ font-weight:700; font-size:36px; }
+  .lead{ font-size:17px; color:var(--muted); }
 
-  <!-- Supabase SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  /* steps */
+  .steps{ display:grid; grid-template-columns:repeat(3,1fr); border:1px solid var(--line); border-radius:20px; overflow:hidden; margin-top:44px; }
+  .step{ padding:36px; border-right:1px solid var(--line); }
+  .step:last-child{ border-right:none; }
+  .step-n{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px; color:var(--teal); }
+  .step-ico{ width:48px; height:48px; border-radius:13px; background:var(--teal-soft); color:var(--teal); display:flex; align-items:center; justify-content:center; margin:18px 0; }
+  .step h3{ font-weight:600; font-size:21px; margin-bottom:10px; }
+  .step p{ font-size:15px; line-height:1.62; color:var(--muted); }
+
+  /* feature split */
+  .split{ display:grid; grid-template-columns:1fr 1fr; gap:56px; align-items:center; }
+  .feat-list{ display:flex; flex-direction:column; gap:16px; }
+  .feat{ display:flex; gap:13px; }
+  .feat-ico{ width:26px; height:26px; border-radius:8px; background:var(--teal-soft); color:var(--teal); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .feat-t{ font-weight:600; font-size:15.5px; }
+  .feat-d{ font-size:14px; color:var(--muted2); }
+
+  /* dark teal section */
+  .teal-sec{ background:var(--teal); color:#fff; }
+  .teal-sec .lead{ color:#d6f0ec; }
+  .teal-sec .feat-ico{ background:rgba(255,255,255,.16); color:#fff; }
+  .teal-sec .feat-d{ color:#bfe7e1; }
+  .ph-dark{ border:1px solid rgba(255,255,255,.22); background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.06),rgba(255,255,255,.06) 14px,rgba(255,255,255,.02) 14px,rgba(255,255,255,.02) 28px); }
+  .ph-dark .ph-label{ color:#bfe7e1; background:rgba(255,255,255,.1); border-color:rgba(255,255,255,.22); }
+
+  /* services */
+  .services{ display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--line); border-radius:18px; overflow:hidden; background:#fff; }
+  .svc{ padding:32px; border-right:1px solid var(--line); }
+  .svc:last-child{ border-right:none; }
+  .svc-ico{ width:50px; height:50px; border-radius:13px; background:var(--teal-soft); color:var(--teal); display:flex; align-items:center; justify-content:center; margin-bottom:18px; }
+  .svc-t{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:18px; margin-bottom:6px; }
+  .svc-d{ font-size:14px; line-height:1.55; color:var(--muted2); }
+
+  /* trust */
+  .trust-list{ display:flex; flex-direction:column; gap:14px; }
+  .trust-item{ display:flex; gap:14px; align-items:center; border:1px solid var(--line); border-radius:14px; padding:18px 20px; }
+  .trust-item .ti-t{ font-weight:600; font-size:15.5px; }
+  .trust-item .ti-d{ font-size:13.5px; color:var(--muted2); }
+
+  /* app preview */
+  .app-sec{ background:var(--ink-deep); }
+  .phones{ display:flex; gap:36px; justify-content:center; align-items:flex-start; flex-wrap:wrap; }
+  .phone{ width:310px; background:#06201c; border:9px solid #1a3a35; border-radius:40px; overflow:hidden; }
+  .phone-notch{ height:32px; background:var(--sand); display:flex; align-items:center; justify-content:center; }
+  .phone-notch span{ width:96px; height:6px; border-radius:3px; background:#d8d2c4; display:block; }
+  .phone-body{ background:var(--sand); padding:20px 17px 24px; color:var(--ink); }
+  .pa-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+  .pa-grid{ display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+  .pa-tile{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; }
+  .pa-tile-ico{ color:var(--teal); margin-bottom:9px; }
+  .pa-pub{ background:var(--teal); color:#fff; border-radius:14px; padding:14px; margin-top:13px; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:600; font-size:14px; }
+  .pa-card{ background:#fff; border:1px solid var(--line); border-radius:15px; padding:16px; margin-bottom:12px; }
+
+  /* faq */
+  .faq-wrap{ max-width:920px; }
+  .faq{ display:flex; flex-direction:column; gap:13px; }
+  .faq-item{ border:1px solid var(--line); border-radius:14px; padding:22px 24px; background:#fff; }
+  .faq-q{ display:flex; justify-content:space-between; align-items:center; gap:16px; }
+  .faq-q span{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:17px; }
+  .faq-a{ font-size:15px; line-height:1.6; color:var(--muted); margin-top:12px; }
+
+  /* cta */
+  .cta-sec{ background:var(--teal); }
+  .cta-inner{ text-align:center; color:#fff; }
+  .cta-inner h2{ font-weight:700; font-size:44px; letter-spacing:-.02em; margin-bottom:18px; }
+  .cta-inner p{ font-size:18px; color:#d6f0ec; margin-bottom:34px; }
+  .cta-actions{ display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+
+  /* footer */
+  .footer{ background:var(--ink-deep); color:#bcd0cb; }
+  .footer-grid{ display:grid; grid-template-columns:1.5fr 1fr 1fr 1fr; gap:32px; padding-bottom:40px; border-bottom:1px solid rgba(255,255,255,.1); }
+  .footer h4{ font-family:'DM Sans',sans-serif; font-weight:600; color:#fff; font-size:14px; margin-bottom:14px; }
+  .footer-col a{ display:block; font-size:14px; margin-bottom:10px; color:#bcd0cb; }
+  .footer-col a:hover{ color:#fff; }
+  .footer-about{ font-size:14px; line-height:1.6; color:#8fa8a2; max-width:280px; }
+  .footer-bottom{ padding-top:24px; font-size:13px; color:#8fa8a2; }
+
+  /* ── responsive ── */
+  @media (max-width:900px){
+    .wrap, .nav-inner, .sec, .sec-72, .hero{ padding-left:22px; padding-right:22px; }
+    .nav-links{ display:none; }
+    .hero{ grid-template-columns:1fr; gap:40px; padding-top:56px; padding-bottom:48px; }
+    .hero h1{ font-size:42px; }
+    .hero p{ font-size:17px; }
+    .ph{ height:340px !important; }
+    .steps{ grid-template-columns:1fr; }
+    .step{ border-right:none; border-bottom:1px solid var(--line); }
+    .step:last-child{ border-bottom:none; }
+    .split{ grid-template-columns:1fr; gap:34px; }
+    .split.reverse > div:first-child{ order:2; }
+    .services{ grid-template-columns:1fr 1fr; }
+    .svc{ border-bottom:1px solid var(--line); }
+    .svc:nth-child(odd){ border-right:1px solid var(--line); }
+    .svc:nth-child(even){ border-right:none; }
+    .h2, .cta-inner h2{ font-size:30px; }
+    .footer-grid{ grid-template-columns:1fr 1fr; gap:28px; }
+  }
+  @media (max-width:560px){
+    .services{ grid-template-columns:1fr; }
+    .svc{ border-right:none !important; }
+    .hero-stats{ gap:22px; }
+    .footer-grid{ grid-template-columns:1fr; }
+    .nav-enter{ display:none; }
+  }
+</style>
 </head>
 <body>
 
-<!-- ══ HEADER ══════════════════════════════════════════ -->
-<header>
-  <div class="header-inner">
-    <div class="logo" onclick="showView('home', null)" style="cursor:pointer">
-      <img src="icon.svg" class="logo-icon" alt="PortGo">
-      PortGo
-    </div>
-    <div class="header-right">
-      <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
-      <!-- Globo de mensajes (solo logueados) -->
-      <div class="notif-wrap logged-in-only" style="position:relative">
-        <button class="btn-notif" id="btn-chat" onclick="toggleChatList()" title="Mensajes">
-          💬
-          <span class="notif-badge" id="chat-badge" style="display:none">0</span>
-        </button>
-        <div class="notif-panel" id="chat-bubble-panel">
-          <div class="notif-panel-header">
-            <span>Mensajes nuevos</span>
-          </div>
-          <div id="chat-bubble-list"></div>
-        </div>
-      </div>
-      <!-- Campana de notificaciones (solo logueados) -->
-      <div class="notif-wrap logged-in-only" style="position:relative">
-        <button class="btn-notif" id="btn-notif" onclick="toggleNotifPanel()" title="Notificaciones">
-          🔔
-          <span class="notif-badge" id="notif-badge" style="display:none">0</span>
-        </button>
-        <div class="notif-panel" id="notif-panel">
-          <div class="notif-panel-header">
-            <span>Notificaciones</span>
-            <button class="notif-mark-all" onclick="markAllRead()">Marcar todas como leídas</button>
-          </div>
-          <div id="notif-list"></div>
-        </div>
-      </div>
-      <!-- btn-entrar eliminado: login es obligatorio al entrar -->
-      <div class="user-chip logged-in-only" onclick="abrirMiPerfil()" style="cursor:pointer" title="Ver mi perfil">
-        <span>👤</span>
-        <strong id="user-label">—</strong>
-        <button class="btn-logout" onclick="event.stopPropagation();logout()" title="Cerrar sesión">Salir</button>
-      </div>
-      <button class="btn-hamburger" id="btn-hamburger" onclick="toggleMenu()" aria-label="Menú">
-        <span></span><span></span><span></span>
-      </button>
+<!-- NAV -->
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="app.html">
+      <span class="brand-mark"><i data-lucide="anchor" width="20" height="20"></i></span>
+      <span class="brand-name">PortGo</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#como">Cómo funciona</a>
+      <a href="#servicios">Servicios</a>
+      <a href="#transportistas">Para transportistas</a>
+      <a href="#faq">Preguntas</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="nav-enter" href="app.html">Entrar</a>
+      <a class="nav-pub" href="app.html">Publicar pedido</a>
     </div>
   </div>
 </header>
 
-<!-- ══ VISTA: HOME ═════════════════════════════════════ -->
-<div id="view-home" class="view active">
-  <div class="home-page">
-    <div class="home-hero">
-      <img src="icon.svg" class="home-logo-img" alt="PortGo">
-      <h1 class="home-greeting" id="home-greeting">Bienvenido 👋</h1>
-      <p class="home-sub">¿Qué quieres hacer hoy?</p>
+<!-- HERO -->
+<section class="hero">
+  <div>
+    <span class="pill"><i data-lucide="badge-check" width="15" height="15"></i> Puerto de Manzanillo · Red verificada</span>
+    <h1>La logística del puerto, <span class="accent">por fin clara.</span></h1>
+    <p>Conecta con transportistas verificados, compara ofertas reales y rastrea cada embarque en tiempo real. Una plataforma, cero llamadas a ciegas.</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary btn-lg" href="app.html">Necesito mover carga <i data-lucide="arrow-right" width="18" height="18"></i></a>
+      <a class="btn btn-ghost btn-lg" href="app.html">Soy transportista</a>
     </div>
-    <div class="home-grid" id="home-grid"></div>
-  </div>
-</div>
-
-<!-- ══ VISTA: CATÁLOGO DE EMPRESAS ══════════════════════ -->
-<div id="view-cliente" class="view">
-  <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
-    <div class="cat-header">
-      <h1 class="cat-titulo">Directorio de Proveedores</h1>
-      <p class="cat-sub">Empresas verificadas que pueden atender tus solicitudes de transporte</p>
-      <div class="cat-pills">
-        <button class="cat-pill active" data-filter="camion"   onclick="filtrarEmpresas('camion')">🚛 Camiones</button>
-        <button class="cat-pill"        data-filter="custodio" onclick="filtrarEmpresas('custodio')">👮 Custodia</button>
-        <button class="cat-pill"        data-filter="patio"    onclick="filtrarEmpresas('patio')">🏭 Patios</button>
-        <button class="cat-pill"        data-filter="lavado"   onclick="filtrarEmpresas('lavado')">🚿 Lavado</button>
-      </div>
-      <div class="cat-search-wrap">
-        <input type="search" id="cat-search" class="cat-search-input"
-               placeholder="🔍 Buscar empresa por nombre..."
-               oninput="buscarEmpresas(this.value)">
-      </div>
-    </div>
-    <div class="empresa-grid" id="empresa-grid"></div>
-    <!-- Elementos ocultos referenciados por JS legacy -->
-    <div id="stats-row"   style="display:none"></div>
-    <div id="truck-grid"  style="display:none"></div>
-    <span id="count-label" style="display:none"></span>
-    <input id="fecha-inicio" type="date" style="display:none">
-    <input id="fecha-fin"    type="date" style="display:none">
-    <select id="filtro-tipo" style="display:none"></select>
-  </div>
-</div>
-
-<!-- ══ VISTA: RESERVACIONES ════════════════════════════ -->
-<div id="view-reservaciones" class="view">
-  <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
-    <div class="section-title">Reservaciones activas</div>
-    <div class="reserv-table">
-      <div id="reserv-header" class="reserv-row header">
-        <div>Unidad</div><div>Empresa</div><div>Cliente</div><div>Inicio</div><div>Fin</div><div>Estado</div>
-      </div>
-      <div id="reserv-body"></div>
+    <div class="hero-stats">
+      <div><div class="stat-n">+120</div><div class="stat-l">unidades verificadas</div></div>
+      <div><div class="stat-n">2 h</div><div class="stat-l">a la primera oferta</div></div>
+      <div><div class="stat-n">4.8★</div><div class="stat-l">calificación promedio</div></div>
     </div>
   </div>
-</div>
-
-<!-- ══ VISTA: PEDIDOS ══════════════════════════════════ -->
-<div id="view-pedidos" class="view">
-  <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
-    <div class="section-title">📋 Solicitudes de servicio</div>
-
-    <!-- Botones de servicio — solo clientes logueados -->
-    <div class="ped-serv-grid logged-in-only" id="ped-serv-btns" style="display:none">
-      <button class="ped-serv-btn" onclick="openNuevoPedido('camion')">
-        <span class="ped-serv-icon">🚛</span>
-        <span class="ped-serv-label">Necesito un camión</span>
-      </button>
-      <button class="ped-serv-btn" onclick="openNuevoPedido('custodio')">
-        <span class="ped-serv-icon">👮</span>
-        <span class="ped-serv-label">Necesito custodia</span>
-      </button>
-      <button class="ped-serv-btn" onclick="openNuevoPedido('patio')">
-        <span class="ped-serv-icon">🏭</span>
-        <span class="ped-serv-label">Necesito un patio</span>
-      </button>
-      <button class="ped-serv-btn" onclick="openNuevoPedido('lavado')">
-        <span class="ped-serv-icon">🚿</span>
-        <span class="ped-serv-label">Servicio de lavado</span>
-      </button>
+  <div class="hero-visual">
+    <div class="ph" style="height:520px;"><span class="ph-label">[ Foto: tractocamión saliendo del puerto ]</span></div>
+    <div class="float-card">
+      <span class="float-ico"><i data-lucide="map-pin" width="22" height="22"></i></span>
+      <div style="flex:1;"><div style="font-weight:700; font-size:14px;">En tránsito · Manzanillo → CDMX</div><div style="font-size:12.5px; color:var(--muted2);">ETA ~14 h · Torton · Verificado</div></div>
+      <span style="width:10px; height:10px; border-radius:50%; background:var(--teal); flex-shrink:0;"></span>
     </div>
-
-    <!-- Filtros — solo usuarios logueados -->
-    <div class="ped-filtros-bar" id="ped-filtros-bar" style="display:none">
-      <div class="ped-filtro-pills">
-        <button class="ped-filtro-pill active" data-tipo="todos"     onclick="filtrarPedidosTipo('todos')">Todos</button>
-        <button class="ped-filtro-pill"        data-tipo="camion"    onclick="filtrarPedidosTipo('camion')"><span class="pill-icon">🚛</span>Camión</button>
-        <button class="ped-filtro-pill"        data-tipo="custodio"  onclick="filtrarPedidosTipo('custodio')"><span class="pill-icon">👮</span>Custodia</button>
-        <button class="ped-filtro-pill"        data-tipo="patio"     onclick="filtrarPedidosTipo('patio')"><span class="pill-icon">🏭</span>Patio</button>
-        <button class="ped-filtro-pill"        data-tipo="lavado"    onclick="filtrarPedidosTipo('lavado')"><span class="pill-icon">🚿</span>Lavado</button>
-      </div>
-      <!-- Filtro de estado para clientes -->
-      <div class="ped-filtro-pills admin-hidden" id="ped-estado-pills" style="margin-top:6px">
-        <button class="ped-filtro-pill active" data-est="todos"     onclick="filtrarPedidosEstado('todos')">Todos</button>
-        <button class="ped-filtro-pill"        data-est="activo"    onclick="filtrarPedidosEstado('activo')">Activos</button>
-        <button class="ped-filtro-pill"        data-est="revision"  onclick="filtrarPedidosEstado('revision')">En revisión</button>
-        <button class="ped-filtro-pill"        data-est="acordado"  onclick="filtrarPedidosEstado('acordado')">Acuerdos</button>
-        <button class="ped-filtro-pill"        data-est="cancelado" onclick="filtrarPedidosEstado('cancelado')">Cancelados</button>
-      </div>
-      <!-- Filtro geográfico para admin/superadmin -->
-      <div class="ped-geo-filter admin-only" id="ped-geo-wrap">
-        <input type="search" id="ped-geo-input" class="ped-geo-input"
-               placeholder="🔍 Filtrar por origen o destino…"
-               oninput="filtrarPedidosGeo(this.value)">
-      </div>
+    <div class="float-offer">
+      <div style="font-size:11.5px; color:#9fd9d1; font-weight:600; margin-bottom:2px;">3 ofertas nuevas</div>
+      <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px;">desde $8,400</div>
     </div>
-
-    <div id="pedidos-list"></div>
   </div>
-</div>
+</section>
 
-<!-- ══ VISTA: ADMIN ════════════════════════════════════ -->
-<div id="view-admin" class="view">
-  <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
-    <div class="section-title">Panel de Administración</div>
-
-    <!-- Perfil de empresa (oculto para superadmin) -->
-    <div class="admin-card" id="perfil-empresa-card" style="margin-bottom:20px">
-      <h3 style="cursor:pointer" onclick="togglePerfilCard()">
-        🏢 Perfil de empresa
-        <span id="perfil-toggle-icon" style="margin-left:auto;font-size:0.85rem;color:var(--text-muted)">▼ Editar</span>
-      </h3>
-      <div id="perfil-card-body" style="display:none">
-        <!-- ── Datos generales ─────────────────────────────── -->
-        <div class="admin-grid" style="margin-top:4px">
-          <div class="form-group">
-            <label>Razón social</label>
-            <input type="text" id="pe-razon" placeholder="Ej. Transportes García S.A. de C.V.">
-          </div>
-          <div class="form-group">
-            <label>RFC</label>
-            <input type="text" id="pe-rfc" placeholder="Ej. GARM800101MC1">
-          </div>
-          <div class="form-group">
-            <label>Teléfono de contacto</label>
-            <input type="tel" id="pe-telefono" placeholder="+52 314 000 0000">
-          </div>
-          <div class="form-group">
-            <label>Años en operación</label>
-            <input type="number" id="pe-anos" placeholder="Ej. 10" min="0">
-          </div>
-          <div class="form-group">
-            <label>Número de unidades en flota</label>
-            <input type="number" id="pe-unidades" placeholder="Ej. 5" min="1">
-          </div>
-          <div class="form-group">
-            <label>Núm. permiso SCT</label>
-            <input type="text" id="pe-sct" placeholder="Ej. SCT/TPAF/MZ-0001/2024">
-          </div>
-          <div class="form-group" style="grid-column:1/-1">
-            <label>Descripción de la empresa</label>
-            <textarea id="pe-desc" rows="3" placeholder="¿Qué servicios ofrecen? ¿Zonas que cubren? ¿Especialidad?"></textarea>
-          </div>
-          <div class="form-group" style="grid-column:1/-1">
-            <label>Seguros vigentes</label>
-            <div style="display:flex;gap:16px;margin-top:4px">
-              <label style="display:flex;align-items:center;gap:8px;font-size:0.88rem;text-transform:none;letter-spacing:0;font-weight:400">
-                <input type="checkbox" id="pe-rc"> Seguro de Responsabilidad Civil
-              </label>
-              <label style="display:flex;align-items:center;gap:8px;font-size:0.88rem;text-transform:none;letter-spacing:0;font-weight:400">
-                <input type="checkbox" id="pe-carga"> Seguro de Carga
-              </label>
-            </div>
-          </div>
-        </div>
-        <button class="btn-add" style="margin-top:8px" onclick="guardarPerfilEmpresa()">💾 Guardar perfil</button>
-
-        <!-- ── Documentos legales (requieren aprobación) ───── -->
-        <div class="op-form-section-title" style="margin-top:24px">📋 Documentos legales <span style="font-weight:400;font-size:0.8rem;color:var(--text-muted)">— requieren revisión del superadmin</span></div>
-        <div id="pe-docs-pendiente-banner" style="display:none;background:var(--surface-2,#fef3c7);border:1px solid var(--warn-border,#f59e0b);border-radius:8px;padding:10px 14px;margin:10px 0 0;font-size:0.85rem;color:var(--text,#92400e)">
-          ⏳ Tienes cambios de documentos pendientes de aprobación por el superadmin
-        </div>
-        <div class="admin-grid" style="margin-top:12px">
-          <div class="form-group">
-            <label>Permiso SCT — vencimiento</label>
-            <input type="date" id="pe-vence-sct">
-            <div id="pe-doc-sct-actual" style="font-size:0.78rem;margin-top:4px"></div>
-          </div>
-          <div class="form-group">
-            <label>Permiso SCT — documento</label>
-            <label class="file-upload-area" for="pe-doc-sct">
-              <span class="file-upload-icon">📄</span>
-              <span class="file-upload-text">PDF o imagen</span>
-            </label>
-            <input type="file" id="pe-doc-sct" accept="image/*,.pdf" style="display:none"
-                   onchange="previewDocNombre(this,'pe-doc-sct-preview')">
-            <div id="pe-doc-sct-preview"></div>
-          </div>
-          <div class="form-group">
-            <label>Seguro RC — vencimiento</label>
-            <input type="date" id="pe-vence-rc">
-            <div id="pe-doc-rc-actual" style="font-size:0.78rem;margin-top:4px"></div>
-          </div>
-          <div class="form-group">
-            <label>Seguro RC — póliza</label>
-            <label class="file-upload-area" for="pe-doc-rc">
-              <span class="file-upload-icon">📄</span>
-              <span class="file-upload-text">PDF o imagen</span>
-            </label>
-            <input type="file" id="pe-doc-rc" accept="image/*,.pdf" style="display:none"
-                   onchange="previewDocNombre(this,'pe-doc-rc-preview')">
-            <div id="pe-doc-rc-preview"></div>
-          </div>
-          <div class="form-group">
-            <label>Seguro de carga — vencimiento</label>
-            <input type="date" id="pe-vence-carga">
-            <div id="pe-doc-carga-actual" style="font-size:0.78rem;margin-top:4px"></div>
-          </div>
-          <div class="form-group">
-            <label>Seguro de carga — póliza</label>
-            <label class="file-upload-area" for="pe-doc-carga">
-              <span class="file-upload-icon">📄</span>
-              <span class="file-upload-text">PDF o imagen</span>
-            </label>
-            <input type="file" id="pe-doc-carga" accept="image/*,.pdf" style="display:none"
-                   onchange="previewDocNombre(this,'pe-doc-carga-preview')">
-            <div id="pe-doc-carga-preview"></div>
-          </div>
-        </div>
-        <button class="btn-add" id="btn-solicitar-docs" style="margin-top:10px" onclick="solicitarActualizacionDocs()">📤 Enviar documentos para aprobación</button>
+<!-- CÓMO FUNCIONA -->
+<div class="band" id="como">
+  <div class="sec-72">
+    <div class="eyebrow">Cómo funciona</div>
+    <h2 class="h2" style="margin-bottom:10px;">Tres pasos, una entrega.</h2>
+    <p class="lead" style="max-width:560px;">Diseñado para que importadores, agentes aduanales y transportistas hablen el mismo idioma.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">01</div>
+        <div class="step-ico"><i data-lucide="file-text" width="24" height="24"></i></div>
+        <h3>Publica tu pedido</h3>
+        <p>Indica origen, destino, tipo de carga, unidad y fechas. Toma menos de 2 minutos y no tiene costo.</p>
       </div>
-    </div>
-
-    <!-- Tabs de tipo de recurso -->
-    <div class="recurso-tabs" style="margin-bottom:24px">
-      <button class="recurso-tab active" id="admin-tab-camion"   onclick="cambiarAdminTab('camion')">🚛 Camiones</button>
-      <button class="recurso-tab"        id="admin-tab-custodio" onclick="cambiarAdminTab('custodio')">👮 Custodios</button>
-      <button class="recurso-tab"        id="admin-tab-patio"    onclick="cambiarAdminTab('patio')">🏭 Patios</button>
-      <button class="recurso-tab"        id="admin-tab-lavado"   onclick="cambiarAdminTab('lavado')">🚿 Lavado</button>
-      <button class="recurso-tab"        id="admin-tab-operador" onclick="cambiarAdminTab('operador')">👷 Operadores</button>
-    </div>
-
-    <!-- ── TAB: CAMIONES ── -->
-    <div id="admin-content-camion">
-    <div class="admin-grid">
-      <div class="admin-card">
-        <h3>➕ Agregar unidad</h3>
-
-        <div class="op-form-section-title" style="margin-top:4px">Datos del vehículo</div>
-        <div class="form-group">
-          <label>Tipo de transporte</label>
-          <select id="admin-tipo" onchange="autoFillDimensiones('admin')">
-            <optgroup label="Camionetas">
-              <option>Camioneta 1.5 ton caja seca</option>
-              <option>Camioneta 1.5 ton plataforma</option>
-              <option>Camioneta 3.5 ton caja seca</option>
-              <option>Camioneta 3.5 ton plataforma</option>
-            </optgroup>
-            <optgroup label="Camiones">
-              <option>Rabón</option>
-              <option>Torton</option>
-              <option>Torton caja seca</option>
-              <option>Torton plataforma</option>
-            </optgroup>
-            <optgroup label="Tractocamiones">
-              <option>Sencillo porta contenedor 40/20</option>
-              <option>Sencillo plataforma</option>
-              <option>Full</option>
-              <option>Full porta contenedor 40/20</option>
-              <option>Full plataforma</option>
-              <option>Plataforma</option>
-            </optgroup>
-            <optgroup label="Unidades especiales">
-              <option>Lowboy</option>
-              <option>Cama baja</option>
-              <option>Plataforma de 3 ejes (sobrepeso)</option>
-              <option>HAZMAT</option>
-            </optgroup>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Marca</label>
-          <select id="admin-marca">
-            <option value="">— Seleccionar —</option>
-            <option>Kenworth</option><option>International</option><option>Freightliner</option>
-            <option>Peterbilt</option><option>Volvo</option><option>Mercedes-Benz</option>
-            <option>Scania</option><option>MAN</option><option>Hino</option><option>Isuzu</option><option>Otra</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Versión / Submarca</label>
-          <input type="text" id="admin-version" placeholder="Ej. T800, LT 625">
-        </div>
-        <div class="form-group">
-          <label>Año del modelo</label>
-          <input type="number" id="admin-modelo-anio" placeholder="Ej. 2022" min="1980" max="2035">
-        </div>
-        <div class="form-group">
-          <label>Color</label>
-          <select id="admin-color">
-            <option value="">— Seleccionar —</option>
-            <option>Blanco</option><option>Negro</option><option>Rojo</option><option>Azul</option>
-            <option>Gris</option><option>Verde</option><option>Amarillo</option><option>Naranja</option>
-            <option>Plata</option><option>Café</option><option>Otro</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Capacidad máxima (toneladas) *</label>
-          <input type="number" id="admin-cap" placeholder="Se llena automáticamente por tipo" step="0.5" min="0">
-        </div>
-        <div class="form-group">
-          <label id="admin-dim-label">Dimensiones de plataforma (L × A)</label>
-          <input type="text" id="admin-dim" placeholder="Se llena automáticamente por tipo">
-        </div>
-        <div class="form-group">
-          <label>Tipo de combustible</label>
-          <select id="admin-combustible">
-            <option value="">— Seleccionar —</option>
-            <option>Diesel</option><option>Gasolina</option>
-            <option>Gas Natural</option><option>Eléctrico</option><option>Híbrido</option>
-          </select>
-        </div>
-
-        <div class="op-form-section-title" style="margin-top:16px">Identificación del vehículo</div>
-        <div class="form-group">
-          <label>Número de serie (NIV)</label>
-          <input type="text" id="admin-num-serie" placeholder="Ej. 3HKRM4H59KM702456">
-        </div>
-        <div class="form-group">
-          <label>Número de placas</label>
-          <input type="text" id="admin-placas" placeholder="Ej. MNZ-123-A">
-        </div>
-        <div class="form-group">
-          <label>Tipo de placa</label>
-          <select id="admin-tipo-placa">
-            <option value="">— Seleccionar —</option>
-            <option>Federal</option><option>Estatal</option><option>Local</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Número de motor</label>
-          <input type="text" id="admin-num-motor" placeholder="Ej. CAT-123456">
-        </div>
-        <div class="form-group">
-          <label>Número económico</label>
-          <input type="text" id="admin-num-economico" placeholder="Ej. ECO-001">
-        </div>
-
-        <div class="op-form-section-title" style="margin-top:16px">Tarjeta de circulación</div>
-        <div class="form-group">
-          <label>Número de tarjeta de circulación</label>
-          <input type="text" id="admin-tc" placeholder="Núm. de tarjeta">
-        </div>
-        <div class="form-group">
-          <label>Fecha de expedición TC</label>
-          <input type="date" id="admin-fecha-tc">
-        </div>
-        <div class="form-group">
-          <label>Fecha de vencimiento TC</label>
-          <input type="date" id="admin-vence-tc">
-        </div>
-
-        <div class="op-form-section-title" style="margin-top:16px">Seguro y permisos</div>
-        <div class="form-group">
-          <label>Vencimiento del seguro</label>
-          <input type="date" id="admin-vence-seguro">
-        </div>
-        <div class="form-group">
-          <label>Vencimiento del permiso SCT</label>
-          <input type="date" id="admin-vence-permiso-sct">
-        </div>
-        <div class="form-group">
-          <label>Número CAAT</label>
-          <input type="text" id="admin-caat" placeholder="Ej. CAAT-2024-0001">
-        </div>
-        <div class="form-group">
-          <label>Vigencia CAAT</label>
-          <input type="date" id="admin-vigencia-caat">
-        </div>
-        <div class="form-group">
-          <label>Vencimiento verificación vehicular</label>
-          <input type="date" id="admin-vence-verificacion">
-        </div>
-
-        <div class="op-form-section-title" style="margin-top:16px">Operación</div>
-        <div class="form-group">
-          <label>Operador asignado</label>
-          <select id="admin-op">
-            <option value="">— Sin operador asignado —</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Tipo de carga que maneja</label>
-          <div class="cargo-chips-select" id="admin-tipo-carga"></div>
-        </div>
-        <div class="form-group">
-          <label>Precio por día (MXN)</label>
-          <input type="number" id="admin-precio" placeholder="Ej. 8500" min="0">
-        </div>
-        <div class="form-group">
-          <label>Estado inicial</label>
-          <select id="admin-estado">
-            <option value="disponible">Disponible</option>
-            <option value="ocupado">Ocupado</option>
-            <option value="mantenimiento">Mantenimiento</option>
-          </select>
-        </div>
-
-        <div class="op-form-section-title" style="margin-top:16px">Fotos de la unidad</div>
-        <div class="form-group">
-          <label>Frente <span style="color:var(--danger)">*</span></label>
-          <label class="file-upload-area" for="admin-foto-frente">
-            <span class="file-upload-icon">📷</span>
-            <span id="foto-frente-label" class="file-upload-text">Adjuntar foto</span>
-          </label>
-          <input type="file" id="admin-foto-frente" accept="image/*" style="display:none"
-                 onchange="updateFileLabel('admin-foto-frente','foto-frente-label')">
-        </div>
-        <div class="form-group">
-          <label>Laterales</label>
-          <label class="file-upload-area" for="admin-foto-laterales">
-            <span class="file-upload-icon">📷</span>
-            <span id="foto-laterales-label" class="file-upload-text">Adjuntar fotos</span>
-          </label>
-          <input type="file" id="admin-foto-laterales" multiple accept="image/*" style="display:none"
-                 onchange="updateFileLabel('admin-foto-laterales','foto-laterales-label')">
-        </div>
-        <div class="form-group">
-          <label>Trasera</label>
-          <label class="file-upload-area" for="admin-foto-trasera">
-            <span class="file-upload-icon">📷</span>
-            <span id="foto-trasera-label" class="file-upload-text">Adjuntar foto</span>
-          </label>
-          <input type="file" id="admin-foto-trasera" accept="image/*" style="display:none"
-                 onchange="updateFileLabel('admin-foto-trasera','foto-trasera-label')">
-        </div>
-        <div class="form-group">
-          <label>Foto de placa <span style="color:var(--danger)">*</span></label>
-          <label class="file-upload-area" for="admin-foto-placa">
-            <span class="file-upload-icon">📷</span>
-            <span id="foto-placa-label" class="file-upload-text">Adjuntar foto</span>
-          </label>
-          <input type="file" id="admin-foto-placa" accept="image/*" style="display:none"
-                 onchange="updateFileLabel('admin-foto-placa','foto-placa-label')">
-        </div>
-
-        <div class="op-form-section-title" style="margin-top:16px">Documentos requeridos</div>
-        <div class="form-group">
-          <label>Tarjeta de circulación <span style="color:var(--danger)">*</span></label>
-          <label class="file-upload-area" for="admin-doc-tc">
-            <span class="file-upload-icon">📄</span>
-            <span id="doc-tc-label" class="file-upload-text">Adjuntar documento</span>
-          </label>
-          <input type="file" id="admin-doc-tc" accept="image/*,.pdf" style="display:none"
-                 onchange="updateFileLabel('admin-doc-tc','doc-tc-label')">
-        </div>
-        <div class="form-group">
-          <label>Permiso SCT <span style="color:var(--danger)">*</span></label>
-          <label class="file-upload-area" for="admin-doc-sct">
-            <span class="file-upload-icon">📄</span>
-            <span id="doc-sct-label" class="file-upload-text">Adjuntar documento</span>
-          </label>
-          <input type="file" id="admin-doc-sct" accept="image/*,.pdf" style="display:none"
-                 onchange="updateFileLabel('admin-doc-sct','doc-sct-label')">
-        </div>
-        <div class="form-group">
-          <label>Póliza de seguro <span style="color:var(--danger)">*</span></label>
-          <label class="file-upload-area" for="admin-doc-seguro">
-            <span class="file-upload-icon">📄</span>
-            <span id="doc-seguro-label" class="file-upload-text">Adjuntar documento</span>
-          </label>
-          <input type="file" id="admin-doc-seguro" accept="image/*,.pdf" style="display:none"
-                 onchange="updateFileLabel('admin-doc-seguro','doc-seguro-label')">
-        </div>
-
-        <!-- Hazmat: se muestra solo cuando se selecciona Peligroso o HAZMAT -->
-        <div id="admin-hazmat-docs" style="display:none">
-          <div class="op-form-section-title" style="margin-top:16px;color:var(--amber)">⚠️ Documentos de carga peligrosa</div>
-          <div class="form-group">
-            <label>Permiso de transporte de materiales peligrosos <span style="color:var(--danger)">*</span></label>
-            <label class="file-upload-area" for="admin-doc-peligrosa">
-              <span class="file-upload-icon">⚠️</span>
-              <span id="doc-peligrosa-label" class="file-upload-text">Adjuntar documento</span>
-            </label>
-            <input type="file" id="admin-doc-peligrosa" accept="image/*,.pdf" style="display:none"
-                   onchange="updateFileLabel('admin-doc-peligrosa','doc-peligrosa-label')">
-          </div>
-          <div class="form-group">
-            <label>Fecha de vencimiento del permiso <span style="color:var(--danger)">*</span></label>
-            <input type="date" id="admin-vence-peligrosa">
-          </div>
-        </div>
-
-        <div class="form-group sa-empresa-row" style="display:none">
-          <label>Empresa propietaria</label>
-          <select id="sa-empresa-camion"><option value="">— Selecciona empresa —</option></select>
-        </div>
-        <button class="btn-add" id="btn-agregar-camion" onclick="agregarCamion()">➕ Enviar a aprobación</button>
+      <div class="step">
+        <div class="step-n">02</div>
+        <div class="step-ico"><i data-lucide="gavel" width="24" height="24"></i></div>
+        <h3>Recibe y negocia ofertas</h3>
+        <p>Empresas verificadas te ofertan. Compara precios lado a lado y contraoferta sin salir de la app.</p>
       </div>
-
-      <div class="admin-card">
-        <h3>🚛 Unidades registradas</h3>
-        <div class="truck-list-admin" id="admin-list"></div>
+      <div class="step">
+        <div class="step-n">03</div>
+        <div class="step-ico"><i data-lucide="route" width="24" height="24"></i></div>
+        <h3>Rastrea y califica</h3>
+        <p>Sigue cada estado del embarque, recibe evidencias de entrega y deja tu calificación al cerrar.</p>
       </div>
-
-    </div>
-    </div><!-- /admin-content-camion -->
-
-    <!-- ── TAB: CUSTODIOS ── -->
-    <div id="admin-content-custodio" style="display:none">
-    <div class="admin-grid">
-      <div class="admin-card">
-        <h3>➕ Agregar custodio</h3>
-        <div class="form-group">
-          <label>Nombre / descripción corta</label>
-          <input type="text" id="ac-nombre" placeholder="Ej. Custodio Armado A2">
-        </div>
-        <div class="form-group">
-          <label>Tipo</label>
-          <select id="ac-tipo" onchange="toggleSedenaFields(this.value)">
-            <option value="Armado">Armado</option>
-            <option value="Sin arma">Sin arma</option>
-            <option value="Motorizado">Motorizado</option>
-            <option value="K9">K9</option>
-            <option value="Supervisión remota">Supervisión remota</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Descripción</label>
-          <textarea id="ac-desc" rows="3" placeholder="Experiencia, equipamiento, zonas que cubre..."></textarea>
-        </div>
-        <div class="form-group">
-          <label>Certificaciones <span style="font-weight:400;color:var(--text-muted)">(separadas por coma)</span></label>
-          <input type="text" id="ac-certs" placeholder="Ej. Portación de arma, Primeros auxilios">
-        </div>
-        <div class="form-group">
-          <label>Vencimiento de certificaciones</label>
-          <input type="date" id="ac-vence-cert">
-        </div>
-        <div id="ac-sedena-group">
-          <div class="form-group">
-            <label>Núm. licencia SEDENA <span style="font-weight:400;color:var(--text-muted)">(portación de arma)</span></label>
-            <input type="text" id="ac-num-sedena" placeholder="Ej. SEDENA-2024-00001">
-          </div>
-          <div class="form-group">
-            <label>Vencimiento licencia SEDENA</label>
-            <input type="date" id="ac-vence-sedena">
-          </div>
-          <div class="form-group">
-            <label>Documento licencia SEDENA</label>
-            <label class="file-upload-area" for="ac-doc-sedena">
-              <span class="file-upload-icon">📄</span>
-              <span class="file-upload-text">PDF o imagen</span>
-            </label>
-            <input type="file" id="ac-doc-sedena" accept="image/*,.pdf" style="display:none"
-                   onchange="previewDocNombre(this,'ac-doc-sedena-preview')">
-            <div id="ac-doc-sedena-preview"></div>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Disponibilidad</label>
-          <select id="ac-disp">
-            <option value="24/7">24/7</option>
-            <option value="Días hábiles">Días hábiles</option>
-            <option value="Fines de semana">Fines de semana</option>
-            <option value="Bajo demanda">Bajo demanda</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Precio por día (MXN)</label>
-          <input type="number" id="ac-precio" placeholder="Ej. 1800">
-        </div>
-        <div class="form-group sa-empresa-row" style="display:none">
-          <label>Empresa propietaria</label>
-          <select id="sa-empresa-custodio"><option value="">— Selecciona empresa —</option></select>
-        </div>
-        <button class="btn-add" id="btn-agregar-custodio" onclick="agregarCustodio()">➕ Agregar custodio</button>
-      </div>
-      <div class="admin-card">
-        <h3>👮 Custodios registrados</h3>
-        <div class="truck-list-admin" id="admin-custodios-list"></div>
-      </div>
-    </div>
-    </div><!-- /admin-content-custodio -->
-
-    <!-- ── TAB: PATIOS ── -->
-    <div id="admin-content-patio" style="display:none">
-    <div class="admin-grid">
-      <div class="admin-card">
-        <h3>➕ Agregar patio</h3>
-        <div class="form-group">
-          <label>Nombre del patio</label>
-          <input type="text" id="ap-nombre" placeholder="Ej. Patio Techado Norte">
-        </div>
-        <div class="form-group">
-          <label>Tipo</label>
-          <select id="ap-tipo">
-            <option value="Techado">Techado</option>
-            <option value="Abierto">Abierto</option>
-            <option value="Refrigerado">Refrigerado</option>
-            <option value="Especializado">Especializado</option>
-            <option value="Bodega">Bodega</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Ubicación</label>
-          <input type="text" id="ap-ubic" placeholder="Ej. Blvd. Costero Norte Km 4, Manzanillo">
-        </div>
-        <div class="form-group">
-          <label>Área (m²)</label>
-          <input type="number" id="ap-area" placeholder="Ej. 4200">
-        </div>
-        <div class="form-group">
-          <label>Capacidad de vehículos</label>
-          <input type="number" id="ap-cap" placeholder="Ej. 18">
-        </div>
-        <div class="form-group">
-          <label>Servicios <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
-          <input type="text" id="ap-svcs" placeholder="Ej. Vigilancia 24/7, Rampa de carga, Báscula">
-        </div>
-        <div class="form-group">
-          <label>Precio por día (MXN)</label>
-          <input type="number" id="ap-precio" placeholder="Ej. 3500">
-        </div>
-        <div class="form-group">
-          <label>Vencimiento del permiso operativo</label>
-          <input type="date" id="ap-vence-permiso">
-        </div>
-        <div class="form-group">
-          <label>Permiso operativo — documento</label>
-          <label class="file-upload-area" for="ap-doc-permiso">
-            <span class="file-upload-icon">📄</span>
-            <span class="file-upload-text">PDF o imagen</span>
-          </label>
-          <input type="file" id="ap-doc-permiso" accept="image/*,.pdf" style="display:none"
-                 onchange="previewDocNombre(this,'ap-doc-permiso-preview')">
-          <div id="ap-doc-permiso-preview"></div>
-        </div>
-        <div class="form-group sa-empresa-row" style="display:none">
-          <label>Empresa propietaria</label>
-          <select id="sa-empresa-patio"><option value="">— Selecciona empresa —</option></select>
-        </div>
-        <button class="btn-add" id="btn-agregar-patio" onclick="agregarPatio()">➕ Agregar patio</button>
-      </div>
-      <div class="admin-card">
-        <h3>🏭 Patios registrados</h3>
-        <div class="truck-list-admin" id="admin-patios-list"></div>
-      </div>
-    </div>
-    </div><!-- /admin-content-patio -->
-
-    <!-- ── TAB: LAVADO ── -->
-    <div id="admin-content-lavado" style="display:none">
-    <div class="admin-grid">
-      <div class="admin-card">
-        <h3>➕ Agregar servicio de lavado</h3>
-        <div class="form-group">
-          <label>Nombre del servicio</label>
-          <input type="text" id="al-nombre" placeholder="Ej. Lavado Express Norte">
-        </div>
-        <div class="form-group">
-          <label>Tipos de vehículo que lavan <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
-          <input type="text" id="al-tipos-vehiculo" placeholder="Ej. Tractocamión, Remolque, Contenedor, Pick-up">
-        </div>
-        <div class="form-group">
-          <label>Tipos de lavado que ofrecen <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
-          <input type="text" id="al-tipos-lavado" placeholder="Ej. Lavado exterior, Lavado interior, Lavado de motor, Desinfección">
-        </div>
-        <div class="form-group">
-          <label>Capacidad simultánea de vehículos</label>
-          <input type="number" id="al-capacidad" placeholder="Ej. 4" min="1">
-        </div>
-        <div class="form-group">
-          <label>Ubicación</label>
-          <input type="text" id="al-ubic" placeholder="Ej. Blvd. Miguel de la Madrid Km 8, Manzanillo">
-        </div>
-        <div class="form-group">
-          <label>Horario de atención</label>
-          <input type="text" id="al-horario" placeholder="Ej. Lun–Sáb 07:00–19:00">
-        </div>
-        <div class="form-group">
-          <label>Precio base por lavado (MXN)</label>
-          <input type="number" id="al-precio" placeholder="Ej. 800" min="0">
-        </div>
-        <div class="form-group">
-          <label>Descripción / servicios adicionales</label>
-          <textarea id="al-desc" rows="2" placeholder="Detalles adicionales del servicio..."></textarea>
-        </div>
-        <div class="form-group sa-empresa-row" style="display:none">
-          <label>Empresa propietaria</label>
-          <select id="sa-empresa-lavado"><option value="">— Selecciona empresa —</option></select>
-        </div>
-        <button class="btn-add" id="btn-agregar-lavado" onclick="agregarLavado()">➕ Agregar servicio</button>
-      </div>
-      <div class="admin-card">
-        <h3>🚿 Servicios de lavado registrados</h3>
-        <div class="truck-list-admin" id="admin-lavados-list"></div>
-      </div>
-    </div>
-    </div><!-- /admin-content-lavado -->
-
-    <!-- ── TAB: OPERADORES ── -->
-    <div id="admin-content-operador" style="display:none">
-    <div class="admin-grid">
-      <div class="admin-card">
-        <h3>➕ Agregar operador</h3>
-
-        <div class="op-form-section">
-          <div class="op-form-section-title">Datos personales</div>
-        </div>
-        <div class="form-group">
-          <label>Nombre *</label>
-          <input type="text" id="op-nombre" placeholder="Nombre(s)">
-        </div>
-        <div class="form-group">
-          <label>Primer apellido</label>
-          <input type="text" id="op-apellido1" placeholder="Primer apellido">
-        </div>
-        <div class="form-group">
-          <label>Segundo apellido</label>
-          <input type="text" id="op-apellido2" placeholder="Segundo apellido">
-        </div>
-        <div class="form-group">
-          <label>Sexo</label>
-          <select id="op-sexo">
-            <option value="">— Sin especificar —</option>
-            <option>Masculino</option>
-            <option>Femenino</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>CURP</label>
-          <input type="text" id="op-curp" placeholder="CURP" maxlength="18" style="text-transform:uppercase">
-        </div>
-        <div class="form-group">
-          <label>RFC</label>
-          <input type="text" id="op-rfc" placeholder="RFC" style="text-transform:uppercase">
-        </div>
-        <div class="form-group">
-          <label>NSS</label>
-          <input type="text" id="op-nss" placeholder="Núm. Seguro Social">
-        </div>
-        <div class="form-group">
-          <label>Tipo sanguíneo</label>
-          <select id="op-sangre">
-            <option value="">— Sin especificar —</option>
-            <option>A+</option><option>A-</option>
-            <option>B+</option><option>B-</option>
-            <option>AB+</option><option>AB-</option>
-            <option>O+</option><option>O-</option>
-          </select>
-        </div>
-
-        <div class="op-form-section">
-          <div class="op-form-section-title">Datos laborales</div>
-        </div>
-        <div class="form-group" style="display:none">
-          <label>Número de trabajador</label>
-          <input type="text" id="op-num-trabajador" placeholder="Ej. EMP-001">
-        </div>
-        <div class="form-group">
-          <label>Nivel de estudio</label>
-          <select id="op-nivel-estudio">
-            <option value="">— Sin especificar —</option>
-            <option>Primaria</option>
-            <option>Secundaria</option>
-            <option>Preparatoria</option>
-            <option>Técnico</option>
-            <option>Licenciatura</option>
-            <option>Posgrado</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Área</label>
-          <input type="text" id="op-area" placeholder="Ej. Operaciones">
-        </div>
-        <div class="form-group">
-          <label>Puesto</label>
-          <input type="text" id="op-puesto" placeholder="Ej. Operador de camión">
-        </div>
-        <div class="form-group">
-          <label>Correo electrónico</label>
-          <input type="email" id="op-correo" placeholder="correo@empresa.com">
-        </div>
-        <div class="form-group">
-          <label>Teléfono</label>
-          <input type="tel" id="op-telefono" placeholder="Ej. 612 123 4567">
-        </div>
-        <div class="form-group">
-          <label>Fecha examen médico</label>
-          <input type="date" id="op-examen">
-        </div>
-        <div class="form-group">
-          <label>Documento — examen médico *</label>
-          <label class="file-upload-area" for="op-doc-medico">
-            <span class="file-upload-icon">📄</span>
-            <span class="file-upload-text">PDF o imagen</span>
-          </label>
-          <input type="file" id="op-doc-medico" accept="image/*,.pdf" style="display:none"
-                 onchange="previewDocNombre(this,'op-doc-medico-preview')">
-          <div id="op-doc-medico-preview"></div>
-        </div>
-        <div class="form-group">
-          <label>Fecha examen toxicológico <span style="font-weight:400;color:var(--text-muted)">(NOM-087)</span></label>
-          <input type="date" id="op-examen-tox">
-        </div>
-        <div class="form-group">
-          <label>Documento — examen toxicológico *</label>
-          <label class="file-upload-area" for="op-doc-tox">
-            <span class="file-upload-icon">📄</span>
-            <span class="file-upload-text">PDF o imagen</span>
-          </label>
-          <input type="file" id="op-doc-tox" accept="image/*,.pdf" style="display:none"
-                 onchange="previewDocNombre(this,'op-doc-tox-preview')">
-          <div id="op-doc-tox-preview"></div>
-        </div>
-        <div class="form-group">
-          <label>Fecha carta de no antecedentes penales</label>
-          <input type="date" id="op-antecedentes">
-        </div>
-        <div class="form-group">
-          <label>Documento — carta de no antecedentes *</label>
-          <label class="file-upload-area" for="op-doc-antecedentes">
-            <span class="file-upload-icon">📄</span>
-            <span class="file-upload-text">PDF o imagen</span>
-          </label>
-          <input type="file" id="op-doc-antecedentes" accept="image/*,.pdf" style="display:none"
-                 onchange="previewDocNombre(this,'op-doc-antecedentes-preview')">
-          <div id="op-doc-antecedentes-preview"></div>
-        </div>
-
-        <div class="op-form-section">
-          <div class="op-form-section-title">Licencia de conducir</div>
-        </div>
-        <div class="form-group">
-          <label>Número de licencia</label>
-          <input type="text" id="op-num-licencia" placeholder="Núm. de licencia">
-        </div>
-        <div class="form-group">
-          <label>Clase de licencia</label>
-          <select id="op-clase-licencia">
-            <option value="">— Sin especificar —</option>
-            <option>A</option><option>B</option><option>C</option>
-            <option>D</option><option>E</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Tipo de licencia</label>
-          <select id="op-tipo-licencia">
-            <option value="">— Sin especificar —</option>
-            <option>Federal</option>
-            <option>Estatal</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Fecha de expedición</label>
-          <input type="date" id="op-fecha-expedicion">
-        </div>
-        <div class="form-group">
-          <label>Fecha de vencimiento</label>
-          <input type="date" id="op-fecha-vencimiento">
-        </div>
-        <div class="form-group">
-          <label>Foto de la licencia *</label>
-          <label class="file-upload-area" for="op-lic-file">
-            <span class="file-upload-icon">🪪</span>
-            <span class="file-upload-text">Seleccionar imagen</span>
-          </label>
-          <input type="file" id="op-lic-file" accept="image/*,.pdf" style="display:none"
-                 onchange="opFotoPreview(this,'op-lic-preview')">
-          <div id="op-lic-preview"></div>
-        </div>
-
-        <div class="op-form-section">
-          <div class="op-form-section-title">Foto del operador</div>
-        </div>
-        <div class="form-group">
-          <label class="file-upload-area" for="op-foto-file">
-            <span class="file-upload-icon">📷</span>
-            <span class="file-upload-text">Seleccionar foto</span>
-          </label>
-          <input type="file" id="op-foto-file" accept="image/*" style="display:none"
-                 onchange="opFotoPreview(this,'op-foto-preview')">
-          <div id="op-foto-preview"></div>
-        </div>
-
-        <div class="form-group sa-empresa-row" style="display:none">
-          <label>Empresa propietaria</label>
-          <select id="sa-empresa-operador" onchange="onCambioEmpresaOperador()"><option value="">— Selecciona empresa —</option></select>
-        </div>
-        <div style="display:flex;gap:10px;margin-top:4px">
-          <button class="btn-add" onclick="agregarOperador()" style="flex:1">Enviar a aprobación</button>
-          <button class="btn-cancel" onclick="closeAgregarOperador()" style="flex:0 0 auto">Limpiar</button>
-        </div>
-      </div>
-
-      <div class="admin-card">
-        <h3>👷 Operadores registrados</h3>
-        <div id="admin-operadores-list"></div>
-      </div>
-    </div>
-    </div><!-- /admin-content-operador -->
-
-    <!-- Pendientes de aprobación — solo superadmin -->
-    <div id="pendientes-section" style="display:none; margin-top:24px">
-      <div class="section-title">⏳ Unidades pendientes de aprobación</div>
-      <div class="admin-card">
-        <div class="truck-list-admin" id="pendientes-list"></div>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<!-- ══ VISTA: PENDIENTES (solo superadmin) ════════════ -->
-<div id="view-pendientes" class="view">
-  <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
-    <div class="section-title">⏳ Pendientes de aprobación</div>
-    <div id="aprobaciones-section">
-      <div id="aprobaciones-content"></div>
     </div>
   </div>
 </div>
 
-<!-- ══ VISTA: VIGENCIAS (admin + superadmin) ══════════ -->
-<div id="view-vigencias" class="view">
-  <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
-    <div class="section-title">📅 Vigencias y vencimientos</div>
-    <div id="vigencias-content"></div>
-  </div>
-</div>
-
-<!-- ══ VISTA: USUARIOS (solo superadmin) ══════════════ -->
-<!-- ══ VISTA: REPORTES ═════════════════════════════════ -->
-<div id="view-reportes" class="view">
-  <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
-    <div class="section-title">📊 Reportes del sistema</div>
-    <div class="rep-date-filter">
-      <label>Desde</label>
-      <input type="date" id="rep-fecha-desde">
-      <label>Hasta</label>
-      <input type="date" id="rep-fecha-hasta">
-      <button class="btn-apr-batch" onclick="renderReportes()">Aplicar</button>
-    </div>
-    <div id="reportes-content"></div>
-  </div>
-</div>
-
-<!-- ══ VISTA: MIS STATS (admin) ════════════════════════ -->
-<div id="view-mis-stats" class="view">
-  <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
-    <div class="section-title">📈 Mi desempeño</div>
-    <div id="mis-stats-content"></div>
-  </div>
-</div>
-
-<!-- ══ VISTA: HISTORIAL RESERVAS (superadmin) ══════════ -->
-<div id="view-historial-reservas" class="view">
-  <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
-    <div class="section-title">🗃 Historial de reservaciones archivadas</div>
-    <div id="historial-reservas-content"></div>
-  </div>
-</div>
-
-<div id="view-usuarios" class="view">
-  <div class="page">
-    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
-    <div class="section-title">Gestión de Usuarios</div>
-    <div class="admin-grid">
-
-      <div class="admin-card">
-        <h3>➕ Crear usuario</h3>
-        <div class="form-group">
-          <label>Nombre completo</label>
-          <input type="text" id="nu-nombre" placeholder="Ej. María López">
-        </div>
-        <div class="form-group">
-          <label>Correo electrónico</label>
-          <input type="email" id="nu-email" placeholder="correo@empresa.com">
-        </div>
-        <div class="form-group">
-          <label>Contraseña temporal</label>
-          <input type="password" id="nu-pass" placeholder="Mínimo 8 caracteres">
-        </div>
-        <div class="form-group">
-          <label>Rol</label>
-          <select id="nu-rol">
-            <option value="admin">Admin (ve panel de administración)</option>
-            <option value="cliente">Cliente (solo disponibilidad y reservas)</option>
-          </select>
-        </div>
-        <button class="btn-add" onclick="crearUsuario()">Crear usuario</button>
-      </div>
-
-      <div class="admin-card">
-        <h3>👥 Usuarios registrados</h3>
-        <div class="truck-list-admin" id="usuarios-list">
-          <div class="empty-state"><div class="icon">⏳</div>Cargando...</div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL EDITAR USUARIO ════════════════════════════ -->
-<div class="modal-overlay" id="modal-editar-usuario">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>Editar usuario</h2>
-      <button class="modal-close" onclick="cerrarEditarUsuario()">✕</button>
-    </div>
-    <input type="hidden" id="eu-id">
-    <div class="form-group">
-      <label>Nombre completo</label>
-      <input type="text" id="eu-nombre" placeholder="Nombre del usuario">
-    </div>
-    <div class="form-group">
-      <label>Correo electrónico</label>
-      <input type="email" id="eu-email" placeholder="correo@ejemplo.com">
-    </div>
-    <div class="form-group">
-      <label>Nueva contraseña <span style="color:var(--text-muted);font-size:0.8rem">(dejar vacío para no cambiar)</span></label>
-      <input type="password" id="eu-pass" placeholder="Mínimo 8 caracteres">
-    </div>
-    <div class="form-group">
-      <label>Rol</label>
-      <select id="eu-rol">
-        <option value="superadmin">⭐ Superadmin</option>
-        <option value="admin">🔧 Admin</option>
-        <option value="cliente">👤 Cliente</option>
-      </select>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:16px">
-      <button class="btn-add" style="flex:1" onclick="guardarEdicionUsuario()">Guardar cambios</button>
-      <button class="btn-edit" style="flex:1" onclick="cerrarEditarUsuario()">Cancelar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL RESERVA ═══════════════════════════════════ -->
-<div class="modal-overlay" id="modal-reserva">
-  <div class="modal">
-    <h2>Agendar unidad</h2>
-    <p class="sub" id="modal-truck-name">Camión seleccionado</p>
-    <div class="form-group">
-      <label>Nombre / Empresa</label>
-      <input type="text" id="res-nombre" placeholder="Tu nombre o empresa">
-    </div>
-    <div class="form-group">
-      <label>Correo electrónico <span style="color:var(--text-muted);font-weight:400">(para recibir confirmación)</span></label>
-      <input type="email" id="res-email" placeholder="correo@ejemplo.com">
-    </div>
-    <div class="form-group">
-      <label>Teléfono de contacto</label>
-      <input type="tel" id="res-tel" placeholder="+52 999 000 0000">
-    </div>
-    <div class="form-group">
-      <label>Fecha de inicio</label>
-      <input type="date" id="res-fecha-ini">
-    </div>
-    <div class="form-group">
-      <label>Fecha de fin</label>
-      <input type="date" id="res-fecha-fin">
-    </div>
-    <div class="form-group">
-      <label>Descripción de la carga</label>
-      <textarea id="res-desc" rows="3" placeholder="Tipo de mercancía, origen, destino..."></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
-      <button class="btn-confirm" onclick="confirmarReserva()">Confirmar reserva</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL DETALLE CAMIÓN ════════════════════════════ -->
-<div class="modal-overlay" id="modal-detalle">
-  <div class="modal">
-    <div class="detalle-header">
-      <div class="detalle-titulo" id="detalle-titulo"></div>
-      <div class="detalle-empresa-header" id="detalle-empresa-header"></div>
-      <div class="detalle-tabs">
-        <button class="detalle-tab active" data-tab="unidad"     onclick="switchDetalleTab('unidad')">📦 Unidad</button>
-        <button class="detalle-tab"        data-tab="empresa"    onclick="switchDetalleTab('empresa')">🏢 Empresa</button>
-        <button class="detalle-tab"        data-tab="calendario" onclick="switchDetalleTab('calendario')">📅 Disponibilidad</button>
+<!-- PARA CLIENTES -->
+<section class="sec">
+  <div class="split reverse">
+    <div class="ph" style="height:420px;"><span class="ph-label">[ Captura: comparador de ofertas ]</span></div>
+    <div>
+      <span class="pill"><i data-lucide="package" width="15" height="15"></i> Para clientes</span>
+      <h2 class="h2" style="font-size:34px; line-height:1.12; margin:20px 0 18px;">Deja de perseguir cotizaciones por WhatsApp</h2>
+      <p class="lead" style="margin-bottom:26px;">Importadores y agentes aduanales encuentran transporte confiable en minutos, con la certeza de que cada empresa está auditada.</p>
+      <div class="feat-list">
+        <div class="feat"><span class="feat-ico"><i data-lucide="shield-check" width="16" height="16"></i></span><div><div class="feat-t">Empresas con permisos SCT y seguros vigentes</div><div class="feat-d">Verificamos documentación antes de que aparezcan.</div></div></div>
+        <div class="feat"><span class="feat-ico"><i data-lucide="layers" width="16" height="16"></i></span><div><div class="feat-t">Ofertas comparables, no promesas</div><div class="feat-d">Precio, unidad y tiempos en un solo panel.</div></div></div>
+        <div class="feat"><span class="feat-ico"><i data-lucide="message-square" width="16" height="16"></i></span><div><div class="feat-t">Chat y rastreo integrados</div><div class="feat-d">Toda la conversación y el seguimiento en un lugar.</div></div></div>
       </div>
     </div>
-    <div class="detalle-body" id="detalle-body">
-      <div id="detalle-loading">Cargando...</div>
-      <div id="detalle-content" style="display:none"></div>
-    </div>
-    <div class="detalle-footer">
-      <button class="btn-cancel" onclick="closeDetalle()">Cerrar</button>
-      <button class="btn-confirm" id="btn-detalle-agendar" onclick="detalleAgendar()">Agendar esta unidad</button>
-    </div>
   </div>
-</div>
+</section>
 
-<!-- ══ MODAL SEGUIMIENTO ═══════════════════════════════ -->
-<div class="modal-overlay" id="modal-tracking">
-  <div class="modal">
-    <h2>Seguimiento de reserva</h2>
-    <div class="tracking-info" id="tracking-reserva-info"></div>
-    <div class="tracking-stepper" id="tracking-steps"></div>
-    <button class="btn-avanzar" id="tracking-btn-avanzar" onclick="avanzarTracking()"></button>
-    <div class="modal-actions" style="margin-top:14px">
-      <button class="btn-confirm" onclick="closeTracking()">Cerrar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL NUEVO PEDIDO ══════════════════════════════ -->
-<div class="modal-overlay" id="modal-nuevo-pedido">
-  <div class="modal modal-np">
-    <!-- Cabecera fija con X -->
-    <div class="modal-np-header">
+<!-- PARA TRANSPORTISTAS -->
+<div class="teal-sec" id="transportistas">
+  <div class="sec">
+    <div class="split">
       <div>
-        <h2 style="margin:0">📋 Nueva solicitud</h2>
-        <p class="sub" style="margin:4px 0 0">Completa los datos para que los proveedores puedan enviarte su mejor oferta.</p>
+        <span class="pill" style="background:rgba(255,255,255,.16); color:#fff;"><i data-lucide="truck" width="15" height="15"></i> Para transportistas</span>
+        <h2 class="h2" style="font-size:34px; line-height:1.12; margin:20px 0 18px;">Más viajes para tu flota, sin comisiones ocultas</h2>
+        <p class="lead" style="margin-bottom:26px;">Recibe pedidos que sí encajan con tus unidades y construye reputación con cada entrega cumplida.</p>
+        <div class="feat-list">
+          <div class="feat"><span class="feat-ico"><i data-lucide="filter" width="16" height="16"></i></span><div><div class="feat-t">Pedidos filtrados por zona y tipo de unidad</div><div class="feat-d">Solo ves lo que tu flota puede atender.</div></div></div>
+          <div class="feat"><span class="feat-ico"><i data-lucide="clipboard-list" width="16" height="16"></i></span><div><div class="feat-t">Gestiona flota, operadores y documentos</div><div class="feat-d">Vigencias y aprobaciones en un solo tablero.</div></div></div>
+          <div class="feat"><span class="feat-ico"><i data-lucide="star" width="16" height="16"></i></span><div><div class="feat-t">Reputación con calificaciones reales</div><div class="feat-d">Cada servicio cumplido suma a tu perfil.</div></div></div>
+        </div>
+        <a class="btn btn-lg" href="app.html" style="background:#fff; color:var(--teal); margin-top:30px;">Registrar mi empresa <i data-lucide="arrow-right" width="17" height="17"></i></a>
       </div>
-      <button class="modal-close-x" onclick="closeNuevoPedido()" title="Cerrar">✕</button>
+      <div class="ph ph-dark" style="height:420px;"><span class="ph-label">[ Captura: panel de flota del transportista ]</span></div>
     </div>
-    <!-- Cuerpo scrolleable -->
-    <div class="modal-np-body">
+  </div>
+</div>
 
-    <!-- Banner de categoría seleccionada (se muestra al abrir desde botón) -->
-    <div id="np-categoria-banner" style="display:none" class="np-cat-banner"></div>
+<!-- SERVICIOS -->
+<section class="sec" id="servicios">
+  <div style="text-align:center; margin-bottom:46px;">
+    <div class="eyebrow">Servicios</div>
+    <h2 class="h2">Todo lo que mueve tu carga, en un lugar</h2>
+  </div>
+  <div class="services">
+    <div class="svc"><div class="svc-ico"><i data-lucide="truck" width="26" height="26"></i></div><div class="svc-t">Camiones</div><div class="svc-d">Desde camioneta de 1.5 ton hasta full y plataformas especiales (lowboy, HAZMAT).</div></div>
+    <div class="svc"><div class="svc-ico"><i data-lucide="shield-check" width="26" height="26"></i></div><div class="svc-t">Custodia</div><div class="svc-d">Armada, motorizada o K9, con licencia SEDENA y certificaciones vigentes.</div></div>
+    <div class="svc"><div class="svc-ico"><i data-lucide="warehouse" width="26" height="26"></i></div><div class="svc-t">Patios</div><div class="svc-d">Techados, refrigerados y bodegas con vigilancia 24/7 y báscula.</div></div>
+    <div class="svc"><div class="svc-ico"><i data-lucide="droplets" width="26" height="26"></i></div><div class="svc-t">Lavado</div><div class="svc-d">Lavado exterior, interior, de motor y desinfección de unidades y contenedores.</div></div>
+  </div>
+</section>
 
-    <!-- Tipo de servicio -->
-    <div class="form-group">
-      <label>Tipo de servicio *</label>
-      <select id="np-tipo" onchange="actualizarSubtipoPedido()"></select>
+<!-- POR QUÉ VERIFICADOS -->
+<div class="band">
+  <div class="sec-72">
+    <div class="split">
+      <div>
+        <div class="eyebrow">Confianza</div>
+        <h2 class="h2" style="font-size:34px; line-height:1.12; margin-bottom:16px;">Verificados de verdad, no solo "registrados"</h2>
+        <p class="lead" style="line-height:1.62;">Cada empresa y unidad pasa por una revisión documental antes de operar. Si un permiso o seguro vence, la unidad se marca automáticamente.</p>
+      </div>
+      <div class="trust-list">
+        <div class="trust-item"><span style="color:var(--teal);"><i data-lucide="file-check" width="24" height="24"></i></span><div><div class="ti-t">Permisos SCT y CAAT validados</div><div class="ti-d">Documentación revisada por nuestro equipo.</div></div></div>
+        <div class="trust-item"><span style="color:var(--teal);"><i data-lucide="shield" width="24" height="24"></i></span><div><div class="ti-t">Seguros de RC y de carga vigentes</div><div class="ti-d">Cobertura comprobada en cada servicio.</div></div></div>
+        <div class="trust-item"><span style="color:var(--teal);"><i data-lucide="user-check" width="24" height="24"></i></span><div><div class="ti-t">Operadores con exámenes y antecedentes</div><div class="ti-d">Médico, toxicológico (NOM-087) y licencia.</div></div></div>
+      </div>
     </div>
-    <!-- Info de capacidad — aparece al seleccionar tipo camión -->
-    <div id="np-info-cap" style="display:none;margin-bottom:12px"></div>
+  </div>
+</div>
 
-    <!-- ══ CAMPOS CAMIÓN ═══════════════════════════════ -->
-    <div id="np-group-camion">
-      <div class="np-section-title">📦 Información de la carga</div>
-      <div class="admin-grid" style="gap:12px">
-        <div class="form-group" id="np-cap-group">
-          <label>Capacidad mínima requerida (ton)</label>
-          <input type="number" id="np-cap" min="0" placeholder="Ej. 20">
-        </div>
-        <div class="form-group" id="np-carga-group">
-          <label>Tipo de carga *</label>
-          <input type="text" id="np-carga" placeholder="Ej. Electrónicos, Maquinaria pesada">
-        </div>
-        <div class="form-group">
-          <label>Peso real de la carga (ton)</label>
-          <input type="number" id="np-peso" min="0" step="0.1" placeholder="Ej. 15.5">
-        </div>
-        <div class="form-group">
-          <label>Número de bultos / pallets</label>
-          <input type="number" id="np-bultos" min="0" placeholder="Ej. 48">
-        </div>
-        <div class="form-group">
-          <label>Tipo de contenedor <span style="font-weight:400;color:var(--text-muted)">(si aplica)</span></label>
-          <select id="np-contenedor">
-            <option value="">— No aplica —</option>
-            <option>20' Standard</option>
-            <option>40' Standard</option>
-            <option>40' High Cube</option>
-            <option>20' Refrigerado (Reefer)</option>
-            <option>40' Refrigerado (Reefer)</option>
-            <option>Open Top</option>
-            <option>Flat Rack</option>
-            <option>Tank Container</option>
-          </select>
+<!-- APP PREVIEW -->
+<div class="app-sec">
+  <div class="sec">
+    <div style="text-align:center; color:#d6f0ec; margin-bottom:50px;">
+      <div class="eyebrow" style="color:#5ec5b8;">La aplicación</div>
+      <h2 class="h2" style="color:#fff;">Tu operación, en una sola pantalla</h2>
+    </div>
+    <div class="phones">
+      <div class="phone">
+        <div class="phone-notch"><span></span></div>
+        <div class="phone-body">
+          <div class="pa-top">
+            <div style="display:flex; align-items:center; gap:7px;"><span style="width:26px; height:26px; border-radius:50%; background:var(--teal); display:flex; align-items:center; justify-content:center; color:#fff;"><i data-lucide="anchor" width="14" height="14"></i></span><span style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px;">PortGo</span></div>
+            <i data-lucide="bell" width="19" height="19" style="color:var(--muted2);"></i>
+          </div>
+          <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:20px; margin-bottom:3px;">Hola, Carlos</div>
+          <div style="font-size:13px; color:var(--muted2); margin-bottom:18px;">¿Qué quieres mover hoy?</div>
+          <div class="pa-grid">
+            <div class="pa-tile"><div class="pa-tile-ico"><i data-lucide="truck" width="24" height="24"></i></div><div style="font-weight:600; font-size:13.5px;">Camión</div></div>
+            <div class="pa-tile"><div class="pa-tile-ico"><i data-lucide="shield-check" width="24" height="24"></i></div><div style="font-weight:600; font-size:13.5px;">Custodia</div></div>
+            <div class="pa-tile"><div class="pa-tile-ico"><i data-lucide="warehouse" width="24" height="24"></i></div><div style="font-weight:600; font-size:13.5px;">Patio</div></div>
+            <div class="pa-tile"><div class="pa-tile-ico"><i data-lucide="droplets" width="24" height="24"></i></div><div style="font-weight:600; font-size:13.5px;">Lavado</div></div>
+          </div>
+          <div class="pa-pub">Publicar pedido <i data-lucide="arrow-right" width="16" height="16"></i></div>
         </div>
       </div>
-      <div class="np-check-row">
-        <label class="np-check"><input type="checkbox" id="np-peligrosa"> Carga peligrosa / materiales peligrosos</label>
-        <label class="np-check"><input type="checkbox" id="np-temp"> Requiere temperatura controlada</label>
-        <label class="np-check"><input type="checkbox" id="np-seguro"> Requiere seguro de carga</label>
-        <label class="np-check"><input type="checkbox" id="np-factura"> Requiere factura</label>
-      </div>
-
-      <div class="np-section-title">🗺️ Ruta</div>
-      <div class="admin-grid" style="gap:12px">
-        <div class="form-group">
-          <label>Origen — ciudad y dirección *</label>
-          <input type="text" id="np-origen" placeholder="Ej. Guadalajara, Av. Industria 450">
-        </div>
-        <div class="form-group">
-          <label>Destino — ciudad y dirección *</label>
-          <input type="text" id="np-destino" placeholder="Ej. CDMX, Bodega Industrial Norte">
-        </div>
-        <div class="form-group">
-          <label>Fecha de carga *</label>
-          <input type="date" id="np-fecha-ini">
-        </div>
-        <div class="form-group">
-          <label>Hora estimada de carga</label>
-          <input type="time" id="np-hora">
-        </div>
-        <div class="form-group">
-          <label>Fecha de entrega estimada</label>
-          <input type="date" id="np-fecha-fin">
-        </div>
-      </div>
-
-      <div class="np-section-title">📞 Contacto en origen</div>
-      <div class="admin-grid" style="gap:12px">
-        <div class="form-group">
-          <label>Nombre del contacto</label>
-          <input type="text" id="np-contacto-nombre" placeholder="Ej. Juan Pérez">
-        </div>
-        <div class="form-group">
-          <label>Teléfono del contacto</label>
-          <input type="tel" id="np-contacto-tel" placeholder="Ej. 33 1234 5678">
+      <div class="phone" style="margin-top:26px;">
+        <div class="phone-notch"><span></span></div>
+        <div class="phone-body">
+          <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; margin-bottom:14px;">Mis pedidos</div>
+          <div class="pa-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><span style="font-weight:700; font-size:14px;">Contenedor 40' · CDMX</span><span style="font-size:11px; font-weight:600; color:var(--teal); background:var(--teal-soft); padding:3px 9px; border-radius:999px;">3 ofertas</span></div>
+            <div style="font-size:12.5px; color:var(--muted2); margin-bottom:11px;">Torton · Sale mañana 8:00</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:11px; border-top:1px solid #f0ece2;"><span style="font-size:12.5px; color:var(--muted2);">Mejor oferta</span><span style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px;">$8,400 MXN</span></div>
+          </div>
+          <div class="pa-card" style="margin-bottom:0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><span style="font-weight:700; font-size:14px;">Plataforma · Guadalajara</span><span style="font-size:11px; font-weight:600; color:var(--coral); background:var(--coral-soft); padding:3px 9px; border-radius:999px;">En tránsito</span></div>
+            <div style="font-size:12.5px; color:var(--muted2);">Full · Llega en ~14 h</div>
+          </div>
         </div>
       </div>
     </div>
+  </div>
+</div>
 
-    <!-- ══ CAMPOS CUSTODIO ════════════════════════════════ -->
-    <div id="np-group-custodio" style="display:none">
-      <div class="np-section-title">👮 Detalles del servicio de custodia</div>
-      <div class="admin-grid" style="gap:12px">
-        <div class="form-group">
-          <label>Número de custodios requeridos *</label>
-          <input type="number" id="np-num-custodios" min="1" placeholder="Ej. 2">
-        </div>
-        <div class="form-group">
-          <label>Zona / lugar de cobertura *</label>
-          <input type="text" id="np-zona" placeholder="Ej. Ruta Guadalajara–CDMX">
-        </div>
-        <div class="form-group">
-          <label>Fecha de inicio *</label>
-          <input type="date" id="np-fecha-ini-cust">
-        </div>
-        <div class="form-group">
-          <label>Fecha de fin</label>
-          <input type="date" id="np-fecha-fin-cust">
-        </div>
-        <div class="form-group" style="grid-column:span 2">
-          <label>Horario de servicio</label>
-          <input type="text" id="np-horario" placeholder="Ej. Lunes a Viernes 08:00–20:00">
-        </div>
+<!-- FAQ -->
+<section class="sec faq-wrap" id="faq" style="max-width:920px;">
+  <div style="text-align:center; margin-bottom:46px;">
+    <div class="eyebrow">Preguntas frecuentes</div>
+    <h2 class="h2">Lo que necesitas saber</h2>
+  </div>
+  <div class="faq">
+    <div class="faq-item"><div class="faq-q"><span>¿Cuánto cuesta publicar un pedido?</span><i data-lucide="plus" width="20" height="20" style="color:var(--teal);"></i></div><p class="faq-a">Publicar es gratis. Solo pagas el servicio de transporte que acuerdes con la empresa que elijas.</p></div>
+    <div class="faq-item"><div class="faq-q"><span>¿Cómo sé que una empresa es confiable?</span><i data-lucide="plus" width="20" height="20" style="color:var(--teal);"></i></div><p class="faq-a">Toda empresa pasa por verificación de permisos SCT, seguros y documentación antes de aparecer. Además puedes ver sus calificaciones reales.</p></div>
+    <div class="faq-item"><div class="faq-q"><span>¿Puedo negociar el precio de una oferta?</span><i data-lucide="plus" width="20" height="20" style="color:var(--teal);"></i></div><p class="faq-a">Sí. Puedes hacer una contraoferta y negociar en rondas hasta llegar a un acuerdo, todo dentro de la plataforma.</p></div>
+    <div class="faq-item"><div class="faq-q"><span>Soy transportista, ¿cómo me registro?</span><i data-lucide="plus" width="20" height="20" style="color:var(--teal);"></i></div><p class="faq-a">Crea tu cuenta de empresa, sube tus documentos legales y tus unidades. Una vez aprobados, empezarás a recibir pedidos de tu zona.</p></div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-sec">
+  <div class="sec cta-inner">
+    <h2>El puerto se mueve. Muévete con él.</h2>
+    <p>Crea tu cuenta gratis y publica tu primer pedido en minutos.</p>
+    <div class="cta-actions">
+      <a class="btn btn-lg" href="app.html" style="background:#fff; color:var(--teal); font-size:17px;">Necesito mover carga <i data-lucide="arrow-right" width="18" height="18"></i></a>
+      <a class="btn btn-lg" href="app.html" style="background:rgba(255,255,255,.14); color:#fff; border:1.5px solid rgba(255,255,255,.3); font-size:17px;">Soy transportista</a>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="wrap" style="padding-top:56px; padding-bottom:32px;">
+    <div class="footer-grid">
+      <div>
+        <div class="brand" style="margin-bottom:14px;"><span class="brand-mark" style="width:30px; height:30px;"><i data-lucide="anchor" width="16" height="16"></i></span><span class="brand-name" style="font-size:19px; color:#fff;">PortGo</span></div>
+        <p class="footer-about">La plataforma que conecta carga y transportistas verificados en el puerto de Manzanillo.</p>
       </div>
+      <div class="footer-col"><h4>Plataforma</h4><a href="#como">Cómo funciona</a><a href="#servicios">Servicios</a><a href="app.html">Rastreo</a></div>
+      <div class="footer-col"><h4>Empresas</h4><a href="app.html">Registrar empresa</a><a href="#transportistas">Verificación</a><a href="app.html">Recursos</a></div>
+      <div class="footer-col"><h4>Soporte</h4><a href="app.html">Centro de ayuda</a><a href="app.html">Contacto</a><a href="app.html">Términos</a></div>
     </div>
-
-    <!-- ══ CAMPOS PATIO ═══════════════════════════════════ -->
-    <div id="np-group-patio" style="display:none">
-      <div class="np-section-title">🏭 Detalles del patio requerido</div>
-      <div class="admin-grid" style="gap:12px">
-        <div class="form-group">
-          <label>Número de vehículos a resguardar</label>
-          <input type="number" id="np-num-vehiculos" min="1" placeholder="Ej. 5">
-        </div>
-        <div class="form-group">
-          <label>Tipo de vehículos</label>
-          <input type="text" id="np-tipo-vehiculos" placeholder="Ej. Tractocamiones, Remolques">
-        </div>
-        <div class="form-group">
-          <label>Área aproximada necesaria (m²)</label>
-          <input type="number" id="np-area" min="0" placeholder="Ej. 500">
-        </div>
-        <div class="form-group">
-          <label>Ubicación preferida</label>
-          <input type="text" id="np-origen" placeholder="Ej. Zona industrial Tlaquepaque">
-        </div>
-        <div class="form-group">
-          <label>Fecha de entrada *</label>
-          <input type="date" id="np-fecha-ini-patio">
-        </div>
-        <div class="form-group">
-          <label>Fecha de salida estimada</label>
-          <input type="date" id="np-fecha-fin-patio">
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ CAMPOS LAVADO ═══════════════════════════════════ -->
-    <div id="np-group-lavado" style="display:none">
-      <div class="np-section-title">🚿 Detalles del servicio de lavado</div>
-      <div class="admin-grid" style="gap:12px">
-        <div class="form-group">
-          <label>Tipo de vehículo a lavar *</label>
-          <input type="text" id="np-vehiculo-lavar" placeholder="Ej. Tractocamión, Remolque, Contenedor">
-        </div>
-        <div class="form-group">
-          <label>Número de vehículos</label>
-          <input type="number" id="np-num-vehiculos-lav" min="1" placeholder="Ej. 3">
-        </div>
-        <div class="form-group">
-          <label>Ubicación del vehículo *</label>
-          <input type="text" id="np-ubic-lav" placeholder="Ej. Zona industrial Manzanillo">
-        </div>
-        <div class="form-group">
-          <label>Fecha requerida *</label>
-          <input type="date" id="np-fecha-ini-lav">
-        </div>
-        <div class="form-group" style="grid-column:span 2">
-          <label>Horario preferido</label>
-          <input type="text" id="np-horario-lav" placeholder="Ej. Mañana antes de las 10:00">
-        </div>
-      </div>
-    </div>
-
-    <!-- Campos comunes al final -->
-    <div class="np-section-title">💬 Información adicional</div>
-    <div class="form-group">
-      <label>Descripción / instrucciones especiales</label>
-      <textarea id="np-desc" rows="3" placeholder="Detalles adicionales que ayuden al proveedor a cotizar mejor…"></textarea>
-    </div>
-    <div class="form-group">
-      <label>Tu presupuesto (MXN) <span style="font-weight:400;color:var(--text-muted)">— opcional, puede quedar abierto</span></label>
-      <input type="number" id="np-precio" placeholder="Ej. 8000">
-    </div>
-    <div class="form-group">
-      <label>Plazo de pago</label>
-      <select id="np-plazo-pago">
-        <option value="">— A convenir / Negociable —</option>
-        <option value="Anticipado">Pago anticipado</option>
-        <option value="3 días">3 días</option>
-        <option value="7 días">7 días (1 semana)</option>
-        <option value="15 días">15 días (quincena)</option>
-        <option value="30 días">30 días (1 mes)</option>
-        <option value="45 días">45 días</option>
-        <option value="60 días">60 días (2 meses)</option>
-      </select>
-    </div>
-
-    <div class="modal-actions">
-      <button class="btn-confirm" onclick="crearPedido()">📋 Publicar solicitud</button>
-    </div>
-    </div><!-- /modal-np-body -->
+    <div class="footer-bottom">© 2026 PortGo · Logística conectada del puerto de Manzanillo</div>
   </div>
-</div>
+</footer>
 
-<!-- ══ MODAL DETALLE PEDIDO (cliente ve ofertas) ═══════ -->
-<div class="modal-overlay" id="modal-pedido-detalle">
-  <div class="modal" style="max-width:520px">
-    <h2 id="pedido-detalle-titulo">Solicitud</h2>
-    <p class="sub" id="pedido-detalle-sub"></p>
-    <div id="pedido-detalle-body" style="max-height:55vh;overflow-y:auto"></div>
-    <div class="modal-actions" style="margin-top:16px">
-      <button class="btn-confirm" onclick="closePedidoDetalle()">Cerrar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL HACER OFERTA (admin) ══════════════════════ -->
-<div class="modal-overlay" id="modal-hacer-oferta">
-  <div class="modal" style="max-width:460px">
-    <h2>💼 Hacer oferta</h2>
-    <p class="sub" id="ho-pedido-info">Propón tu precio y el recurso que asignarás.</p>
-    <div id="ho-sin-recursos" style="display:none;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:12px 14px;font-size:0.83rem;color:#f87171;margin-bottom:4px"></div>
-    <div id="ho-recurso-warn" style="display:none;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.4);border-radius:10px;padding:10px 14px;font-size:0.82rem;color:#d97706;margin-bottom:4px"></div>
-    <div class="form-group">
-      <label id="ho-recurso-label">Recurso que asignas *</label>
-      <select id="ho-camion">
-        <option value="">Sin asignar aún</option>
-      </select>
-    </div>
-    <div class="form-group" id="ho-op-row" style="display:none">
-      <label>Chofer asignado *</label>
-      <select id="ho-operador">
-        <option value="">— Selecciona un chofer —</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Tu precio (MXN) *</label>
-      <input type="number" id="ho-precio" placeholder="Ej. 9500">
-    </div>
-    <div class="form-group">
-      <label>Mensaje al cliente <span style="font-weight:400;color:var(--text-muted)">(opcional)</span></label>
-      <textarea id="ho-mensaje" rows="2" placeholder="Experiencia, disponibilidad, detalles del servicio..."></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeHacerOferta()">Cancelar</button>
-      <button class="btn-confirm" id="btn-enviar-oferta" onclick="enviarOferta()">Enviar oferta</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL RESPONDER CONTRAOFERTA (admin) ════════════ -->
-<div class="modal-overlay" id="modal-responder-contra">
-  <div class="modal" style="max-width:420px">
-    <h2>↩ Contraoferta del cliente</h2>
-    <div id="contra-detalle-info" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;padding:14px;margin-bottom:20px;font-size:0.85rem"></div>
-    <p class="sub" style="margin-bottom:0">¿Aceptas la contraoferta o la rechazas?</p>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeResponderContra()">Cancelar</button>
-      <button class="btn-edit btn-rechazar" style="flex:1;padding:10px;font-size:0.85rem" onclick="responderContra('rechazar')">✕ Rechazar</button>
-      <button class="btn-confirm" onclick="responderContra('aceptar')">✓ Aceptar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL DETALLES DEL SERVICIO (post-acuerdo) ══════ -->
-<div class="modal-overlay" id="modal-detalles-servicio">
-  <div class="modal" style="max-width:500px">
-    <h2>📋 Datos adicionales del servicio</h2>
-    <p id="ds-resumen" class="sub"></p>
-    <p style="font-size:0.82rem;color:var(--text-muted);margin:-4px 0 14px">Estos datos son opcionales — puedes coordinarlos después con el proveedor por el chat.</p>
-    <div class="form-group">
-      <label>Fecha del servicio</label>
-      <input type="date" id="ds-fecha">
-    </div>
-    <div class="form-group">
-      <label>Hora aproximada</label>
-      <input type="time" id="ds-hora">
-    </div>
-    <div class="form-group">
-      <label>Dirección / punto de encuentro</label>
-      <input type="text" id="ds-lugar" placeholder="Ej. Terminal Lázaro Cárdenas, Patio 3…">
-    </div>
-    <div class="form-group">
-      <label>Nombre del contacto en sitio</label>
-      <input type="text" id="ds-contacto-nombre" placeholder="Quien recibirá al proveedor">
-    </div>
-    <div class="form-group">
-      <label>Teléfono de contacto</label>
-      <input type="tel" id="ds-contacto-tel" placeholder="Ej. 314 123 4567">
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="omitirDetallesServicio()">Omitir</button>
-      <button class="btn-confirm" onclick="confirmarDetallesServicio()">✓ Guardar y confirmar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL PERFIL DE EMPRESA ════════════════════════ -->
-<div class="modal-overlay" id="modal-empresa-perfil">
-  <div class="modal" style="max-width:440px">
-    <h2 id="ep-titulo">Empresa</h2>
-    <div id="ep-body" style="max-height:50vh;overflow-y:auto"></div>
-    <div class="modal-actions" style="margin-top:16px">
-      <button class="btn-confirm" onclick="closeEmpresaPerfil()">Cerrar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL VER CALIFICACIONES ════════════════════════ -->
-<div class="modal-overlay" id="modal-ver-calificaciones">
-  <div class="modal" style="max-width:480px">
-    <h2 id="vcal-titulo">⭐ Calificaciones</h2>
-    <div id="vcal-resumen" style="margin-bottom:14px"></div>
-    <div id="vcal-lista" style="display:flex;flex-direction:column;gap:12px;max-height:340px;overflow-y:auto"></div>
-    <div class="modal-actions" style="margin-top:16px">
-      <button class="btn-cancel" onclick="cerrarVerCalificaciones()">Cerrar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL EVIDENCIAS DE SERVICIO ═════════════════════ -->
-<div class="modal-overlay" id="modal-evidencias">
-  <div class="modal" style="max-width:480px">
-    <h2>📎 Evidencias del servicio</h2>
-    <p class="sub" id="ev-plazo-info">Sube fotos o documentos de entrega. Disponible por 5 días desde la fecha de completado.</p>
-    <input type="hidden" id="ev-reserva-id">
-    <div id="ev-lista-actual" style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px"></div>
-    <div class="form-group">
-      <label>Adjuntar nuevos archivos <span style="font-weight:400;color:var(--text-muted)">(máx. 5 en total)</span></label>
-      <input type="file" id="ev-files" multiple accept="image/*,.pdf" style="margin-top:4px">
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="cerrarEvidencias()">Cancelar</button>
-      <button class="btn-confirm" onclick="subirEvidencias()">📤 Subir evidencias</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL CALIFICAR SERVICIO ════════════════════════ -->
-<div class="modal-overlay" id="modal-calificar">
-  <div class="modal" style="max-width:400px">
-    <h2>⭐ Calificar servicio</h2>
-    <p id="cal-subtitulo" class="sub"></p>
-    <input type="hidden" id="cal-reservacion-id">
-    <input type="hidden" id="cal-admin-id">
-    <div class="form-group" style="text-align:center;margin-bottom:0">
-      <div class="star-rating" id="cal-stars">
-        <span class="star" data-val="1" onclick="seleccionarEstrella(1)">★</span>
-        <span class="star" data-val="2" onclick="seleccionarEstrella(2)">★</span>
-        <span class="star" data-val="3" onclick="seleccionarEstrella(3)">★</span>
-        <span class="star" data-val="4" onclick="seleccionarEstrella(4)">★</span>
-        <span class="star" data-val="5" onclick="seleccionarEstrella(5)">★</span>
-      </div>
-      <div id="cal-rating-label" style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">Excelente</div>
-    </div>
-    <div class="form-group">
-      <label>Comentario <span style="font-weight:400;color:var(--text-muted)">(opcional)</span></label>
-      <textarea id="cal-comentario" rows="2" placeholder="¿Cómo fue el servicio?"></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeCalificar()">Cancelar</button>
-      <button class="btn-confirm" onclick="enviarCalificacion()">⭐ Enviar calificación</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL EDITAR CAMIÓN ═════════════════════════════ -->
-<div class="modal-overlay" id="modal-editar">
-  <div class="modal">
-    <h2>✏ Editar unidad</h2>
-    <p class="sub" id="editar-subtitulo">Modificar datos de la unidad</p>
-    <input type="hidden" id="editar-id">
-    <div class="form-group">
-      <label>Tipo</label>
-      <select id="editar-tipo" onchange="autoFillDimensiones('editar')">
-        <optgroup label="Camionetas">
-          <option>Camioneta 1.5 ton caja seca</option>
-          <option>Camioneta 1.5 ton plataforma</option>
-          <option>Camioneta 3.5 ton caja seca</option>
-          <option>Camioneta 3.5 ton plataforma</option>
-        </optgroup>
-        <optgroup label="Camiones">
-          <option>Rabón</option>
-          <option>Torton</option>
-          <option>Torton caja seca</option>
-          <option>Torton plataforma</option>
-        </optgroup>
-        <optgroup label="Tractocamiones">
-          <option>Sencillo porta contenedor 40/20</option>
-          <option>Sencillo plataforma</option>
-          <option>Full</option>
-          <option>Full porta contenedor 40/20</option>
-          <option>Full plataforma</option>
-          <option>Plataforma</option>
-        </optgroup>
-        <optgroup label="Unidades especiales">
-          <option>Lowboy</option>
-          <option>Cama baja</option>
-          <option>Plataforma de 3 ejes (sobrepeso)</option>
-          <option>HAZMAT</option>
-        </optgroup>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Capacidad máxima (toneladas)</label>
-      <input type="number" id="editar-cap" placeholder="Ej. 24.5" step="0.5" min="0">
-    </div>
-    <div class="form-group">
-      <label>Operador</label>
-      <select id="editar-op">
-        <option value="">— Sin operador asignado —</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Placas</label>
-      <input type="text" id="editar-placas" placeholder="Ej. MNZ-123-A">
-    </div>
-    <div class="form-group">
-      <label id="editar-dim-label">Dimensiones</label>
-      <input type="text" id="editar-dim" placeholder="Ej. 8.5m × 2.4m × 2.5m">
-    </div>
-    <div class="form-group">
-      <label>Tipo de carga que maneja</label>
-      <div class="cargo-chips-select" id="editar-tipo-carga"></div>
-    </div>
-    <div class="form-group">
-      <label>Precio por día (MXN)</label>
-      <input type="number" id="editar-precio" placeholder="Ej. 8500" min="0">
-    </div>
-    <div class="form-group">
-      <label>Estado</label>
-      <select id="editar-estado">
-        <option value="disponible">Disponible</option>
-        <option value="ocupado">Ocupado</option>
-        <option value="mantenimiento">Mantenimiento</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Tipo de placa</label>
-      <select id="editar-tipo-placa">
-        <option value="">— Seleccionar —</option>
-        <option>Federal</option><option>Estatal</option><option>Local</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Marca</label>
-      <select id="editar-marca">
-        <option value="">— Seleccionar —</option>
-        <option>Kenworth</option><option>International</option><option>Freightliner</option>
-        <option>Peterbilt</option><option>Volvo</option><option>Mercedes-Benz</option>
-        <option>Scania</option><option>MAN</option><option>Hino</option><option>Isuzu</option><option>Otra</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Número de serie (NIV)</label>
-      <input type="text" id="editar-num-serie" placeholder="Ej. 3HKRM4H59KM702456">
-    </div>
-    <div class="form-group">
-      <label>Número de motor</label>
-      <input type="text" id="editar-num-motor" placeholder="Ej. CAT-123456">
-    </div>
-    <div class="form-group">
-      <label>Número económico</label>
-      <input type="text" id="editar-num-economico" placeholder="Ej. ECO-001">
-    </div>
-    <div class="form-group">
-      <label>Tipo de combustible</label>
-      <select id="editar-combustible">
-        <option value="">— Seleccionar —</option>
-        <option>Diesel</option><option>Gasolina</option>
-        <option>Gas Natural</option><option>Eléctrico</option><option>Híbrido</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Tarjeta de circulación</label>
-      <input type="text" id="editar-tc" placeholder="Núm. de tarjeta">
-    </div>
-    <div class="form-group">
-      <label>Fecha expedición TC</label>
-      <input type="date" id="editar-fecha-tc">
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeEditarCamion()">Cancelar</button>
-      <button class="btn-confirm" onclick="guardarEdicion()">💾 Guardar cambios</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL RECHAZO OPERADOR ═══════════════════════════ -->
-<div class="modal-overlay" id="modal-rechazar-operador">
-  <div class="modal" style="max-width:500px">
-    <div class="modal-header">
-      <h2>✕ Rechazar con comentarios</h2>
-      <button class="modal-close" onclick="cerrarRechazarOperador()">✕</button>
-    </div>
-    <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:16px">
-      La empresa verá este motivo y podrá corregir sin perder sus datos.
-    </p>
-    <input type="hidden" id="ro-operador-id">
-    <div class="form-group">
-      <label>Campos con problemas</label>
-      <div id="ro-campos" class="ro-campos-wrap">
-        <label class="ro-chip"><input type="checkbox" value="Nombre / Apellidos"> Nombre / Apellidos</label>
-        <label class="ro-chip"><input type="checkbox" value="CURP"> CURP</label>
-        <label class="ro-chip"><input type="checkbox" value="RFC"> RFC</label>
-        <label class="ro-chip"><input type="checkbox" value="NSS"> NSS</label>
-        <label class="ro-chip"><input type="checkbox" value="Núm. trabajador"> Núm. trabajador</label>
-        <label class="ro-chip"><input type="checkbox" value="Correo / Teléfono"> Correo / Teléfono</label>
-        <label class="ro-chip"><input type="checkbox" value="Área / Puesto"> Área / Puesto</label>
-        <label class="ro-chip"><input type="checkbox" value="Núm. de licencia"> Núm. de licencia</label>
-        <label class="ro-chip"><input type="checkbox" value="Clase / Tipo licencia"> Clase / Tipo licencia</label>
-        <label class="ro-chip"><input type="checkbox" value="Fechas de licencia"> Fechas de licencia</label>
-        <label class="ro-chip"><input type="checkbox" value="Foto del operador"> Foto del operador</label>
-        <label class="ro-chip"><input type="checkbox" value="Foto de licencia"> Foto de licencia</label>
-      </div>
-    </div>
-    <div class="form-group" style="margin-top:14px">
-      <label>Comentario adicional</label>
-      <textarea id="ro-nota" rows="3" placeholder="Explica qué debe corregir la empresa…"></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="cerrarRechazarOperador()">Cancelar</button>
-      <button class="btn-confirm" style="background:var(--red)" onclick="confirmarRechazarOperador()">✕ Rechazar con comentarios</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL RECHAZO CAMIÓN ════════════════════════════ -->
-<div class="modal-overlay" id="modal-rechazar-camion">
-  <div class="modal" style="max-width:520px">
-    <div class="modal-header">
-      <h2>✕ Rechazar unidad con comentarios</h2>
-      <button class="modal-close" onclick="cerrarRechazarCamion()">✕</button>
-    </div>
-    <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:16px">
-      La empresa verá el motivo y podrá corregir sin perder sus datos.
-    </p>
-    <input type="hidden" id="rc-camion-id">
-    <div class="form-group">
-      <label>Campos con problemas</label>
-      <div id="rc-campos" class="ro-campos-wrap">
-        <label class="ro-chip"><input type="checkbox" value="Tipo de transporte"> Tipo</label>
-        <label class="ro-chip"><input type="checkbox" value="Marca"> Marca</label>
-        <label class="ro-chip"><input type="checkbox" value="Año / Versión"> Año / Versión</label>
-        <label class="ro-chip"><input type="checkbox" value="Color"> Color</label>
-        <label class="ro-chip"><input type="checkbox" value="Capacidad"> Capacidad</label>
-        <label class="ro-chip"><input type="checkbox" value="Dimensiones"> Dimensiones</label>
-        <label class="ro-chip"><input type="checkbox" value="Núm. serie (NIV)"> Núm. serie (NIV)</label>
-        <label class="ro-chip"><input type="checkbox" value="Placas"> Placas</label>
-        <label class="ro-chip"><input type="checkbox" value="Núm. motor"> Núm. motor</label>
-        <label class="ro-chip"><input type="checkbox" value="Núm. económico"> Núm. económico</label>
-        <label class="ro-chip"><input type="checkbox" value="Tarjeta de circulación"> TC</label>
-        <label class="ro-chip"><input type="checkbox" value="Imagen TC"> Imagen TC</label>
-        <label class="ro-chip"><input type="checkbox" value="CAAT"> CAAT</label>
-        <label class="ro-chip"><input type="checkbox" value="Imagen CAAT"> Imagen CAAT</label>
-        <label class="ro-chip"><input type="checkbox" value="Fotos del vehículo"> Fotos</label>
-      </div>
-    </div>
-    <div class="form-group" style="margin-top:14px">
-      <label>Comentario adicional</label>
-      <textarea id="rc-nota" rows="3" placeholder="Explica qué debe corregir la empresa…"></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="cerrarRechazarCamion()">Cancelar</button>
-      <button class="btn-confirm" style="background:var(--red)" onclick="confirmarRechazarCamion()">✕ Rechazar con comentarios</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL RECHAZO RECURSO (custodio/patio/lavado) ══ -->
-<div class="modal-overlay" id="modal-rechazar-recurso">
-  <div class="modal" style="max-width:500px">
-    <div class="modal-header">
-      <h2 id="rrs-titulo">✕ Rechazar con comentarios</h2>
-      <button class="modal-close" onclick="cerrarRechazarRecurso()">✕</button>
-    </div>
-    <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:16px">
-      La empresa verá el motivo y podrá corregir sin perder sus datos.
-    </p>
-    <input type="hidden" id="rrs-tabla">
-    <input type="hidden" id="rrs-id">
-    <div class="form-group">
-      <label>Campos con problemas</label>
-      <div id="rrs-campos" class="ro-campos-wrap"></div>
-    </div>
-    <div class="form-group" style="margin-top:14px">
-      <label>Comentario adicional</label>
-      <textarea id="rrs-nota" rows="3" placeholder="Explica qué debe corregir la empresa…"></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="cerrarRechazarRecurso()">Cancelar</button>
-      <button class="btn-confirm" style="background:var(--red)" onclick="confirmarRechazarRecurso()">✕ Rechazar con comentarios</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL EDITAR LAVADO ═══════════════════════════ -->
-<div class="modal-overlay" id="modal-editar-lavado">
-  <div class="modal" style="max-width:480px">
-    <h2>✏ Editar servicio de lavado</h2>
-    <input type="hidden" id="elav-id">
-    <div class="form-group">
-      <label>Nombre</label>
-      <input type="text" id="elav-nombre">
-    </div>
-    <div class="form-group">
-      <label>Tipos de vehículo <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
-      <input type="text" id="elav-tipos-vehiculo">
-    </div>
-    <div class="form-group">
-      <label>Tipos de lavado <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
-      <input type="text" id="elav-tipos-lavado">
-    </div>
-    <div class="form-group">
-      <label>Capacidad simultánea</label>
-      <input type="number" id="elav-capacidad" min="1">
-    </div>
-    <div class="form-group">
-      <label>Ubicación</label>
-      <input type="text" id="elav-ubic">
-    </div>
-    <div class="form-group">
-      <label>Horario</label>
-      <input type="text" id="elav-horario">
-    </div>
-    <div class="form-group">
-      <label>Precio base (MXN)</label>
-      <input type="number" id="elav-precio" min="0">
-    </div>
-    <div class="form-group">
-      <label>Estado</label>
-      <select id="elav-estado">
-        <option value="disponible">Disponible</option>
-        <option value="ocupado">Ocupado</option>
-        <option value="no_disponible">No disponible</option>
-      </select>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeEditarLavado()">Cancelar</button>
-      <button class="btn-confirm" onclick="guardarEdicionLavado()">💾 Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL ARCHIVOS ══════════════════════════════════ -->
-<div class="modal-overlay" id="modal-archivos">
-  <div class="modal">
-    <h2>Archivos adjuntos</h2>
-    <p class="sub" id="modal-archivos-sub"></p>
-    <div id="archivos-list"></div>
-    <div class="modal-actions">
-      <button class="btn-confirm" onclick="document.getElementById('modal-archivos').classList.remove('open')">Cerrar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL EDITAR CUSTODIO ══════════════════════════ -->
-<div class="modal-overlay" id="modal-editar-custodio">
-  <div class="modal" style="max-width:480px">
-    <h2>✏ Editar custodio</h2>
-    <input type="hidden" id="ec-id">
-    <div class="form-group">
-      <label>Nombre</label>
-      <input type="text" id="ec-nombre">
-    </div>
-    <div class="form-group">
-      <label>Tipo</label>
-      <select id="ec-tipo">
-        <option value="Armado">Armado</option>
-        <option value="Sin arma">Sin arma</option>
-        <option value="Motorizado">Motorizado</option>
-        <option value="K9">K9</option>
-        <option value="Supervisión remota">Supervisión remota</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Descripción</label>
-      <textarea id="ec-desc" rows="3"></textarea>
-    </div>
-    <div class="form-group">
-      <label>Certificaciones <span style="font-weight:400;color:var(--text-muted)">(separadas por coma)</span></label>
-      <input type="text" id="ec-certs">
-    </div>
-    <div class="form-group">
-      <label>Vencimiento de certificaciones</label>
-      <input type="date" id="ec-vence-cert">
-    </div>
-    <div id="ec-sedena-group">
-      <div class="form-group">
-        <label>Núm. licencia SEDENA</label>
-        <input type="text" id="ec-num-sedena" placeholder="Ej. SEDENA-2024-00001">
-      </div>
-      <div class="form-group">
-        <label>Vencimiento licencia SEDENA</label>
-        <input type="date" id="ec-vence-sedena">
-      </div>
-      <div class="form-group">
-        <label>Documento licencia SEDENA</label>
-        <label class="file-upload-area" for="ec-doc-sedena">
-          <span class="file-upload-icon">📄</span>
-          <span class="file-upload-text">PDF o imagen</span>
-        </label>
-        <input type="file" id="ec-doc-sedena" accept="image/*,.pdf" style="display:none"
-               onchange="previewDocNombre(this,'ec-doc-sedena-preview')">
-        <div id="ec-doc-sedena-preview"></div>
-        <div id="ec-doc-sedena-actual" style="font-size:0.78rem;margin-top:4px"></div>
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Disponibilidad</label>
-      <select id="ec-disp">
-        <option value="24/7">24/7</option>
-        <option value="Días hábiles">Días hábiles</option>
-        <option value="Fines de semana">Fines de semana</option>
-        <option value="Bajo demanda">Bajo demanda</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Precio por día (MXN)</label>
-      <input type="number" id="ec-precio">
-    </div>
-    <div class="form-group">
-      <label>Estado</label>
-      <select id="ec-estado">
-        <option value="disponible">Disponible</option>
-        <option value="ocupado">Ocupado</option>
-        <option value="no_disponible">No disponible</option>
-      </select>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeEditarCustodio()">Cancelar</button>
-      <button class="btn-confirm" onclick="guardarEdicionCustodio()">💾 Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL EDITAR PATIO ════════════════════════════ -->
-<div class="modal-overlay" id="modal-editar-patio">
-  <div class="modal" style="max-width:480px">
-    <h2>✏ Editar patio</h2>
-    <input type="hidden" id="ep-id">
-    <div class="form-group">
-      <label>Nombre</label>
-      <input type="text" id="ep-nombre">
-    </div>
-    <div class="form-group">
-      <label>Tipo</label>
-      <select id="ep-tipo">
-        <option value="Techado">Techado</option>
-        <option value="Abierto">Abierto</option>
-        <option value="Refrigerado">Refrigerado</option>
-        <option value="Especializado">Especializado</option>
-        <option value="Bodega">Bodega</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Ubicación</label>
-      <input type="text" id="ep-ubic">
-    </div>
-    <div class="form-group">
-      <label>Área (m²)</label>
-      <input type="number" id="ep-area">
-    </div>
-    <div class="form-group">
-      <label>Capacidad de vehículos</label>
-      <input type="number" id="ep-cap">
-    </div>
-    <div class="form-group">
-      <label>Servicios <span style="font-weight:400;color:var(--text-muted)">(separados por coma)</span></label>
-      <input type="text" id="ep-svcs">
-    </div>
-    <div class="form-group">
-      <label>Precio por día (MXN)</label>
-      <input type="number" id="ep-precio">
-    </div>
-    <div class="form-group">
-      <label>Vencimiento del permiso operativo</label>
-      <input type="date" id="ep-vence-permiso">
-    </div>
-    <div class="form-group">
-      <label>Estado</label>
-      <select id="ep-estado">
-        <option value="disponible">Disponible</option>
-        <option value="ocupado">Ocupado</option>
-        <option value="mantenimiento">Mantenimiento</option>
-      </select>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeEditarPatio()">Cancelar</button>
-      <button class="btn-confirm" onclick="guardarEdicionPatio()">💾 Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ BACKDROP MENÚ MÓVIL ══════════════════════════════ -->
-<div class="menu-backdrop" id="menu-backdrop" onclick="toggleMenu()"></div>
-
-<!-- ══ TOAST ════════════════════════════════════════════ -->
-<div class="toast" id="toast"></div>
-
-
-<!-- ══ LOGIN ════════════════════════════════════════════ -->
-<div id="login-overlay">
-  <div class="login-box">
-    <div class="login-logo">
-      <img src="icon.svg" class="logo-icon" alt="PortGo">
-      PortGo
-    </div>
-
-    <!-- Tabs -->
-    <div class="login-tabs">
-      <button class="login-tab active" id="tab-login"    onclick="switchLoginTab('login')">Iniciar sesión</button>
-      <button class="login-tab"        id="tab-registro" onclick="switchLoginTab('registro')">Crear cuenta</button>
-    </div>
-
-    <!-- Panel login -->
-    <div id="login-panel">
-      <div class="login-error" id="login-error">Correo o contraseña incorrectos</div>
-      <div class="form-group">
-        <label>Correo electrónico</label>
-        <input type="email" id="login-user" placeholder="correo@empresa.com"
-               autocomplete="username" onkeydown="if(event.key==='Enter') doLogin()">
-      </div>
-      <div class="form-group">
-        <label>Contraseña</label>
-        <input type="password" id="login-pass" placeholder="••••••••"
-               autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
-      </div>
-      <button class="btn-login" onclick="doLogin()">Entrar</button>
-      <button class="btn-forgot" onclick="forgotPassword()">¿Olvidaste tu contraseña?</button>
-      <p class="login-soporte">¿Necesitas ayuda? <a href="mailto:soporte@portgo.mx">soporte@portgo.mx</a></p>
-    </div>
-
-    <!-- Panel registro (rendered by JS) -->
-    <div id="registro-panel"></div>
-
-  </div>
-</div>
-
-<!-- ══ MODAL CORREGIR Y REENVIAR PEDIDO ════════════════ -->
-<div class="modal-overlay" id="modal-reenviar-pedido">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>Corregir y reenviar solicitud</h2>
-      <button class="modal-close" onclick="cerrarReenviarPedido()">✕</button>
-    </div>
-    <input type="hidden" id="rp-id">
-    <div class="form-group">
-      <label>Servicio solicitado</label>
-      <div id="rp-tipo" style="padding:8px 12px;background:var(--surface-2);border-radius:8px;font-size:0.9rem;color:var(--text-muted)"></div>
-    </div>
-    <div class="form-group">
-      <label>Ruta</label>
-      <div style="padding:8px 12px;background:var(--surface-2);border-radius:8px;font-size:0.9rem;color:var(--text-muted)">
-        📍 <span id="rp-origen"></span> → <span id="rp-destino"></span>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="form-group">
-        <label>Fecha inicio</label>
-        <input type="date" id="rp-fecha-ini">
-      </div>
-      <div class="form-group">
-        <label>Fecha fin</label>
-        <input type="date" id="rp-fecha-fin">
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Descripción / correcciones</label>
-      <textarea id="rp-descripcion" rows="3" placeholder="Explica los cambios o agrega detalles relevantes" style="resize:vertical"></textarea>
-    </div>
-    <div class="form-group">
-      <label>Precio ofrecido MXN <span style="color:var(--text-muted);font-size:0.8rem">(opcional)</span></label>
-      <input type="number" id="rp-precio" placeholder="Ej. 5000" min="0">
-    </div>
-    <div style="display:flex;gap:10px;margin-top:4px">
-      <button class="btn-add" style="flex:1" onclick="confirmarReenviar()">🔄 Reenviar solicitud</button>
-      <button class="btn-edit" onclick="cerrarReenviarPedido()">Cancelar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL PERFIL EMPRESA (catálogo) ═════════════════ -->
-<div class="modal-overlay" id="modal-emp-cat">
-  <div class="modal">
-    <div class="modal-header">
-      <h2 id="epc-titulo">Empresa</h2>
-      <button class="modal-close" onclick="cerrarPerfilEmpresaCat()">✕</button>
-    </div>
-    <div id="epc-body"></div>
-  </div>
-</div>
-
-<!-- ══ MODAL HISTORIAL DE USUARIO ══════════════════════ -->
-<div class="modal-overlay" id="modal-historial-usuario">
-  <div class="modal" style="max-width:680px">
-    <div class="modal-header">
-      <h2 id="hist-titulo">Historial</h2>
-      <button class="modal-close" onclick="cerrarHistorialUsuario()">✕</button>
-    </div>
-    <div id="hist-body"></div>
-  </div>
-</div>
-
-<!-- ══ MODAL RECHAZAR CON NOTA (genérico) ══════════════ -->
-<div class="modal-overlay" id="modal-rechazar-nota">
-  <div class="modal" style="max-width:460px">
-    <div class="modal-header">
-      <h2 id="rn-titulo">Rechazar</h2>
-      <button class="modal-close" onclick="cerrarRechazarNota()">✕</button>
-    </div>
-    <div class="form-group">
-      <label id="rn-label">Motivo del rechazo:</label>
-      <textarea id="rn-nota" rows="3" placeholder="Escribe el motivo (opcional)…" style="resize:vertical"></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="cerrarRechazarNota()">Cancelar</button>
-      <button class="btn-confirm" style="background:var(--danger);border-color:var(--danger)" onclick="confirmarRechazarNota()">✕ Confirmar rechazo</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL EDITAR PEDIDO (estado abierto) ════════════ -->
-<div class="modal-overlay" id="modal-editar-pedido">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>✏ Editar solicitud</h2>
-      <button class="modal-close" onclick="cerrarEditarPedido()">✕</button>
-    </div>
-    <input type="hidden" id="edp-id">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="form-group">
-        <label>Fecha inicio</label>
-        <input type="date" id="edp-fecha-ini">
-      </div>
-      <div class="form-group">
-        <label>Fecha fin <span style="color:var(--text-muted);font-size:0.8rem">(opcional)</span></label>
-        <input type="date" id="edp-fecha-fin">
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Descripción <span style="color:var(--text-muted);font-size:0.8rem">(opcional)</span></label>
-      <textarea id="edp-descripcion" rows="3" style="resize:vertical" placeholder="Detalles adicionales de la solicitud…"></textarea>
-    </div>
-    <div class="form-group">
-      <label>Precio ofrecido (MXN) <span style="color:var(--text-muted);font-size:0.8rem">(opcional)</span></label>
-      <input type="number" id="edp-precio" placeholder="Ej. 5000" min="0">
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="cerrarEditarPedido()">Cancelar</button>
-      <button class="btn-confirm" onclick="confirmarEditarPedido()">💾 Guardar cambios</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL MI PERFIL ══════════════════════════════════ -->
-<div class="modal-overlay" id="modal-mi-perfil">
-  <div class="modal" style="max-width:400px">
-    <div class="modal-header">
-      <h2>Mi perfil</h2>
-      <button class="modal-close" onclick="cerrarMiPerfil()">✕</button>
-    </div>
-    <div id="mi-perfil-body"></div>
-  </div>
-</div>
-
-<!-- ══ MODAL CONFIRM GENÉRICO ═══════════════════════════ -->
-<div class="modal-overlay" id="modal-confirm">
-  <div class="modal" style="max-width:400px">
-    <p id="sc-msg" style="font-size:0.95rem;color:var(--text);line-height:1.5;margin-bottom:4px"></p>
-    <div class="modal-actions" style="margin-top:18px">
-      <button class="btn-cancel" onclick="_scCancel()">Cancelar</button>
-      <button class="btn-confirm" id="sc-confirm" onclick="_scConfirm()">Confirmar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ SCRIPTS (orden importante) ══════════════════════ -->
-<script src="js/utils.js?v=4"></script>
-<script src="js/notificaciones.js?v=14"></script>
-<script src="js/detalle.js?v=12"></script>
-<script src="js/config.js?v=12"></script>
-<script src="js/auth.js?v=18"></script>
-<script src="js/theme.js?v=10"></script>
-<script src="js/views.js?v=19"></script>
-<script src="js/camiones.js?v=11"></script>
-<script src="js/recursos.js?v=11"></script>
-<script src="js/reservaciones.js?v=21"></script>
-<script src="js/modal.js?v=11"></script>
-<script src="js/pedidos.js?v=37"></script>
-<script src="js/aprobaciones.js?v=24"></script>
-<script src="js/admin.js?v=26"></script>
-<script src="js/operadores.js?v=8"></script>
-<script src="js/usuarios.js?v=17"></script>
-<script src="js/reportes.js?v=2"></script>
-<script src="js/chat.js?v=12"></script>
-<script src="js/catalogo.js?v=20"></script>
-<script src="js/tracking.js?v=11"></script>
-<script src="js/vigencias.js?v=4"></script>
-<script src="js/main.js?v=14"></script>
-
-<!-- ══ PANEL DE CHAT ════════════════════════════════════ -->
-<div id="chat-panel" class="chat-panel">
-  <div class="chat-header">
-    <span id="chat-titulo" class="chat-titulo">Chat</span>
-    <button class="chat-close-btn" onclick="closeChat()">✕</button>
-  </div>
-  <div id="chat-msgs" class="chat-msgs"></div>
-  <div class="chat-footer">
-    <input type="text" id="chat-input" class="chat-input-field"
-           placeholder="Escribe un mensaje…"
-           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMensaje()}">
-    <button class="chat-send-btn" onclick="enviarMensaje()">➤</button>
-  </div>
-</div>
-
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script>
+  (function(){
+    function draw(){ if(window.lucide && window.lucide.createIcons){ window.lucide.createIcons(); } else { setTimeout(draw, 120); } }
+    draw();
+  })();
+</script>
 </body>
 </html>
