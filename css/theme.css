@@ -1,96 +1,262 @@
-/* ── LIGHT MODE (azul cielo) ─────────────────────────── */
+/* ══════════════════════════════════════════════════════════════
+   PortGo · TEMA "MAREA" (teal / arena)
+   Drop-in: reemplaza css/theme.css. Se carga al final, así que
+   re-pinta toda la app. El modo claro (default) = tema Marea.
+   No cambia el markup ni el JS: solo color, superficie y borde.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── LIGHT MODE = MAREA (default) ────────────────────── */
 body.light {
-  --navy:         #e8f4fd;
-  --navy-mid:     #ffffff;
-  --navy-light:   #cce4f6;
-  --steel:        #93c5e8;
-  --accent:       #2563eb;
-  --accent-bright:#1d4ed8;
-  --silver:       #4a6fa5;
-  --white:        #0d1f3c;
-  --text-main:    #0d1f3c;
-  --text-muted:   #4a6fa5;
+  /* Paleta núcleo remapeada a Marea */
+  --navy:         #faf8f3;  /* fondo base (arena) */
+  --navy-mid:     #ffffff;  /* superficie de tarjetas */
+  --navy-light:   #eef5f3;  /* hover sutil */
+  --steel:        #cfe5e0;  /* bordes/realces suaves */
+  --accent:       #0d9488;  /* teal océano */
+  --accent-bright:#0f766e;  /* teal oscuro (hover) */
+  --silver:       #4f6661;  /* texto secundario fuerte */
+  --white:        #102a26;  /* "tinta" (texto sobre claro) */
+  --text-main:    #102a26;
+  --text-muted:   #7c8a85;
   --nav-mobile-bg:#ffffff;
+
+  /* Tokens semánticos (faltaban en :root; aquí quedan en Marea) */
+  --surface:      #ffffff;
+  --surface-2:    #f3faf8;
+  --card-bg:      #ffffff;
+  --border:       #e6e1d6;
+  --text:         #102a26;
+
+  /* Estados (se conservan, armonizan con teal) */
+  --green:        #15924e;
+  --amber:        #c77c11;
+  --red:          #d4513a;
+  --danger:       #d4513a;
 }
 
+/* Fondo: degradado teal muy sutil sobre arena */
 body.light::before {
   background:
-    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(37,99,235,0.08) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(147,197,232,0.3) 0%, transparent 60%);
+    radial-gradient(ellipse 80% 50% at 18% 0%, rgba(13,148,136,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 85% 100%, rgba(13,148,136,0.05) 0%, transparent 60%);
 }
 
+/* ── HEADER + NAV ────────────────────────────────────── */
 body.light header {
-  background: rgba(240,248,255,0.92);
-  border-bottom: 1px solid rgba(37,99,235,0.2);
+  background: rgba(250,248,243,0.88);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #ece7da;
 }
-body.light .nav-tabs  { background: rgba(0,0,0,0.07); }
-body.light .nav-tab   { color: #4a6fa5; }
+body.light .nav-tabs { background: #f1efe9; }
+body.light .nav-tab  { color: #7c8a85; }
+body.light .nav-tab:not(.active):hover { color: #102a26; background: rgba(13,148,136,0.07); }
+body.light .nav-tab.active { color: #0d9488; }
 
 @media (max-width: 640px) {
   body.light .nav-tabs {
     background: #ffffff;
-    border-bottom: 1px solid rgba(37,99,235,0.18);
-    box-shadow: 0 12px 32px rgba(37,99,235,0.1);
+    border-bottom: 1px solid #ece7da;
+    box-shadow: 0 12px 32px rgba(16,42,38,0.10);
   }
-  body.light .nav-tab { color: #0d1f3c; }
-  body.light .nav-tab:not(.active):hover { background: rgba(37,99,235,0.08); }
+  body.light .nav-tab { color: #102a26; }
+  body.light .nav-tab:not(.active):hover { background: rgba(13,148,136,0.08); }
 }
 
+/* ── HERO / STATS ────────────────────────────────────── */
 body.light .hero {
-  background: linear-gradient(135deg, #fff, #cce4f6);
-  border-color: rgba(37,99,235,0.2);
+  background: linear-gradient(135deg, #ffffff, #e3f1ee);
+  border-color: #d6ebe6;
 }
-body.light .stat-card { background: rgba(255,255,255,0.85); border-color: rgba(37,99,235,0.15); }
+body.light .stat-card { background: rgba(255,255,255,0.9); border-color: #e6e1d6; }
 
-body.light .truck-card { background: #fff; border-color: rgba(37,99,235,0.18); }
+/* ── TRUCK CARD ──────────────────────────────────────── */
+body.light .truck-card { background: #fff; border-color: #e6e1d6; }
 body.light .truck-card:hover {
-  border-color: rgba(37,99,235,0.5);
-  box-shadow: 0 12px 32px rgba(37,99,235,0.12);
+  border-color: rgba(13,148,136,0.5);
+  box-shadow: 0 12px 32px rgba(13,148,136,0.12);
 }
 body.light .truck-img-area {
-  background: linear-gradient(135deg, rgba(204,228,246,0.8), rgba(147,197,232,0.4));
-  border-color: rgba(37,99,235,0.1);
+  background: linear-gradient(135deg, rgba(227,241,238,0.9), rgba(207,229,224,0.5));
+  border-color: rgba(13,148,136,0.12);
 }
-body.light .truck-footer { border-color: rgba(37,99,235,0.1); }
+body.light .truck-footer { border-color: rgba(13,148,136,0.12); }
+body.light .truck-img-area::after { background: linear-gradient(135deg, transparent 40%, rgba(13,148,136,0.06)); }
 
+/* ── BÚSQUEDA / FORM INPUTS ──────────────────────────── */
 body.light .search-group input,
 body.light .search-group select {
-  background: rgba(255,255,255,0.85);
-  border-color: rgba(37,99,235,0.3);
-  color: #0d1f3c;
+  background: #faf8f3;
+  border-color: #e0dacb;
+  color: #102a26;
 }
 body.light .search-group select option { background: #fff; }
-
-body.light .reserv-table      { background: #fff; border-color: rgba(37,99,235,0.18); }
-body.light .reserv-row.header { background: rgba(37,99,235,0.05); }
-body.light .reserv-row:hover  { background: rgba(37,99,235,0.04); }
-
-body.light .admin-card { background: #fff; border-color: rgba(37,99,235,0.18); }
 
 body.light .form-group input,
 body.light .form-group textarea,
 body.light .form-group select {
-  background: rgba(232,244,253,0.7);
-  border-color: rgba(37,99,235,0.25);
-  color: #0d1f3c;
+  background: #faf8f3;
+  border-color: #e0dacb;
+  color: #102a26;
+}
+body.light .form-group input::placeholder,
+body.light .form-group textarea::placeholder { color: #a7b1ad; }
+body.light .form-group input:focus,
+body.light .form-group textarea:focus,
+body.light .form-group select:focus {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13,148,136,0.14);
 }
 body.light .form-group select option { background: #fff; }
+body.light .cat-search-input:focus,
+body.light .ped-geo-input:focus,
+body.light .apr-emp-filter input:focus { border-color: #0d9488; }
 
-body.light .modal         { background: #fff; border-color: rgba(37,99,235,0.3); }
-body.light .modal-overlay { background: rgba(190,220,245,0.75); }
-body.light .btn-cancel         { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); color: #4a6fa5; }
-body.light .btn-confirm        { background: #2563eb; color: #fff; border-color: #2563eb; }
-body.light .btn-confirm:hover  { background: #1d4ed8; }
+/* ── TABLA DE RESERVACIONES ──────────────────────────── */
+body.light .reserv-table      { background: #fff; border-color: #e6e1d6; }
+body.light .reserv-row.header { background: rgba(13,148,136,0.06); }
+body.light .reserv-row:hover  { background: rgba(13,148,136,0.05); }
+body.light .reserv-row        { border-bottom-color: rgba(13,148,136,0.08); }
 
-body.light .truck-list-item { background: rgba(232,244,253,0.7); }
-body.light .btn-detail { background: rgba(37,99,235,0.1); border-color: rgba(37,99,235,0.3); }
-body.light .btn-edit   { background: rgba(37,99,235,0.1); border-color: rgba(37,99,235,0.3); }
+/* ── ADMIN CARD ──────────────────────────────────────── */
+body.light .admin-card { background: #fff; border-color: #e6e1d6; }
 
-body.light .user-chip  { background: rgba(37,99,235,0.1); border-color: rgba(37,99,235,0.22); }
-body.light .btn-theme  { background: rgba(0,0,0,0.04); border-color: rgba(37,99,235,0.2); }
+/* ── MODAL ───────────────────────────────────────────── */
+body.light .modal         { background: #fff; border-color: #e6e1d6; }
+body.light .modal-overlay { background: rgba(16,42,38,0.45); backdrop-filter: blur(6px); }
+body.light .btn-cancel        { background: #f1efe9; border-color: #e0dacb; color: #4f6661; }
+body.light .btn-confirm       { background: #0d9488; color: #fff; border-color: #0d9488; }
+body.light .btn-confirm:hover { background: #0f766e; }
 
-body.light .login-box    { background: #fff; border-color: rgba(37,99,235,0.3); }
-body.light .notif-panel  { background: #fff; border-color: rgba(37,99,235,0.25); box-shadow: 0 12px 32px rgba(37,99,235,0.1); }
-body.light .notif-item:hover { background: rgba(37,99,235,0.05); }
-body.light .notif-badge  { border-color: var(--navy); }
-body.light .btn-notif    { background: rgba(0,0,0,0.04); border-color: rgba(37,99,235,0.2); }
+/* ── BOTONES SECUNDARIOS / LISTAS ────────────────────── */
+body.light .truck-list-item { background: #f3faf8; }
+body.light .btn-detail { background: rgba(13,148,136,0.1); border-color: rgba(13,148,136,0.3); color: #0d9488; }
+body.light .btn-detail:hover { background: rgba(13,148,136,0.18); }
+body.light .btn-edit   { background: rgba(13,148,136,0.1); border-color: rgba(13,148,136,0.3); color: #0d9488; }
+
+/* ── USER CHIP / THEME / NOTIF ───────────────────────── */
+body.light .user-chip  { background: rgba(13,148,136,0.1); border-color: rgba(13,148,136,0.22); }
+body.light .btn-theme  { background: #f1efe9; border-color: #e0dacb; }
+body.light .btn-notif  { background: #f1efe9; border-color: #e0dacb; }
+body.light .notif-panel  { background: #fff; border-color: #e6e1d6; box-shadow: 0 12px 32px rgba(16,42,38,0.12); }
+body.light .notif-item:hover { background: rgba(13,148,136,0.06); }
+body.light .notif-badge  { border-color: #faf8f3; }
+
+/* ── LOGIN (login.css ya trae Marea; respaldo) ───────── */
+body.light .login-box { background: #fff; border-color: #e6e1d6; }
+
+/* ══ COMPONENTES QUE EN "light" VENÍAN EN AZUL ══════════
+   theme.css carga después de components.css, así que estas
+   reglas ganan y los re-pintan a teal.                    */
+
+/* Pills de filtro de solicitudes */
+body.light .ped-filtro-pill { border-color: rgba(13,148,136,0.18); color: #7c8a85; background: rgba(13,148,136,0.03); }
+body.light .ped-filtro-pill:hover { border-color: rgba(13,148,136,0.5); color: #102a26; background: rgba(13,148,136,0.07); }
+body.light .ped-filtro-pill.active { background: rgba(13,148,136,0.1); border-color: #0d9488; color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
+
+/* Banner categoría nueva solicitud */
+body.light .np-cat-banner { background: rgba(13,148,136,0.06); border-color: rgba(13,148,136,0.2); }
+body.light .np-cap-info { background: rgba(13,148,136,0.06); border-color: rgba(13,148,136,0.22); }
+body.light .np-cap-cont-item { background: rgba(13,148,136,0.05); border-color: rgba(13,148,136,0.15); }
+
+/* Chips de cargo / recursos */
+body.light .cargo-chip { background: rgba(13,148,136,0.08); border-color: rgba(13,148,136,0.25); color: #0d9488; }
+body.light .cargo-chip-toggle { background: #f1efe9; border-color: rgba(13,148,136,0.22); color: #7c8a85; }
+body.light .cargo-chip-toggle.selected { background: rgba(13,148,136,0.1); border-color: rgba(13,148,136,0.5); color: #0d9488; }
+
+/* Tabs de recurso */
+body.light .recurso-tab { border-color: rgba(13,148,136,0.2); color: #7c8a85; }
+body.light .recurso-tab:hover { border-color: rgba(13,148,136,0.5); color: #102a26; background: rgba(13,148,136,0.06); }
+body.light .recurso-tab.active { background: rgba(13,148,136,0.1); border-color: rgba(13,148,136,0.5); color: #0d9488; }
+
+/* Pedidos (cards y meta) */
+body.light .pedido-card    { background: #fff; border-color: #e6e1d6; }
+body.light .pedido-card:hover { border-color: rgba(13,148,136,0.4); }
+body.light .pedido-footer  { border-top-color: rgba(13,148,136,0.12); }
+body.light .pedido-desc    { border-left-color: rgba(13,148,136,0.3); }
+body.light .oferta-item    { background: #f3faf8; border-color: rgba(13,148,136,0.14); }
+body.light .ped-num-ofertas { background: rgba(13,148,136,0.1); border-color: rgba(13,148,136,0.2); color: #0d9488; }
+body.light .btn-ver-pedido  { background: rgba(13,148,136,0.1); border-color: rgba(13,148,136,0.3); color: #0d9488; }
+body.light .btn-ver-pedido:hover { background: rgba(13,148,136,0.18); }
+body.light .badge-acordado  { background: rgba(13,148,136,0.13); color: #0d9488; }
+body.light .ped-cliente-grupo-title { color: #0d9488; border-left-color: #0d9488; }
+
+/* Botones de servicio (grid) */
+body.light .ped-serv-btn { background: #fff; border-color: #e6e1d6; }
+body.light .ped-serv-btn:hover { border-color: rgba(13,148,136,0.45); box-shadow: 0 10px 28px rgba(13,148,136,0.12); }
+
+/* Catálogo: pills y tarjetas de empresa */
+body.light .cat-pill { background: rgba(13,148,136,0.06); border-color: rgba(13,148,136,0.2); color: #7c8a85; }
+body.light .cat-pill:hover { background: rgba(13,148,136,0.13); color: #102a26; }
+body.light .cat-pill.active { background: #0d9488; border-color: #0d9488; color: #fff; box-shadow: 0 4px 14px rgba(13,148,136,0.32); }
+
+body.light .empresa-card { background: #fff; border-color: #e6e1d6; }
+body.light .empresa-card:hover { border-color: rgba(13,148,136,0.4); box-shadow: 0 16px 40px rgba(13,148,136,0.1); }
+body.light .empresa-card-top { border-color: rgba(13,148,136,0.1); }
+body.light .emp-rec-bloque { border-color: rgba(13,148,136,0.08); }
+body.light .empresa-card-footer { border-color: rgba(13,148,136,0.1); }
+body.light .emp-avail-bar { background: rgba(16,42,38,0.07); }
+body.light .cargo-chip-sm { background: #f1efe9; border-color: #e0dacb; color: #7c8a85; }
+body.light .emp-icon-badge { background: #f1efe9; }
+body.light .emp-info-chip { background: rgba(13,148,136,0.09); border-color: rgba(13,148,136,0.2); color: #0d9488; }
+body.light .btn-emp-solicitar { background: linear-gradient(135deg, #0d9488, #14b8a6); }
+body.light .btn-emp-perfil:hover { border-color: #0d9488; color: #0d9488; }
+body.light .emp-btn-resenas { color: #0d9488; border-color: #e6e1d6; }
+body.light .emp-btn-resenas:hover { background: #0d9488; color: #fff; }
+
+/* Catálogo búsqueda + cargar más + volver */
+body.light .cat-search-input { background: #fff; border-color: #e6e1d6; }
+body.light .btn-cargar-mas:hover { border-color: #0d9488; color: #0d9488; }
+body.light .btn-back-home:hover { border-color: #0d9488; color: #0d9488; }
+
+/* Timeline de solicitud */
+body.light .ped-tl-dot { background: #fff; border-color: #e6e1d6; }
+body.light .ped-tl-dot.active { background: #0d9488; border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,0.2); }
+body.light .ped-tl-line { background: #e6e1d6; }
+
+/* Aprobaciones / revisiones (superadmin) */
+body.light .apr-card { background: #fff; border-color: #e6e1d6; }
+body.light .apr-oferta-box { background: rgba(13,148,136,0.05); border-color: rgba(13,148,136,0.15); }
+body.light .apr-oferta-title { color: #0d9488; }
+body.light .apr-count { background: #0d9488; }
+body.light .apr-empresa-header { background: #f3faf8; }
+body.light .apr-empresa-header:hover { background: #e3f1ee; }
+body.light .apr-ec { background: rgba(13,148,136,0.12); color: #0d9488; }
+
+/* Chat */
+body.light .chat-panel    { background: #faf8f3; box-shadow: -4px 0 24px rgba(16,42,38,0.12); }
+body.light .chat-header   { background: #fff; border-color: #ece7da; }
+body.light .chat-footer   { background: #fff; border-color: #ece7da; }
+body.light .chat-msg-otro .chat-bubble { background: #eef5f3; color: #102a26; }
+body.light .chat-input-field { background: #fff; border-color: #e6e1d6; }
+body.light .chat-input-field:focus { border-color: #0d9488; }
+body.light .btn-chat-hilo { background: #f1efe9; border-color: #e0dacb; }
+body.light .btn-chat-hilo:hover { background: #e3f1ee; }
+
+/* Geo autocomplete */
+body.light .geo-dropdown { background: #fff; border-color: #e6e1d6; box-shadow: 0 8px 28px rgba(16,42,38,0.14); }
+body.light .geo-item { color: #102a26; border-bottom-color: rgba(13,148,136,0.08); }
+body.light .geo-item:hover { background: #e3f1ee; }
+
+/* Reportes */
+body.light .rep-kpi-card,
+body.light .rep-section { background: #fff; border-color: #e6e1d6; }
+body.light .rep-date-filter { background: #f3faf8; border-color: #e6e1d6; }
+body.light .rep-date-filter input[type=date] { background: #fff; border-color: #e6e1d6; color: #102a26; }
+body.light .rep-rank, body.light .rep-bar-fill { background: #0d9488; }
+
+/* Próximamente */
+body.light .btn-prox { border-color: #e0dacb; }
+body.light .prox-badge { background: rgba(13,148,136,0.08); border-color: rgba(13,148,136,0.2); color: #0d9488; }
+
+/* Vigencias / operadores */
+body.light .vig-empresa-card { background: #fff; }
+body.light .operador-card { background: #fff; border-color: #e6e1d6; }
+
+/* ── DARK MODE: realces teal (coherencia de marca) ────
+   La app por defecto es clara; esto solo aplica si el
+   usuario activa el modo oscuro manualmente.            */
+body:not(.light) {
+  --accent:        #2dd4bf;
+  --accent-bright: #5eead4;
+}
+body:not(.light) header { border-bottom-color: rgba(45,212,191,0.18); }

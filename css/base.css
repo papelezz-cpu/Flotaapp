@@ -15,6 +15,16 @@
   --text-main:    #e8f0ff;
   --text-muted:   #7a9cc4;
   --nav-mobile-bg:#0d1e38;
+
+  /* Tokens semánticos (modo oscuro). En modo claro los re-mapea
+     body.light en theme.css al tema "Marea". Se usan ~60 veces en
+     components.css/JS; sin estos valores el modo oscuro perdía
+     fondos, bordes y color de texto en tarjetas, modales y chat. */
+  --surface:      #112240;
+  --surface-2:    #0f1f3a;
+  --card-bg:      #112240;
+  --border:       #243a5e;
+  --text:         #e8f0ff;
 }
 
 /* ── RESET ───────────────────────────────────────────── */
