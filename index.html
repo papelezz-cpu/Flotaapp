@@ -215,7 +215,70 @@
     </div>
   </div>
   <div class="hero-visual">
-    <div class="ph" style="height:520px;"><span class="ph-label">[ Foto: tractocamión saliendo del puerto ]</span></div>
+    <div class="ph" style="height:520px; padding:0; overflow:hidden;">
+      <svg viewBox="0 0 480 520" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" style="display:block" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tractocamión saliendo del puerto de Manzanillo">
+        <defs>
+          <linearGradient id="hsky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#eef6f4"/><stop offset="1" stop-color="#d6ebe6"/>
+          </linearGradient>
+          <linearGradient id="hsea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#bfe3dc"/><stop offset="1" stop-color="#a4d4cb"/>
+          </linearGradient>
+        </defs>
+        <!-- cielo -->
+        <rect width="480" height="520" fill="url(#hsky)"/>
+        <circle cx="378" cy="104" r="56" fill="#ffffff" opacity="0.5"/>
+        <circle cx="378" cy="104" r="34" fill="#5ec5b8" opacity="0.30"/>
+        <!-- grúas pórtico del puerto (fondo) -->
+        <g stroke="#8fccc2" stroke-width="6" fill="none" stroke-linecap="round">
+          <path d="M70 300 V150 H250 M150 300 V150 M250 150 L250 130"/>
+          <path d="M250 150 H320" />
+          <line x1="150" y1="150" x2="150" y2="120"/>
+          <line x1="150" y1="195" x2="180" y2="195"/><line x1="180" y1="195" x2="180" y2="225"/>
+        </g>
+        <g stroke="#a9d8cf" stroke-width="5" fill="none" stroke-linecap="round" opacity="0.8">
+          <path d="M300 300 V180 H420 M360 300 V180 M420 180 V165"/>
+        </g>
+        <!-- agua/muelle -->
+        <rect x="0" y="300" width="480" height="60" fill="url(#hsea)"/>
+        <rect x="0" y="356" width="480" height="14" fill="#7c8a85" opacity="0.35"/>
+        <!-- pilas de contenedores -->
+        <g>
+          <rect x="40"  y="250" width="58" height="26" rx="3" fill="#0d9488"/>
+          <rect x="40"  y="278" width="58" height="22" rx="3" fill="#0f766e"/>
+          <rect x="102" y="262" width="58" height="38" rx="3" fill="#c0573a"/>
+          <rect x="360" y="258" width="56" height="42" rx="3" fill="#e0a23e"/>
+          <rect x="418" y="270" width="50" height="30" rx="3" fill="#0d9488"/>
+        </g>
+        <!-- carretera -->
+        <rect x="0" y="370" width="480" height="150" fill="#cfe5e0"/>
+        <g stroke="#ffffff" stroke-width="5" stroke-dasharray="26 22" stroke-linecap="round" opacity="0.85">
+          <line x1="0" y1="470" x2="480" y2="470"/>
+        </g>
+        <!-- tractocamión (primer plano) -->
+        <g>
+          <!-- caja/remolque -->
+          <rect x="58" y="372" width="190" height="92" rx="6" fill="#0f766e"/>
+          <rect x="58" y="372" width="190" height="92" rx="6" fill="none" stroke="#0c5f59" stroke-width="2"/>
+          <line x1="120" y1="376" x2="120" y2="460" stroke="#0c5f59" stroke-width="2"/>
+          <line x1="184" y1="376" x2="184" y2="460" stroke="#0c5f59" stroke-width="2"/>
+          <!-- cabina -->
+          <path d="M250 392 h44 a10 10 0 0 1 9 6 l14 30 a8 8 0 0 1 1 4 v32 h-68 z" fill="#0d9488"/>
+          <path d="M256 398 h34 a8 8 0 0 1 7 4 l11 24 h-52 z" fill="#bfe3dc"/>
+          <!-- chasis -->
+          <rect x="58" y="464" width="270" height="8" rx="3" fill="#102a26"/>
+          <!-- ruedas -->
+          <g fill="#102a26">
+            <circle cx="108" cy="476" r="20"/><circle cx="170" cy="476" r="20"/><circle cx="300" cy="476" r="20"/>
+          </g>
+          <g fill="#5ec5b8">
+            <circle cx="108" cy="476" r="8"/><circle cx="170" cy="476" r="8"/><circle cx="300" cy="476" r="8"/>
+          </g>
+          <!-- faro -->
+          <rect x="316" y="448" width="8" height="9" rx="2" fill="#ffe7a8"/>
+        </g>
+      </svg>
+    </div>
     <div class="float-card">
       <span class="float-ico"><i data-lucide="map-pin" width="22" height="22"></i></span>
       <div style="flex:1;"><div style="font-weight:700; font-size:14px;">En tránsito · Manzanillo → CDMX</div><div style="font-size:12.5px; color:var(--muted2);">ETA ~14 h · Torton · Verificado</div></div>
@@ -260,7 +323,56 @@
 <!-- PARA CLIENTES -->
 <section class="sec">
   <div class="split reverse">
-    <div class="ph" style="height:420px;"><span class="ph-label">[ Captura: comparador de ofertas ]</span></div>
+    <div style="height:420px; border-radius:24px; border:1px solid var(--line); background:#fff; box-shadow:0 16px 44px rgba(16,42,38,.10); padding:22px 20px; overflow:hidden;">
+      <!-- encabezado de la solicitud -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px;">
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px;">Contenedor 40' · Manzanillo → CDMX</div>
+          <div style="font-size:12.5px; color:var(--muted2); margin-top:3px;">Torton · Sale mañana 8:00 · Carga seca</div>
+        </div>
+        <span style="font-size:11px; font-weight:600; color:var(--teal); background:var(--teal-soft); padding:4px 10px; border-radius:999px; white-space:nowrap;">3 ofertas</span>
+      </div>
+      <div style="font-size:11.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:16px 0 10px;">Comparar ofertas</div>
+      <!-- oferta ganadora -->
+      <div style="border:1.5px solid var(--teal); background:var(--teal-soft); border-radius:14px; padding:13px 14px; margin-bottom:10px; position:relative;">
+        <span style="position:absolute; top:-9px; left:13px; background:var(--teal); color:#fff; font-size:10px; font-weight:700; padding:2px 9px; border-radius:999px;">MEJOR OFERTA</span>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-weight:700; font-size:14px;">Transportes del Pacífico</div>
+            <div style="font-size:12px; color:var(--muted2); margin-top:2px;">Torton · ★ 4.9 · Llega en ~13 h</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; color:var(--teal-dark);">$8,400</div>
+            <div style="font-size:10.5px; color:var(--muted2);">MXN</div>
+          </div>
+        </div>
+      </div>
+      <!-- otras ofertas -->
+      <div style="border:1px solid var(--line); border-radius:14px; padding:13px 14px; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-weight:700; font-size:14px;">Fletes González</div>
+            <div style="font-size:12px; color:var(--muted2); margin-top:2px;">Torton · ★ 4.7 · Llega en ~15 h</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px;">$8,900</div>
+            <div style="font-size:10.5px; color:var(--muted2);">MXN</div>
+          </div>
+        </div>
+      </div>
+      <div style="border:1px solid var(--line); border-radius:14px; padding:13px 14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-weight:700; font-size:14px;">Logística Colima</div>
+            <div style="font-size:12px; color:var(--muted2); margin-top:2px;">Torton · ★ 4.6 · Llega en ~16 h</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px;">$9,250</div>
+            <div style="font-size:10.5px; color:var(--muted2);">MXN</div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div>
       <span class="pill"><i data-lucide="package" width="15" height="15"></i> Para clientes</span>
       <h2 class="h2" style="font-size:34px; line-height:1.12; margin:20px 0 18px;">Deja de perseguir cotizaciones por WhatsApp</h2>
@@ -289,7 +401,39 @@
         </div>
         <a class="btn btn-lg" href="app.html" style="background:#fff; color:var(--teal); margin-top:30px;">Registrar mi empresa <i data-lucide="arrow-right" width="17" height="17"></i></a>
       </div>
-      <div class="ph ph-dark" style="height:420px;"><span class="ph-label">[ Captura: panel de flota del transportista ]</span></div>
+      <div style="height:420px; border-radius:24px; border:1px solid rgba(255,255,255,.22); background:#0b332e; padding:22px 20px; overflow:hidden; color:#fff;">
+        <!-- encabezado -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+          <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px;">Mi flota</div>
+          <span style="font-size:11px; font-weight:600; color:#bfe7e1; background:rgba(255,255,255,.12); padding:4px 11px; border-radius:999px;">6 unidades</span>
+        </div>
+        <!-- unidades -->
+        <div style="display:flex; flex-direction:column; gap:9px;">
+          <div style="display:flex; align-items:center; gap:12px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); border-radius:13px; padding:12px 14px;">
+            <span style="width:9px; height:9px; border-radius:50%; background:#34d399; flex-shrink:0;"></span>
+            <div style="flex:1;"><div style="font-weight:600; font-size:13.5px;">Torton · TOR-04</div><div style="font-size:11.5px; color:#9fd0c9;">Caja seca · 8 ton</div></div>
+            <span style="font-size:11px; font-weight:600; color:#6ee7c4;">Disponible</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); border-radius:13px; padding:12px 14px;">
+            <span style="width:9px; height:9px; border-radius:50%; background:#fbbf24; flex-shrink:0;"></span>
+            <div style="flex:1;"><div style="font-weight:600; font-size:13.5px;">Full · FUL-12</div><div style="font-size:11.5px; color:#9fd0c9;">Plataforma · 30 ton</div></div>
+            <span style="font-size:11px; font-weight:600; color:#fcd34d;">En viaje</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); border-radius:13px; padding:12px 14px;">
+            <span style="width:9px; height:9px; border-radius:50%; background:#34d399; flex-shrink:0;"></span>
+            <div style="flex:1;"><div style="font-weight:600; font-size:13.5px;">Rabón · RAB-07</div><div style="font-size:11.5px; color:#9fd0c9;">Caja refrigerada · 5 ton</div></div>
+            <span style="font-size:11px; font-weight:600; color:#6ee7c4;">Disponible</span>
+          </div>
+        </div>
+        <!-- pedido nuevo en zona -->
+        <div style="margin-top:16px; background:#fff; color:var(--ink); border-radius:14px; padding:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-weight:700; font-size:13.5px;">Nuevo pedido en tu zona</span>
+            <span style="font-size:10.5px; font-weight:700; color:var(--teal); background:var(--teal-soft); padding:3px 9px; border-radius:999px;">Manzanillo</span>
+          </div>
+          <div style="font-size:12px; color:var(--muted2);">Contenedor 20' → Guadalajara · Torton · Hoy</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
