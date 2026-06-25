@@ -62,6 +62,35 @@ body.light .nav-tab.active { color: #0d9488; }
   body.light .nav-tab:not(.active):hover { background: rgba(13,148,136,0.08); }
 }
 
+/* ── HOME · TARJETAS "ARENA LIMPIA" ──────────────────── */
+body.light .home-card {
+  background: #ffffff;
+  border: 1px solid #e6e1d6;
+  box-shadow: 0 1px 3px rgba(16,42,38,0.05);
+}
+body.light .home-card:hover {
+  border-color: rgba(13,148,136,0.45);
+  box-shadow: 0 14px 34px rgba(13,148,136,0.12);
+  transform: translateY(-5px);
+}
+body.light .hc-icon {
+  width: 54px; height: 54px; margin: 0 auto 14px;
+  display: flex; align-items: center; justify-content: center;
+  background: #e3f1ee; color: #0d9488;
+  border-radius: 15px;
+}
+body.light .hc-title { color: #102a26; }
+body.light .hc-desc  { color: #7c8a85; }
+body.light .hc-bg-emoji { display: none; }
+/* Badge de avisos (aprobaciones / vigencias): rojo sólido y legible sobre tarjeta clara */
+body.light .hc-badge { background: #d4513a; color: #fff; box-shadow: 0 2px 8px rgba(212,81,58,0.35); }
+
+/* Íconos SVG nítidos y centrados en ambos modos.
+   margin:0 auto centra el SVG en modo oscuro (donde .hc-icon NO es
+   flex); en claro es inofensivo porque el contenedor ya es flex. */
+.hc-icon svg { display: block; margin: 0 auto; }
+body:not(.light) .hc-icon { color: #ffffff; }
+
 /* ── HERO / STATS ────────────────────────────────────── */
 body.light .hero {
   background: linear-gradient(135deg, #ffffff, #e3f1ee);
