@@ -480,7 +480,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
   } else if (vista === 'cliente' && p.estado === 'rechazado') {
     acciones = `
       ${p.rechazo_nota ? `<div class="apr-rechazo-nota" style="margin-bottom:8px">Motivo: ${esc(p.rechazo_nota)}</div>` : ''}
-      <button class="btn-ofertar" onclick="abrirReenviarPedido('${p.id}')">🔄 Corregir y reenviar</button>`;
+      <button class="btn-ofertar" onclick="abrirReenviarPedido('${escJs(p.id)}')">🔄 Corregir y reenviar</button>`;
 
   } else if (vista === 'superadmin') {
     const ofertasActivas = (ofertasMap?.[p.id] || ofertas).filter(o => o.estado !== 'rechazada');
@@ -517,7 +517,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
               : 'Rechazada';
     const bdg = enRevision ? 'badge-revision' : st === 'aceptada' ? 'badge-avail' : st === 'rechazada' ? 'badge-maint' : 'badge-busy';
     const chatAdminBtn = (p.cliente_id && st !== 'rechazada')
-      ? `<button class="btn-chat-hilo" onclick="openChatPedido('${p.id}','${p.cliente_id}','${escJs(p.cliente_nombre||'')}')">💬 Chat</button>`
+      ? `<button class="btn-chat-hilo" onclick="openChatPedido('${escJs(p.id)}','${escJs(p.cliente_id)}','${escJs(p.cliente_nombre||'')}')">💬 Chat</button>`
       : '';
     acciones = `
       <span class="badge ${bdg}" style="font-size:0.72rem">${etq}</span>
@@ -880,7 +880,7 @@ async function crearPedido() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tipo_camion: tipo, cliente_nombre: currentUser.nombre }),
-  }).catch(() => {});
+  }).catch(e => console.warn('Email notificación falló:', e));
 
   closeNuevoPedido();
   document.getElementById('modal-nuevo-pedido').querySelectorAll('input, textarea, select').forEach(el => {
@@ -948,7 +948,7 @@ function ofertaItemHTML(o) {
 
   // Botón de chat con el admin que ofertó (solo cliente)
   const chatOfertaBtn = (currentUser.rol === 'cliente' && o.admin_id && o.estado !== 'rechazada')
-    ? `<button class="btn-chat-hilo" onclick="openChatPedido('${o.pedido_id}','${o.admin_id}','${escJs(o.admin_nombre||'')}')">💬 Chat</button>`
+    ? `<button class="btn-chat-hilo" onclick="openChatPedido('${escJs(o.pedido_id)}','${escJs(o.admin_id)}','${escJs(o.admin_nombre||'')}')">💬 Chat</button>`
     : '';
 
   let acciones = '';
@@ -1125,7 +1125,7 @@ async function confirmarDetallesServicio() {
       admin_nombre:   oferta.admin_nombre,
       precio:         oferta.precio_oferta,
     }),
-  }).catch(() => {});
+  }).catch(e => console.warn('Email notificación falló:', e));
 
   _pendingOferta = null;
   _pendingPedido = null;
@@ -1456,7 +1456,7 @@ async function _enviarOfertaCore() {
         tipo_camion:    ped.tipo_camion,
         precio,
       }),
-    }).catch(() => {});
+    }).catch(e => console.warn('Email notificación falló:', e));
   }
 
   closeHacerOferta();
@@ -1528,7 +1528,7 @@ async function responderContra(accion) {
         admin_nombre:   currentUser.nombre,
         precio:         oferta.contra_precio,
       }),
-    }).catch(() => {});
+    }).catch(e => console.warn('Email notificación falló:', e));
 
     closeResponderContra();
     await renderPedidos();

@@ -1126,7 +1126,7 @@ async function _ejecutarAprobarAcuerdo(ped, oferta) {
       clienteId:   ped.cliente_id,
       adminId:     oferta.admin_id,
     }),
-  }).catch(() => {});
+  }).catch(e => console.warn('Email notificación falló:', e));
 
   showToast('✓ Acuerdo aprobado. Reservación creada');
   renderAprobaciones();

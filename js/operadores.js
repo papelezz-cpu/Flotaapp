@@ -77,9 +77,13 @@ function _operadorCardHTML(op) {
   const licInfo = op.num_licencia
     ? `<div class="op-sub">🪪 ${esc(op.num_licencia)}${op.clase_licencia ? ' · Clase ' + esc(op.clase_licencia) : ''}${op.tipo_licencia ? ' · ' + esc(op.tipo_licencia) : ''}</div>`
     : '';
-  const vence = op.fecha_vencimiento
-    ? `<div class="op-sub" style="color:${new Date(op.fecha_vencimiento) < new Date() ? 'var(--danger)' : 'var(--text-muted)'}">Vence: ${fmtFecha(op.fecha_vencimiento)}</div>`
-    : '';
+  let vence = '';
+  if (op.fecha_vencimiento) {
+    const dias = Math.ceil((new Date(op.fecha_vencimiento) - new Date()) / 86400000);
+    const color = dias < 0 ? 'var(--danger)' : dias <= 30 ? 'var(--warning, #d97706)' : 'var(--text-muted)';
+    const aviso = dias < 0 ? ' ⚠ vencida' : dias <= 30 ? ` ⚠ vence en ${dias} día${dias !== 1 ? 's' : ''}` : '';
+    vence = `<div class="op-sub" style="color:${color}">Licencia vence: ${fmtFecha(op.fecha_vencimiento)}${aviso}</div>`;
+  }
   const licFotoBtn = op.foto_licencia
     ? `<button class="btn-edit" style="font-size:0.7rem" onclick="window.open('${escJs(op.foto_licencia)}','_blank')">🪪 Ver licencia</button>`
     : '';
@@ -234,12 +238,22 @@ async function agregarOperador() {
   const v = id => document.getElementById(id)?.value?.trim() || '';
 
   const nombre = v('op-nombre');
-  if (!nombre) { alert('El nombre del operador es obligatorio.'); restore(); return; }
+  if (!nombre) { showToast('El nombre del operador es obligatorio.', 'error'); restore(); return; }
 
   const propietarioId = currentUser.rol === 'superadmin'
     ? document.getElementById('sa-empresa-operador')?.value
     : currentUser.id;
   if (!propietarioId) { showToast('Selecciona una empresa propietaria', 'error'); restore(); return; }
+
+  // Validar CURP único dentro de la misma empresa (evita operadores duplicados)
+  const curp = v('op-curp');
+  if (curp) {
+    let dupQ = sb.from('operadores').select('id').eq('propietario_id', propietarioId).eq('curp', curp);
+    if (_operadorEditId) dupQ = dupQ.neq('id', _operadorEditId);
+    const { data: dup, error: dupErr } = await dupQ;
+    if (dupErr) { showToast('Error al validar CURP: ' + dupErr.message, 'error'); restore(); return; }
+    if (dup?.length) { showToast(`Ya existe un operador con esta CURP en la empresa (${dup[0].id}).`, 'error'); restore(); return; }
+  }
 
   // Validar archivos obligatorios
   const fotoFile    = document.getElementById('op-foto-file')?.files?.[0];

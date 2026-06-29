@@ -57,11 +57,11 @@ async function confirmarReserva() {
   const desc   = document.getElementById('res-desc').value.trim();
 
   if (!nombre || !ini || !fin) {
-    alert('Por favor completa los campos requeridos.');
+    showToast('Por favor completa los campos requeridos.', 'error');
     return;
   }
   if (fin < ini) {
-    alert('La fecha de fin no puede ser anterior a la de inicio.');
+    showToast('La fecha de fin no puede ser anterior a la de inicio.', 'error');
     return;
   }
 
@@ -76,7 +76,7 @@ async function confirmarReserva() {
 
     if (conflictos?.length) {
       const c = conflictos[0];
-      alert(`Este recurso ya está reservado del ${fmtFecha(c.fecha_ini)} al ${fmtFecha(c.fecha_fin)}.\nElige otras fechas.`);
+      showToast(`Este recurso ya está reservado del ${fmtFecha(c.fecha_ini)} al ${fmtFecha(c.fecha_fin)}. Elige otras fechas.`, 'error');
       return;
     }
   }
@@ -96,7 +96,7 @@ async function confirmarReserva() {
     descripcion:     desc,
     estado:          'Pendiente',
   });
-  if (errRes) { alert('Error al guardar la reserva: ' + (errRes.message || '')); return; }
+  if (errRes) { showToast('Error al guardar la reserva: ' + (errRes.message || ''), 'error'); return; }
 
   // Notificación por email (silencioso si falla)
   try {
@@ -131,7 +131,7 @@ async function confirmarReserva() {
         })
       });
     }
-  } catch (_) { /* silencioso */ }
+  } catch (e) { console.warn('Email notificación falló:', e); }
 
   closeModal();
   filtrarRecursos();
