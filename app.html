@@ -124,7 +124,16 @@
 <div id="view-reservaciones" class="view">
   <div class="page">
     <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
-    <div class="section-title">Reservaciones activas</div>
+    <div class="section-title">Reservaciones</div>
+    <div class="ped-filtros-bar" id="reserv-filtros-bar">
+      <div class="ped-filtro-pills">
+        <button class="ped-filtro-pill active" data-rest="Activa"     onclick="filtrarReservas('Activa')">Activas</button>
+        <button class="ped-filtro-pill"        data-rest="Pendiente"  onclick="filtrarReservas('Pendiente')">Pendientes</button>
+        <button class="ped-filtro-pill"        data-rest="Completada" onclick="filtrarReservas('Completada')">Completadas</button>
+        <button class="ped-filtro-pill"        data-rest="Cancelada"  onclick="filtrarReservas('Cancelada')">Canceladas</button>
+        <button class="ped-filtro-pill"        data-rest="todas"      onclick="filtrarReservas('todas')">Todas</button>
+      </div>
+    </div>
     <div class="reserv-table">
       <div id="reserv-header" class="reserv-row header">
         <div>Unidad</div><div>Empresa</div><div>Cliente</div><div>Inicio</div><div>Fin</div><div>Estado</div>
@@ -2186,10 +2195,10 @@
 <script src="js/config.js?v=12"></script>
 <script src="js/auth.js?v=18"></script>
 <script src="js/theme.js?v=10"></script>
-<script src="js/views.js?v=20"></script>
+<script src="js/views.js?v=21"></script>
 <script src="js/camiones.js?v=11"></script>
 <script src="js/recursos.js?v=11"></script>
-<script src="js/reservaciones.js?v=24"></script>
+<script src="js/reservaciones.js?v=25"></script>
 <script src="js/modal.js?v=12"></script>
 <script src="js/pedidos.js?v=39"></script>
 <script src="js/aprobaciones.js?v=25"></script>

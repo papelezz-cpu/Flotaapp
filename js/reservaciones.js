@@ -20,10 +20,37 @@ function _chatHiloBadge(n) {
   return `<span style="position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;padding:0 4px;background:#d4513a;color:#fff;border-radius:8px;font-size:9.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;box-shadow:0 1px 3px rgba(16,42,38,.3)">${n > 9 ? '9+' : n}</span>`;
 }
 
+// Filtro de estado de la vista de reservaciones. Por defecto "Activa": al
+// entrar desde el cuadro del home se ven primero las activas; los demás
+// estados se ven con las pills.
+let _reservFiltro = 'Activa';
+
+const _RESERV_FILTRO_LABEL = {
+  Activa: 'activas', Pendiente: 'pendientes', Completada: 'completadas',
+  Cancelada: 'canceladas', todas: '',
+};
+
+function _aplicaFiltroReserva(rows) {
+  if (_reservFiltro === 'todas') return rows;
+  if (_reservFiltro === 'Cancelada') return rows.filter(r => r.estado === 'Cancelada' || r.estado === 'Rechazada');
+  return rows.filter(r => r.estado === _reservFiltro);
+}
+
+function filtrarReservas(est) {
+  _reservFiltro = est;
+  document.querySelectorAll('#reserv-filtros-bar .ped-filtro-pill').forEach(el =>
+    el.classList.toggle('active', el.dataset.rest === est));
+  renderReserv();
+}
+
 async function renderReserv() {
   const body   = document.getElementById('reserv-body');
   const header = document.getElementById('reserv-header');
   body.innerHTML = skeletonRows(4);
+
+  // Sincronizar las pills con el filtro activo (p. ej. al llegar desde el home)
+  document.querySelectorAll('#reserv-filtros-bar .ped-filtro-pill').forEach(el =>
+    el.classList.toggle('active', el.dataset.rest === _reservFiltro));
 
   // Sin sesión
   if (!currentUser.id) {
@@ -36,13 +63,18 @@ async function renderReserv() {
     header.innerHTML = `<div>Unidad</div><div>Empresa</div><div>Inicio</div><div>Fin</div><div>Estado</div>`;
     header.classList.add('cli');
 
-    const { data, error } = await sb.from('reservaciones')
+    const { data: _allCli, error } = await sb.from('reservaciones')
       .select('*')
       .eq('cliente_email', currentUser.email)
       .order('created_at', { ascending: false });
 
     if (error) { body.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar.</div>`; return; }
-    if (!data?.length) { body.innerHTML = `<div class="empty-state"><div class="icon">📋</div>Aún no tienes reservaciones.</div>`; return; }
+    const data = _aplicaFiltroReserva(_allCli || []);
+    if (!data.length) {
+      const lbl = _RESERV_FILTRO_LABEL[_reservFiltro] || '';
+      body.innerHTML = `<div class="empty-state"><div class="icon">📋</div>No tienes reservaciones${lbl ? ' ' + lbl : ''}.</div>`;
+      return;
+    }
 
     // Obtener empresa según tipo de recurso
     const camionIds   = data.filter(r => !r.recurso_tipo || r.recurso_tipo === 'camion').map(r => r.unidad).filter(Boolean);
@@ -155,9 +187,14 @@ async function renderReserv() {
     reservQuery = reservQuery.eq('propietario_id', currentUser.id);
   }
 
-  const { data, error } = await reservQuery;
+  const { data: _allAdm, error } = await reservQuery;
   if (error) { body.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar.</div>`; return; }
-  if (!data.length) { body.innerHTML = `<div class="empty-state"><div class="icon">📋</div>No hay reservaciones registradas.</div>`; return; }
+  const data = _aplicaFiltroReserva(_allAdm || []);
+  if (!data.length) {
+    const lbl = _RESERV_FILTRO_LABEL[_reservFiltro] || '';
+    body.innerHTML = `<div class="empty-state"><div class="icon">📋</div>No hay reservaciones${lbl ? ' ' + lbl : ''}.</div>`;
+    return;
+  }
 
   // Construir mapa de empresa y etiqueta por tipo de recurso
   const camionIds   = [...new Set(data.filter(r => !r.recurso_tipo || r.recurso_tipo === 'camion').map(r => r.unidad).filter(Boolean))];

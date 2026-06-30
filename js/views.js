@@ -67,11 +67,11 @@ function renderHome() {
       { i:'truck',         bg:'hc-blue',   t:'Solicitar servicio',     d:'Transporte, custodia y más',      fn:`_pedidosMode='solicitar';showView('pedidos',null)` },
       { i:'clipboardList', bg:'hc-slate',  t:'Mis solicitudes',         d:'Revisa el estado de tus pedidos', fn:`_pedidosMode='lista';showView('pedidos',null)` },
       { i:'building',      bg:'hc-teal',   t:'Catálogo',                d:'Empresas verificadas',            fn:`showView('cliente',null)` },
-      { i:'calendarCheck', bg:'hc-purple', t:'Reservaciones',           d:'Tus reservas activas',            fn:`showView('reservaciones',null)` },
+      { i:'calendarCheck', bg:'hc-purple', t:'Reservaciones',           d:'Tus reservas activas',            fn:`_reservFiltro='Activa';showView('reservaciones',null)`, badge:'home-res-badge' },
     ],
     admin: [
       { i:'clipboardList', bg:'hc-blue',   t:'Solicitudes',   d:'Ofertas y pedidos activos',        fn:`showView('pedidos',null)` },
-      { i:'calendarCheck', bg:'hc-purple', t:'Reservaciones', d:'Viajes y servicios activos',       fn:`showView('reservaciones',null)` },
+      { i:'calendarCheck', bg:'hc-purple', t:'Reservaciones', d:'Viajes y servicios activos',       fn:`_reservFiltro='Activa';showView('reservaciones',null)`, badge:'home-res-badge' },
       { i:'truck',         bg:'hc-slate',  t:'Mis unidades',  d:'Gestiona tu flota de camiones',    fn:`_irAdmin('camion')` },
       { i:'hardHat',       bg:'hc-amber',  t:'Operadores',    d:'Personal de conducción',           fn:`_irAdmin('operador')` },
       { i:'calendarClock', bg:'hc-red',    t:'Vigencias',     d:'Documentos por vencer o vencidos', fn:`showView('vigencias',null)`, badge:'home-vig-badge' },
@@ -84,7 +84,7 @@ function renderHome() {
       { i:'barChart',      bg:'hc-amber',  t:'Reportes',      d:'Métricas y estadísticas',          fn:`showView('reportes',null)` },
       { i:'building',      bg:'hc-teal',   t:'Catálogo',      d:'Directorio de proveedores',        fn:`showView('cliente',null)` },
       { i:'calendarClock', bg:'hc-red',    t:'Vigencias',     d:'Documentos vencidos o por vencer', fn:`showView('vigencias',null)`, badge:'home-vig-badge' },
-      { i:'calendarCheck', bg:'hc-purple', t:'Reservaciones', d:'Reservas activas',                 fn:`showView('reservaciones',null)` },
+      { i:'calendarCheck', bg:'hc-purple', t:'Reservaciones', d:'Reservas activas',                 fn:`_reservFiltro='Activa';showView('reservaciones',null)`, badge:'home-res-badge' },
       { i:'archive',       bg:'hc-orange', t:'Historial',     d:'Reservaciones archivadas',         fn:`showView('historial-reservas',null)` },
     ],
   };
@@ -100,6 +100,24 @@ function renderHome() {
 
   if (currentUser?.rol === 'superadmin') _loadAprBadge();
   if (['admin','superadmin'].includes(currentUser?.rol)) actualizarBadgeVigencias();
+  if (currentUser?.id) actualizarBadgeReservas();
+}
+
+// Cuenta de reservaciones ACTIVAS para el badge del cuadro de Reservaciones.
+// Cliente → las suyas (por email); empresa → las de su flota; superadmin → todas.
+async function actualizarBadgeReservas() {
+  const badge = document.getElementById('home-res-badge');
+  if (!badge || !currentUser.id) return;
+  let q = sb.from('reservaciones').select('id', { count: 'exact', head: true }).eq('estado', 'Activa');
+  if (currentUser.rol === 'cliente')   q = q.eq('cliente_email', currentUser.email);
+  else if (currentUser.rol === 'admin') q = q.eq('propietario_id', currentUser.id);
+  const { count } = await q;
+  if (count > 0) {
+    badge.textContent = count > 99 ? '99+' : count;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 function _navTab(view) {
