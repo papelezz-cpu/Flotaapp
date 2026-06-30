@@ -79,8 +79,11 @@ async function renderReserv() {
         : '';
       const unidadLabel = recursoNombreMap[r.unidad] || esc(r.unidad) || '—';
       const propId = ownerIdMap[r.unidad] || r.propietario_id || '';
+      // El chat solo se puede usar mientras la reserva está vigente; al finalizar
+      // queda como historial de solo lectura.
+      const chatAbierto = r.estado === 'Pendiente' || r.estado === 'Activa';
       const chatBtn = propId
-        ? `<button class="btn-chat-hilo" onclick="openChatReserva('${r.id}','${propId}','${escJs(empresaMap[r.unidad]||'')}')">💬</button>`
+        ? `<button class="btn-chat-hilo" title="${chatAbierto ? 'Chat con la empresa' : 'Conversación cerrada (historial)'}" onclick="openChatReserva('${r.id}','${propId}','${escJs(empresaMap[r.unidad]||'')}'${chatAbierto ? '' : ', {readonly:true}'})">💬</button>`
         : '';
       const calBtn = (r.estado === 'Completada' && !r.calificado && propId)
         ? `<button class="btn-calificar" onclick="openCalificar('${r.id}','${propId}','${escJs(empresaMap[r.unidad]||'')}')">⭐ Calificar</button>`
@@ -225,10 +228,19 @@ async function renderReserv() {
       : '';
 
     const unidadLabel = recursoLabelMap[r.unidad] || esc(r.unidad) || '—';
-    // Chat con el cliente (solo si hay cliente_user_id y la reserva está activa/pendiente)
-    const chatBtn = (esDueno && r.cliente_user_id && !inactiva)
-      ? `<button class="btn-chat-hilo" onclick="openChatReserva('${r.id}','${r.cliente_user_id}','${escJs(r.cliente||'')}')">💬</button>`
-      : '';
+    // Chat con el cliente. La empresa puede escribir mientras la reserva está
+    // vigente (Pendiente/Activa); al finalizar queda como historial de lectura.
+    // El superadmin entra como observador del hilo real cliente↔empresa.
+    const esSuper      = currentUser.rol === 'superadmin';
+    const propietarioId = ownerMap[r.unidad] || r.propietario_id || '';
+    const chatVigente  = esPendiente || esActiva;
+    let chatBtn = '';
+    if (esSuper && r.cliente_user_id && propietarioId) {
+      const etiqueta = `${escJs(r.cliente || 'Cliente')} ↔ ${escJs(empresaMap[r.unidad] || 'Empresa')}`;
+      chatBtn = `<button class="btn-chat-hilo" title="Ver conversación (solo lectura)" onclick="openChatReserva('${r.id}','','${etiqueta}', {readonly:true, observador:true, participantes:['${r.cliente_user_id}','${propietarioId}']})">💬</button>`;
+    } else if (esDueno && r.cliente_user_id && !inactiva) {
+      chatBtn = `<button class="btn-chat-hilo" title="${chatVigente ? 'Chat con el cliente' : 'Conversación cerrada (historial)'}" onclick="openChatReserva('${r.id}','${r.cliente_user_id}','${escJs(r.cliente||'')}'${chatVigente ? '' : ', {readonly:true}'})">💬</button>`;
+    }
     // Eliminar (mover a histórico) — solo superadmin
     const elimBtn = currentUser.rol === 'superadmin'
       ? `<button class="btn-edit btn-rechazar" style="font-size:0.72rem" onclick="eliminarReserva('${r.id}')">🗑</button>`

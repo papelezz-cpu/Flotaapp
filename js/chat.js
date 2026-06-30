@@ -6,18 +6,27 @@ let chatState = {
   reservaId:     null,
   pedidoId:      null,
   participantes: [],  // [myId, otroId]
+  readonly:      false,
   subscription:  null,
 };
 
 // ─── Abrir chat desde una reservación ──────────────────
-async function openChatReserva(reservaId, otroUserId, tituloExtra) {
+// opts: { readonly, observador, participantes }
+//   - readonly:    deshabilita el envío (servicio finalizado o supervisión)
+//   - observador:  el superadmin mira el hilo cliente↔empresa sin participar
+//   - participantes: hilo explícito [clienteId, propietarioId] (para observador)
+async function openChatReserva(reservaId, otroUserId, tituloExtra, opts = {}) {
   if (!currentUser.id) return;
-  const participantes = [...new Set([currentUser.id, otroUserId].filter(Boolean))];
+  const participantes = opts.participantes
+    ? [...new Set(opts.participantes.filter(Boolean))]
+    : [...new Set([currentUser.id, otroUserId].filter(Boolean))];
   await _abrirChat({
     reservaId,
     pedidoId: null,
     participantes,
     titulo: `💬 ${tituloExtra || 'Reserva'}`,
+    readonly:  !!opts.readonly,
+    observador: !!opts.observador,
   });
 }
 
@@ -34,21 +43,41 @@ async function openChatPedido(pedidoId, otroUserId, tituloExtra) {
 }
 
 // ─── Core: abre el panel y carga mensajes ───────────────
-async function _abrirChat({ reservaId, pedidoId, participantes, titulo }) {
+async function _abrirChat({ reservaId, pedidoId, participantes, titulo, readonly, observador }) {
   // Desuscribir canal anterior
   if (chatState.subscription) {
     chatState.subscription.unsubscribe();
     chatState.subscription = null;
   }
 
-  chatState = { open: true, reservaId, pedidoId, participantes, subscription: null };
+  chatState = { open: true, reservaId, pedidoId, participantes, readonly: !!readonly, observador: !!observador, subscription: null };
 
   document.getElementById('chat-titulo').textContent = titulo;
   document.getElementById('chat-panel').classList.add('open');
-  document.getElementById('chat-input').focus();
+  _aplicarModoChat(chatState.readonly, chatState.observador);
 
   await _cargarMensajes();
   _suscribirChat();
+}
+
+// ─── Modo del panel: lectura/escritura ──────────────────
+function _aplicarModoChat(readonly, observador) {
+  const footer = document.querySelector('#chat-panel .chat-footer');
+  const aviso  = document.getElementById('chat-cerrado-aviso');
+  const input  = document.getElementById('chat-input');
+  if (readonly) {
+    if (footer) footer.style.display = 'none';
+    if (aviso) {
+      aviso.textContent = observador
+        ? '👁 Vista de supervisión — solo lectura.'
+        : '🔒 Conversación cerrada — el servicio finalizó. Queda disponible como historial.';
+      aviso.style.display = 'block';
+    }
+  } else {
+    if (footer) footer.style.display = '';
+    if (aviso)  aviso.style.display = 'none';
+    if (input)  input.focus();
+  }
 }
 
 // ─── Cargar historial ───────────────────────────────────
@@ -70,6 +99,9 @@ async function _cargarMensajes() {
 
   const { data } = await query;
   _renderMensajes(data || []);
+
+  // Un observador (superadmin) no marca como leídos los mensajes ajenos.
+  if (chatState.observador) return;
 
   // Marcar como leídos los del otro
   const noLeidos = (data || [])
@@ -106,6 +138,7 @@ function _msgHTML(m) {
 let _chatLastSend = 0;
 
 async function enviarMensaje() {
+  if (chatState.readonly) return; // chat cerrado o en modo supervisión
   const ahora = Date.now();
   if (ahora - _chatLastSend < 800) return; // throttle: máximo 1 msg cada 800ms
   _chatLastSend = ahora;
@@ -156,7 +189,8 @@ function _suscribirChat() {
       el.scrollTop = el.scrollHeight;
 
       // Marcar como leído si el panel está abierto y el mensaje es del otro
-      if (m.de_user_id !== currentUser.id) {
+      // (el observador/superadmin no altera el estado de lectura del hilo ajeno)
+      if (!chatState.observador && m.de_user_id !== currentUser.id) {
         sb.from('mensajes').update({ leido: true }).eq('id', m.id).then(() => {});
       }
     })
