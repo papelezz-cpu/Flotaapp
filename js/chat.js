@@ -141,15 +141,32 @@ function _msgHTML(m) {
 // ─── Enviar mensaje ─────────────────────────────────────
 let _chatLastSend = 0;
 
+// Candado anti-desintermediación: detecta números de teléfono para evitar que
+// se cierren tratos fuera de la plataforma. Considera "teléfono" a una secuencia
+// de 10+ dígitos aunque venga separada por espacios, puntos, guiones o paréntesis
+// (ej: "55 1234 5678", "+52 314-123-4567"). No bloquea precios/fechas (<10 dígitos
+// o separados por comas).
+function _contieneTelefono(texto) {
+  return /(?:\+?\d[\s.\-()]*){10,}/.test(texto);
+}
+
 async function enviarMensaje() {
   if (chatState.readonly) return; // chat cerrado o en modo supervisión
-  const ahora = Date.now();
-  if (ahora - _chatLastSend < 800) return; // throttle: máximo 1 msg cada 800ms
-  _chatLastSend = ahora;
 
   const input = document.getElementById('chat-input');
   const texto = input.value.trim();
   if (!texto || !currentUser.id) return;
+
+  // No permitir compartir teléfonos por el chat (se conserva el texto escrito)
+  if (_contieneTelefono(texto)) {
+    showToast('Por seguridad no se permiten números de teléfono en el chat. Mantén el trato dentro de PortGo.', 'error');
+    return;
+  }
+
+  const ahora = Date.now();
+  if (ahora - _chatLastSend < 800) return; // throttle: máximo 1 msg cada 800ms
+  _chatLastSend = ahora;
+
   input.value = '';
   input.focus();
 
