@@ -425,11 +425,23 @@ function eliminarReserva(reservaId) {
 
 // ── COMPLETAR SERVICIO (admin) ─────────────────────────
 
-function marcarCompletado(reservaId) {
+async function marcarCompletado(reservaId) {
+  const { data: r } = await sb.from('reservaciones')
+    .select('unidad, recurso_tipo, tracking_estado, cliente_user_id, cliente, propietario_id, pedido_id')
+    .eq('id', reservaId).single();
+  if (!r) { showToast('No se encontró la reserva', 'error'); return; }
+
+  // No se puede completar si el seguimiento no llegó al último estado:
+  // el dueño debe avanzar el tracking (📍) hasta la entrega antes de cerrar.
+  const estados   = _getEstados(r.recurso_tipo);
+  const estadoFin = estados[estados.length - 1];
+  const actual    = r.tracking_estado || estados[0].key;
+  if (actual !== estadoFin.key) {
+    showToast(`Primero avanza el seguimiento 📍 hasta "${estadoFin.label}". Estado actual: "${esc(actual)}".`, 'error');
+    return;
+  }
+
   showConfirm('¿Marcar este servicio como completado? El cliente podrá calificarlo.', async () => {
-    const { data: r } = await sb.from('reservaciones')
-      .select('unidad, recurso_tipo, cliente_user_id, cliente, propietario_id, pedido_id')
-      .eq('id', reservaId).single();
     await sb.from('reservaciones').update({
       estado:        'Completada',
       completado_en: new Date().toISOString(),
