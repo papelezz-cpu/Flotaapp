@@ -16,13 +16,17 @@ This file provides guidance to Claude Code when working with the **PortGo** code
 
 ## ⚡ Deployment Checklist — DO THIS EVERY TIME
 
-The app is served from **GitHub Pages** (`https://github.com/papelezz-cpu/Flotaapp.git`). Nothing is live until pushed. After ANY change:
+The app is served from **Vercel** at **`https://portgo-six.vercel.app`** (repo `papelezz-cpu/Flotaapp`, root served as a static site — no build step). The app is `/app.html`; the landing is `/`. **`git push` to `main` auto-deploys** (usually live within ~30s). After ANY change:
 
 1. **Bump the `?v=` param in `app.html`** for every JS/CSS file you changed (e.g. `js/pedidos.js?v=36` → `?v=37`). `app.html` is the application; `index.html` is the static marketing landing. If you skip this, browsers serve the old cached file and the user reports "it's not fixed".
-2. **Bump the cache version in `sw.js`**: `const CACHE = 'portgo-vXX'` → `vXX+1`.
-3. **Commit AND `git push`** — a commit alone deploys nothing.
-4. Schema changes: `mcp__supabase__apply_migration`. Edge Functions: `mcp__supabase__deploy_edge_function`. Both hit **production immediately** — there is no staging.
+2. **Bump the cache version in `sw.js`**: `const CACHE = 'portgo-vXX'` → `vXX+1`. On Vercel the Service Worker actually registers (the site is at the domain root), so the cache bump genuinely matters now — unlike on the old GitHub Pages subpath where `/sw.js` 404'd.
+3. **Commit AND `git push`** — Vercel deploys on push to `main`; a local commit alone deploys nothing.
+4. Schema changes: `mcp__supabase__apply_migration` (or run the SQL in the Supabase dashboard). Edge Functions: `mcp__supabase__deploy_edge_function`. Both hit **production immediately** — there is no staging.
 5. Tell the user to hard-refresh (**Ctrl+Shift+R**) if they're testing right away.
+
+`vercel.json` sets the static config: `cleanUrls:false` (keeps the `.html` URLs), no-cache for `sw.js`, revalidate for HTML/manifest.
+
+> ⚠️ **Auth redirect URLs:** the Vercel domain must be in Supabase → Authentication → URL Configuration (Site URL + Redirect URLs), or password-reset links won't redirect. Add any new domain (e.g. a custom domain) there too.
 
 To run locally: `npx serve .` (connects to the live Supabase project; credentials in `js/config.js`).
 
