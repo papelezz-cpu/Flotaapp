@@ -76,11 +76,13 @@ function init() {
       if (pedidosActivo()) renderPedidos();
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
-      // Actualizar badge si el mensaje va dirigido a mí y no está abierto su chat
+      // Mensaje dirigido a mí: refrescar la "nubesita" de la reserva si estoy
+      // viendo Reservaciones (la notificación en sí llega por la campana).
       const m = payload.new;
       if (currentUser.id && m.de_user_id !== currentUser.id &&
           (m.participantes || []).includes(currentUser.id)) {
         actualizarBadgeChat();
+        if (document.getElementById('view-reservaciones')?.classList.contains('active')) renderReserv();
       }
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificaciones' }, payload => {

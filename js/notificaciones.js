@@ -16,9 +16,9 @@ async function loadNotificaciones() {
     .limit(20);
 
   const notifs = data || [];
-  // Los mensajes van al globo 💬, no a la campana
-  const sinMensajes = notifs.filter(n => n.tipo !== 'nuevo_mensaje');
-  const unread = sinMensajes.filter(n => !n.leido).length;
+  // Los mensajes nuevos también van a la campana (antes iban al globo 💬,
+  // que se eliminó). Al hacer click, onNotifClick abre el chat de la reserva.
+  const unread = notifs.filter(n => !n.leido).length;
   const badge  = document.getElementById('notif-badge');
 
   if (unread > 0) {
@@ -28,8 +28,7 @@ async function loadNotificaciones() {
     badge.style.display = 'none';
   }
 
-  // Guardar solo notifs que no son mensajes para el panel de campana
-  notifPanel = sinMensajes;
+  notifPanel = notifs;
 }
 
 function toggleNotifPanel() {

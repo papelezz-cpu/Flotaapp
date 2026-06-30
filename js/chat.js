@@ -109,7 +109,11 @@ async function _cargarMensajes() {
     .map(m => m.id);
   if (noLeidos.length) {
     sb.from('mensajes').update({ leido: true }).in('id', noLeidos)
-      .then(() => actualizarBadgeChat());
+      .then(() => {
+        actualizarBadgeChat();
+        // Quitar la "nubesita" de la fila ahora que el hilo quedó leído
+        if (document.getElementById('view-reservaciones')?.classList.contains('active')) renderReserv();
+      });
   }
 }
 

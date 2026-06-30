@@ -1,5 +1,25 @@
 // ── RESERVACIONES ─────────────────────────────────────
 
+// Mensajes sin leer para mí, agrupados por reserva → { reserva_id: count }
+async function _unreadPorReserva(reservaIds) {
+  const map = {};
+  if (!reservaIds.length || !currentUser.id) return map;
+  const { data } = await sb.from('mensajes')
+    .select('reserva_id')
+    .in('reserva_id', reservaIds)
+    .eq('leido', false)
+    .neq('de_user_id', currentUser.id)
+    .contains('participantes', [currentUser.id]);
+  (data || []).forEach(m => { map[m.reserva_id] = (map[m.reserva_id] || 0) + 1; });
+  return map;
+}
+
+// "Nubesita" de mensajes nuevos sobre el botón 💬 de una fila
+function _chatHiloBadge(n) {
+  if (!n) return '';
+  return `<span style="position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;padding:0 4px;background:#d4513a;color:#fff;border-radius:8px;font-size:9.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;box-shadow:0 1px 3px rgba(16,42,38,.3)">${n > 9 ? '9+' : n}</span>`;
+}
+
 async function renderReserv() {
   const body   = document.getElementById('reserv-body');
   const header = document.getElementById('reserv-header');
@@ -69,6 +89,8 @@ async function renderReserv() {
       });
     }
 
+    const unreadMap = await _unreadPorReserva(data.map(r => r.id));
+
     body.innerHTML = data.map(r => {
       const badgeCls = r.estado === 'Pendiente'   ? 'badge-busy'
                      : r.estado === 'Activa'      ? 'badge-avail'
@@ -83,7 +105,7 @@ async function renderReserv() {
       // queda como historial de solo lectura.
       const chatAbierto = r.estado === 'Pendiente' || r.estado === 'Activa';
       const chatBtn = propId
-        ? `<button class="btn-chat-hilo" title="${chatAbierto ? 'Chat con la empresa' : 'Conversación cerrada (historial)'}" onclick="openChatReserva('${r.id}','${propId}','${escJs(empresaMap[r.unidad]||'')}'${chatAbierto ? '' : ', {readonly:true}'})">💬</button>`
+        ? `<button class="btn-chat-hilo" style="position:relative" title="${chatAbierto ? 'Chat con la empresa' : 'Conversación cerrada (historial)'}" onclick="openChatReserva('${r.id}','${propId}','${escJs(empresaMap[r.unidad]||'')}'${chatAbierto ? '' : ', {readonly:true}'})">💬${_chatHiloBadge(unreadMap[r.id])}</button>`
         : '';
       const calBtn = (r.estado === 'Completada' && !r.calificado && propId)
         ? `<button class="btn-calificar" onclick="openCalificar('${r.id}','${propId}','${escJs(empresaMap[r.unidad]||'')}')">⭐ Calificar</button>`
@@ -184,6 +206,8 @@ async function renderReserv() {
     });
   }
 
+  const unreadMap = await _unreadPorReserva(data.map(r => r.id));
+
   body.innerHTML = data.map(r => {
     const esCancelada = r.estado === 'Cancelada';
     const esRechazada = r.estado === 'Rechazada';
@@ -239,7 +263,7 @@ async function renderReserv() {
       const etiqueta = `${escJs(r.cliente || 'Cliente')} ↔ ${escJs(empresaMap[r.unidad] || 'Empresa')}`;
       chatBtn = `<button class="btn-chat-hilo" title="Ver conversación (solo lectura)" onclick="openChatReserva('${r.id}','','${etiqueta}', {readonly:true, observador:true, participantes:['${r.cliente_user_id}','${propietarioId}']})">💬</button>`;
     } else if (esDueno && r.cliente_user_id && !inactiva) {
-      chatBtn = `<button class="btn-chat-hilo" title="${chatVigente ? 'Chat con el cliente' : 'Conversación cerrada (historial)'}" onclick="openChatReserva('${r.id}','${r.cliente_user_id}','${escJs(r.cliente||'')}'${chatVigente ? '' : ', {readonly:true}'})">💬</button>`;
+      chatBtn = `<button class="btn-chat-hilo" style="position:relative" title="${chatVigente ? 'Chat con el cliente' : 'Conversación cerrada (historial)'}" onclick="openChatReserva('${r.id}','${r.cliente_user_id}','${escJs(r.cliente||'')}'${chatVigente ? '' : ', {readonly:true}'})">💬${_chatHiloBadge(unreadMap[r.id])}</button>`;
     }
     // Eliminar (mover a histórico) — solo superadmin
     const elimBtn = currentUser.rol === 'superadmin'
