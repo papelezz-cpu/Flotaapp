@@ -400,6 +400,13 @@ async function editarCamion(id) {
   set('editar-combustible', c.tipo_combustible || '');
   set('editar-tc', c.tarjeta_circulacion || '');
   set('editar-fecha-tc', c.fecha_expedicion_tc || '');
+  // Vigencias y documentos (CAAT, seguro, SCT, verificación)
+  set('editar-caat', c.caat || '');
+  set('editar-vigencia-caat', c.vigencia_caat || '');
+  set('editar-vence-tc', c.fecha_vencimiento_tc || '');
+  set('editar-vence-seguro', c.fecha_vencimiento_seguro || '');
+  set('editar-vence-permiso-sct', c.fecha_vencimiento_permiso_sct || '');
+  set('editar-vence-verificacion', c.fecha_vencimiento_verificacion || '');
 
   renderCargoChipsSelect('editar-tipo-carga', c.tipo_carga || []);
   document.getElementById('modal-editar').classList.add('open');
@@ -432,6 +439,12 @@ async function guardarEdicion() {
     tipo_combustible:    g('editar-combustible'),
     tarjeta_circulacion: g('editar-tc'),
     fecha_expedicion_tc: g('editar-fecha-tc'),
+    caat:                           g('editar-caat'),
+    vigencia_caat:                  g('editar-vigencia-caat'),
+    fecha_vencimiento_tc:           g('editar-vence-tc'),
+    fecha_vencimiento_seguro:       g('editar-vence-seguro'),
+    fecha_vencimiento_permiso_sct:  g('editar-vence-permiso-sct'),
+    fecha_vencimiento_verificacion: g('editar-vence-verificacion'),
   };
 
   const esSuperAdmin = currentUser.rol === 'superadmin';

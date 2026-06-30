@@ -1692,6 +1692,34 @@
       <label>Fecha expedición TC</label>
       <input type="date" id="editar-fecha-tc">
     </div>
+
+    <div style="margin:18px 0 4px;font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);border-top:1px solid var(--steel);padding-top:14px">📅 Vigencias y documentos</div>
+    <div style="font-size:0.76rem;color:var(--text-muted);margin-bottom:12px">Actualiza aquí las fechas de vencimiento (CAAT, seguro, etc.) sin volver a subir los documentos.</div>
+    <div class="form-group">
+      <label>CAAT</label>
+      <input type="text" id="editar-caat" placeholder="Núm. de CAAT">
+    </div>
+    <div class="form-group">
+      <label>Vigencia CAAT</label>
+      <input type="date" id="editar-vigencia-caat">
+    </div>
+    <div class="form-group">
+      <label>Vence tarjeta de circulación</label>
+      <input type="date" id="editar-vence-tc">
+    </div>
+    <div class="form-group">
+      <label>Vence póliza de seguro</label>
+      <input type="date" id="editar-vence-seguro">
+    </div>
+    <div class="form-group">
+      <label>Vence permiso SCT</label>
+      <input type="date" id="editar-vence-permiso-sct">
+    </div>
+    <div class="form-group">
+      <label>Vence verificación vehicular</label>
+      <input type="date" id="editar-vence-verificacion">
+    </div>
+
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeEditarCamion()">Cancelar</button>
       <button class="btn-confirm" onclick="guardarEdicion()">💾 Guardar cambios</button>
@@ -2202,7 +2230,7 @@
 <script src="js/modal.js?v=12"></script>
 <script src="js/pedidos.js?v=39"></script>
 <script src="js/aprobaciones.js?v=25"></script>
-<script src="js/admin.js?v=26"></script>
+<script src="js/admin.js?v=27"></script>
 <script src="js/operadores.js?v=9"></script>
 <script src="js/usuarios.js?v=17"></script>
 <script src="js/reportes.js?v=2"></script>
