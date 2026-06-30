@@ -675,6 +675,8 @@ function _renderCamionCard(c) {
         ${c.imagen_tc  ? `<a href="#" onclick="verArchivoPublico('${escJs(c.imagen_tc)}')"  class="btn-edit" style="font-size:0.75rem">🪪 TC</a>` : ''}
         ${c.doc_sct    ? `<a href="#" onclick="verArchivoPublico('${escJs(c.doc_sct)}')"    class="btn-edit" style="font-size:0.75rem">📄 SCT</a>` : ''}
         ${c.doc_seguro ? `<a href="#" onclick="verArchivoPublico('${escJs(c.doc_seguro)}')" class="btn-edit" style="font-size:0.75rem">📄 Seguro</a>` : ''}
+        ${c.doc_caat   ? `<a href="#" onclick="verArchivoPublico('${escJs(c.doc_caat)}')"   class="btn-edit" style="font-size:0.75rem">📄 CAAT</a>` : ''}
+        ${c.doc_verificacion ? `<a href="#" onclick="verArchivoPublico('${escJs(c.doc_verificacion)}')" class="btn-edit" style="font-size:0.75rem">📄 Verificación</a>` : ''}
         ${(c.archivos||[]).length ? `<button class="btn-edit" style="font-size:0.75rem" onclick="verArchivos('${c.id}')">📎 Todos los archivos</button>` : ''}
       </div>
       <div class="apr-op-section-title" style="margin-top:10px">Núm. CAAT</div>

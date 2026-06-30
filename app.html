@@ -1694,7 +1694,8 @@
     </div>
 
     <div style="margin:18px 0 4px;font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);border-top:1px solid var(--steel);padding-top:14px">📅 Vigencias y documentos</div>
-    <div style="font-size:0.76rem;color:var(--text-muted);margin-bottom:12px">Actualiza aquí las fechas de vencimiento (CAAT, seguro, etc.) sin volver a subir los documentos.</div>
+    <div style="font-size:0.76rem;color:var(--text-muted);margin-bottom:12px">Si renuevas una fecha de vencimiento, <strong>adjunta el documento renovado</strong>. El cambio queda pendiente hasta que el superadmin lo verifique y apruebe.</div>
+
     <div class="form-group">
       <label>CAAT</label>
       <input type="text" id="editar-caat" placeholder="Núm. de CAAT">
@@ -1702,22 +1703,47 @@
     <div class="form-group">
       <label>Vigencia CAAT</label>
       <input type="date" id="editar-vigencia-caat">
+      <label class="file-upload-area" for="editar-doc-caat" style="margin-top:6px">
+        <span class="file-upload-icon">📄</span>
+        <span id="editar-doc-caat-label" class="file-upload-text">Adjuntar CAAT renovado</span>
+      </label>
+      <input type="file" id="editar-doc-caat" accept="image/*,.pdf" style="display:none" onchange="updateFileLabel('editar-doc-caat','editar-doc-caat-label')">
     </div>
     <div class="form-group">
       <label>Vence tarjeta de circulación</label>
       <input type="date" id="editar-vence-tc">
+      <label class="file-upload-area" for="editar-doc-tc" style="margin-top:6px">
+        <span class="file-upload-icon">📄</span>
+        <span id="editar-doc-tc-label" class="file-upload-text">Adjuntar tarjeta de circulación</span>
+      </label>
+      <input type="file" id="editar-doc-tc" accept="image/*,.pdf" style="display:none" onchange="updateFileLabel('editar-doc-tc','editar-doc-tc-label')">
     </div>
     <div class="form-group">
       <label>Vence póliza de seguro</label>
       <input type="date" id="editar-vence-seguro">
+      <label class="file-upload-area" for="editar-doc-seguro" style="margin-top:6px">
+        <span class="file-upload-icon">📄</span>
+        <span id="editar-doc-seguro-label" class="file-upload-text">Adjuntar póliza de seguro</span>
+      </label>
+      <input type="file" id="editar-doc-seguro" accept="image/*,.pdf" style="display:none" onchange="updateFileLabel('editar-doc-seguro','editar-doc-seguro-label')">
     </div>
     <div class="form-group">
       <label>Vence permiso SCT</label>
       <input type="date" id="editar-vence-permiso-sct">
+      <label class="file-upload-area" for="editar-doc-sct" style="margin-top:6px">
+        <span class="file-upload-icon">📄</span>
+        <span id="editar-doc-sct-label" class="file-upload-text">Adjuntar permiso SCT</span>
+      </label>
+      <input type="file" id="editar-doc-sct" accept="image/*,.pdf" style="display:none" onchange="updateFileLabel('editar-doc-sct','editar-doc-sct-label')">
     </div>
     <div class="form-group">
       <label>Vence verificación vehicular</label>
       <input type="date" id="editar-vence-verificacion">
+      <label class="file-upload-area" for="editar-doc-verificacion" style="margin-top:6px">
+        <span class="file-upload-icon">📄</span>
+        <span id="editar-doc-verificacion-label" class="file-upload-text">Adjuntar verificación</span>
+      </label>
+      <input type="file" id="editar-doc-verificacion" accept="image/*,.pdf" style="display:none" onchange="updateFileLabel('editar-doc-verificacion','editar-doc-verificacion-label')">
     </div>
 
     <div class="modal-actions">
@@ -2229,8 +2255,8 @@
 <script src="js/reservaciones.js?v=25"></script>
 <script src="js/modal.js?v=12"></script>
 <script src="js/pedidos.js?v=39"></script>
-<script src="js/aprobaciones.js?v=25"></script>
-<script src="js/admin.js?v=27"></script>
+<script src="js/aprobaciones.js?v=26"></script>
+<script src="js/admin.js?v=28"></script>
 <script src="js/operadores.js?v=9"></script>
 <script src="js/usuarios.js?v=17"></script>
 <script src="js/reportes.js?v=2"></script>

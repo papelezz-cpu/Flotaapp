@@ -408,6 +408,17 @@ async function editarCamion(id) {
   set('editar-vence-permiso-sct', c.fecha_vencimiento_permiso_sct || '');
   set('editar-vence-verificacion', c.fecha_vencimiento_verificacion || '');
 
+  // Limpiar inputs de documentos (no se pueden pre-cargar) y sus etiquetas
+  [['editar-doc-caat','editar-doc-caat-label','Adjuntar CAAT renovado'],
+   ['editar-doc-tc','editar-doc-tc-label','Adjuntar tarjeta de circulación'],
+   ['editar-doc-seguro','editar-doc-seguro-label','Adjuntar póliza de seguro'],
+   ['editar-doc-sct','editar-doc-sct-label','Adjuntar permiso SCT'],
+   ['editar-doc-verificacion','editar-doc-verificacion-label','Adjuntar verificación']
+  ].forEach(([inp, lbl, txt]) => {
+    const i = document.getElementById(inp); if (i) i.value = '';
+    const l = document.getElementById(lbl); if (l) l.textContent = txt;
+  });
+
   renderCargoChipsSelect('editar-tipo-carga', c.tipo_carga || []);
   document.getElementById('modal-editar').classList.add('open');
 }
@@ -448,11 +459,39 @@ async function guardarEdicion() {
   };
 
   const esSuperAdmin = currentUser.rol === 'superadmin';
-  let updatePayload = payload;
 
+  // Estado actual: necesario para detectar qué vigencia cambió y para la ruta
+  // de storage de los documentos.
+  const { data: anterior } = await sb.from('camiones').select('*').eq('id', id).single();
+  const propietarioId = anterior?.propietario_id;
+
+  // Candado de vigencias: si se renueva una fecha hay que adjuntar el documento
+  // (para que el superadmin verifique). Si se adjunta, se sube y se guarda la ruta.
+  const vigDocs = [
+    { dateEl:'editar-vigencia-caat',      fileEl:'editar-doc-caat',         dateCol:'vigencia_caat',                  docCol:'doc_caat',         label:'CAAT' },
+    { dateEl:'editar-vence-tc',           fileEl:'editar-doc-tc',           dateCol:'fecha_vencimiento_tc',           docCol:'imagen_tc',        label:'tarjeta de circulación' },
+    { dateEl:'editar-vence-seguro',       fileEl:'editar-doc-seguro',       dateCol:'fecha_vencimiento_seguro',       docCol:'doc_seguro',       label:'póliza de seguro' },
+    { dateEl:'editar-vence-permiso-sct',  fileEl:'editar-doc-sct',          dateCol:'fecha_vencimiento_permiso_sct',  docCol:'doc_sct',          label:'permiso SCT' },
+    { dateEl:'editar-vence-verificacion', fileEl:'editar-doc-verificacion', dateCol:'fecha_vencimiento_verificacion', docCol:'doc_verificacion', label:'verificación vehicular' },
+  ];
+
+  for (const v of vigDocs) {
+    const file        = document.getElementById(v.fileEl)?.files?.[0];
+    const dateChanged = (g(v.dateEl) || '') !== (anterior?.[v.dateCol] || '');
+    if (file) {
+      const ext  = file.name.split('.').pop();
+      const path = `${propietarioId}/${id}/${v.docCol}_${Date.now()}.${ext}`;
+      const { data: up, error: upErr } = await sb.storage.from('unidades').upload(path, file);
+      if (upErr || !up) { showToast(`No se pudo subir el documento de ${v.label}`, 'error'); return; }
+      payload[v.docCol] = up.path;
+    } else if (dateChanged && !esSuperAdmin) {
+      showToast(`Para renovar la vigencia de ${v.label} debes adjuntar el documento renovado.`, 'error');
+      return;
+    }
+  }
+
+  let updatePayload = payload;
   if (!esSuperAdmin) {
-    // Fetch estado actual para calcular diff
-    const { data: anterior } = await sb.from('camiones').select('*').eq('id', id).single();
     const camposEditados = Object.keys(payload).filter(k =>
       JSON.stringify(anterior?.[k]) !== JSON.stringify(payload[k])
     );
