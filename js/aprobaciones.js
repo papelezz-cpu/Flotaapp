@@ -899,7 +899,7 @@ async function aprobarCuenta(userId, metodo) {
     .select('nombre').eq('user_id', userId).single();
 
   const [{ error }] = await Promise.all([
-    sb.from('perfiles').update({ aprobacion_cuenta: null, metodo_verificacion: metodo }).eq('user_id', userId),
+    sb.from('perfiles').update({ aprobacion_cuenta: null, metodo_verificacion: metodo, verificado: esFisica }).eq('user_id', userId),
     sb.from('solicitudes_cuenta').update({ estado: 'aprobada' }).eq('user_id', userId),
   ]);
   if (error) { showToast('Error al aprobar', 'error'); return; }

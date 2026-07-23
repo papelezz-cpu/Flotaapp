@@ -48,7 +48,7 @@ async function renderUsuarios() {
     const verificado = verificadoMap[u.user_id] || false;
     const verBadge   = verificado
       ? `<span title="Usuario verificado" style="display:inline-block;font-size:0.7rem;font-weight:700;background:rgba(34,197,94,0.15);color:var(--green,#22c55e);border:1px solid rgba(34,197,94,0.4);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">✓ Verificado</span>`
-      : '';
+      : `<span title="Usuario no verificado" style="display:inline-block;font-size:0.7rem;font-weight:700;background:rgba(234,179,8,0.15);color:#ca8a04;border:1px solid rgba(234,179,8,0.35);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">No verificado</span>`;
     return `
     <div class="truck-list-item">
       <div class="truck-list-item-info">
