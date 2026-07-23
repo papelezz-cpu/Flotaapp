@@ -318,11 +318,14 @@ body.light .ep-recurso-row { background: rgba(0,0,0,0.04); }
 .btn-add:hover { background: var(--accent-bright); }
 
 .btn-edit {
-  padding: 5px 12px;
+  padding: 6px 12px; min-height: 30px; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
   background: rgba(78,142,247,0.15); border: 1px solid rgba(78,142,247,0.3);
   border-radius: 7px; color: var(--accent);
-  font-size: 0.75rem; font-weight: 600; cursor: pointer;
+  font-size: 0.75rem; font-weight: 600; cursor: pointer; line-height: 1;
+  white-space: nowrap;
 }
+.btn-edit-icon { width: 30px; padding: 6px; flex: 0 0 auto; }
 
 /* ── MODAL ───────────────────────────────────────────── */
 .modal-overlay {
@@ -861,12 +864,14 @@ body.light .badge-acordado  { background: rgba(37,99,235,0.1); }
 .truck-list-admin { display: flex; flex-direction: column; gap: 8px; }
 .truck-list-item {
   display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px 8px;
   background: rgba(255,255,255,0.04); border-radius: 10px; padding: 10px 14px;
   font-size: 0.85rem;
 }
-.truck-list-item-info { display: flex; flex-direction: column; gap: 2px; }
-.truck-list-item-name { font-weight: 600; }
+.truck-list-item-info { flex: 1 1 200px; min-width: 180px; display: flex; flex-direction: column; gap: 4px; }
+.truck-list-item-name { font-weight: 600; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 0; }
 .truck-list-item-sub  { font-size: 0.75rem; color: var(--text-muted); }
+.truck-list-actions   { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; flex: 0 0 auto; }
 
 /* ── CHAT PANEL ──────────────────────────────────────── */
 .chat-panel {

@@ -31,9 +31,9 @@ async function renderUsuarios() {
   }
 
   const APR_BADGE = {
-    pendiente:  `<span style="display:inline-block;font-size:0.68rem;font-weight:700;background:rgba(234,179,8,0.15);color:#ca8a04;border:1px solid rgba(234,179,8,0.35);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">Pendiente</span>`,
-    rechazada:  `<span style="display:inline-block;font-size:0.68rem;font-weight:700;background:rgba(239,68,68,0.12);color:var(--danger);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">Rechazada</span>`,
-    suspendida: `<span style="display:inline-block;font-size:0.68rem;font-weight:700;background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.35);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">Suspendida</span>`,
+    pendiente:  `<span style="display:inline-block;font-size:0.68rem;font-weight:700;background:rgba(234,179,8,0.15);color:#ca8a04;border:1px solid rgba(234,179,8,0.35);border-radius:10px;padding:1px 7px">Pendiente</span>`,
+    rechazada:  `<span style="display:inline-block;font-size:0.68rem;font-weight:700;background:rgba(239,68,68,0.12);color:var(--danger);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:1px 7px">Rechazada</span>`,
+    suspendida: `<span style="display:inline-block;font-size:0.68rem;font-weight:700;background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.35);border-radius:10px;padding:1px 7px">Suspendida</span>`,
   };
 
   // Cargar estados verificado desde perfiles
@@ -47,26 +47,28 @@ async function renderUsuarios() {
   list.innerHTML = json.lista.map(u => {
     const verificado = verificadoMap[u.user_id] || false;
     const verBadge   = verificado
-      ? `<span title="Usuario verificado" style="display:inline-block;font-size:0.7rem;font-weight:700;background:rgba(34,197,94,0.15);color:var(--green,#22c55e);border:1px solid rgba(34,197,94,0.4);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">✓ Verificado</span>`
-      : `<span title="Usuario no verificado" style="display:inline-block;font-size:0.7rem;font-weight:700;background:rgba(234,179,8,0.15);color:#ca8a04;border:1px solid rgba(234,179,8,0.35);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle">No verificado</span>`;
+      ? `<span title="Usuario verificado" style="display:inline-block;font-size:0.7rem;font-weight:700;background:rgba(34,197,94,0.15);color:var(--green,#22c55e);border:1px solid rgba(34,197,94,0.4);border-radius:10px;padding:1px 7px">✓ Verificado</span>`
+      : `<span title="Usuario no verificado" style="display:inline-block;font-size:0.7rem;font-weight:700;background:rgba(234,179,8,0.15);color:#ca8a04;border:1px solid rgba(234,179,8,0.35);border-radius:10px;padding:1px 7px">No verificado</span>`;
     return `
     <div class="truck-list-item">
       <div class="truck-list-item-info">
         <div class="truck-list-item-name">
-          ${esc(u.nombre)}${APR_BADGE[u.aprobacion_cuenta] || ''}${verBadge}
+          <span>${esc(u.nombre)}</span>${APR_BADGE[u.aprobacion_cuenta] || ''}${verBadge}
         </div>
         <div class="truck-list-item-sub">${esc(u.email)} · ${ROL_LABEL[u.rol] || u.rol}</div>
       </div>
-      <button class="btn-edit" onclick="abrirHistorialUsuario('${u.user_id}','${escJs(u.nombre)}','${u.rol}')">📋</button>
-      <button class="btn-edit" onclick="abrirEditarUsuario('${u.user_id}','${escJs(u.nombre)}','${escJs(u.email)}','${u.rol}')">✏ Editar</button>
-      ${u.rol !== 'superadmin' ? `
-        <button class="btn-edit" style="font-size:0.72rem;${verificado ? 'color:var(--green,#22c55e);border-color:rgba(34,197,94,0.4)' : ''}"
-          onclick="toggleVerificado('${u.user_id}','${escJs(u.nombre)}',${verificado})">${verificado ? '✓ Verificado' : '✓ Verificar'}</button>
-        ${u.aprobacion_cuenta === 'suspendida'
-          ? `<button class="btn-edit" style="color:var(--green);border-color:rgba(34,197,94,0.3)" onclick="reactivarUsuario('${u.user_id}','${escJs(u.nombre)}')">↑ Activar</button>`
-          : `<button class="btn-edit" style="color:var(--amber);border-color:rgba(245,158,11,0.3)" onclick="suspenderUsuario('${u.user_id}','${escJs(u.nombre)}')">🚫</button>`}
-        <button class="btn-edit btn-rechazar" onclick="eliminarUsuario('${u.user_id}','${escJs(u.nombre)}')">🗑</button>
-      ` : ''}
+      <div class="truck-list-actions">
+        <button class="btn-edit btn-edit-icon" title="Historial" onclick="abrirHistorialUsuario('${u.user_id}','${escJs(u.nombre)}','${u.rol}')">📋</button>
+        <button class="btn-edit" onclick="abrirEditarUsuario('${u.user_id}','${escJs(u.nombre)}','${escJs(u.email)}','${u.rol}')">✏ Editar</button>
+        ${u.rol !== 'superadmin' ? `
+          <button class="btn-edit" style="${verificado ? 'color:var(--green,#22c55e);border-color:rgba(34,197,94,0.4)' : ''}"
+            onclick="toggleVerificado('${u.user_id}','${escJs(u.nombre)}',${verificado})">${verificado ? '✓ Verificado' : '✓ Verificar'}</button>
+          ${u.aprobacion_cuenta === 'suspendida'
+            ? `<button class="btn-edit" style="color:var(--green);border-color:rgba(34,197,94,0.3)" onclick="reactivarUsuario('${u.user_id}','${escJs(u.nombre)}')">↑ Activar</button>`
+            : `<button class="btn-edit btn-edit-icon" title="Suspender" style="color:var(--amber);border-color:rgba(245,158,11,0.3)" onclick="suspenderUsuario('${u.user_id}','${escJs(u.nombre)}')">🚫</button>`}
+          <button class="btn-edit btn-edit-icon btn-rechazar" title="Eliminar" onclick="eliminarUsuario('${u.user_id}','${escJs(u.nombre)}')">🗑</button>
+        ` : ''}
+      </div>
     </div>`;
   }).join('');
 }
