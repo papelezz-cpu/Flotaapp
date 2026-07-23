@@ -28,7 +28,7 @@ async function checkExistingSession() {
   if (!session) { showLoginOverlay(); return; }
 
   const { data: perfil } = await sb.from('perfiles')
-    .select('nombre, rol, aprobacion_cuenta, nota_rechazo_cuenta')
+    .select('nombre, rol, aprobacion_cuenta, nota_rechazo_cuenta, metodo_verificacion')
     .eq('user_id', session.user.id)
     .maybeSingle();
 
@@ -54,6 +54,7 @@ async function checkExistingSession() {
     email:  session.user.email,
     nombre: perfil?.nombre || session.user.email,
     rol:    perfil?.rol    || 'cliente',
+    metodoVerificacion: perfil?.metodo_verificacion || null,
   };
   applyUserUI();
   sb.channel('notif-' + currentUser.id)
@@ -100,7 +101,7 @@ async function doLogin() {
   }
 
   const { data: perfil } = await sb.from('perfiles')
-    .select('nombre, rol, aprobacion_cuenta, nota_rechazo_cuenta')
+    .select('nombre, rol, aprobacion_cuenta, nota_rechazo_cuenta, metodo_verificacion')
     .eq('user_id', data.user.id)
     .maybeSingle();
 
@@ -143,6 +144,7 @@ async function doLogin() {
     email:  data.user.email,
     nombre: perfil?.nombre || email,
     rol:    perfil?.rol    || 'cliente',
+    metodoVerificacion: perfil?.metodo_verificacion || null,
   };
 
   applyUserUI();
@@ -867,12 +869,18 @@ function abrirMiPerfil() {
   const ROL_LABEL_MAP = { superadmin: '⭐ Superadmin', admin: '🏢 Empresa', cliente: '🛒 Cliente' };
   const rolLabel = ROL_LABEL_MAP[currentUser.rol] || currentUser.rol;
   const initial  = (currentUser.nombre || '?')[0].toUpperCase();
+  const verifLegend = currentUser.metodoVerificacion === 'fisica'
+    ? '🪪 Cuenta verificada con validación física'
+    : currentUser.metodoVerificacion === 'documental'
+      ? '📄 Cuenta verificada por revisión documental'
+      : '';
   document.getElementById('mi-perfil-body').innerHTML = `
     <div style="text-align:center;padding:8px 0 16px">
       <div style="width:60px;height:60px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;margin:0 auto 12px">${esc(initial)}</div>
       <div style="font-size:1.1rem;font-weight:700;color:var(--text)">${esc(currentUser.nombre || '—')}</div>
       <div style="font-size:0.85rem;color:var(--text-muted);margin-top:4px">${esc(currentUser.email || '')}</div>
       <span class="badge badge-avail" style="margin-top:8px;display:inline-block">${rolLabel}</span>
+      ${verifLegend ? `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:8px">${verifLegend}</div>` : ''}
     </div>
     <hr style="border:none;border-top:1px solid var(--steel);margin:4px 0 16px">
     <button class="btn-add" style="width:100%;margin-bottom:10px" onclick="cerrarMiPerfil();showPasswordResetModal()">🔑 Cambiar contraseña</button>

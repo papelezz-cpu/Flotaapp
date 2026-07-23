@@ -201,8 +201,9 @@ async function renderAprobaciones() {
               ${verDoc(s.doc_poder_notarial,    'Poder notarial')}
             </div>
           </div>
-          <div class="apr-actions">
-            <button class="btn-apr-aprobar" onclick="aprobarCuenta('${s.user_id}')">✓ Aprobar cuenta</button>
+          <div class="apr-actions" style="flex-wrap:wrap">
+            <button class="btn-apr-aprobar" onclick="aprobarCuenta('${s.user_id}','documental')">✓ Aprobar sin verificación física</button>
+            <button class="btn-apr-aprobar" onclick="aprobarCuenta('${s.user_id}','fisica')">✓ Aprobar con verificación física</button>
             <button class="btn-apr-rechazar" onclick="rechazarCuenta('${s.user_id}')">✕ Rechazar</button>
           </div>
         </div>`;
@@ -892,12 +893,13 @@ function verDocRegistro(path) {
   });
 }
 
-async function aprobarCuenta(userId) {
+async function aprobarCuenta(userId, metodo) {
+  const esFisica = metodo === 'fisica';
   const { data: sc } = await sb.from('solicitudes_cuenta')
     .select('nombre').eq('user_id', userId).single();
 
   const [{ error }] = await Promise.all([
-    sb.from('perfiles').update({ aprobacion_cuenta: null }).eq('user_id', userId),
+    sb.from('perfiles').update({ aprobacion_cuenta: null, metodo_verificacion: metodo }).eq('user_id', userId),
     sb.from('solicitudes_cuenta').update({ estado: 'aprobada' }).eq('user_id', userId),
   ]);
   if (error) { showToast('Error al aprobar', 'error'); return; }
@@ -906,12 +908,14 @@ async function aprobarCuenta(userId) {
     user_id: userId,
     tipo:    'cuenta_aprobada',
     titulo:  '¡Cuenta aprobada!',
-    mensaje: 'Tu cuenta ha sido verificada. Ya puedes iniciar sesión en PortGo.',
+    mensaje: esFisica
+      ? 'Tu cuenta ha sido verificada con validación física. Ya puedes iniciar sesión en PortGo.'
+      : 'Tu cuenta ha sido verificada mediante revisión documental. Ya puedes iniciar sesión en PortGo.',
     leido:   false,
   });
 
   document.getElementById(`aprcuenta-${userId}`)?.remove();
-  showToast(`✓ Cuenta de ${esc(sc?.nombre || 'usuario')} aprobada`);
+  showToast(`✓ Cuenta de ${esc(sc?.nombre || 'usuario')} aprobada (${esFisica ? 'verificación física' : 'sin verificación física'})`);
   _loadAprBadge();
 }
 
