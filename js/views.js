@@ -19,6 +19,7 @@ function showView(v, btn) {
   if (v === 'pendientes')         renderAprobaciones();
   if (v === 'pedidos')            renderPedidos();
   if (v === 'usuarios')           renderUsuarios();
+  if (v === 'verificacion')       renderVerificacion();
   if (v === 'reportes')           renderReportes();
   if (v === 'mis-stats')          renderMisStats();
   if (v === 'historial-reservas') renderHistorialReservas();

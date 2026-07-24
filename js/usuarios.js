@@ -62,7 +62,7 @@ async function renderUsuarios() {
         <button class="btn-edit" onclick="abrirEditarUsuario('${u.user_id}','${escJs(u.nombre)}','${escJs(u.email)}','${u.rol}')">✏ Editar</button>
         ${u.rol !== 'superadmin' ? `
           <button class="btn-edit" style="${verificado ? 'color:var(--green,#22c55e);border-color:rgba(34,197,94,0.4)' : ''}"
-            onclick="toggleVerificado('${u.user_id}','${escJs(u.nombre)}',${verificado})">${verificado ? '✓ Verificado' : '✓ Verificar'}</button>
+            onclick="abrirVerificacion('${u.user_id}','${escJs(u.nombre)}')">${verificado ? '✓ Verificado' : '✓ Verificar'}</button>
           ${u.aprobacion_cuenta === 'suspendida'
             ? `<button class="btn-edit" style="color:var(--green);border-color:rgba(34,197,94,0.3)" onclick="reactivarUsuario('${u.user_id}','${escJs(u.nombre)}')">↑ Activar</button>`
             : `<button class="btn-edit btn-edit-icon" title="Suspender" style="color:var(--amber);border-color:rgba(245,158,11,0.3)" onclick="suspenderUsuario('${u.user_id}','${escJs(u.nombre)}')">🚫</button>`}
@@ -71,14 +71,6 @@ async function renderUsuarios() {
       </div>
     </div>`;
   }).join('');
-}
-
-async function toggleVerificado(userId, nombre, actualmente) {
-  const nuevoValor = !actualmente;
-  const { error } = await sb.from('perfiles').update({ verificado: nuevoValor }).eq('user_id', userId);
-  if (error) { showToast('Error al actualizar verificación', 'error'); return; }
-  showToast(nuevoValor ? `✓ ${esc(nombre)} marcado como verificado` : `${esc(nombre)} desmarcado como verificado`);
-  renderUsuarios();
 }
 
 async function crearUsuario() {
