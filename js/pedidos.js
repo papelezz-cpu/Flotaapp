@@ -874,11 +874,7 @@ async function crearPedido() {
   }
 
   // Enviar correo a admins y superadmins
-  fetch(FN_NOTIFICACION, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tipo_camion: tipo, cliente_nombre: currentUser.nombre }),
-  }).catch(e => console.warn('Email notificación falló:', e));
+  _notificarEmail({ tipo_camion: tipo, cliente_nombre: currentUser.nombre });
 
   closeNuevoPedido();
   document.getElementById('modal-nuevo-pedido').querySelectorAll('input, textarea, select').forEach(el => {
@@ -1108,17 +1104,13 @@ async function confirmarDetallesServicio() {
   }
 
   // Correo a superadmins: acuerdo pendiente de aprobación
-  fetch(FN_NOTIFICACION, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      tipo_evento:    'acuerdo',
-      tipo_camion:    pedido.tipo_camion,
-      cliente_nombre: pedido.cliente_nombre,
-      admin_nombre:   oferta.admin_nombre,
-      precio:         oferta.precio_oferta,
-    }),
-  }).catch(e => console.warn('Email notificación falló:', e));
+  _notificarEmail({
+    tipo_evento:    'acuerdo',
+    tipo_camion:    pedido.tipo_camion,
+    cliente_nombre: pedido.cliente_nombre,
+    admin_nombre:   oferta.admin_nombre,
+    precio:         oferta.precio_oferta,
+  });
 
   _pendingOferta = null;
   _pendingPedido = null;
@@ -1438,18 +1430,14 @@ async function _enviarOfertaCore() {
   // Email al cliente (fire-and-forget)
   const ped = _pedidosAccum.find(p => p.id === pedidoParaOfertar);
   if (ped?.cliente_id) {
-    fetch(FN_NOTIFICACION, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tipo:           'nueva_oferta',
-        clienteId:      ped.cliente_id,
-        clienteNombre:  ped.cliente_nombre,
-        adminNombre:    currentUser.nombre,
-        tipo_camion:    ped.tipo_camion,
-        precio,
-      }),
-    }).catch(e => console.warn('Email notificación falló:', e));
+    _notificarEmail({
+      tipo:           'nueva_oferta',
+      clienteId:      ped.cliente_id,
+      clienteNombre:  ped.cliente_nombre,
+      adminNombre:    currentUser.nombre,
+      tipo_camion:    ped.tipo_camion,
+      precio,
+    });
   }
 
   closeHacerOferta();
@@ -1511,17 +1499,13 @@ async function responderContra(accion) {
     }
 
     // Correo a superadmins: acuerdo pendiente de aprobación
-    fetch(FN_NOTIFICACION, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tipo_evento:    'acuerdo',
-        tipo_camion:    pedido.tipo_camion,
-        cliente_nombre: pedido.cliente_nombre,
-        admin_nombre:   currentUser.nombre,
-        precio:         oferta.contra_precio,
-      }),
-    }).catch(e => console.warn('Email notificación falló:', e));
+    _notificarEmail({
+      tipo_evento:    'acuerdo',
+      tipo_camion:    pedido.tipo_camion,
+      cliente_nombre: pedido.cliente_nombre,
+      admin_nombre:   currentUser.nombre,
+      precio:         oferta.contra_precio,
+    });
 
     closeResponderContra();
     await renderPedidos();

@@ -1123,16 +1123,12 @@ async function _ejecutarAprobarAcuerdo(ped, oferta) {
   await sb.from('notificaciones').insert(notifs);
 
   // Correo al cliente y proveedor: acuerdo aprobado
-  fetch(FN_NOTIFICACION, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      tipo:        'acuerdo_aprobado',
-      tipo_camion: ped.tipo_camion,
-      clienteId:   ped.cliente_id,
-      adminId:     oferta.admin_id,
-    }),
-  }).catch(e => console.warn('Email notificación falló:', e));
+  _notificarEmail({
+    tipo:        'acuerdo_aprobado',
+    tipo_camion: ped.tipo_camion,
+    clienteId:   ped.cliente_id,
+    adminId:     oferta.admin_id,
+  });
 
   showToast('✓ Acuerdo aprobado. Reservación creada');
   renderAprobaciones();

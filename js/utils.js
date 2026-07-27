@@ -85,6 +85,19 @@ function formatPrecio(num) {
   return '$' + Number(num).toLocaleString('es-MX', { minimumFractionDigits: 0 }) + ' MXN/día';
 }
 
+// Correo transaccional (fire-and-forget) — la Edge Function exige sesión activa.
+async function _notificarEmail(payload) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    await fetch(FN_NOTIFICACION, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) { console.warn('Email notificación falló:', e); }
+}
+
 // ── CONFIRM MODAL (reemplaza window.confirm) ───────────
 
 let _confirmCb = null;
