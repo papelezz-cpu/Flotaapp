@@ -576,22 +576,35 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
   }
 
   // ── Timeline para vista cliente ──────────────────────
+  // 5 pasos reales: hay dos revisiones distintas de superadmin (antes de
+  // publicar, y antes de crear la reservación) que antes compartían la
+  // misma posición en la barra, haciendo que pendiente_revision se viera
+  // como si ya hubiera sido publicada y negociada.
   let timelineHTML = '';
+  let esperaHint = '';
   if (vista === 'cliente') {
-    const TL_STEPS = ['Publicada', 'Negociando', 'En revisión', 'Acordada'];
-    const TL_POS = { abierto:0, en_negociacion:1, pendiente_revision:2, pendiente_acuerdo:2, acordado:3, finalizado:3 };
-    const cur = TL_POS[p.estado] ?? -1;
+    const TL_STEPS = ['En revisión', 'Publicada', 'Negociando', 'Acuerdo en revisión', 'Acordada'];
+    const TL_POS = { pendiente_revision:0, abierto:1, en_negociacion:2, pendiente_acuerdo:3, acordado:4, finalizado:4 };
+    let cur = TL_POS[p.estado] ?? -1;
+    const hayAceptadaTL = ofertas.some(o => o.estado === 'aceptada');
+    if (p.estado === 'en_negociacion' && hayAceptadaTL) cur = TL_POS.pendiente_acuerdo;
     const isFailed = p.estado === 'rechazado' || p.estado === 'cancelado' || p.estado === 'expirado';
     timelineHTML = `<div class="ped-timeline">` +
       TL_STEPS.map((label, i) => {
         const done   = !isFailed && i < cur;
         const active = !isFailed && i === cur;
-        const failed = isFailed && i === Math.min(2, cur < 0 ? 1 : cur);
+        const failed = isFailed && i === Math.min(3, cur < 0 ? 1 : cur);
         return `<div class="ped-tl-item">
           <div class="ped-tl-dot ${done ? 'done' : active ? 'active' : failed ? 'failed' : ''}"></div>
           <div class="ped-tl-label">${label}</div>
         </div>${i < TL_STEPS.length - 1 ? `<div class="ped-tl-line ${done ? 'done' : ''}"></div>` : ''}`;
       }).join('') + `</div>`;
+
+    if (p.estado === 'pendiente_revision') {
+      esperaHint = `<div class="ped-espera-hint">🕐 Nuestro equipo está revisando tu solicitud antes de publicarla a las empresas. Te avisaremos en cuanto esté disponible.</div>`;
+    } else if (p.estado === 'pendiente_acuerdo' || (p.estado === 'en_negociacion' && hayAceptadaTL)) {
+      esperaHint = `<div class="ped-espera-hint">🕐 Ya aceptaste una oferta. Nuestro equipo está validando el acuerdo antes de confirmar tu reservación.</div>`;
+    }
   }
 
   return `
@@ -609,6 +622,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
       ${sobrepesoBanner}
       ${p.descripcion ? `<div class="pedido-desc">${esc(p.descripcion)}</div>` : ''}
       ${timelineHTML}
+      ${esperaHint}
       <div class="pedido-footer">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           ${precioBadge}

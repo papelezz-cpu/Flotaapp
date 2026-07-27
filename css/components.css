@@ -481,11 +481,30 @@ body.light .modal-close-x:hover { background: rgba(239,68,68,0.1); }
 }
 .btn-rechazar-reserva:hover, .btn-cancelar-reserva:hover { background: rgba(239,68,68,0.22); }
 
+/* Móvil: en vez de ocultar columnas (perdiendo fechas y el bloque de estado/
+   acciones), se reacomoda en 2 columnas y varias filas por reservación. */
 @media (max-width: 520px) {
-  .reserv-row { grid-template-columns: 65px 1fr 85px; }
-  .reserv-row > *:nth-child(2),
-  .reserv-row > *:nth-child(4),
-  .reserv-row > *:nth-child(5) { display: none; }
+  .reserv-row.header { display: none; }
+  .reserv-row:not(.header) { grid-template-columns: 1fr 1fr; row-gap: 6px; }
+
+  /* Vista admin/superadmin: Unidad · Empresa · Cliente · Inicio · Fin · Estado */
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(3) { grid-column: 2; grid-row: 1; text-align: right; }
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(2) { grid-column: 1 / -1; grid-row: 2; font-size: 0.76rem; }
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(4) { grid-column: 1; grid-row: 3; font-size: 0.76rem; }
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(5) { grid-column: 2; grid-row: 3; font-size: 0.76rem; text-align: right; }
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(4)::before { content: "Desde "; color: var(--text-muted); }
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(5)::before { content: "Hasta "; color: var(--text-muted); }
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(6) { grid-column: 1 / -1; grid-row: 4; margin-top: 2px; }
+
+  /* Vista cliente: Unidad · Empresa · Inicio · Fin · Estado */
+  .reserv-row.reserv-row-cli > *:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .reserv-row.reserv-row-cli > *:nth-child(2) { grid-column: 2; grid-row: 1; text-align: right; }
+  .reserv-row.reserv-row-cli > *:nth-child(3) { grid-column: 1; grid-row: 2; font-size: 0.76rem; }
+  .reserv-row.reserv-row-cli > *:nth-child(4) { grid-column: 2; grid-row: 2; font-size: 0.76rem; text-align: right; }
+  .reserv-row.reserv-row-cli > *:nth-child(3)::before { content: "Desde "; color: var(--text-muted); }
+  .reserv-row.reserv-row-cli > *:nth-child(4)::before { content: "Hasta "; color: var(--text-muted); }
+  .reserv-row.reserv-row-cli > *:nth-child(5) { grid-column: 1 / -1; grid-row: 3; margin-top: 2px; }
 }
 
 /* ── ADMIN PANEL ─────────────────────────────────────── */
@@ -1443,8 +1462,8 @@ body.light .rechazo-info   { background: rgba(197,48,48,0.05); border-color: rgb
 .ped-tl-dot.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(78,142,247,0.2); }
 .ped-tl-dot.failed { background: var(--danger); border-color: var(--danger); }
 .ped-tl-label {
-  font-size: 0.66rem; color: var(--text-muted);
-  white-space: nowrap; max-width: 60px; text-align: center;
+  font-size: 0.63rem; color: var(--text-muted);
+  white-space: normal; max-width: 56px; text-align: center;
   line-height: 1.2;
 }
 .ped-tl-item:has(.ped-tl-dot.active) .ped-tl-label,
@@ -1454,6 +1473,18 @@ body.light .rechazo-info   { background: rgba(197,48,48,0.05); border-color: rgb
   margin: 0 4px; margin-bottom: 17px;
 }
 .ped-tl-line.done { background: var(--green); }
+
+/* Aviso de espera bajo el timeline (por qué sigue "en revisión") */
+.ped-espera-hint {
+  margin: 8px 0 4px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(78,142,247,0.08);
+  border: 1px solid rgba(78,142,247,0.25);
+  color: var(--text-main);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
 
 /* ── GEO AUTOCOMPLETE ────────────────────────────────── */
 .geo-dropdown {

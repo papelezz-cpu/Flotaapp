@@ -8,7 +8,10 @@ function _aplicarLogo(isLight) {
 
 function toggleTheme() {
   const isLight = document.body.classList.toggle('light');
-  document.getElementById('btn-theme').textContent = isLight ? '☀️' : '🌙';
+  const icon = isLight ? '☀️' : '🌙';
+  document.getElementById('btn-theme').textContent = icon;
+  const mobileIcon = document.getElementById('mobile-theme-icon');
+  if (mobileIcon) mobileIcon.textContent = icon;
   localStorage.setItem('portgo-theme', isLight ? 'light' : 'dark');
   _aplicarLogo(isLight);
 }
@@ -21,8 +24,11 @@ function toggleTheme() {
   }
   document.addEventListener('DOMContentLoaded', () => {
     const isLight = document.body.classList.contains('light');
+    const icon = isLight ? '☀️' : '🌙';
     const btn = document.getElementById('btn-theme');
-    if (btn) btn.textContent = isLight ? '☀️' : '🌙';
+    if (btn) btn.textContent = icon;
+    const mobileIcon = document.getElementById('mobile-theme-icon');
+    if (mobileIcon) mobileIcon.textContent = icon;
     _aplicarLogo(isLight);
   });
 })();
