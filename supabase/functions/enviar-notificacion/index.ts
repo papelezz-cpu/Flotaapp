@@ -13,6 +13,14 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
+// Escapa HTML: todo el contenido de los templates viene de datos que el usuario controla
+// (nombre, descripción, nota de rechazo…), y se inyecta directo en el cuerpo del correo.
+function esc(v: unknown): string {
+  return String(v ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c] as string));
+}
+
 // ── HTML email templates ───────────────────────────────
 const BRAND = `<div style="font-family:Inter,sans-serif;max-width:520px;margin:auto;color:#1e293b">
   <div style="background:#1a4fd6;padding:18px 24px;border-radius:12px 12px 0 0">
@@ -28,11 +36,11 @@ function tpl(subject: string, body: string) {
 
 const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: string; html: string }> = {
   nueva_solicitud: (p) => tpl(
-    `Nueva solicitud de ${p.cliente_nombre} — PortGo`,
+    `Nueva solicitud de ${esc(p.cliente_nombre)} — PortGo`,
     `<h2 style="margin:0 0 12px;color:#1a4fd6">Nueva solicitud de servicio</h2>
-    <p><strong>${p.cliente_nombre || 'Un cliente'}</strong> publicó una solicitud en PortGo.</p>
+    <p><strong>${esc(p.cliente_nombre) || 'Un cliente'}</strong> publicó una solicitud en PortGo.</p>
     <table style="width:100%;border-collapse:collapse;margin:16px 0">
-      <tr><td style="padding:6px 0;color:#64748b;width:140px">Servicio:</td><td><strong>${p.tipo_camion || '—'}</strong></td></tr>
+      <tr><td style="padding:6px 0;color:#64748b;width:140px">Servicio:</td><td><strong>${esc(p.tipo_camion) || '—'}</strong></td></tr>
     </table>
     <p>Ingresa a la plataforma para revisar y hacer tu oferta.</p>`
   ),
@@ -40,9 +48,9 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: strin
   acuerdo: (p) => tpl(
     `Acuerdo pendiente de aprobación — PortGo`,
     `<h2 style="margin:0 0 12px;color:#1a4fd6">Acuerdo listo para aprobar</h2>
-    <p>El cliente <strong>${p.cliente_nombre}</strong> aceptó la oferta de <strong>${p.admin_nombre}</strong>.</p>
+    <p>El cliente <strong>${esc(p.cliente_nombre)}</strong> aceptó la oferta de <strong>${esc(p.admin_nombre)}</strong>.</p>
     <table style="width:100%;border-collapse:collapse;margin:16px 0">
-      <tr><td style="padding:6px 0;color:#64748b;width:140px">Servicio:</td><td><strong>${p.tipo_camion || '—'}</strong></td></tr>
+      <tr><td style="padding:6px 0;color:#64748b;width:140px">Servicio:</td><td><strong>${esc(p.tipo_camion) || '—'}</strong></td></tr>
       <tr><td style="padding:6px 0;color:#64748b">Precio acordado:</td><td><strong>$${Number(p.precio||0).toLocaleString('es-MX')} MXN</strong></td></tr>
     </table>
     <p>Ingresa al módulo de <strong>Aprobaciones</strong> para revisar y activar el acuerdo.</p>`
@@ -53,11 +61,11 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: strin
     `<h2 style="margin:0 0 12px;color:#1a4fd6">Solicitud de reserva recibida</h2>
     <p>Tienes una nueva solicitud de reserva en PortGo.</p>
     ${p.camion ? `<table style="width:100%;border-collapse:collapse;margin:16px 0">
-      <tr><td style="padding:6px 0;color:#64748b;width:140px">Unidad:</td><td><strong>${(p.camion as Record<string,string>).id} — ${(p.camion as Record<string,string>).tipo}</strong></td></tr>
+      <tr><td style="padding:6px 0;color:#64748b;width:140px">Unidad:</td><td><strong>${esc((p.camion as Record<string,string>).id)} — ${esc((p.camion as Record<string,string>).tipo)}</strong></td></tr>
       ${p.reserva ? `
-      <tr><td style="padding:6px 0;color:#64748b">Cliente:</td><td>${(p.reserva as Record<string,string>).cliente}</td></tr>
-      <tr><td style="padding:6px 0;color:#64748b">Período:</td><td>${(p.reserva as Record<string,string>).fecha_ini} – ${(p.reserva as Record<string,string>).fecha_fin}</td></tr>
-      ${(p.reserva as Record<string,string>).descripcion ? `<tr><td style="padding:6px 0;color:#64748b">Detalle:</td><td>${(p.reserva as Record<string,string>).descripcion}</td></tr>` : ''}` : ''}
+      <tr><td style="padding:6px 0;color:#64748b">Cliente:</td><td>${esc((p.reserva as Record<string,string>).cliente)}</td></tr>
+      <tr><td style="padding:6px 0;color:#64748b">Período:</td><td>${esc((p.reserva as Record<string,string>).fecha_ini)} – ${esc((p.reserva as Record<string,string>).fecha_fin)}</td></tr>
+      ${(p.reserva as Record<string,string>).descripcion ? `<tr><td style="padding:6px 0;color:#64748b">Detalle:</td><td>${esc((p.reserva as Record<string,string>).descripcion)}</td></tr>` : ''}` : ''}
     </table>` : ''}
     <p>Ingresa a <strong>Reservaciones</strong> para confirmar o rechazar.</p>`
   ),
@@ -65,11 +73,11 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: strin
   solicitud_recibida: (p) => tpl(
     `Tu solicitud fue recibida — PortGo`,
     `<h2 style="margin:0 0 12px;color:#1a4fd6">¡Solicitud recibida!</h2>
-    <p>Hola <strong>${p.clienteNombre}</strong>, tu solicitud de reserva fue enviada correctamente.</p>
+    <p>Hola <strong>${esc(p.clienteNombre)}</strong>, tu solicitud de reserva fue enviada correctamente.</p>
     ${p.camion ? `<table style="width:100%;border-collapse:collapse;margin:16px 0">
-      <tr><td style="padding:6px 0;color:#64748b;width:140px">Unidad:</td><td><strong>${(p.camion as Record<string,string>).id}</strong> — ${(p.camion as Record<string,string>).tipo}</td></tr>
-      <tr><td style="padding:6px 0;color:#64748b">Empresa:</td><td>${(p.camion as Record<string,string>).empresa || '—'}</td></tr>
-      <tr><td style="padding:6px 0;color:#64748b">Período:</td><td>${p.fecha_ini} – ${p.fecha_fin}</td></tr>
+      <tr><td style="padding:6px 0;color:#64748b;width:140px">Unidad:</td><td><strong>${esc((p.camion as Record<string,string>).id)}</strong> — ${esc((p.camion as Record<string,string>).tipo)}</td></tr>
+      <tr><td style="padding:6px 0;color:#64748b">Empresa:</td><td>${esc((p.camion as Record<string,string>).empresa) || '—'}</td></tr>
+      <tr><td style="padding:6px 0;color:#64748b">Período:</td><td>${esc(p.fecha_ini)} – ${esc(p.fecha_fin)}</td></tr>
     </table>` : ''}
     <p>La empresa revisará tu solicitud y recibirás una notificación cuando sea confirmada o rechazada.</p>`
   ),
@@ -77,10 +85,10 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: strin
   reserva_aceptada: (p) => tpl(
     `¡Tu reserva fue aceptada! — PortGo`,
     `<h2 style="margin:0 0 12px;color:#16a34a">✓ Reserva confirmada</h2>
-    <p>Hola <strong>${p.clienteNombre}</strong>, tu reserva fue <strong style="color:#16a34a">aceptada</strong>.</p>
+    <p>Hola <strong>${esc(p.clienteNombre)}</strong>, tu reserva fue <strong style="color:#16a34a">aceptada</strong>.</p>
     ${p.camion ? `<table style="width:100%;border-collapse:collapse;margin:16px 0">
-      <tr><td style="padding:6px 0;color:#64748b;width:140px">Unidad:</td><td><strong>${(p.camion as Record<string,string>).id}</strong></td></tr>
-      <tr><td style="padding:6px 0;color:#64748b">Período:</td><td>${p.fecha_ini} – ${p.fecha_fin}</td></tr>
+      <tr><td style="padding:6px 0;color:#64748b;width:140px">Unidad:</td><td><strong>${esc((p.camion as Record<string,string>).id)}</strong></td></tr>
+      <tr><td style="padding:6px 0;color:#64748b">Período:</td><td>${esc(p.fecha_ini)} – ${esc(p.fecha_fin)}</td></tr>
     </table>` : ''}
     <p>Ingresa a la plataforma para ver los detalles completos de tu reservación.</p>`
   ),
@@ -88,17 +96,17 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: strin
   reserva_rechazada: (p) => tpl(
     `Tu reserva no pudo confirmarse — PortGo`,
     `<h2 style="margin:0 0 12px;color:#dc2626">Reserva no confirmada</h2>
-    <p>Hola <strong>${p.clienteNombre}</strong>, lamentablemente tu reserva no pudo ser confirmada en esta ocasión.</p>
-    ${p.nota ? `<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:10px 14px;border-radius:4px;margin:14px 0"><strong>Motivo:</strong> ${p.nota}</div>` : ''}
+    <p>Hola <strong>${esc(p.clienteNombre)}</strong>, lamentablemente tu reserva no pudo ser confirmada en esta ocasión.</p>
+    ${p.nota ? `<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:10px 14px;border-radius:4px;margin:14px 0"><strong>Motivo:</strong> ${esc(p.nota)}</div>` : ''}
     <p>Puedes publicar una nueva solicitud en la plataforma para encontrar otro proveedor disponible.</p>`
   ),
 
   nueva_oferta: (p) => tpl(
     `Tienes una nueva oferta — PortGo`,
     `<h2 style="margin:0 0 12px;color:#1a4fd6">📨 Nueva oferta recibida</h2>
-    <p>Hola <strong>${p.clienteNombre}</strong>, <strong>${p.adminNombre}</strong> hizo una oferta para tu solicitud.</p>
+    <p>Hola <strong>${esc(p.clienteNombre)}</strong>, <strong>${esc(p.adminNombre)}</strong> hizo una oferta para tu solicitud.</p>
     <table style="width:100%;border-collapse:collapse;margin:16px 0">
-      <tr><td style="padding:6px 0;color:#64748b;width:140px">Servicio:</td><td><strong>${p.tipo_camion || '—'}</strong></td></tr>
+      <tr><td style="padding:6px 0;color:#64748b;width:140px">Servicio:</td><td><strong>${esc(p.tipo_camion) || '—'}</strong></td></tr>
       <tr><td style="padding:6px 0;color:#64748b">Precio ofrecido:</td><td><strong style="color:#1a4fd6">$${Number(p.precio||0).toLocaleString('es-MX')} MXN</strong></td></tr>
     </table>
     <p>Ingresa a <strong>Mis solicitudes</strong> para revisar y responder la oferta.</p>`
@@ -107,7 +115,7 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: strin
   acuerdo_aprobado: (p) => tpl(
     `¡Acuerdo aprobado! — PortGo`,
     `<h2 style="margin:0 0 12px;color:#16a34a">✓ Acuerdo aprobado</h2>
-    <p>El acuerdo de <strong>${p.tipo_camion || 'transporte'}</strong> fue aprobado. Ya hay una reservación activa.</p>
+    <p>El acuerdo de <strong>${esc(p.tipo_camion) || 'transporte'}</strong> fue aprobado. Ya hay una reservación activa.</p>
     <p>Ingresa a la plataforma para ver los detalles.</p>`
   ),
 };
@@ -127,8 +135,23 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
 
   try {
-    const payload = await req.json();
+    const authHeader = req.headers.get('Authorization') || '';
+    if (!authHeader.startsWith('Bearer ')) {
+      return json({ error: 'No autenticado' }, 401);
+    }
+    const jwt = authHeader.replace('Bearer ', '');
+
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+    // Cualquier usuario logueado puede disparar notificaciones (se envían tras acciones
+    // normales de la app), pero el caller debe ser una sesión válida — cierra el hueco
+    // de que cualquiera en internet, sin cuenta, use esta función como relay de correo.
+    const { data: { user: caller }, error: authErr } = await sb.auth.getUser(jwt);
+    if (authErr || !caller) {
+      return json({ error: 'Token inválido' }, 401);
+    }
+
+    const payload = await req.json();
     const { data: { users } } = await sb.auth.admin.listUsers();
     const userById: Record<string, string> = {};
     users.forEach((u: { id: string; email?: string }) => { if (u.email) userById[u.id] = u.email; });

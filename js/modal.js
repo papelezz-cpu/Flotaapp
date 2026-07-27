@@ -99,39 +99,24 @@ async function confirmarReserva() {
   if (errRes) { showToast('Error al guardar la reserva: ' + (errRes.message || ''), 'error'); return; }
 
   // Notificación por email (silencioso si falla)
-  try {
-    const session = (await sb.auth.getSession()).data.session;
-    const token   = session?.access_token;
-    const fnBase  = typeof FN_URL !== 'undefined'
-      ? FN_URL.replace('gestionar-usuario', 'enviar-notificacion')
-      : null;
-    if (fnBase && token && currentRecurso?.propietario_id) {
-      fetch(fnBase, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({
-          tipo: 'nueva_reserva',
-          propietario_id: currentRecurso.propietario_id,
-          camion:  { id: currentRecurso.id, tipo: currentRecurso.tipo },
-          reserva: { cliente: nombre, email, telefono: tel, fecha_ini: ini, fecha_fin: fin, descripcion: desc }
-        })
-      });
-    }
-    if (fnBase && token && email) {
-      fetch(fnBase, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({
-          tipo: 'solicitud_recibida',
-          clienteEmail:  email,
-          clienteNombre: nombre,
-          camion:   { id: currentRecurso?.id, tipo: currentRecurso?.tipo, empresa: currentRecurso?.empresaNombre },
-          fecha_ini: ini,
-          fecha_fin: fin
-        })
-      });
-    }
-  } catch (e) { console.warn('Email notificación falló:', e); }
+  if (currentRecurso?.propietario_id) {
+    _notificarEmail({
+      tipo: 'nueva_reserva',
+      propietario_id: currentRecurso.propietario_id,
+      camion:  { id: currentRecurso.id, tipo: currentRecurso.tipo },
+      reserva: { cliente: nombre, email, telefono: tel, fecha_ini: ini, fecha_fin: fin, descripcion: desc }
+    });
+  }
+  if (email) {
+    _notificarEmail({
+      tipo: 'solicitud_recibida',
+      clienteEmail:  email,
+      clienteNombre: nombre,
+      camion:   { id: currentRecurso?.id, tipo: currentRecurso?.tipo, empresa: currentRecurso?.empresaNombre },
+      fecha_ini: ini,
+      fecha_fin: fin
+    });
+  }
 
   closeModal();
   filtrarRecursos();
