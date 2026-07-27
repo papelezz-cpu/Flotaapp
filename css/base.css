@@ -38,6 +38,14 @@ body {
   overflow-x: hidden;
 }
 
+/* Safari en iOS hace zoom automático al enfocar un input/select/textarea con
+   font-size menor a 16px, y no siempre revierte el zoom al salir del campo —
+   por eso hay que hacer zoom out manualmente. Se fuerza 16px mínimo en
+   pantallas móviles sin tocar los tamaños de fuente del resto de la UI. */
+@media (max-width: 640px) {
+  input, textarea, select { font-size: 16px !important; }
+}
+
 /* ── BACKGROUND GRADIENT ─────────────────────────────── */
 body::before {
   content: '';
