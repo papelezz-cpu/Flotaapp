@@ -27,6 +27,7 @@ const SHELL = [
   '/js/aprobaciones.js',
   '/js/admin.js',
   '/js/usuarios.js',
+  '/js/verificacion.js',
   '/js/reportes.js',
   '/js/chat.js',
   '/js/catalogo.js',
