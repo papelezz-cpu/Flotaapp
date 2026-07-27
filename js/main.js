@@ -15,35 +15,23 @@ function init() {
   actualizarBadgeChat();
 }
 
-// ── ARRANQUE ──────────────────────────────────────────
-// Primero verifica sesión; si no hay, muestra login y no carga nada
-(async () => {
-  const hoy    = today();
-  const manana = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+// ── SUSCRIPCIONES REALTIME (campanita + cambios globales) ─
+// Antes esto vivía inline dentro del IIFE de arranque, así que solo se
+// creaba una vez, al cargar la página con una sesión YA activa. Si el
+// usuario cerraba sesión e iniciaba sesión de nuevo sin recargar, nunca
+// se volvía a suscribir — pedidos/ofertas/reservaciones/notificaciones
+// dejaban de actualizarse en vivo hasta hacer un refresh manual. Ahora es
+// una función que se llama tanto al restaurar sesión como tras un login
+// nuevo (ver checkExistingSession/doLogin en auth.js), y logout() limpia
+// los canales antes de mostrar el login de nuevo.
+function iniciarSuscripcionesRealtime() {
+  sb.channel('notif-' + currentUser.id)
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'notificaciones',
+      filter: `user_id=eq.${currentUser.id}`
+    }, () => loadNotificaciones())
+    .subscribe();
 
-  document.getElementById('fecha-inicio').value = hoy;
-  document.getElementById('fecha-fin').value    = manana;
-  document.getElementById('res-fecha-ini').min  = hoy;
-  document.getElementById('res-fecha-fin').min  = hoy;
-  document.getElementById('res-fecha-ini').addEventListener('change', e => {
-    document.getElementById('res-fecha-fin').min = e.target.value;
-    if (document.getElementById('res-fecha-fin').value < e.target.value) {
-      document.getElementById('res-fecha-fin').value = e.target.value;
-    }
-  });
-
-  // Restaurar sesión — si no hay sesión, checkExistingSession() muestra el login
-  await checkExistingSession();
-
-  // Solo continuar si hay sesión activa
-  if (!currentUser.id) return;
-
-  // Cargar home y notificaciones
-  renderHome();
-  loadNotificaciones();
-  actualizarBadgeChat();
-
-  // #5 — Realtime: actualizar vistas cuando cambia la BD
   const clienteActivo       = () => document.getElementById('view-cliente').classList.contains('active');
   const adminActivo         = () => document.getElementById('view-admin').classList.contains('active');
   const pendientesActivo    = () => document.getElementById('view-pendientes')?.classList.contains('active');
@@ -97,6 +85,36 @@ function init() {
       }
     })
     .subscribe();
+}
+
+// ── ARRANQUE ──────────────────────────────────────────
+// Primero verifica sesión; si no hay, muestra login y no carga nada
+(async () => {
+  const hoy    = today();
+  const manana = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
+  document.getElementById('fecha-inicio').value = hoy;
+  document.getElementById('fecha-fin').value    = manana;
+  document.getElementById('res-fecha-ini').min  = hoy;
+  document.getElementById('res-fecha-fin').min  = hoy;
+  document.getElementById('res-fecha-ini').addEventListener('change', e => {
+    document.getElementById('res-fecha-fin').min = e.target.value;
+    if (document.getElementById('res-fecha-fin').value < e.target.value) {
+      document.getElementById('res-fecha-fin').value = e.target.value;
+    }
+  });
+
+  // Restaurar sesión — si no hay sesión, checkExistingSession() muestra el login
+  await checkExistingSession();
+
+  // Solo continuar si hay sesión activa
+  if (!currentUser.id) return;
+
+  // Cargar home y notificaciones
+  renderHome();
+  loadNotificaciones();
+  actualizarBadgeChat();
+  iniciarSuscripcionesRealtime();
 })();
 
 // ── EVENT LISTENERS ───────────────────────────────────
