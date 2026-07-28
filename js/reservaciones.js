@@ -562,8 +562,15 @@ async function abrirEvidencias(reservaId, campo = 'evidencias') {
     }
   }
 
+  const campoInput = document.getElementById('ev-campo');
+  if (!campoInput) {
+    // El HTML del modal está desactualizado en este navegador (falta el
+    // campo nuevo) — avisar en vez de fallar en silencio.
+    showToast('Tu app está desactualizada. Recarga la página (Ctrl+Shift+R) e inténtalo de nuevo.', 'error');
+    return;
+  }
   document.getElementById('ev-reserva-id').value = reservaId;
-  document.getElementById('ev-campo').value = campo;
+  campoInput.value = campo;
   document.getElementById('ev-files').value = '';
   document.getElementById('ev-lista-actual').innerHTML = '<span style="color:var(--text-muted);font-size:0.82rem">Cargando…</span>';
   document.getElementById('modal-evidencias').classList.add('open');
@@ -612,7 +619,7 @@ function cerrarEvidencias() {
 
 async function subirEvidencias() {
   const reservaId = document.getElementById('ev-reserva-id').value;
-  const campo     = document.getElementById('ev-campo').value || 'evidencias';
+  const campo     = document.getElementById('ev-campo')?.value || 'evidencias';
   const files     = Array.from(document.getElementById('ev-files')?.files || []);
   if (!files.length) { showToast('Selecciona al menos un archivo', 'error'); return; }
 
