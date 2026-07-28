@@ -26,9 +26,13 @@ function _chatHiloBadge(n) {
 let _reservFiltro = 'Activa';
 
 const _RESERV_FILTRO_LABEL = {
-  Activa: 'activas', Pendiente: 'pendientes', Completada: 'completadas',
+  Activa: 'activas', Pendiente: 'pendientes', PorAprobar: 'por aprobar', Completada: 'completadas',
   Cancelada: 'canceladas', todas: '',
 };
+
+// Texto legible del estado (la DB guarda 'PorAprobar' sin espacio)
+const _ESTADO_LABEL = { PorAprobar: 'Por aprobar' };
+const _estadoLabel = estado => _ESTADO_LABEL[estado] || estado;
 
 function _aplicaFiltroReserva(rows) {
   if (_reservFiltro === 'todas') return rows;
@@ -172,7 +176,7 @@ async function renderReserv() {
         <div>${fmtFecha(r.fecha_ini)}</div>
         <div>${fmtFecha(r.fecha_fin)}</div>
         <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-          <span class="badge ${badgeCls}">${esc(r.estado)}</span>
+          <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
           ${trackBtn}
           ${completarBtn}
           ${chatBtn}
@@ -336,7 +340,7 @@ async function renderReserv() {
       <div>${fmtFecha(r.fecha_ini)}</div>
       <div>${fmtFecha(r.fecha_fin)}</div>
       <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-        <span class="badge ${badgeCls}">${esc(r.estado)}</span>
+        <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
         ${acciones}
         ${cartaPorteBtnAdmin}
         ${chatBtn}
