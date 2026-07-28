@@ -37,9 +37,25 @@ function toggleNotifPanel() {
   if (notifPanelOpen) {
     renderNotifPanel();
     panel.classList.add('open');
+    _marcarNotifsVistas();
   } else {
     panel.classList.remove('open');
   }
+}
+
+// Al abrir la campana se consideran "vistas": se quita el badge y se marcan
+// como leídas en segundo plano, sin volver a dibujar la lista — así el
+// usuario todavía distingue cuáles eran nuevas durante esta apertura.
+async function _marcarNotifsVistas() {
+  if (!currentUser.id) return;
+  const idsNoLeidos = (notifPanel || []).filter(n => !n.leido).map(n => n.id);
+  if (!idsNoLeidos.length) return;
+
+  document.getElementById('notif-badge').style.display = 'none';
+  notifPanel = (notifPanel || []).map(n => ({ ...n, leido: true }));
+
+  await sb.from('notificaciones').update({ leido: true })
+    .eq('user_id', currentUser.id).eq('leido', false);
 }
 
 function renderNotifPanel() {
