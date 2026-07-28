@@ -1299,6 +1299,21 @@ body.light .apr-op-detalle { background: #f8faff; border-color: rgba(37,99,235,0
 .op-nombre { font-size: 0.95rem; font-weight: 700; color: var(--text); margin-bottom: 2px; }
 .op-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 1px; }
 .op-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; align-items: center; }
+/* En móvil los 3 botones (flex-shrink:0) se comían el ancho y aplastaban
+   .op-info hasta dejar el nombre partido palabra por palabra, con los botones
+   encimados sobre el texto. Se pasan a su propia fila completa. */
+@media (max-width: 640px) {
+  .operador-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    row-gap: 10px;
+  }
+  .op-foto-wrap { grid-column: 1; grid-row: 1; }
+  .op-info      { grid-column: 2; grid-row: 1; }
+  .op-actions   { grid-column: 1 / -1; grid-row: 2; }
+  .op-sub       { overflow-wrap: anywhere; }
+}
 .op-upload-preview { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); margin-top: 6px; }
 .op-form-section { margin-top: 18px; margin-bottom: 6px; }
 .op-form-section-title {
