@@ -26,9 +26,13 @@ function _chatHiloBadge(n) {
 let _reservFiltro = 'Activa';
 
 const _RESERV_FILTRO_LABEL = {
-  Activa: 'activas', Pendiente: 'pendientes', Completada: 'completadas',
+  Activa: 'activas', Pendiente: 'pendientes', PorAprobar: 'por aprobar', Completada: 'completadas',
   Cancelada: 'canceladas', todas: '',
 };
+
+// Texto legible del estado (la DB guarda 'PorAprobar' sin espacio)
+const _ESTADO_LABEL = { PorAprobar: 'Por aprobar' };
+const _estadoLabel = estado => _ESTADO_LABEL[estado] || estado;
 
 function _aplicaFiltroReserva(rows) {
   if (_reservFiltro === 'todas') return rows;
@@ -126,16 +130,27 @@ async function renderReserv() {
     body.innerHTML = data.map(r => {
       const badgeCls = r.estado === 'Pendiente'   ? 'badge-busy'
                      : r.estado === 'Activa'      ? 'badge-avail'
+                     : r.estado === 'PorAprobar'  ? 'badge-acuerdo-rev'
                      : r.estado === 'Completada'  ? 'badge-completado'
                      : 'badge-maint';
       const trackBtn = r.estado === 'Activa'
         ? `<button class="btn-edit" onclick="openTracking('${r.id}')" style="font-size:0.7rem">📍 ${esc(r.tracking_estado || 'Confirmado')}</button>`
         : '';
+      // El servicio se cierra cuando cliente Y empresa marcan completado (cada
+      // quien sube su propia evidencia) y el superadmin aprueba la revisión.
+      const miEvidenciaCli = r.evidencias_cliente?.length || 0;
+      const completarBtn = r.estado === 'Activa'
+        ? `<button class="btn-completar-reserva" style="font-size:0.7rem" onclick="abrirEvidencias('${r.id}','evidencias_cliente')">✓ Marcar completado</button>`
+        : r.estado === 'PorAprobar'
+          ? (miEvidenciaCli
+              ? `<span style="font-size:0.7rem;color:var(--text-muted)">⏳ Esperando aprobación</span>`
+              : `<button class="btn-completar-reserva" style="font-size:0.7rem" onclick="abrirEvidencias('${r.id}','evidencias_cliente')">📎 Subir mi evidencia</button>`)
+          : '';
       const unidadLabel = recursoNombreMap[r.unidad] || esc(r.unidad) || '—';
       const propId = ownerIdMap[r.unidad] || r.propietario_id || '';
       // El chat solo se puede usar mientras la reserva está vigente; al finalizar
       // queda como historial de solo lectura.
-      const chatAbierto = r.estado === 'Pendiente' || r.estado === 'Activa';
+      const chatAbierto = r.estado === 'Pendiente' || r.estado === 'Activa' || r.estado === 'PorAprobar';
       const chatBtn = propId
         ? `<button class="btn-chat-hilo" style="position:relative" title="${chatAbierto ? 'Chat con la empresa' : 'Conversación cerrada (historial)'}" onclick="openChatReserva('${r.id}','${propId}','${escJs(empresaMap[r.unidad]||'')}'${chatAbierto ? '' : ', {readonly:true}'})">💬${_chatHiloBadge(unreadMap[r.id])}</button>`
         : '';
@@ -161,8 +176,9 @@ async function renderReserv() {
         <div>${fmtFecha(r.fecha_ini)}</div>
         <div>${fmtFecha(r.fecha_fin)}</div>
         <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-          <span class="badge ${badgeCls}">${esc(r.estado)}</span>
+          <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
           ${trackBtn}
+          ${completarBtn}
           ${chatBtn}
           ${calBtn}
           ${pagoLbl}
@@ -252,10 +268,12 @@ async function renderReserv() {
     const esActiva    = r.estado === 'Activa';
     const inactiva    = esCancelada || esRechazada;
 
-    const esCompletada = r.estado === 'Completada';
-    const badgeCls = esPendiente  ? 'badge-busy'
-                   : esActiva     ? 'badge-avail'
-                   : esCompletada ? 'badge-acordado'
+    const esCompletada  = r.estado === 'Completada';
+    const esPorAprobar  = r.estado === 'PorAprobar';
+    const badgeCls = esPendiente   ? 'badge-busy'
+                   : esActiva      ? 'badge-avail'
+                   : esPorAprobar  ? 'badge-acuerdo-rev'
+                   : esCompletada  ? 'badge-acordado'
                    : 'badge-maint';
 
     const esDueno = currentUser.rol === 'superadmin' || ownerMap[r.unidad] === currentUser.id || r.propietario_id === currentUser.id;
@@ -268,15 +286,22 @@ async function renderReserv() {
       const trackStep = r.tracking_estado || 'Confirmado';
       acciones = `
         <button class="btn-edit" onclick="openTracking('${r.id}')" title="Ver seguimiento">📍 ${esc(trackStep)}</button>
-        <button class="btn-completar-reserva" onclick="marcarCompletado('${r.id}')">✓ Completar</button>
+        <button class="btn-completar-reserva" onclick="abrirEvidencias('${r.id}','evidencias')">✓ Completar</button>
         <button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${escJs(r.unidad)}')">Cancelar</button>`;
+    } else if (esDueno && esPorAprobar) {
+      // El servicio se cierra cuando cliente Y empresa marcan completado (cada
+      // quien sube su propia evidencia); el superadmin aprueba la revisión.
+      const miEvidencia = r.evidencias?.length || 0;
+      acciones = miEvidencia
+        ? `<span style="font-size:0.72rem;color:var(--text-muted)">⏳ Esperando aprobación del superadmin</span>`
+        : `<button class="btn-completar-reserva" style="font-size:0.72rem" onclick="abrirEvidencias('${r.id}','evidencias')">📎 Subir mi evidencia</button>`;
     } else if (esDueno && esCompletada) {
       const diasPasados = r.completado_en
         ? Math.floor((new Date() - new Date(r.completado_en)) / 86400000) : 99;
       const numEv = r.evidencias?.length || 0;
       const evBtnLabel = numEv > 0 ? `📎 Evidencias (${numEv})` : '📎 Subir evidencias';
       const evBtn = diasPasados <= 5 || numEv > 0
-        ? `<button class="btn-edit" style="font-size:0.72rem" onclick="abrirEvidencias('${r.id}')">${evBtnLabel}</button>`
+        ? `<button class="btn-edit" style="font-size:0.72rem" onclick="abrirEvidencias('${r.id}','evidencias')">${evBtnLabel}</button>`
         : '';
       acciones = (r.pagado
         ? `<span style="font-size:0.72rem;color:var(--green);font-weight:600">💰 Pagado</span>`
@@ -284,17 +309,18 @@ async function renderReserv() {
         + evBtn;
     }
 
-    const cartaPorteBtnAdmin = (esActiva || esCompletada)
+    const cartaPorteBtnAdmin = (esActiva || esPorAprobar || esCompletada)
       ? `<button class="btn-prox" disabled title="Carta Porte digital — próximamente">📄 Carta Porte <span class="prox-badge">Prox.</span></button>`
       : '';
 
     const unidadLabel = recursoLabelMap[r.unidad] || esc(r.unidad) || '—';
     // Chat con el cliente. La empresa puede escribir mientras la reserva está
-    // vigente (Pendiente/Activa); al finalizar queda como historial de lectura.
+    // vigente (Pendiente/Activa/PorAprobar, para coordinar la evidencia); al
+    // finalizar queda como historial de lectura.
     // El superadmin entra como observador del hilo real cliente↔empresa.
     const esSuper      = currentUser.rol === 'superadmin';
     const propietarioId = ownerMap[r.unidad] || r.propietario_id || '';
-    const chatVigente  = esPendiente || esActiva;
+    const chatVigente  = esPendiente || esActiva || esPorAprobar;
     let chatBtn = '';
     if (esSuper && r.cliente_user_id && propietarioId) {
       const etiqueta = `${escJs(r.cliente || 'Cliente')} ↔ ${escJs(empresaMap[r.unidad] || 'Empresa')}`;
@@ -314,7 +340,7 @@ async function renderReserv() {
       <div>${fmtFecha(r.fecha_ini)}</div>
       <div>${fmtFecha(r.fecha_fin)}</div>
       <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-        <span class="badge ${badgeCls}">${esc(r.estado)}</span>
+        <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
         ${acciones}
         ${cartaPorteBtnAdmin}
         ${chatBtn}
@@ -512,73 +538,69 @@ function eliminarReserva(reservaId) {
   });
 }
 
-// ── COMPLETAR SERVICIO (admin) ─────────────────────────
+// ── COMPLETAR SERVICIO (cliente y empresa, con aprobación del superadmin) ──
+//
+// Ni cliente ni empresa cierran el servicio directamente: cada quien marca
+// su lado como completado subiendo su propia evidencia (evidencias = empresa,
+// evidencias_cliente = cliente). En cuanto el primero lo hace, la reserva
+// pasa a 'PorAprobar' y el superadmin revisa ambas evidencias antes de
+// aprobar (-> 'Completada', cierra el pedido) o rechazar (-> 'Activa').
 
-async function marcarCompletado(reservaId) {
+async function abrirEvidencias(reservaId, campo = 'evidencias') {
   const { data: r } = await sb.from('reservaciones')
-    .select('unidad, recurso_tipo, tracking_estado, cliente_user_id, cliente, propietario_id, pedido_id')
+    .select('estado, tracking_estado, recurso_tipo, completado_en, evidencias, evidencias_cliente, cliente_user_id, propietario_id, cliente, pedido_id')
     .eq('id', reservaId).single();
   if (!r) { showToast('No se encontró la reserva', 'error'); return; }
 
-  // No se puede completar si el seguimiento no llegó al último estado:
-  // el dueño debe avanzar el tracking (📍) hasta la entrega antes de cerrar.
-  const estados   = _getEstados(r.recurso_tipo);
-  const estadoFin = estados[estados.length - 1];
-  const actual    = r.tracking_estado || estados[0].key;
-  if (actual !== estadoFin.key) {
-    showToast(`Primero avanza el seguimiento 📍 hasta "${estadoFin.label}". Estado actual: "${esc(actual)}".`, 'error');
-    return;
+  const modo = r.estado === 'Activa' ? 'solicitar' : 'agregar';
+
+  // Solo la empresa, y solo al solicitar el cierre, debe haber avanzado el
+  // seguimiento hasta el último paso.
+  if (campo === 'evidencias' && modo === 'solicitar') {
+    const estados   = _getEstados(r.recurso_tipo);
+    const estadoFin = estados[estados.length - 1];
+    const actual    = r.tracking_estado || estados[0].key;
+    if (actual !== estadoFin.key) {
+      showToast(`Primero avanza el seguimiento 📍 hasta "${estadoFin.label}". Estado actual: "${esc(actual)}".`, 'error');
+      return;
+    }
   }
 
-  showConfirm('¿Marcar este servicio como completado? El cliente podrá calificarlo.', async () => {
-    await sb.from('reservaciones').update({
-      estado:        'Completada',
-      completado_en: new Date().toISOString(),
-    }).eq('id', reservaId);
-    // Cerrar el ciclo del pedido: el acuerdo queda finalizado y deja de figurar como activo
-    if (r?.pedido_id) {
-      await sb.from('pedidos').update({ estado: 'finalizado' }).eq('id', r.pedido_id);
-    }
-    if (r?.unidad) {
-      const tabla = r.recurso_tipo === 'custodio' ? 'custodios' : r.recurso_tipo === 'patio' ? 'patios' : 'camiones';
-      await sb.from(tabla).update({ estado: 'disponible' }).eq('id', r.unidad);
-    }
-    // Notificar al cliente
-    if (r?.cliente_user_id) {
-      await sb.from('notificaciones').insert({
-        user_id: r.cliente_user_id,
-        tipo:    'servicio_completado',
-        titulo:  '✅ Servicio completado',
-        mensaje: `Tu servicio fue marcado como completado. Ya puedes calificarlo y tienes 5 días para subir evidencias si las necesitas.`,
-        leido:   false,
-      });
-    }
-    await renderReserv();
-    showToast('✓ Servicio marcado como completado');
-  });
-}
-
-// ── EVIDENCIAS DE SERVICIO ────────────────────────────
-
-async function abrirEvidencias(reservaId) {
+  const campoInput = document.getElementById('ev-campo');
+  if (!campoInput) {
+    // El HTML del modal está desactualizado en este navegador (falta el
+    // campo nuevo) — avisar en vez de fallar en silencio.
+    showToast('Tu app está desactualizada. Recarga la página (Ctrl+Shift+R) e inténtalo de nuevo.', 'error');
+    return;
+  }
   document.getElementById('ev-reserva-id').value = reservaId;
+  campoInput.value = campo;
   document.getElementById('ev-files').value = '';
   document.getElementById('ev-lista-actual').innerHTML = '<span style="color:var(--text-muted);font-size:0.82rem">Cargando…</span>';
   document.getElementById('modal-evidencias').classList.add('open');
 
-  const { data: r } = await sb.from('reservaciones').select('completado_en, evidencias').eq('id', reservaId).single();
-  const hoy = new Date();
-  const fechaComp = r?.completado_en ? new Date(r.completado_en) : hoy;
-  const diasRestantes = 5 - Math.floor((hoy - fechaComp) / 86400000);
+  const tituloEl = document.getElementById('ev-titulo');
+  const btnEl    = document.getElementById('btn-subir-evidencias');
+  if (tituloEl) tituloEl.textContent = modo === 'solicitar' ? '✓ Marcar servicio completado' : '📎 Evidencias del servicio';
+  if (btnEl)    btnEl.textContent    = modo === 'solicitar' ? '✓ Confirmar y enviar a revisión' : '📤 Subir evidencias';
 
   const infoEl = document.getElementById('ev-plazo-info');
-  if (infoEl) infoEl.textContent = diasRestantes > 0
-    ? `Tienes ${diasRestantes} día${diasRestantes !== 1 ? 's' : ''} para subir evidencias (máx. 5 archivos en total).`
-    : 'El plazo de 5 días para subir evidencias ha vencido.';
+  if (modo === 'solicitar') {
+    if (infoEl) infoEl.textContent = 'Sube al menos una foto como evidencia. La otra parte también deberá subir la suya antes de que el superadmin apruebe el cierre.';
+  } else {
+    const hoy = new Date();
+    const fechaComp = r.completado_en ? new Date(r.completado_en) : hoy;
+    const diasRestantes = 5 - Math.floor((hoy - fechaComp) / 86400000);
+    if (infoEl) infoEl.textContent = diasRestantes > 0
+      ? `Tienes ${diasRestantes} día${diasRestantes !== 1 ? 's' : ''} para subir evidencias (máx. 5 archivos en total).`
+      : 'El plazo de 5 días para subir evidencias ha vencido.';
+    const fileInput = document.getElementById('ev-files');
+    if (fileInput) fileInput.disabled = diasRestantes <= 0;
+  }
 
   // El bucket es privado: se guardan paths y se firman URLs al momento de ver.
   // Entradas legadas con URL completa se muestran tal cual.
-  const existentes = r?.evidencias || [];
+  const existentes = r[campo] || [];
   const listaEl = document.getElementById('ev-lista-actual');
   if (existentes.length) {
     const enlaces = await Promise.all(existentes.map(async (e) => {
@@ -593,9 +615,6 @@ async function abrirEvidencias(reservaId) {
   } else {
     listaEl.innerHTML = '<span style="font-size:0.78rem;color:var(--text-muted)">Sin evidencias aún</span>';
   }
-
-  const fileInput = document.getElementById('ev-files');
-  if (fileInput) fileInput.disabled = diasRestantes <= 0;
 }
 
 function cerrarEvidencias() {
@@ -604,17 +623,26 @@ function cerrarEvidencias() {
 
 async function subirEvidencias() {
   const reservaId = document.getElementById('ev-reserva-id').value;
-  const files = Array.from(document.getElementById('ev-files')?.files || []);
+  const campo     = document.getElementById('ev-campo')?.value || 'evidencias';
+  const files     = Array.from(document.getElementById('ev-files')?.files || []);
   if (!files.length) { showToast('Selecciona al menos un archivo', 'error'); return; }
 
-  // Verificar plazo (5 días)
-  const { data: r } = await sb.from('reservaciones').select('completado_en, evidencias').eq('id', reservaId).single();
-  const diasPasados = r?.completado_en
-    ? Math.floor((new Date() - new Date(r.completado_en)) / 86400000)
-    : 0;
-  if (diasPasados > 5) { showToast('El plazo de 5 días para subir evidencias ha vencido.', 'error'); return; }
+  const { data: r } = await sb.from('reservaciones')
+    .select('estado, completado_en, evidencias, evidencias_cliente, cliente_user_id, propietario_id, cliente, unidad, recurso_tipo, pedido_id')
+    .eq('id', reservaId).single();
+  if (!r) { showToast('No se encontró la reserva', 'error'); return; }
 
-  const existentes = r?.evidencias || [];
+  const solicitando = r.estado === 'Activa';
+
+  // Verificar plazo (5 días) — solo aplica cuando ya se solicitó el cierre.
+  if (!solicitando) {
+    const diasPasados = r.completado_en
+      ? Math.floor((new Date() - new Date(r.completado_en)) / 86400000)
+      : 0;
+    if (diasPasados > 5) { showToast('El plazo de 5 días para subir evidencias ha vencido.', 'error'); return; }
+  }
+
+  const existentes = r[campo] || [];
   if (existentes.length + files.length > 5) {
     showToast(`Solo puedes tener 5 evidencias. Ya tienes ${existentes.length}.`, 'error'); return;
   }
@@ -630,10 +658,60 @@ async function subirEvidencias() {
     nuevosPaths.push(path);
   }
 
-  await sb.from('reservaciones').update({ evidencias: [...existentes, ...nuevosPaths] }).eq('id', reservaId);
+  const payload = { [campo]: [...existentes, ...nuevosPaths] };
+  const actor = campo === 'evidencias_cliente' ? 'cliente' : 'empresa';
+  if (solicitando) {
+    payload.estado = 'PorAprobar';
+    payload.finalizacion_solicitada_por = actor;
+    if (!r.completado_en) payload.completado_en = new Date().toISOString();
+  }
+
+  const { error } = await sb.from('reservaciones').update(payload).eq('id', reservaId);
+  if (error) { showToast('Error al guardar: ' + error.message, 'error'); return; }
+
+  if (solicitando) {
+    // Notificar a la otra parte para que suba su propia evidencia
+    const otroId = actor === 'cliente' ? r.propietario_id : r.cliente_user_id;
+    if (otroId) {
+      await sb.from('notificaciones').insert({
+        user_id: otroId,
+        tipo:    'finalizacion_solicitada',
+        titulo:  '📎 Confirma la finalización del servicio',
+        mensaje: `${actor === 'cliente' ? 'El cliente' : 'La empresa'} marcó el servicio como completado. Sube tu propia evidencia para enviarlo a revisión del superadmin.`,
+        leido:   false,
+      });
+    }
+    // Notificar a superadmins para que lo revisen
+    const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+    if (supers?.length) {
+      await sb.from('notificaciones').insert(supers.map(a => ({
+        user_id: a.user_id,
+        tipo:    'revision_finalizacion',
+        titulo:  '🏁 Finalización de servicio por revisar',
+        mensaje: `${esc(r.cliente || 'Un cliente')} tiene un servicio marcado como completado, pendiente de tu aprobación.`,
+        leido:   false,
+      })));
+    }
+  } else if (!existentes.length) {
+    // La otra parte ya había solicitado el cierre; esta es la primera vez que
+    // ESTE lado sube su evidencia — avisar a superadmins que ya están ambas.
+    const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+    if (supers?.length) {
+      await sb.from('notificaciones').insert(supers.map(a => ({
+        user_id: a.user_id,
+        tipo:    'revision_finalizacion',
+        titulo:  '🏁 Ya están ambas evidencias',
+        mensaje: `${esc(r.cliente || 'Un cliente')} y la empresa ya subieron su evidencia de cierre. Puedes revisarla y aprobarla.`,
+        leido:   false,
+      })));
+    }
+  }
+
   cerrarEvidencias();
   await renderReserv();
-  showToast(`✓ ${nuevosPaths.length} evidencia${nuevosPaths.length !== 1 ? 's' : ''} subida${nuevosPaths.length !== 1 ? 's' : ''}`);
+  showToast(solicitando
+    ? '✓ Enviado a revisión del superadmin'
+    : `✓ ${nuevosPaths.length} evidencia${nuevosPaths.length !== 1 ? 's' : ''} subida${nuevosPaths.length !== 1 ? 's' : ''}`);
 }
 
 // ── CALIFICAR SERVICIO (cliente) ───────────────────────

@@ -56,6 +56,9 @@ function iniciarSuscripcionesRealtime() {
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'reservaciones' }, () => {
       if (document.getElementById('view-reservaciones').classList.contains('active')) renderReserv();
+      // El superadmin necesita ver en vivo cuando cliente/empresa suben su
+      // evidencia de cierre (no siempre dispara una notificación nueva).
+      if (pendientesActivo()) renderAprobaciones();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
       if (pedidosActivo()) renderPedidos();

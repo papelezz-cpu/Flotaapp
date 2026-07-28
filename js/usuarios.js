@@ -233,7 +233,7 @@ async function abrirHistorialUsuario(userId, nombre, rol) {
             <td>${esc(r.cliente || '—')}</td>
             <td style="font-size:0.78rem">${fmtFecha(r.fecha_ini)} – ${fmtFecha(r.fecha_fin)}</td>
             <td style="color:var(--green);font-size:0.8rem">$${(Number(r.precio_acordado)||0).toLocaleString('es-MX')}</td>
-            <td style="font-size:0.78rem;color:var(--text-muted)">${esc(r.estado)}</td>
+            <td style="font-size:0.78rem;color:var(--text-muted)">${esc(_estadoLabel(r.estado))}</td>
           </tr>`).join('')}
         </tbody>
       </table>` : '<div class="rep-empty">Sin reservaciones aún.</div>'}`;
