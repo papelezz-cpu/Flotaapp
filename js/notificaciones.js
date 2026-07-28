@@ -146,13 +146,14 @@ async function onNotifClick(id, tipo) {
     return;
   }
 
-  // Superadmin: solicitud o acuerdo en espera de revisión → ir a Pendientes (aprobaciones)
-  if (tipo === 'revision_solicitud' || tipo === 'revision_acuerdo') {
+  // Superadmin: solicitud, acuerdo o finalización de servicio en espera de revisión → Pendientes
+  if (tipo === 'revision_solicitud' || tipo === 'revision_acuerdo' || tipo === 'revision_finalizacion') {
     goTo('pendientes', 'Pendientes', 0, null);
     return;
   }
   if (tipo === 'reserva_pendiente' || tipo === 'reserva_aceptada' || tipo === 'reserva_rechazada' ||
-      tipo === 'tracking_actualizado' || tipo === 'reserva_cancelada') {
+      tipo === 'tracking_actualizado' || tipo === 'reserva_cancelada' || tipo === 'servicio_completado' ||
+      tipo === 'finalizacion_solicitada' || tipo === 'finalizacion_rechazada') {
     goTo('reservaciones', 'Reservaciones', 0, null);
     return;
   }

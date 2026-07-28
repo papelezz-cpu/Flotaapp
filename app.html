@@ -1555,9 +1555,10 @@
 <!-- ══ MODAL EVIDENCIAS DE SERVICIO ═════════════════════ -->
 <div class="modal-overlay" id="modal-evidencias">
   <div class="modal" style="max-width:480px">
-    <h2>📎 Evidencias del servicio</h2>
+    <h2 id="ev-titulo">📎 Evidencias del servicio</h2>
     <p class="sub" id="ev-plazo-info">Sube fotos o documentos de entrega. Disponible por 5 días desde la fecha de completado.</p>
     <input type="hidden" id="ev-reserva-id">
+    <input type="hidden" id="ev-campo" value="evidencias">
     <div id="ev-lista-actual" style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px"></div>
     <div class="form-group">
       <label>Adjuntar nuevos archivos <span style="font-weight:400;color:var(--text-muted)">(máx. 5 en total)</span></label>
@@ -1565,7 +1566,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="cerrarEvidencias()">Cancelar</button>
-      <button class="btn-confirm" onclick="subirEvidencias()">📤 Subir evidencias</button>
+      <button class="btn-confirm" id="btn-subir-evidencias" onclick="subirEvidencias()">📤 Subir evidencias</button>
     </div>
   </div>
 </div>
@@ -2284,7 +2285,7 @@
 
 <!-- ══ SCRIPTS (orden importante) ══════════════════════ -->
 <script src="js/utils.js?v=5"></script>
-<script src="js/notificaciones.js?v=16"></script>
+<script src="js/notificaciones.js?v=17"></script>
 <script src="js/detalle.js?v=12"></script>
 <script src="js/config.js?v=12"></script>
 <script src="js/auth.js?v=20"></script>
@@ -2292,10 +2293,10 @@
 <script src="js/views.js?v=23"></script>
 <script src="js/camiones.js?v=11"></script>
 <script src="js/recursos.js?v=11"></script>
-<script src="js/reservaciones.js?v=27"></script>
+<script src="js/reservaciones.js?v=28"></script>
 <script src="js/modal.js?v=13"></script>
 <script src="js/pedidos.js?v=42"></script>
-<script src="js/aprobaciones.js?v=29"></script>
+<script src="js/aprobaciones.js?v=30"></script>
 <script src="js/admin.js?v=28"></script>
 <script src="js/operadores.js?v=9"></script>
 <script src="js/usuarios.js?v=20"></script>

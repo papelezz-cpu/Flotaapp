@@ -36,7 +36,7 @@ async function renderAprobaciones() {
 
   const [{ data: solicitudes }, { data: acuerdos }, { data: operadores },
          { data: camiones }, { data: custodios }, { data: patios }, { data: lavados },
-         { data: cuentasPend }, { data: docsEmpresa }] = await Promise.all([
+         { data: cuentasPend }, { data: docsEmpresa }, { data: finalizaciones }] = await Promise.all([
     sb.from('pedidos').select('*').eq('estado', 'pendiente_revision').order('created_at'),
     sb.from('pedidos').select('*').eq('estado', 'pendiente_acuerdo').order('created_at'),
     sb.from('operadores').select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at'),
@@ -46,7 +46,18 @@ async function renderAprobaciones() {
     sb.from('lavados'   ).select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('id', { ascending: false }),
     sb.from('solicitudes_cuenta').select('*').eq('estado', 'pendiente').order('created_at', { ascending: false }),
     sb.from('perfiles').select('user_id, nombre, fecha_vencimiento_permiso_sct, fecha_vencimiento_permiso_sct_pendiente, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_rc_pendiente, fecha_vencimiento_seguro_carga, fecha_vencimiento_seguro_carga_pendiente, doc_permiso_sct, doc_permiso_sct_pendiente, doc_seguro_rc, doc_seguro_rc_pendiente, doc_seguro_carga, doc_seguro_carga_pendiente').eq('perfil_docs_pendiente', true),
+    sb.from('reservaciones').select('*').eq('estado', 'PorAprobar').order('completado_en'),
   ]);
+
+  // Nombre de empresa para cada finalización pendiente
+  const finEmpresaMap = {};
+  if (finalizaciones?.length) {
+    const propIds = [...new Set(finalizaciones.map(r => r.propietario_id).filter(Boolean))];
+    if (propIds.length) {
+      const { data: props } = await sb.from('perfiles').select('user_id, nombre').in('user_id', propIds);
+      (props || []).forEach(p => { finEmpresaMap[p.user_id] = p.nombre; });
+    }
+  }
 
   // Cargar ofertas pendientes para los acuerdos
   let ofertasMap = {};
@@ -308,6 +319,58 @@ async function renderAprobaciones() {
       }).join('');
       return _colapseCard(`acug-${key}`, header, body);
     }).join('');
+  }
+
+  // ── FINALIZACIONES DE SERVICIO POR APROBAR ───────────
+  html += `<div class="apr-bloque-title" style="margin-top:28px">🏁 Finalizaciones por aprobar <span class="apr-count">${(finalizaciones||[]).length}</span></div>`;
+  if (!finalizaciones?.length) {
+    html += `<div class="apr-empty">Sin finalizaciones pendientes de aprobación</div>`;
+  } else {
+    const _verEvFin = async (paths) => {
+      if (!paths?.length) return '<span style="font-size:0.78rem;color:var(--text-muted)">Sin evidencia</span>';
+      const enlaces = await Promise.all(paths.map(async (e) => {
+        if (String(e).startsWith('http')) return e;
+        const { data } = await sb.storage.from('unidades').createSignedUrl(e, 3600);
+        return data?.signedUrl || null;
+      }));
+      return enlaces.map((url, i) => url
+        ? `<a href="${esc(url)}" target="_blank" class="btn-edit" style="font-size:0.75rem;margin:2px 4px 2px 0;display:inline-block">📎 Foto ${i + 1}</a>`
+        : `<span style="font-size:0.75rem;color:var(--text-muted)">Foto ${i + 1} (no disponible)</span>`
+      ).join('');
+    };
+    const bodies = await Promise.all(finalizaciones.map(async r => {
+      const evEmpresaHtml = await _verEvFin(r.evidencias);
+      const evClienteHtml = await _verEvFin(r.evidencias_cliente);
+      const faltaEmpresa = !(r.evidencias?.length);
+      const faltaCliente = !(r.evidencias_cliente?.length);
+      return `
+        <div class="apr-card" id="aprfin-${r.id}">
+          <div class="apr-card-header">
+            <div>
+              <div class="apr-tipo">🏁 ${esc(r.cliente || 'Cliente')} ↔ ${esc(finEmpresaMap[r.propietario_id] || '—')}</div>
+              <div class="apr-sub">Unidad: <strong>${esc(r.unidad || '—')}</strong> · ${fmtFecha(r.fecha_ini)} → ${fmtFecha(r.fecha_fin)}</div>
+            </div>
+            <span class="badge badge-acuerdo-rev">En revisión</span>
+          </div>
+          <div class="apr-op-detalle">
+            <div class="apr-op-grid">
+              <div class="apr-op-row"><span>Precio acordado</span><strong>${r.precio_acordado ? '$' + Number(r.precio_acordado).toLocaleString('es-MX') + ' MXN' : '—'}</strong></div>
+              <div class="apr-op-row"><span>Pago</span><strong style="color:${r.pagado ? 'var(--green,#22c55e)' : 'var(--amber)'}">${r.pagado ? '💰 Marcado como pagado' : '⚠️ No marcado como pagado'}</strong></div>
+              <div class="apr-op-row"><span>Solicitó el cierre</span><strong>${r.finalizacion_solicitada_por === 'cliente' ? 'Cliente' : 'Empresa'}</strong></div>
+              <div class="apr-op-row"><span>Seguimiento</span><strong>${esc(r.tracking_estado || '—')}</strong></div>
+            </div>
+            <div class="apr-op-section-title">Evidencia de la empresa ${faltaEmpresa ? '<span style="color:var(--amber)">⚠️ falta</span>' : ''}</div>
+            <div style="margin:4px 0 10px">${evEmpresaHtml}</div>
+            <div class="apr-op-section-title">Evidencia del cliente ${faltaCliente ? '<span style="color:var(--amber)">⚠️ falta</span>' : ''}</div>
+            <div style="margin:4px 0">${evClienteHtml}</div>
+          </div>
+          <div class="apr-actions">
+            <button class="btn-apr-aprobar" onclick="aprobarFinalizacion('${r.id}')">✓ Aprobar finalización</button>
+            <button class="btn-apr-rechazar" onclick="rechazarFinalizacion('${r.id}')">✕ Rechazar</button>
+          </div>
+        </div>`;
+    }));
+    html += bodies.join('');
   }
 
   // ── RECURSOS POR EMPRESA ─────────────────────────────
@@ -1053,6 +1116,79 @@ function rechazarSolicitud(pedidoId) {
       if (document.getElementById('view-pedidos')?.classList.contains('active')) renderPedidos();
     }
   );
+}
+
+// ── APROBAR / RECHAZAR FINALIZACIÓN DE SERVICIO ──────────
+
+async function aprobarFinalizacion(reservaId) {
+  const { data: r } = await sb.from('reservaciones')
+    .select('unidad, recurso_tipo, cliente_user_id, propietario_id, cliente, pedido_id')
+    .eq('id', reservaId).single();
+  if (!r) { showToast('No se encontró la reserva', 'error'); return; }
+
+  const { error } = await sb.from('reservaciones').update({
+    estado: 'Completada',
+    finalizacion_aprobada_por: currentUser.id,
+    finalizacion_aprobada_en: new Date().toISOString(),
+  }).eq('id', reservaId);
+  if (error) { showToast('Error al aprobar: ' + error.message, 'error'); return; }
+
+  if (r.pedido_id) {
+    await sb.from('pedidos').update({ estado: 'finalizado' }).eq('id', r.pedido_id);
+  }
+  if (r.unidad) {
+    const tabla = r.recurso_tipo === 'custodio' ? 'custodios' : r.recurso_tipo === 'patio' ? 'patios' : 'camiones';
+    await sb.from(tabla).update({ estado: 'disponible' }).eq('id', r.unidad);
+  }
+
+  const notifs = [];
+  if (r.cliente_user_id) notifs.push({
+    user_id: r.cliente_user_id, tipo: 'servicio_completado', titulo: '✅ Servicio completado',
+    mensaje: 'El superadmin aprobó la finalización de tu servicio. Ya puedes calificarlo.', leido: false,
+  });
+  if (r.propietario_id) notifs.push({
+    user_id: r.propietario_id, tipo: 'servicio_completado', titulo: '✅ Finalización aprobada',
+    mensaje: `El servicio con ${esc(r.cliente || 'el cliente')} fue aprobado como completado.`, leido: false,
+  });
+  if (notifs.length) await sb.from('notificaciones').insert(notifs);
+
+  document.getElementById(`aprfin-${reservaId}`)?.remove();
+  showToast('✓ Finalización aprobada');
+  renderAprobaciones();
+}
+
+function rechazarFinalizacion(reservaId) {
+  _abrirRechazarNota(
+    'Rechazar finalización',
+    'Motivo (se notificará a cliente y empresa; la reserva vuelve a Activa):',
+    nota => _ejecutarRechazarFinalizacion(reservaId, nota)
+  );
+}
+
+async function _ejecutarRechazarFinalizacion(reservaId, nota) {
+  const { data: r } = await sb.from('reservaciones')
+    .select('cliente_user_id, propietario_id, cliente').eq('id', reservaId).single();
+
+  const { error } = await sb.from('reservaciones').update({
+    estado: 'Activa',
+    finalizacion_nota: nota || null,
+  }).eq('id', reservaId);
+  if (error) { showToast('Error al rechazar: ' + error.message, 'error'); return; }
+
+  const notifs = [];
+  if (r?.cliente_user_id) notifs.push({
+    user_id: r.cliente_user_id, tipo: 'finalizacion_rechazada', titulo: 'Finalización no aprobada',
+    mensaje: `El superadmin no aprobó el cierre del servicio.${nota ? ' Motivo: ' + nota : ''} El servicio sigue activo.`, leido: false,
+  });
+  if (r?.propietario_id) notifs.push({
+    user_id: r.propietario_id, tipo: 'finalizacion_rechazada', titulo: 'Finalización no aprobada',
+    mensaje: `El superadmin no aprobó el cierre del servicio con ${esc(r?.cliente || 'el cliente')}.${nota ? ' Motivo: ' + nota : ''} El servicio sigue activo.`, leido: false,
+  });
+  if (notifs.length) await sb.from('notificaciones').insert(notifs);
+
+  document.getElementById(`aprfin-${reservaId}`)?.remove();
+  showToast('Finalización rechazada, la reserva vuelve a Activa');
+  renderAprobaciones();
 }
 
 // ── APROBAR ACUERDO ──────────────────────────────────────
