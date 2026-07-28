@@ -315,8 +315,17 @@ async function renderPedidos(append = false) {
   } else if (currentUser.id && currentUser.rol === 'admin') {
     if (_adminCamionTipos === null) await _cargarAdminCamionTipos();
 
-    const misOfertaIds = new Set(
-      todasOfertas.filter(o => o.admin_id === currentUser.id).map(o => o.pedido_id)
+    // Ofertas propias todavía vivas — mientras existan, el pedido se ve en
+    // "Mis negociaciones", no en "disponibles".
+    const misOfertaIdsActivas = new Set(
+      todasOfertas.filter(o => o.admin_id === currentUser.id && o.estado !== 'rechazada').map(o => o.pedido_id)
+    );
+    // Ofertas propias rechazadas donde el cliente decidió no permitir que
+    // vuelva a ofertar en esa misma solicitud (ver confirmarRechazarOferta).
+    const misOfertaIdsBloqueadas = new Set(
+      todasOfertas.filter(o =>
+        o.admin_id === currentUser.id && o.estado === 'rechazada' && o.permite_reoferta === false
+      ).map(o => o.pedido_id)
     );
 
     const ESTADOS_NEGOCIABLES = ['abierto','en_negociacion','pendiente_revision','pendiente_acuerdo'];
@@ -336,7 +345,7 @@ async function renderPedidos(append = false) {
     ));
 
     const disponibles = _filtrar((pedidos || []).filter(p =>
-      p.estado === 'abierto' && !misOfertaIds.has(p.id)
+      p.estado === 'abierto' && !misOfertaIdsActivas.has(p.id) && !misOfertaIdsBloqueadas.has(p.id)
     ));
 
     if (disponibles.length) {
@@ -1025,9 +1034,34 @@ async function responderOferta(ofertaId, accion) {
     _openDetallesServicio(oferta, pedidoDetalle);
     return;
   }
-  // Rechazar
-  const { error } = await sb.from('ofertas').update({ estado: 'rechazada' }).eq('id', ofertaId);
-  if (error) { showToast('Error al procesar'); return; }
+  // Rechazar — se decide primero si se permite que la empresa vuelva a
+  // ofertar en esta misma solicitud (ver confirmarRechazarOferta).
+  abrirRechazarOferta(ofertaId);
+}
+
+// ── RECHAZAR OFERTA (cliente decide si permite reofertar) ─
+let _rechazarOfertaId = null;
+
+function abrirRechazarOferta(ofertaId) {
+  _rechazarOfertaId = ofertaId;
+  const chk = document.getElementById('ro-permitir-reoferta');
+  if (chk) chk.checked = true;
+  document.getElementById('modal-rechazar-oferta').classList.add('open');
+}
+
+function cerrarRechazarOferta() {
+  document.getElementById('modal-rechazar-oferta').classList.remove('open');
+  _rechazarOfertaId = null;
+}
+
+async function confirmarRechazarOferta() {
+  if (!_rechazarOfertaId) return;
+  const permiteReoferta = document.getElementById('ro-permitir-reoferta').checked;
+  const { error } = await sb.from('ofertas')
+    .update({ estado: 'rechazada', permite_reoferta: permiteReoferta })
+    .eq('id', _rechazarOfertaId);
+  cerrarRechazarOferta();
+  if (error) { showToast('Error al procesar', 'error'); return; }
   await loadNotificaciones();
   if (pedidoDetalle) await openPedidoDetalle(pedidoDetalle.id);
   await renderPedidos();

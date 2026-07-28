@@ -2208,6 +2208,25 @@
   </div>
 </div>
 
+<!-- ══ MODAL RECHAZAR OFERTA (cliente) ═════════════════ -->
+<div class="modal-overlay" id="modal-rechazar-oferta">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <h2>Rechazar oferta</h2>
+      <button class="modal-close" onclick="cerrarRechazarOferta()">✕</button>
+    </div>
+    <p class="sub">La empresa será notificada de que no fue seleccionada.</p>
+    <label style="display:flex;align-items:flex-start;gap:10px;margin:14px 0;cursor:pointer;font-size:0.86rem;line-height:1.4">
+      <input type="checkbox" id="ro-permitir-reoferta" checked style="width:17px;height:17px;flex-shrink:0;margin-top:2px">
+      <span>Permitir que esta empresa pueda volver a ofertar en esta misma solicitud (por ejemplo, si no llega otra oferta mejor)</span>
+    </label>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="cerrarRechazarOferta()">Cancelar</button>
+      <button class="btn-confirm" style="background:var(--danger);border-color:var(--danger)" onclick="confirmarRechazarOferta()">✕ Rechazar oferta</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL EDITAR PEDIDO (estado abierto) ════════════ -->
 <div class="modal-overlay" id="modal-editar-pedido">
   <div class="modal">
@@ -2275,7 +2294,7 @@
 <script src="js/recursos.js?v=11"></script>
 <script src="js/reservaciones.js?v=25"></script>
 <script src="js/modal.js?v=13"></script>
-<script src="js/pedidos.js?v=40"></script>
+<script src="js/pedidos.js?v=41"></script>
 <script src="js/aprobaciones.js?v=29"></script>
 <script src="js/admin.js?v=28"></script>
 <script src="js/operadores.js?v=9"></script>
