@@ -2,6 +2,34 @@
 
 let currentUser = { id: null, nombre: null, rol: null };
 
+// Versiones vigentes de los documentos legales. Al publicar una versión nueva,
+// actualízalas aquí: cada consentimiento se guarda con la versión que el
+// usuario aceptó, de modo que después se puede saber a quién hay que volver a
+// pedírselo. Ver tabla `consentimientos`.
+const LEGAL_VERSION_PRIVACIDAD = 'borrador-0';
+const LEGAL_VERSION_TERMINOS   = 'borrador-0';
+
+// Bloque de aceptación que se muestra al final de ambos formularios de registro.
+function _regConsentimientoHTML() {
+  return `
+    <label class="reg-consent">
+      <input type="checkbox" id="reg-acepto">
+      <span>He leído y acepto el
+        <a href="privacidad.html" target="_blank" rel="noopener">Aviso de Privacidad</a> y los
+        <a href="terminos.html" target="_blank" rel="noopener">Términos y Condiciones</a>.</span>
+    </label>`;
+}
+
+// Deja constancia de lo aceptado. Se llama después de crear la cuenta.
+async function _registrarConsentimientos(userId, contexto) {
+  const { error } = await sb.from('consentimientos').insert([
+    { user_id: userId, tipo: 'aviso_privacidad', version: LEGAL_VERSION_PRIVACIDAD, contexto },
+    { user_id: userId, tipo: 'terminos',         version: LEGAL_VERSION_TERMINOS,   contexto },
+  ]);
+  if (error) console.error('No se pudo registrar el consentimiento:', error);
+  return !error;
+}
+
 // Aplica clases de rol y estado en el body
 function applyUserUI() {
   document.body.classList.remove('role-admin', 'role-superadmin', 'logged-in');
@@ -412,6 +440,7 @@ function _regFormHTML(rol) {
           <input type="file" id="reg-ine" accept="image/*,.pdf" onchange="updateRegFileLabel('reg-ine')">
         </label>
       </div>
+      ${_regConsentimientoHTML()}
       <button class="btn-login" onclick="doRegistro()">Enviar solicitud de registro</button>`;
   }
 
@@ -514,6 +543,7 @@ function _regFormHTML(rol) {
         <input type="file" id="reg-opinion" accept="image/*,.pdf" onchange="updateRegFileLabel('reg-opinion')">
       </label>
     </div>
+    ${_regConsentimientoHTML()}
     <button class="btn-login" onclick="doRegistro()">Enviar solicitud de registro</button>`;
 }
 
@@ -547,6 +577,10 @@ async function doRegistro() {
   const passConfirm = document.getElementById('reg-pass-confirm')?.value || '';
   if (pass.length < 8) { showErr('La contraseña debe tener al menos 8 caracteres.'); return; }
   if (pass !== passConfirm) { showErr('Las contraseñas no coinciden.'); return; }
+  if (!document.getElementById('reg-acepto')?.checked) {
+    showErr('Debes aceptar el Aviso de Privacidad y los Términos y Condiciones para continuar.');
+    return;
+  }
   if (_regRol === 'admin' && (!ineFile || !compDomFile || !fotoDomFile)) {
     showErr('Adjunta todos los documentos requeridos.'); return;
   }
@@ -764,6 +798,10 @@ async function doRegistro() {
     });
     await sb.from('solicitudes_cuenta').insert({ user_id: userId, rol: _regRol, ...solicitudPayload });
   }
+
+  // Constancia de la aceptación (versión + fecha). Se guarda también en el
+  // re-registro: puede haber cambiado la versión del aviso desde la vez pasada.
+  await _registrarConsentimientos(userId, 'registro');
 
   const { data: superadmins } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
   if (superadmins?.length) {

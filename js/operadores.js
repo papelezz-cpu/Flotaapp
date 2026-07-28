@@ -240,6 +240,13 @@ async function agregarOperador() {
   const nombre = v('op-nombre');
   if (!nombre) { showToast('El nombre del operador es obligatorio.', 'error'); restore(); return; }
 
+  // Se registran datos sensibles de un tercero: sin esta declaración no se
+  // continúa (ver privacidad.html §4).
+  if (!document.getElementById('op-consent-sensibles')?.checked) {
+    showToast('Debes declarar que cuentas con el consentimiento del operador.', 'error');
+    restore(); return;
+  }
+
   const propietarioId = currentUser.rol === 'superadmin'
     ? document.getElementById('sa-empresa-operador')?.value
     : currentUser.id;
@@ -367,6 +374,17 @@ async function agregarOperador() {
     error = e;
   }
   if (error) { showToast('Error al guardar: ' + (error.message || ''), 'error'); restore(); return; }
+
+  // Constancia de la declaración de consentimiento sobre los datos sensibles
+  // de este operador (quién la hizo, para quién y cuándo).
+  const { error: errConsent } = await sb.from('consentimientos').insert({
+    user_id:    currentUser.id,
+    tipo:       'datos_sensibles_operador',
+    version:    LEGAL_VERSION_PRIVACIDAD,
+    contexto:   'alta_operador',
+    referencia: id,
+  });
+  if (errConsent) console.error('No se pudo registrar la declaración:', errConsent);
 
   // Notificar a superadmins
   const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');

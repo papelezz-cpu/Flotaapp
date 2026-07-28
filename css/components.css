@@ -1794,3 +1794,19 @@ body.light .vig-empresa-header:hover { background: rgba(0,0,0,0.03); }
   .np-check input[type=checkbox],
   .ro-chip input[type=checkbox] { width: 18px; height: 18px; }
 }
+
+/* ── DECLARACIÓN DE DATOS SENSIBLES (alta de operador) ─── */
+.decl-sensibles {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 16px 0 10px; padding: 12px 14px;
+  background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.32);
+  border-radius: 10px; cursor: pointer;
+  font-size: 0.82rem; line-height: 1.45; color: var(--text-main);
+  text-transform: none; letter-spacing: 0; font-weight: 400;
+}
+.decl-sensibles input[type=checkbox] {
+  flex-shrink: 0; width: 18px; height: 18px; margin-top: 1px;
+  accent-color: var(--accent); cursor: pointer;
+}
+.decl-sensibles a { color: var(--accent); font-weight: 600; }

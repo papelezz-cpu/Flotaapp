@@ -24,8 +24,8 @@
   <!-- Estilos -->
   <link rel="stylesheet" href="css/base.css?v=7">
   <link rel="stylesheet" href="css/layout.css?v=4">
-  <link rel="stylesheet" href="css/components.css?v=19">
-  <link rel="stylesheet" href="css/login.css?v=4">
+  <link rel="stylesheet" href="css/components.css?v=20">
+  <link rel="stylesheet" href="css/login.css?v=5">
   <link rel="stylesheet" href="css/detalle.css?v=2">
   <link rel="stylesheet" href="css/theme.css?v=6">
   <style>
@@ -976,6 +976,16 @@
           <label>Empresa propietaria</label>
           <select id="sa-empresa-operador" onchange="onCambioEmpresaOperador()"><option value="">— Selecciona empresa —</option></select>
         </div>
+        <!-- Datos sensibles de un tercero: la empresa debe declarar que cuenta
+             con el consentimiento del operador (ver privacidad.html §4). -->
+        <label class="decl-sensibles">
+          <input type="checkbox" id="op-consent-sensibles">
+          <span>Declaro que cuento con el consentimiento expreso y por escrito de esta persona para
+            registrar y compartir con PortGo sus datos personales, incluidos los de salud
+            (tipo de sangre, examen médico y toxicológico) y su constancia de antecedentes no penales.
+            <a href="privacidad.html" target="_blank" rel="noopener">Ver Aviso de Privacidad</a></span>
+        </label>
+
         <div style="display:flex;gap:10px;margin-top:4px">
           <button class="btn-add" onclick="agregarOperador()" style="flex:1">Enviar a aprobación</button>
           <button class="btn-cancel" onclick="closeAgregarOperador()" style="flex:0 0 auto">Limpiar</button>
@@ -1092,6 +1102,17 @@
         </div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- ══ VISTA: PRIVACIDAD Y DATOS PERSONALES (ARCO) ═════ -->
+<div id="view-privacidad" class="view">
+  <div class="page">
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
+    <div class="section-title">🔐 Privacidad y datos personales</div>
+    <div id="privacidad-content">
+      <div class="empty-state"><div class="icon">⏳</div>Cargando...</div>
     </div>
   </div>
 </div>
@@ -2203,7 +2224,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="cerrarRechazarNota()">Cancelar</button>
-      <button class="btn-confirm" style="background:var(--danger);border-color:var(--danger)" onclick="confirmarRechazarNota()">✕ Confirmar rechazo</button>
+      <button class="btn-confirm" id="rn-confirm" style="background:var(--danger);border-color:var(--danger)" onclick="confirmarRechazarNota()">✕ Confirmar rechazo</button>
     </div>
   </div>
 </div>
@@ -2287,19 +2308,20 @@
 <script src="js/notificaciones.js?v=15"></script>
 <script src="js/detalle.js?v=12"></script>
 <script src="js/config.js?v=12"></script>
-<script src="js/auth.js?v=20"></script>
+<script src="js/auth.js?v=21"></script>
 <script src="js/theme.js?v=11"></script>
-<script src="js/views.js?v=23"></script>
+<script src="js/views.js?v=24"></script>
 <script src="js/camiones.js?v=11"></script>
 <script src="js/recursos.js?v=11"></script>
 <script src="js/reservaciones.js?v=27"></script>
 <script src="js/modal.js?v=13"></script>
 <script src="js/pedidos.js?v=42"></script>
-<script src="js/aprobaciones.js?v=29"></script>
+<script src="js/aprobaciones.js?v=30"></script>
 <script src="js/admin.js?v=28"></script>
-<script src="js/operadores.js?v=9"></script>
+<script src="js/operadores.js?v=10"></script>
 <script src="js/usuarios.js?v=20"></script>
 <script src="js/verificacion.js?v=1"></script>
+<script src="js/privacidad.js?v=1"></script>
 <script src="js/reportes.js?v=2"></script>
 <script src="js/chat.js?v=16"></script>
 <script src="js/catalogo.js?v=21"></script>

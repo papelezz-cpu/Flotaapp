@@ -223,3 +223,16 @@ body:not(.logged-in) #login-overlay { cursor: default; }
 .reg-success-icon { font-size: 3rem; margin-bottom: 12px; }
 .reg-success-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1.1rem; margin-bottom: 8px; color: #102a26; }
 .reg-success-desc { font-size: 0.85rem; color: #7c8a85; line-height: 1.7; }
+
+/* ── ACEPTACIÓN DE AVISO Y TÉRMINOS (registro) ────────── */
+.reg-consent {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 18px 0 6px; padding: 12px 14px;
+  background: #faf8f3; border: 1px solid #e0dacb; border-radius: 11px;
+  cursor: pointer; font-size: 0.85rem; line-height: 1.45; color: #4f6661;
+}
+.reg-consent input[type=checkbox] {
+  flex-shrink: 0; width: 18px; height: 18px; margin-top: 1px;
+  accent-color: #0d9488; cursor: pointer;
+}
+.reg-consent a { color: #0d9488; font-weight: 600; }

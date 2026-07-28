@@ -3,10 +3,19 @@
 // ─── Modal genérico para rechazo con nota ──────────────
 let _rechazarNotaCb = null;
 
-function _abrirRechazarNota(titulo, label, callback) {
+// opts: { confirmLabel, danger } — por defecto se comporta como rechazo, que
+// es el uso original; privacidad.js lo reutiliza para respuestas afirmativas.
+function _abrirRechazarNota(titulo, label, callback, opts = {}) {
+  const { confirmLabel = '✕ Confirmar rechazo', danger = true } = opts;
   document.getElementById('rn-titulo').textContent = titulo;
   document.getElementById('rn-label').textContent  = label;
   document.getElementById('rn-nota').value         = '';
+  const btn = document.getElementById('rn-confirm');
+  if (btn) {
+    btn.textContent = confirmLabel;
+    btn.style.background   = danger ? 'var(--danger)' : 'var(--green)';
+    btn.style.borderColor  = danger ? 'var(--danger)' : 'var(--green)';
+  }
   _rechazarNotaCb = callback;
   document.getElementById('modal-rechazar-nota').classList.add('open');
   setTimeout(() => document.getElementById('rn-nota')?.focus(), 100);
