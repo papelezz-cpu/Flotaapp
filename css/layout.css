@@ -229,8 +229,9 @@ header {
 /* ── HAMBURGER ───────────────────────────────────────── */
 .btn-hamburger {
   display: none;
-  flex-direction: column; justify-content: center; gap: 5px;
+  flex-direction: column; justify-content: center; align-items: center; gap: 5px;
   background: none; border: none; cursor: pointer;
+  width: 40px; height: 40px;              /* área táctil cómoda */
   padding: 6px; border-radius: 8px;
   transition: background 0.2s;
 }

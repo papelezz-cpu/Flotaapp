@@ -492,7 +492,10 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
       <button class="btn-ofertar" onclick="abrirReenviarPedido('${escJs(p.id)}')">🔄 Corregir y reenviar</button>`;
 
   } else if (vista === 'superadmin') {
-    const ofertasActivas = (ofertasMap?.[p.id] || ofertas).filter(o => o.estado !== 'rechazada');
+    // `ofertasMap` es una const local de renderPedidos(), no visible aquí: la
+    // referencia lanzaba ReferenceError y rompía toda la vista de solicitudes
+    // del superadmin. El llamador ya pasa ofertasMap[p.id] en `ofertas`.
+    const ofertasActivas = ofertas.filter(o => o.estado !== 'rechazada');
     if (ofertasActivas.length) {
       const resumen = ofertasActivas.map(o =>
         `<span class="cargo-chip" style="font-size:0.74rem">${esc(o.admin_nombre||'—')} · $${Number(o.precio_oferta).toLocaleString('es-MX')}</span>`

@@ -345,6 +345,27 @@ body.light .ep-recurso-row { background: rgba(0,0,0,0.04); }
 .modal p.sub { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px; }
 .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
 
+/* Cabecera de modal con botón de cierre. Ambas clases se usan en 11 modales
+   de app.html pero nunca tuvieron CSS: el ✕ salía como botón por defecto del
+   navegador (≈15x19px) apilado debajo del título en vez de alineado a la
+   derecha. */
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 14px;
+}
+.modal-header h2 { margin-bottom: 0; }
+.modal-close {
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.06); border: none;
+  color: var(--text-muted); cursor: pointer;
+  width: 36px; height: 36px; border-radius: 8px;
+  font-size: 1rem; display: flex; align-items: center; justify-content: center;
+  transition: background 0.18s, color 0.18s;
+}
+.modal-close:hover { background: rgba(239,68,68,0.15); color: var(--red); }
+body.light .modal-close { background: rgba(0,0,0,0.05); }
+body.light .modal-close:hover { background: rgba(239,68,68,0.1); }
+
 /* ── MODAL NUEVO PEDIDO — cabecera fija ──────────────── */
 .modal-np {
   display: flex; flex-direction: column;
@@ -894,7 +915,9 @@ body.light .badge-acordado  { background: rgba(37,99,235,0.1); }
 
 /* ── CHAT PANEL ──────────────────────────────────────── */
 .chat-panel {
-  position: fixed; right: -420px; top: 0; width: 380px; height: 100dvh;
+  /* min() para que en teléfonos angostos (≤380px) el panel no se salga de la
+     pantalla: antes el ancho fijo cortaba el título y el botón de cerrar. */
+  position: fixed; right: -420px; top: 0; width: min(380px, 100vw); height: 100dvh;
   background: var(--navy-mid, #112240); border-left: 1px solid rgba(78,142,247,0.2);
   display: flex; flex-direction: column; z-index: 1100;
   transition: right 0.28s cubic-bezier(.4,0,.2,1);
@@ -1087,10 +1110,22 @@ body.light .pedido-sobrepeso-alert {
 }
 
 .empresa-header-info { flex: 1; min-width: 0; }
+.empresa-nombre-row {
+  display: flex; align-items: center; gap: 6px;
+  min-width: 0; margin-bottom: 5px;
+}
 .empresa-nombre {
   font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.05rem;
   color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  margin-bottom: 5px;
+  min-width: 0;
+}
+/* Fuera del elemento que trunca, para que el sello no se recorte nunca */
+.emp-ver-badge {
+  flex-shrink: 0; display: inline-block;
+  font-size: 0.7rem; font-weight: 700;
+  background: rgba(34,197,94,0.15); color: #16a34a;
+  border: 1px solid rgba(34,197,94,0.4);
+  border-radius: 10px; padding: 1px 8px;
 }
 
 .emp-status { font-size: 0.75rem; font-weight: 600; display: block; margin-bottom: 6px; }
@@ -1473,6 +1508,11 @@ body.light .rechazo-info   { background: rgba(197,48,48,0.05); border-color: rgb
   margin: 0 4px; margin-bottom: 17px;
 }
 .ped-tl-line.done { background: var(--green); }
+/* Con 5 pasos, las etiquetas se salían de la tarjeta en teléfonos angostos */
+@media (max-width: 360px) {
+  .ped-tl-label { max-width: 46px; font-size: 0.58rem; }
+  .ped-tl-line  { margin: 0 2px; }
+}
 
 /* Aviso de espera bajo el timeline (por qué sigue "en revisión") */
 .ped-espera-hint {
@@ -1667,3 +1707,42 @@ body.light .vig-empresa-card    { background: #fff; }
 body.light .vig-item--vencido   { background: rgba(239,68,68,0.05); }
 body.light .vig-item--proximo   { background: rgba(251,146,60,0.05); }
 body.light .vig-empresa-header:hover { background: rgba(0,0,0,0.03); }
+
+/* ── OBJETIVOS TÁCTILES EN MÓVIL ──────────────────────────
+   En pantallas táctiles varios botones quedaban de 12–26px de alto
+   (el ✕ de los modales, "Marcar todas como leídas", las acciones de las
+   filas de reservaciones, los chips y los checkboxes), muy por debajo de
+   lo cómodo para el dedo. Se les fija un alto mínimo sin cambiar su
+   apariencia en escritorio. */
+@media (max-width: 640px) {
+  .modal-close,
+  .modal-close-x,
+  .chat-close-btn {
+    width: 40px; height: 40px;
+  }
+
+  .notif-mark-all { padding: 8px 0; min-height: 34px; }
+  .reg-back-btn   { min-height: 36px; }
+  .btn-logout     { min-height: 32px; padding: 6px 10px; }
+
+  /* Acciones dentro de filas y tarjetas (reservaciones, pedidos, listas) */
+  .btn-edit,
+  .btn-prox,
+  .btn-chat-hilo,
+  .btn-calificar,
+  .btn-aceptar-reserva,
+  .btn-rechazar-reserva,
+  .btn-cancelar-reserva,
+  .btn-completar-reserva,
+  .cargo-chip-toggle,
+  .btn-apr-batch {
+    min-height: 34px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+
+  .btn-avanzar { min-height: 42px; }
+
+  /* Casillas de verificación: 13–14px era muy pequeño para tocar */
+  .np-check input[type=checkbox],
+  .ro-chip input[type=checkbox] { width: 18px; height: 18px; }
+}

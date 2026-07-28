@@ -141,8 +141,11 @@ function _empresaCardHTML(e) {
     ? `<div class="emp-info-chips">${chips.map(c => `<span class="emp-info-chip">${c}</span>`).join('')}</div>`
     : '';
 
+  // El badge vive fuera de .empresa-nombre: ese elemento trunca con ellipsis
+  // (white-space:nowrap + overflow:hidden), así que un nombre largo dejaba el
+  // sello de verificación recortado e invisible en móvil.
   const verBadge = e.verificado
-    ? `<span style="display:inline-block;font-size:0.7rem;font-weight:700;background:rgba(34,197,94,0.15);color:#16a34a;border:1px solid rgba(34,197,94,0.4);border-radius:10px;padding:1px 8px;margin-left:6px;vertical-align:middle">✓ Verificado</span>`
+    ? `<span class="emp-ver-badge">✓ Verificado</span>`
     : '';
 
   return `
@@ -150,7 +153,7 @@ function _empresaCardHTML(e) {
       <div class="empresa-card-top">
         <div class="empresa-avatar" style="--av-color:${color}">${inicial}</div>
         <div class="empresa-header-info">
-          <div class="empresa-nombre">${esc(e.nombre)}${verBadge}</div>
+          <div class="empresa-nombre-row"><span class="empresa-nombre">${esc(e.nombre)}</span>${verBadge}</div>
           <div class="empresa-serv-icons">${iconBadges}</div>
         </div>
       </div>
