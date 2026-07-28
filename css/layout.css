@@ -229,8 +229,9 @@ header {
 /* ── HAMBURGER ───────────────────────────────────────── */
 .btn-hamburger {
   display: none;
-  flex-direction: column; justify-content: center; gap: 5px;
+  flex-direction: column; justify-content: center; align-items: center; gap: 5px;
   background: none; border: none; cursor: pointer;
+  width: 40px; height: 40px;              /* área táctil cómoda */
   padding: 6px; border-radius: 8px;
   transition: background 0.2s;
 }
@@ -252,6 +253,26 @@ header {
   backdrop-filter: blur(2px);
 }
 .menu-backdrop.open { display: block; }
+
+/* ── PANEL DEL MENÚ MÓVIL (☰) ─────────────────────────── */
+.mobile-menu-panel {
+  display: none;
+  position: fixed; top: 68px; right: 20px; z-index: 99;
+  background: var(--nav-mobile-bg, #0d1e38);
+  border: 1px solid rgba(78,142,247,0.25);
+  border-radius: 12px; padding: 6px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  min-width: 170px;
+}
+.mobile-menu-panel.open { display: block; }
+.mobile-menu-item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 10px 14px; border-radius: 8px;
+  background: transparent; border: none;
+  color: var(--text-main); font-size: 0.88rem;
+  cursor: pointer; text-align: left;
+}
+.mobile-menu-item:hover { background: rgba(78,142,247,0.1); }
 
 /* ── MOBILE ──────────────────────────────────────────── */
 @media (max-width: 640px) {

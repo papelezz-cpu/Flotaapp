@@ -315,8 +315,17 @@ async function renderPedidos(append = false) {
   } else if (currentUser.id && currentUser.rol === 'admin') {
     if (_adminCamionTipos === null) await _cargarAdminCamionTipos();
 
-    const misOfertaIds = new Set(
-      todasOfertas.filter(o => o.admin_id === currentUser.id).map(o => o.pedido_id)
+    // Ofertas propias todavía vivas — mientras existan, el pedido se ve en
+    // "Mis negociaciones", no en "disponibles".
+    const misOfertaIdsActivas = new Set(
+      todasOfertas.filter(o => o.admin_id === currentUser.id && o.estado !== 'rechazada').map(o => o.pedido_id)
+    );
+    // Ofertas propias rechazadas donde el cliente decidió no permitir que
+    // vuelva a ofertar en esa misma solicitud (ver confirmarRechazarOferta).
+    const misOfertaIdsBloqueadas = new Set(
+      todasOfertas.filter(o =>
+        o.admin_id === currentUser.id && o.estado === 'rechazada' && o.permite_reoferta === false
+      ).map(o => o.pedido_id)
     );
 
     const ESTADOS_NEGOCIABLES = ['abierto','en_negociacion','pendiente_revision','pendiente_acuerdo'];
@@ -336,7 +345,7 @@ async function renderPedidos(append = false) {
     ));
 
     const disponibles = _filtrar((pedidos || []).filter(p =>
-      p.estado === 'abierto' && !misOfertaIds.has(p.id)
+      p.estado === 'abierto' && !misOfertaIdsActivas.has(p.id) && !misOfertaIdsBloqueadas.has(p.id)
     ));
 
     if (disponibles.length) {
@@ -483,7 +492,10 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
       <button class="btn-ofertar" onclick="abrirReenviarPedido('${escJs(p.id)}')">🔄 Corregir y reenviar</button>`;
 
   } else if (vista === 'superadmin') {
-    const ofertasActivas = (ofertasMap?.[p.id] || ofertas).filter(o => o.estado !== 'rechazada');
+    // `ofertasMap` es una const local de renderPedidos(), no visible aquí: la
+    // referencia lanzaba ReferenceError y rompía toda la vista de solicitudes
+    // del superadmin. El llamador ya pasa ofertasMap[p.id] en `ofertas`.
+    const ofertasActivas = ofertas.filter(o => o.estado !== 'rechazada');
     if (ofertasActivas.length) {
       const resumen = ofertasActivas.map(o =>
         `<span class="cargo-chip" style="font-size:0.74rem">${esc(o.admin_nombre||'—')} · $${Number(o.precio_oferta).toLocaleString('es-MX')}</span>`
@@ -576,22 +588,35 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
   }
 
   // ── Timeline para vista cliente ──────────────────────
+  // 5 pasos reales: hay dos revisiones distintas de superadmin (antes de
+  // publicar, y antes de crear la reservación) que antes compartían la
+  // misma posición en la barra, haciendo que pendiente_revision se viera
+  // como si ya hubiera sido publicada y negociada.
   let timelineHTML = '';
+  let esperaHint = '';
   if (vista === 'cliente') {
-    const TL_STEPS = ['Publicada', 'Negociando', 'En revisión', 'Acordada'];
-    const TL_POS = { abierto:0, en_negociacion:1, pendiente_revision:2, pendiente_acuerdo:2, acordado:3, finalizado:3 };
-    const cur = TL_POS[p.estado] ?? -1;
+    const TL_STEPS = ['En revisión', 'Publicada', 'Negociando', 'Acuerdo en revisión', 'Acordada'];
+    const TL_POS = { pendiente_revision:0, abierto:1, en_negociacion:2, pendiente_acuerdo:3, acordado:4, finalizado:4 };
+    let cur = TL_POS[p.estado] ?? -1;
+    const hayAceptadaTL = ofertas.some(o => o.estado === 'aceptada');
+    if (p.estado === 'en_negociacion' && hayAceptadaTL) cur = TL_POS.pendiente_acuerdo;
     const isFailed = p.estado === 'rechazado' || p.estado === 'cancelado' || p.estado === 'expirado';
     timelineHTML = `<div class="ped-timeline">` +
       TL_STEPS.map((label, i) => {
         const done   = !isFailed && i < cur;
         const active = !isFailed && i === cur;
-        const failed = isFailed && i === Math.min(2, cur < 0 ? 1 : cur);
+        const failed = isFailed && i === Math.min(3, cur < 0 ? 1 : cur);
         return `<div class="ped-tl-item">
           <div class="ped-tl-dot ${done ? 'done' : active ? 'active' : failed ? 'failed' : ''}"></div>
           <div class="ped-tl-label">${label}</div>
         </div>${i < TL_STEPS.length - 1 ? `<div class="ped-tl-line ${done ? 'done' : ''}"></div>` : ''}`;
       }).join('') + `</div>`;
+
+    if (p.estado === 'pendiente_revision') {
+      esperaHint = `<div class="ped-espera-hint">🕐 Nuestro equipo está revisando tu solicitud antes de publicarla a las empresas. Te avisaremos en cuanto esté disponible.</div>`;
+    } else if (p.estado === 'pendiente_acuerdo' || (p.estado === 'en_negociacion' && hayAceptadaTL)) {
+      esperaHint = `<div class="ped-espera-hint">🕐 Ya aceptaste una oferta. Nuestro equipo está validando el acuerdo antes de confirmar tu reservación.</div>`;
+    }
   }
 
   return `
@@ -609,6 +634,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
       ${sobrepesoBanner}
       ${p.descripcion ? `<div class="pedido-desc">${esc(p.descripcion)}</div>` : ''}
       ${timelineHTML}
+      ${esperaHint}
       <div class="pedido-footer">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           ${precioBadge}
@@ -1011,9 +1037,34 @@ async function responderOferta(ofertaId, accion) {
     _openDetallesServicio(oferta, pedidoDetalle);
     return;
   }
-  // Rechazar
-  const { error } = await sb.from('ofertas').update({ estado: 'rechazada' }).eq('id', ofertaId);
-  if (error) { showToast('Error al procesar'); return; }
+  // Rechazar — se decide primero si se permite que la empresa vuelva a
+  // ofertar en esta misma solicitud (ver confirmarRechazarOferta).
+  abrirRechazarOferta(ofertaId);
+}
+
+// ── RECHAZAR OFERTA (cliente decide si permite reofertar) ─
+let _rechazarOfertaId = null;
+
+function abrirRechazarOferta(ofertaId) {
+  _rechazarOfertaId = ofertaId;
+  const chk = document.getElementById('ro-permitir-reoferta');
+  if (chk) chk.checked = true;
+  document.getElementById('modal-rechazar-oferta').classList.add('open');
+}
+
+function cerrarRechazarOferta() {
+  document.getElementById('modal-rechazar-oferta').classList.remove('open');
+  _rechazarOfertaId = null;
+}
+
+async function confirmarRechazarOferta() {
+  if (!_rechazarOfertaId) return;
+  const permiteReoferta = document.getElementById('ro-permitir-reoferta').checked;
+  const { error } = await sb.from('ofertas')
+    .update({ estado: 'rechazada', permite_reoferta: permiteReoferta })
+    .eq('id', _rechazarOfertaId);
+  cerrarRechazarOferta();
+  if (error) { showToast('Error al procesar', 'error'); return; }
   await loadNotificaciones();
   if (pedidoDetalle) await openPedidoDetalle(pedidoDetalle.id);
   await renderPedidos();

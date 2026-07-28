@@ -89,7 +89,7 @@ body:not(.logged-in) #login-overlay { cursor: default; }
   color: #4f6661; margin-bottom: 6px;
   text-transform: none; letter-spacing: 0;
 }
-#login-overlay .form-group input,
+#login-overlay .form-group input:not([type=checkbox]):not([type=radio]),
 #login-overlay .form-group textarea,
 #login-overlay .form-group select {
   width: 100%;

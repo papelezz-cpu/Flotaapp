@@ -29,6 +29,7 @@ function showView(v, btn) {
 function toggleMenu() {
   document.getElementById('btn-hamburger')?.classList.toggle('open');
   document.querySelector('.nav-tabs')?.classList.toggle('open');
+  document.getElementById('mobile-menu-panel')?.classList.toggle('open');
   document.getElementById('menu-backdrop')?.classList.toggle('open');
 }
 

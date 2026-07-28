@@ -57,12 +57,8 @@ async function checkExistingSession() {
     metodoVerificacion: perfil?.metodo_verificacion || null,
   };
   applyUserUI();
-  sb.channel('notif-' + currentUser.id)
-    .on('postgres_changes', {
-      event: 'INSERT', schema: 'public', table: 'notificaciones',
-      filter: `user_id=eq.${currentUser.id}`
-    }, () => loadNotificaciones())
-    .subscribe();
+  // Las suscripciones realtime (notif- + portgo-changes) se arman en
+  // main.js, después de este checkExistingSession(), para no duplicarlas.
 }
 
 function showLoginOverlay() {
@@ -152,12 +148,7 @@ async function doLogin() {
   hideLoginOverlay();
   loadNotificaciones();
   actualizarBadgeChat();
-  sb.channel('notif-' + currentUser.id)
-    .on('postgres_changes', {
-      event: 'INSERT', schema: 'public', table: 'notificaciones',
-      filter: `user_id=eq.${currentUser.id}`
-    }, () => loadNotificaciones())
-    .subscribe();
+  iniciarSuscripcionesRealtime();
 }
 
 // ── REGISTRO — SELECTOR Y FORMULARIOS ─────────────────
@@ -896,6 +887,7 @@ function cerrarMiPerfil() {
 // Detecta expiración de sesión en background (token refresh failure)
 sb.auth.onAuthStateChange((event) => {
   if (event === 'SIGNED_OUT' && currentUser.id) {
+    sb.removeAllChannels();
     currentUser = { id: null, nombre: null, rol: null };
     document.body.classList.remove('role-admin', 'role-superadmin', 'logged-in');
     showLoginOverlay();
@@ -904,6 +896,10 @@ sb.auth.onAuthStateChange((event) => {
 });
 
 async function logout() {
+  // Sin esto, los canales de la sesión anterior (notif-, portgo-changes)
+  // quedaban activos y el siguiente login creaba unos nuevos encima sin
+  // que los viejos se limpiaran nunca.
+  await sb.removeAllChannels();
   await sb.auth.signOut();
   currentUser = { id: null, nombre: null, rol: null };
   document.body.classList.remove('role-admin', 'role-superadmin', 'logged-in');

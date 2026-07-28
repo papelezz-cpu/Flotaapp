@@ -1,5 +1,5 @@
 // ── SERVICE WORKER — PortGo ────────────────────────────
-const CACHE      = 'portgo-v104';
+const CACHE      = 'portgo-v116';
 const DATA_CACHE = 'portgo-data-v1';
 
 const SHELL = [
@@ -66,26 +66,23 @@ self.addEventListener('fetch', e => {
   // ── Supabase Edge Functions: always network, never cache ──
   if (isSupabaseEdge) return;
 
-  // ── Supabase REST (data): stale-while-revalidate ──────────
+  // ── Supabase REST (data): network-first, caché solo como respaldo ──
+  // Antes era stale-while-revalidate: siempre devolvía la respuesta vieja
+  // guardada y actualizaba el caché para la SIGUIENTE vez, así que la app
+  // nunca mostraba datos frescos hasta la carga después de esa — pedidos,
+  // notificaciones, etc. se veían "un paso atrás" y solo un refresh (o dos)
+  // los ponía al día. Ahora se intenta la red primero; el caché solo se usa
+  // si de verdad no hay conexión.
   if (isSupabaseRest) {
     e.respondWith(
-      caches.open(DATA_CACHE).then(async cache => {
-        const cached = await cache.match(e.request);
-
-        const networkFetch = fetch(e.request.clone()).then(res => {
-          if (res.ok) cache.put(e.request.clone(), res.clone());
-          return res;
-        }).catch(() => null);
-
-        if (cached) {
-          // Return cached immediately, update in background
-          networkFetch.catch(() => {});
-          return cached;
+      fetch(e.request.clone()).then(res => {
+        if (res.ok) {
+          caches.open(DATA_CACHE).then(cache => cache.put(e.request.clone(), res.clone()));
         }
-
-        // No cache yet: wait for network, fallback to empty array when offline
-        const networkRes = await networkFetch;
-        return networkRes ?? new Response('[]', {
+        return res;
+      }).catch(async () => {
+        const cached = await caches.match(e.request);
+        return cached || new Response('[]', {
           status: 200,
           headers: { 'Content-Type': 'application/json', 'X-From-Cache': 'offline' }
         });

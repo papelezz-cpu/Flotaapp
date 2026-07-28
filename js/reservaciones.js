@@ -418,17 +418,32 @@ function cancelarReserva(reservaId, unidad) {
 
     // Regresar el pedido a abierto para que puedan ofertar de nuevo
     if (rv?.pedido_id) {
-      await sb.from('pedidos').update({
+      const { error: errPedido } = await sb.from('pedidos').update({
         estado:              'abierto',
         oferta_pendiente_id: null,
       }).eq('id', rv.pedido_id);
+      if (errPedido) {
+        _reservaActiva = false;
+        showToast('La reserva se canceló, pero la solicitud no se pudo reabrir: ' + errPedido.message, 'error');
+        await renderReserv();
+        return;
+      }
 
-      // Invalidar todas las ofertas aceptadas anteriores para que no interfieran
-      // con el nuevo ciclo de negociación
+      // La oferta que ya estaba aceptada (la de quien canceló el viaje) queda
+      // bloqueada para volver a ofertar en esta misma solicitud — canceló un
+      // acuerdo ya cerrado, no es lo mismo que una oferta simplemente rechazada.
+      await sb.from('ofertas')
+        .update({ estado: 'rechazada', permite_reoferta: false })
+        .eq('pedido_id', rv.pedido_id)
+        .eq('estado', 'aceptada');
+
+      // Las demás ofertas que seguían activas (de otras empresas) también se
+      // invalidan para el ciclo de negociación anterior, pero sí podrán
+      // volver a ofertar en la solicitud reabierta.
       await sb.from('ofertas')
         .update({ estado: 'rechazada' })
         .eq('pedido_id', rv.pedido_id)
-        .in('estado', ['aceptada', 'enviada', 'contra_oferta']);
+        .in('estado', ['enviada', 'contra_oferta']);
     }
 
     // Notificar al cliente
@@ -441,6 +456,19 @@ function cancelarReserva(reservaId, unidad) {
         leido:   false,
       });
     }
+
+    // Notificar a superadmin — un acuerdo ya aprobado se cayó, debe saberlo
+    const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+    if (supers?.length) {
+      await sb.from('notificaciones').insert(supers.map(a => ({
+        user_id: a.user_id,
+        tipo:    'reserva_cancelada_admin',
+        titulo:  'Un acuerdo aprobado se canceló',
+        mensaje: `${esc(currentUser.nombre)} canceló la reserva con ${esc(rv?.cliente || 'un cliente')} después de que el acuerdo ya había sido aprobado. La solicitud volvió a estar abierta.`,
+        leido:   false,
+      })));
+    }
+
     _reservaActiva = false;
     await renderReserv();
     showToast('Reserva cancelada — solicitud reabierta para nuevas ofertas');

@@ -345,6 +345,27 @@ body.light .ep-recurso-row { background: rgba(0,0,0,0.04); }
 .modal p.sub { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px; }
 .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
 
+/* Cabecera de modal con botón de cierre. Ambas clases se usan en 11 modales
+   de app.html pero nunca tuvieron CSS: el ✕ salía como botón por defecto del
+   navegador (≈15x19px) apilado debajo del título en vez de alineado a la
+   derecha. */
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 14px;
+}
+.modal-header h2 { margin-bottom: 0; }
+.modal-close {
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.06); border: none;
+  color: var(--text-muted); cursor: pointer;
+  width: 36px; height: 36px; border-radius: 8px;
+  font-size: 1rem; display: flex; align-items: center; justify-content: center;
+  transition: background 0.18s, color 0.18s;
+}
+.modal-close:hover { background: rgba(239,68,68,0.15); color: var(--red); }
+body.light .modal-close { background: rgba(0,0,0,0.05); }
+body.light .modal-close:hover { background: rgba(239,68,68,0.1); }
+
 /* ── MODAL NUEVO PEDIDO — cabecera fija ──────────────── */
 .modal-np {
   display: flex; flex-direction: column;
@@ -377,22 +398,55 @@ body.light .modal-close-x { background: rgba(0,0,0,0.05); }
 body.light .modal-close-x:hover { background: rgba(239,68,68,0.1); }
 
 /* ── FORMS ───────────────────────────────────────────── */
-.form-group { margin-bottom: 16px; }
+/* min-width:0 — como celda de rejilla/flex, por defecto no puede encogerse
+   por debajo del contenido (min-width:auto). Un campo de fecha con ancho
+   mínimo grande (iOS) arrastraba a toda la celda fuera de la tarjeta. */
+.form-group { margin-bottom: 16px; min-width: 0; }
 .form-group label {
   display: block; font-size: 0.75rem; font-weight: 600;
   color: var(--text-muted); text-transform: uppercase;
   letter-spacing: 0.7px; margin-bottom: 6px;
 }
-.form-group input, .form-group textarea, .form-group select {
+/* :not(checkbox/radio) — antes una casilla suelta dentro de .form-group
+   heredaba width:100% y padding, estirándose a decenas de px: empujaba su
+   etiqueta lejos y el recuadro terminaba encimado sobre el texto
+   (p. ej. "Seguros vigentes" en el perfil de empresa). */
+.form-group input:not([type=checkbox]):not([type=radio]),
+.form-group textarea, .form-group select {
   width: 100%; background: rgba(255,255,255,0.06);
   border: 1px solid rgba(78,142,247,0.25);
   border-radius: 10px; padding: 10px 14px;
   color: var(--white); font-family: 'DM Sans', sans-serif;
   font-size: 0.9rem; outline: none; transition: border-color 0.2s; resize: vertical;
 }
-.form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+.form-group input:not([type=checkbox]):not([type=radio]):focus,
+.form-group textarea:focus, .form-group select:focus {
   border-color: var(--accent);
 }
+.form-group input[type=checkbox], .form-group input[type=radio] {
+  flex-shrink: 0; width: 18px; height: 18px; accent-color: var(--accent);
+}
+
+/* ── CAMPOS DE FECHA / HORA ───────────────────────────────
+   Safari en iOS le da a input[type=date] un ancho intrínseco propio
+   (derivado del formato de la fecha) con un min-width que ignora el
+   width:100% del contenedor, así que el recuadro se salía de la tarjeta.
+   min-width:0 + appearance:none lo dejan encogerse; ::-webkit-date-and-
+   time-value corrige que iOS centre el valor mientras el resto de campos
+   van alineados a la izquierda. Global: son 45 campos de fecha en la app. */
+input[type=date], input[type=time], input[type=datetime-local], input[type=month] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+}
+input[type=date]::-webkit-date-and-time-value,
+input[type=time]::-webkit-date-and-time-value,
+input[type=datetime-local]::-webkit-date-and-time-value {
+  text-align: left;
+}
+/* iOS deja el indicador nativo con márgenes propios que suman ancho */
+input[type=date]::-webkit-calendar-picker-indicator { margin-left: 4px; }
 .form-group select option { background: var(--navy-mid); }
 
 .btn-cancel {
@@ -481,11 +535,30 @@ body.light .modal-close-x:hover { background: rgba(239,68,68,0.1); }
 }
 .btn-rechazar-reserva:hover, .btn-cancelar-reserva:hover { background: rgba(239,68,68,0.22); }
 
+/* Móvil: en vez de ocultar columnas (perdiendo fechas y el bloque de estado/
+   acciones), se reacomoda en 2 columnas y varias filas por reservación. */
 @media (max-width: 520px) {
-  .reserv-row { grid-template-columns: 65px 1fr 85px; }
-  .reserv-row > *:nth-child(2),
-  .reserv-row > *:nth-child(4),
-  .reserv-row > *:nth-child(5) { display: none; }
+  .reserv-row.header { display: none; }
+  .reserv-row:not(.header) { grid-template-columns: 1fr 1fr; row-gap: 6px; }
+
+  /* Vista admin/superadmin: Unidad · Empresa · Cliente · Inicio · Fin · Estado */
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(3) { grid-column: 2; grid-row: 1; text-align: right; }
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(2) { grid-column: 1 / -1; grid-row: 2; font-size: 0.76rem; }
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(4) { grid-column: 1; grid-row: 3; font-size: 0.76rem; }
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(5) { grid-column: 2; grid-row: 3; font-size: 0.76rem; text-align: right; }
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(4)::before { content: "Desde "; color: var(--text-muted); }
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(5)::before { content: "Hasta "; color: var(--text-muted); }
+  .reserv-row:not(.reserv-row-cli):not(.header) > *:nth-child(6) { grid-column: 1 / -1; grid-row: 4; margin-top: 2px; }
+
+  /* Vista cliente: Unidad · Empresa · Inicio · Fin · Estado */
+  .reserv-row.reserv-row-cli > *:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .reserv-row.reserv-row-cli > *:nth-child(2) { grid-column: 2; grid-row: 1; text-align: right; }
+  .reserv-row.reserv-row-cli > *:nth-child(3) { grid-column: 1; grid-row: 2; font-size: 0.76rem; }
+  .reserv-row.reserv-row-cli > *:nth-child(4) { grid-column: 2; grid-row: 2; font-size: 0.76rem; text-align: right; }
+  .reserv-row.reserv-row-cli > *:nth-child(3)::before { content: "Desde "; color: var(--text-muted); }
+  .reserv-row.reserv-row-cli > *:nth-child(4)::before { content: "Hasta "; color: var(--text-muted); }
+  .reserv-row.reserv-row-cli > *:nth-child(5) { grid-column: 1 / -1; grid-row: 3; margin-top: 2px; }
 }
 
 /* ── ADMIN PANEL ─────────────────────────────────────── */
@@ -875,7 +948,9 @@ body.light .badge-acordado  { background: rgba(37,99,235,0.1); }
 
 /* ── CHAT PANEL ──────────────────────────────────────── */
 .chat-panel {
-  position: fixed; right: -420px; top: 0; width: 380px; height: 100dvh;
+  /* min() para que en teléfonos angostos (≤380px) el panel no se salga de la
+     pantalla: antes el ancho fijo cortaba el título y el botón de cerrar. */
+  position: fixed; right: -420px; top: 0; width: min(380px, 100vw); height: 100dvh;
   background: var(--navy-mid, #112240); border-left: 1px solid rgba(78,142,247,0.2);
   display: flex; flex-direction: column; z-index: 1100;
   transition: right 0.28s cubic-bezier(.4,0,.2,1);
@@ -1068,10 +1143,22 @@ body.light .pedido-sobrepeso-alert {
 }
 
 .empresa-header-info { flex: 1; min-width: 0; }
+.empresa-nombre-row {
+  display: flex; align-items: center; gap: 6px;
+  min-width: 0; margin-bottom: 5px;
+}
 .empresa-nombre {
   font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.05rem;
   color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  margin-bottom: 5px;
+  min-width: 0;
+}
+/* Fuera del elemento que trunca, para que el sello no se recorte nunca */
+.emp-ver-badge {
+  flex-shrink: 0; display: inline-block;
+  font-size: 0.7rem; font-weight: 700;
+  background: rgba(34,197,94,0.15); color: #16a34a;
+  border: 1px solid rgba(34,197,94,0.4);
+  border-radius: 10px; padding: 1px 8px;
 }
 
 .emp-status { font-size: 0.75rem; font-weight: 600; display: block; margin-bottom: 6px; }
@@ -1245,6 +1332,21 @@ body.light .apr-op-detalle { background: #f8faff; border-color: rgba(37,99,235,0
 .op-nombre { font-size: 0.95rem; font-weight: 700; color: var(--text); margin-bottom: 2px; }
 .op-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 1px; }
 .op-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; align-items: center; }
+/* En móvil los 3 botones (flex-shrink:0) se comían el ancho y aplastaban
+   .op-info hasta dejar el nombre partido palabra por palabra, con los botones
+   encimados sobre el texto. Se pasan a su propia fila completa. */
+@media (max-width: 640px) {
+  .operador-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    row-gap: 10px;
+  }
+  .op-foto-wrap { grid-column: 1; grid-row: 1; }
+  .op-info      { grid-column: 2; grid-row: 1; }
+  .op-actions   { grid-column: 1 / -1; grid-row: 2; }
+  .op-sub       { overflow-wrap: anywhere; }
+}
 .op-upload-preview { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); margin-top: 6px; }
 .op-form-section { margin-top: 18px; margin-bottom: 6px; }
 .op-form-section-title {
@@ -1443,8 +1545,8 @@ body.light .rechazo-info   { background: rgba(197,48,48,0.05); border-color: rgb
 .ped-tl-dot.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(78,142,247,0.2); }
 .ped-tl-dot.failed { background: var(--danger); border-color: var(--danger); }
 .ped-tl-label {
-  font-size: 0.66rem; color: var(--text-muted);
-  white-space: nowrap; max-width: 60px; text-align: center;
+  font-size: 0.63rem; color: var(--text-muted);
+  white-space: normal; max-width: 56px; text-align: center;
   line-height: 1.2;
 }
 .ped-tl-item:has(.ped-tl-dot.active) .ped-tl-label,
@@ -1454,6 +1556,23 @@ body.light .rechazo-info   { background: rgba(197,48,48,0.05); border-color: rgb
   margin: 0 4px; margin-bottom: 17px;
 }
 .ped-tl-line.done { background: var(--green); }
+/* Con 5 pasos, las etiquetas se salían de la tarjeta en teléfonos angostos */
+@media (max-width: 360px) {
+  .ped-tl-label { max-width: 46px; font-size: 0.58rem; }
+  .ped-tl-line  { margin: 0 2px; }
+}
+
+/* Aviso de espera bajo el timeline (por qué sigue "en revisión") */
+.ped-espera-hint {
+  margin: 8px 0 4px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(78,142,247,0.08);
+  border: 1px solid rgba(78,142,247,0.25);
+  color: var(--text-main);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
 
 /* ── GEO AUTOCOMPLETE ────────────────────────────────── */
 .geo-dropdown {
@@ -1636,3 +1755,42 @@ body.light .vig-empresa-card    { background: #fff; }
 body.light .vig-item--vencido   { background: rgba(239,68,68,0.05); }
 body.light .vig-item--proximo   { background: rgba(251,146,60,0.05); }
 body.light .vig-empresa-header:hover { background: rgba(0,0,0,0.03); }
+
+/* ── OBJETIVOS TÁCTILES EN MÓVIL ──────────────────────────
+   En pantallas táctiles varios botones quedaban de 12–26px de alto
+   (el ✕ de los modales, "Marcar todas como leídas", las acciones de las
+   filas de reservaciones, los chips y los checkboxes), muy por debajo de
+   lo cómodo para el dedo. Se les fija un alto mínimo sin cambiar su
+   apariencia en escritorio. */
+@media (max-width: 640px) {
+  .modal-close,
+  .modal-close-x,
+  .chat-close-btn {
+    width: 40px; height: 40px;
+  }
+
+  .notif-mark-all { padding: 8px 0; min-height: 34px; }
+  .reg-back-btn   { min-height: 36px; }
+  .btn-logout     { min-height: 32px; padding: 6px 10px; }
+
+  /* Acciones dentro de filas y tarjetas (reservaciones, pedidos, listas) */
+  .btn-edit,
+  .btn-prox,
+  .btn-chat-hilo,
+  .btn-calificar,
+  .btn-aceptar-reserva,
+  .btn-rechazar-reserva,
+  .btn-cancelar-reserva,
+  .btn-completar-reserva,
+  .cargo-chip-toggle,
+  .btn-apr-batch {
+    min-height: 34px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+
+  .btn-avanzar { min-height: 42px; }
+
+  /* Casillas de verificación: 13–14px era muy pequeño para tocar */
+  .np-check input[type=checkbox],
+  .ro-chip input[type=checkbox] { width: 18px; height: 18px; }
+}
