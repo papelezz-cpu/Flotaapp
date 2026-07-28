@@ -398,7 +398,10 @@ body.light .modal-close-x { background: rgba(0,0,0,0.05); }
 body.light .modal-close-x:hover { background: rgba(239,68,68,0.1); }
 
 /* ── FORMS ───────────────────────────────────────────── */
-.form-group { margin-bottom: 16px; }
+/* min-width:0 — como celda de rejilla/flex, por defecto no puede encogerse
+   por debajo del contenido (min-width:auto). Un campo de fecha con ancho
+   mínimo grande (iOS) arrastraba a toda la celda fuera de la tarjeta. */
+.form-group { margin-bottom: 16px; min-width: 0; }
 .form-group label {
   display: block; font-size: 0.75rem; font-weight: 600;
   color: var(--text-muted); text-transform: uppercase;
@@ -423,6 +426,27 @@ body.light .modal-close-x:hover { background: rgba(239,68,68,0.1); }
 .form-group input[type=checkbox], .form-group input[type=radio] {
   flex-shrink: 0; width: 18px; height: 18px; accent-color: var(--accent);
 }
+
+/* ── CAMPOS DE FECHA / HORA ───────────────────────────────
+   Safari en iOS le da a input[type=date] un ancho intrínseco propio
+   (derivado del formato de la fecha) con un min-width que ignora el
+   width:100% del contenedor, así que el recuadro se salía de la tarjeta.
+   min-width:0 + appearance:none lo dejan encogerse; ::-webkit-date-and-
+   time-value corrige que iOS centre el valor mientras el resto de campos
+   van alineados a la izquierda. Global: son 45 campos de fecha en la app. */
+input[type=date], input[type=time], input[type=datetime-local], input[type=month] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+}
+input[type=date]::-webkit-date-and-time-value,
+input[type=time]::-webkit-date-and-time-value,
+input[type=datetime-local]::-webkit-date-and-time-value {
+  text-align: left;
+}
+/* iOS deja el indicador nativo con márgenes propios que suman ancho */
+input[type=date]::-webkit-calendar-picker-indicator { margin-left: 4px; }
 .form-group select option { background: var(--navy-mid); }
 
 .btn-cancel {
