@@ -120,7 +120,9 @@ body.light .search-group select {
 }
 body.light .search-group select option { background: #fff; }
 
-body.light .form-group input,
+/* Se excluyen casillas y radios: el fondo y borde beige les quitaba la
+   apariencia nativa y los dejaba como recuadros vacíos. */
+body.light .form-group input:not([type=checkbox]):not([type=radio]),
 body.light .form-group textarea,
 body.light .form-group select {
   background: #faf8f3;
