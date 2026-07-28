@@ -681,6 +681,19 @@ async function subirEvidencias() {
         leido:   false,
       })));
     }
+  } else if (!existentes.length) {
+    // La otra parte ya había solicitado el cierre; esta es la primera vez que
+    // ESTE lado sube su evidencia — avisar a superadmins que ya están ambas.
+    const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+    if (supers?.length) {
+      await sb.from('notificaciones').insert(supers.map(a => ({
+        user_id: a.user_id,
+        tipo:    'revision_finalizacion',
+        titulo:  '🏁 Ya están ambas evidencias',
+        mensaje: `${esc(r.cliente || 'Un cliente')} y la empresa ya subieron su evidencia de cierre. Puedes revisarla y aprobarla.`,
+        leido:   false,
+      })));
+    }
   }
 
   cerrarEvidencias();
