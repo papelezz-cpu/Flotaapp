@@ -418,10 +418,16 @@ function cancelarReserva(reservaId, unidad) {
 
     // Regresar el pedido a abierto para que puedan ofertar de nuevo
     if (rv?.pedido_id) {
-      await sb.from('pedidos').update({
+      const { error: errPedido } = await sb.from('pedidos').update({
         estado:              'abierto',
         oferta_pendiente_id: null,
       }).eq('id', rv.pedido_id);
+      if (errPedido) {
+        _reservaActiva = false;
+        showToast('La reserva se canceló, pero la solicitud no se pudo reabrir: ' + errPedido.message, 'error');
+        await renderReserv();
+        return;
+      }
 
       // La oferta que ya estaba aceptada (la de quien canceló el viaje) queda
       // bloqueada para volver a ofertar en esta misma solicitud — canceló un
