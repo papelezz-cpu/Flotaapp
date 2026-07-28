@@ -182,7 +182,7 @@ Deploy with `mcp__supabase__deploy_edge_function` (or `supabase functions deploy
 
 ## PWA / Service Worker
 
-- `sw.js`: **network-first** for JS/CSS/HTML (falls back to cache offline), **stale-while-revalidate** for Supabase REST GETs, network-only for auth/realtime/Edge Functions, cache-first for images.
+- `sw.js`: **network-first** for JS/CSS/HTML and for Supabase REST GETs (falls back to cache only when actually offline — a prior stale-while-revalidate strategy for REST GETs always served last-known data first, so the app looked "one step behind" until a second refresh; don't reintroduce it), network-only for auth/realtime/Edge Functions, cache-first for images.
 - New static assets → add to the `SHELL` list in `sw.js`.
 - Bumping `CACHE` (`portgo-vXX`) purges all old caches on activate — required on every deploy.
 
