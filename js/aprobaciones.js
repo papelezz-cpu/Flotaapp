@@ -45,7 +45,8 @@ async function renderAprobaciones() {
 
   const [{ data: solicitudes }, { data: acuerdos }, { data: operadores },
          { data: camiones }, { data: custodios }, { data: patios }, { data: lavados },
-         { data: cuentasPend }, { data: docsEmpresa }, { data: finalizaciones }] = await Promise.all([
+         { data: cuentasPend }, { data: docsEmpresa }, { data: finalizaciones },
+         { data: cancelaciones }] = await Promise.all([
     sb.from('pedidos').select('*').eq('estado', 'pendiente_revision').order('created_at'),
     sb.from('pedidos').select('*').eq('estado', 'pendiente_acuerdo').order('created_at'),
     sb.from('operadores').select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at'),
@@ -56,12 +57,14 @@ async function renderAprobaciones() {
     sb.from('solicitudes_cuenta').select('*').eq('estado', 'pendiente').order('created_at', { ascending: false }),
     sb.from('perfiles').select('user_id, nombre, fecha_vencimiento_permiso_sct, fecha_vencimiento_permiso_sct_pendiente, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_rc_pendiente, fecha_vencimiento_seguro_carga, fecha_vencimiento_seguro_carga_pendiente, doc_permiso_sct, doc_permiso_sct_pendiente, doc_seguro_rc, doc_seguro_rc_pendiente, doc_seguro_carga, doc_seguro_carga_pendiente').eq('perfil_docs_pendiente', true),
     sb.from('reservaciones').select('*').eq('estado', 'PorAprobar').order('completado_en'),
+    sb.from('reservaciones').select('*').eq('estado', 'CancelacionSolicitada').order('cancelacion_solicitada_en'),
   ]);
 
-  // Nombre de empresa para cada finalización pendiente
+  // Nombre de empresa para finalizaciones y cancelaciones pendientes
   const finEmpresaMap = {};
-  if (finalizaciones?.length) {
-    const propIds = [...new Set(finalizaciones.map(r => r.propietario_id).filter(Boolean))];
+  const _conPropietario = [...(finalizaciones || []), ...(cancelaciones || [])];
+  if (_conPropietario.length) {
+    const propIds = [...new Set(_conPropietario.map(r => r.propietario_id).filter(Boolean))];
     if (propIds.length) {
       const { data: props } = await sb.from('perfiles').select('user_id, nombre').in('user_id', propIds);
       (props || []).forEach(p => { finEmpresaMap[p.user_id] = p.nombre; });
@@ -380,6 +383,48 @@ async function renderAprobaciones() {
         </div>`;
     }));
     html += bodies.join('');
+  }
+
+  // ── CANCELACIONES SOLICITADAS POR EL CLIENTE ─────────
+  // Se muestra bien visible el punto del viaje en que se pidió: cancelar antes
+  // de salir y cancelar con la carga en tránsito no son lo mismo.
+  html += `<div class="apr-bloque-title" style="margin-top:28px">🚫 Cancelaciones por revisar <span class="apr-count">${(cancelaciones||[]).length}</span></div>`;
+  if (!cancelaciones?.length) {
+    html += `<div class="apr-empty">Sin solicitudes de cancelación</div>`;
+  } else {
+    html += cancelaciones.map(r => {
+      const punto = r.cancelacion_tracking_estado || r.tracking_estado || 'Confirmado';
+      const arranco = punto !== 'Confirmado';
+      return `
+        <div class="apr-card" id="aprcancel-${r.id}" style="${arranco ? 'border-color:rgba(239,68,68,0.45)' : ''}">
+          <div class="apr-card-header">
+            <div>
+              <div class="apr-tipo">🚫 ${esc(r.cliente || 'Cliente')} ↔ ${esc(finEmpresaMap[r.propietario_id] || '—')}</div>
+              <div class="apr-sub">Unidad: <strong>${esc(r.unidad || '—')}</strong> · ${fmtFecha(r.fecha_ini)} → ${fmtFecha(r.fecha_fin)}</div>
+            </div>
+            <span class="badge ${arranco ? 'badge-maint' : 'badge-revision'}">${arranco ? '⚠ Servicio iniciado' : 'Sin iniciar'}</span>
+          </div>
+          <div class="apr-op-detalle">
+            <div class="apr-op-grid">
+              <div class="apr-op-row"><span>Punto del viaje</span><strong style="color:${arranco ? 'var(--danger)' : 'var(--text-main)'}">${esc(punto)}</strong></div>
+              <div class="apr-op-row"><span>Motivo</span><strong>${esc(r.cancelacion_motivo || '—')}</strong></div>
+              <div class="apr-op-row"><span>Solicitada</span><strong>${r.cancelacion_solicitada_en ? fmtFecha(r.cancelacion_solicitada_en) : '—'}</strong></div>
+              <div class="apr-op-row"><span>Precio acordado</span><strong>${r.precio_acordado ? '$' + Number(r.precio_acordado).toLocaleString('es-MX') + ' MXN' : '—'}</strong></div>
+            </div>
+            ${r.cancelacion_detalle
+              ? `<div class="apr-op-section-title">Detalle del cliente</div>
+                 <div style="margin:4px 0;font-size:0.85rem;font-style:italic;color:var(--text-muted)">"${esc(r.cancelacion_detalle)}"</div>`
+              : ''}
+            ${arranco
+              ? `<div class="apr-rechazo-nota" style="margin-top:10px">El servicio ya había iniciado. Considera hablar con la empresa antes de aprobar: puede haber costos incurridos.</div>`
+              : ''}
+          </div>
+          <div class="apr-actions">
+            <button class="btn-apr-aprobar" onclick="aprobarCancelacionCliente('${r.id}')">✓ Aprobar cancelación</button>
+            <button class="btn-apr-rechazar" onclick="rechazarCancelacionCliente('${r.id}')">✕ Rechazar</button>
+          </div>
+        </div>`;
+    }).join('');
   }
 
   // ── RECURSOS POR EMPRESA ─────────────────────────────
@@ -1209,6 +1254,101 @@ async function _ejecutarRechazarFinalizacion(reservaId, nota) {
 
   document.getElementById(`aprfin-${reservaId}`)?.remove();
   showToast('Finalización rechazada, la reserva vuelve a Activa');
+  renderAprobaciones();
+}
+
+// ── RESOLVER CANCELACIÓN SOLICITADA POR EL CLIENTE ───────
+// A diferencia de cuando cancela la empresa, aquí el pedido NO se reabre a
+// nuevas ofertas: el cliente ya no quiere el servicio, así que se cierra.
+
+function aprobarCancelacionCliente(reservaId) {
+  _abrirRechazarNota(
+    'Aprobar cancelación',
+    'Nota para las partes (opcional):',
+    nota => _ejecutarAprobarCancelacion(reservaId, nota),
+    { confirmLabel: '✓ Aprobar cancelación', danger: false }
+  );
+}
+
+async function _ejecutarAprobarCancelacion(reservaId, nota) {
+  const { data: r } = await sb.from('reservaciones')
+    .select('unidad, recurso_tipo, cliente_user_id, propietario_id, cliente, pedido_id')
+    .eq('id', reservaId).single();
+  if (!r) { showToast('No se encontró la reserva', 'error'); return; }
+
+  const { error } = await sb.from('reservaciones').update({
+    estado:                      'Cancelada',
+    cancelacion_resuelta_en:     new Date().toISOString(),
+    cancelacion_resuelta_por:    currentUser.id,
+    cancelacion_nota_resolucion: nota || null,
+  }).eq('id', reservaId);
+  if (error) { showToast('Error al aprobar: ' + error.message, 'error'); return; }
+
+  // Liberar la unidad comprometida
+  if (r.unidad) {
+    const tabla = r.recurso_tipo === 'custodio' ? 'custodios'
+                : r.recurso_tipo === 'patio'    ? 'patios'
+                : r.recurso_tipo === 'lavado'   ? 'lavados' : 'camiones';
+    await sb.from(tabla).update({ estado: 'disponible' }).eq('id', r.unidad);
+  }
+
+  // El pedido se cierra: fue el cliente quien desistió del servicio.
+  if (r.pedido_id) {
+    const { error: errPed } = await sb.from('pedidos')
+      .update({ estado: 'cancelado', oferta_pendiente_id: null })
+      .eq('id', r.pedido_id);
+    if (errPed) showToast('La reserva se canceló, pero el pedido no se cerró: ' + errPed.message, 'error');
+  }
+
+  const notifs = [];
+  if (r.cliente_user_id) notifs.push({
+    user_id: r.cliente_user_id, tipo: 'cancelacion_aprobada', titulo: 'Cancelación aprobada',
+    mensaje: `Tu solicitud de cancelación fue aprobada.${nota ? ' Nota: ' + nota : ''} La solicitud quedó cerrada.`, leido: false,
+  });
+  if (r.propietario_id) notifs.push({
+    user_id: r.propietario_id, tipo: 'cancelacion_aprobada', titulo: 'Servicio cancelado',
+    mensaje: `Se aprobó la cancelación del servicio con ${esc(r.cliente || 'el cliente')}. Tu unidad quedó disponible de nuevo.${nota ? ' Nota: ' + nota : ''}`, leido: false,
+  });
+  if (notifs.length) await sb.from('notificaciones').insert(notifs);
+
+  document.getElementById(`aprcancel-${reservaId}`)?.remove();
+  showToast('Cancelación aprobada — unidad liberada y solicitud cerrada');
+  renderAprobaciones();
+}
+
+function rechazarCancelacionCliente(reservaId) {
+  _abrirRechazarNota(
+    'Rechazar cancelación',
+    'Motivo (se notificará al cliente; el servicio sigue activo):',
+    nota => _ejecutarRechazarCancelacion(reservaId, nota)
+  );
+}
+
+async function _ejecutarRechazarCancelacion(reservaId, nota) {
+  const { data: r } = await sb.from('reservaciones')
+    .select('cliente_user_id, propietario_id, cliente').eq('id', reservaId).single();
+
+  const { error } = await sb.from('reservaciones').update({
+    estado:                      'Activa',
+    cancelacion_resuelta_en:     new Date().toISOString(),
+    cancelacion_resuelta_por:    currentUser.id,
+    cancelacion_nota_resolucion: nota || null,
+  }).eq('id', reservaId);
+  if (error) { showToast('Error al rechazar: ' + error.message, 'error'); return; }
+
+  const notifs = [];
+  if (r?.cliente_user_id) notifs.push({
+    user_id: r.cliente_user_id, tipo: 'cancelacion_rechazada', titulo: 'Cancelación no aprobada',
+    mensaje: `Tu solicitud de cancelación no fue aprobada.${nota ? ' Motivo: ' + nota : ''} El servicio sigue activo.`, leido: false,
+  });
+  if (r?.propietario_id) notifs.push({
+    user_id: r.propietario_id, tipo: 'cancelacion_rechazada', titulo: 'El servicio continúa',
+    mensaje: `No se aprobó la cancelación solicitada por ${esc(r?.cliente || 'el cliente')}. El servicio sigue activo.`, leido: false,
+  });
+  if (notifs.length) await sb.from('notificaciones').insert(notifs);
+
+  document.getElementById(`aprcancel-${reservaId}`)?.remove();
+  showToast('Cancelación rechazada — el servicio sigue activo');
   renderAprobaciones();
 }
 

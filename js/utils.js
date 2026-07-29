@@ -27,7 +27,11 @@ function today() {
 // Formatear fecha DD/MM/YYYY para mostrar
 function fmtFecha(str) {
   if (!str) return '—';
-  const [y, m, d] = str.split('-');
+  // Acepta tanto '2026-07-29' como marcas de tiempo ISO
+  // ('2026-07-29T10:00:00Z'): sin recortar la hora, el split producía
+  // "29T10:00:00Z/07/2026". Antes se parchaba en cada llamada con
+  // .substring(0,10); mejor resolverlo aquí de una vez.
+  const [y, m, d] = String(str).slice(0, 10).split('-');
   return `${d}/${m}/${y}`;
 }
 

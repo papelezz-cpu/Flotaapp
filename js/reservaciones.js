@@ -27,11 +27,11 @@ let _reservFiltro = 'Activa';
 
 const _RESERV_FILTRO_LABEL = {
   Activa: 'activas', Pendiente: 'pendientes', PorAprobar: 'por aprobar', Completada: 'completadas',
-  Cancelada: 'canceladas', PorCobrar: 'por cobrar', Vencido: 'con pago vencido', todas: '',
+  Cancelada: 'canceladas', CancelacionSolicitada: 'con cancelación en revisión', PorCobrar: 'por cobrar', Vencido: 'con pago vencido', todas: '',
 };
 
 // Texto legible del estado (la DB guarda 'PorAprobar' sin espacio)
-const _ESTADO_LABEL = { PorAprobar: 'Por aprobar' };
+const _ESTADO_LABEL = { PorAprobar: 'Por aprobar', CancelacionSolicitada: 'Cancelación en revisión' };
 const _estadoLabel = estado => _ESTADO_LABEL[estado] || estado;
 
 function _aplicaFiltroReserva(rows) {
@@ -134,11 +134,19 @@ async function renderReserv() {
       const badgeCls = r.estado === 'Pendiente'   ? 'badge-busy'
                      : r.estado === 'Activa'      ? 'badge-avail'
                      : r.estado === 'PorAprobar'  ? 'badge-acuerdo-rev'
+                     : r.estado === 'CancelacionSolicitada' ? 'badge-revision'
                      : r.estado === 'Completada'  ? 'badge-completado'
                      : 'badge-maint';
       const trackBtn = r.estado === 'Activa'
         ? `<button class="btn-edit" onclick="openTracking('${r.id}')" style="font-size:0.7rem">📍 ${esc(r.tracking_estado || 'Confirmado')}</button>`
         : '';
+      // Cancelar un acuerdo ya aprobado no es unilateral: se solicita y el
+      // superadmin decide (ver solicitarCancelacion).
+      const cancelBtn = r.estado === 'Activa'
+        ? `<button class="btn-cancelar-reserva" style="font-size:0.7rem" onclick="solicitarCancelacion('${r.id}')">Solicitar cancelación</button>`
+        : r.estado === 'CancelacionSolicitada'
+          ? `<span style="font-size:0.7rem;color:var(--text-muted)">⏳ Cancelación en revisión</span>`
+          : '';
       // El servicio se cierra cuando cliente Y empresa marcan completado (cada
       // quien sube su propia evidencia) y el superadmin aprueba la revisión.
       const miEvidenciaCli = r.evidencias_cliente?.length || 0;
@@ -187,6 +195,7 @@ async function renderReserv() {
           ${precioLbl}
           ${pagarBtn}
           ${cartaPorteBtn}
+          ${cancelBtn}
         </div>
       </div>`;
     }).join('');
@@ -272,7 +281,8 @@ async function renderReserv() {
 
     const esCompletada  = r.estado === 'Completada';
     const esPorAprobar  = r.estado === 'PorAprobar';
-    const badgeCls = esPendiente   ? 'badge-busy'
+    const badgeCls = r.estado === 'CancelacionSolicitada' ? 'badge-revision'
+                   : esPendiente   ? 'badge-busy'
                    : esActiva      ? 'badge-avail'
                    : esPorAprobar  ? 'badge-acuerdo-rev'
                    : esCompletada  ? 'badge-acordado'
@@ -780,6 +790,73 @@ async function enviarCalificacion() {
 
 // El registro de cobros vive en js/cobros.js (abrirRegistrarPago /
 // revertirPago), que además captura forma de pago y referencia.
+
+// ── SOLICITUD DE CANCELACIÓN (cliente) ─────────────────
+// El acuerdo ya fue aprobado y la empresa comprometió una unidad, así que el
+// cliente no cancela por su cuenta: lo solicita con un motivo y el superadmin
+// resuelve. La empresa se entera de inmediato, porque puede tener un camión
+// ya en camino.
+let _cancelReservaId = null;
+
+function solicitarCancelacion(reservaId) {
+  _cancelReservaId = reservaId;
+  document.getElementById('sc-motivo').value = '';
+  document.getElementById('sc-detalle').value = '';
+  document.getElementById('modal-solicitar-cancelacion').classList.add('open');
+}
+
+function cerrarSolicitarCancelacion() {
+  document.getElementById('modal-solicitar-cancelacion').classList.remove('open');
+  _cancelReservaId = null;
+}
+
+async function confirmarSolicitudCancelacion() {
+  if (!_cancelReservaId) return;
+  const motivo  = document.getElementById('sc-motivo').value;
+  const detalle = document.getElementById('sc-detalle').value.trim();
+  if (!motivo) { showToast('Selecciona el motivo de la cancelación.', 'error'); return; }
+
+  const { data: r } = await sb.from('reservaciones')
+    .select('tracking_estado, propietario_id, unidad, cliente')
+    .eq('id', _cancelReservaId).single();
+
+  const { error } = await sb.from('reservaciones').update({
+    estado:                      'CancelacionSolicitada',
+    cancelacion_solicitada_en:   new Date().toISOString(),
+    cancelacion_solicitada_por:  currentUser.id,
+    cancelacion_motivo:          motivo,
+    cancelacion_detalle:         detalle || null,
+    // Se congela el punto del viaje: no es lo mismo cancelar antes de salir
+    // que con la carga en tránsito.
+    cancelacion_tracking_estado: r?.tracking_estado || 'Confirmado',
+  }).eq('id', _cancelReservaId);
+
+  cerrarSolicitarCancelacion();
+  if (error) { showToast('No se pudo enviar la solicitud: ' + error.message, 'error'); return; }
+
+  // Avisar a la empresa YA (puede detener la unidad) y al superadmin, que decide.
+  const notifs = [];
+  if (r?.propietario_id) notifs.push({
+    user_id: r.propietario_id,
+    tipo:    'cancelacion_solicitada',
+    titulo:  '⚠ El cliente pidió cancelar un servicio',
+    mensaje: `${esc(currentUser.nombre || 'El cliente')} solicitó cancelar el servicio de ${esc(r.unidad || 'la unidad')}. Motivo: ${esc(motivo)}. Está en revisión — no continúes hasta que se resuelva.`,
+    leido:   false,
+  });
+  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+  (supers || []).forEach(s => notifs.push({
+    user_id: s.user_id,
+    tipo:    'cancelacion_solicitada',
+    titulo:  'Cancelación por revisar',
+    mensaje: `${esc(currentUser.nombre || 'Un cliente')} solicitó cancelar un servicio activo (${esc(r?.tracking_estado || 'Confirmado')}). Motivo: ${esc(motivo)}.`,
+    leido:   false,
+  }));
+  if (notifs.length) await sb.from('notificaciones').insert(notifs);
+
+  showToast('✓ Solicitud enviada — te avisaremos cuando se resuelva');
+  await renderReserv();
+  await loadNotificaciones();
+}
 
 // ── HISTORIAL DE RESERVACIONES ARCHIVADAS (superadmin) ─
 

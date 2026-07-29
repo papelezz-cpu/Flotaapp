@@ -140,6 +140,7 @@
         <button class="ped-filtro-pill"        data-rest="PorAprobar" onclick="filtrarReservas('PorAprobar')">Por aprobar</button>
         <button class="ped-filtro-pill"        data-rest="Completada" onclick="filtrarReservas('Completada')">Completadas</button>
         <button class="ped-filtro-pill"        data-rest="Cancelada"  onclick="filtrarReservas('Cancelada')">Canceladas</button>
+        <button class="ped-filtro-pill"        data-rest="CancelacionSolicitada" onclick="filtrarReservas('CancelacionSolicitada')">Cancelación en revisión</button>
         <button class="ped-filtro-pill"        data-rest="PorCobrar"  onclick="filtrarReservas('PorCobrar')">Por cobrar</button>
         <button class="ped-filtro-pill pill-alerta" data-rest="Vencido" onclick="filtrarReservas('Vencido')">Pago vencido</button>
         <button class="ped-filtro-pill"        data-rest="todas"      onclick="filtrarReservas('todas')">Todas</button>
@@ -2233,6 +2234,39 @@
   </div>
 </div>
 
+<!-- ══ MODAL SOLICITAR CANCELACIÓN (cliente) ═══════════ -->
+<div class="modal-overlay" id="modal-solicitar-cancelacion">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <h2>Solicitar cancelación</h2>
+      <button class="modal-close" title="Cerrar" onclick="cerrarSolicitarCancelacion()">✕</button>
+    </div>
+    <p class="sub">La empresa ya comprometió una unidad para este servicio, así que la cancelación
+      pasa a revisión de nuestro equipo. Se le avisará de inmediato para que no continúe.</p>
+    <div class="form-group">
+      <label>Motivo de la cancelación</label>
+      <select id="sc-motivo">
+        <option value="">— Selecciona —</option>
+        <option value="La carga no está lista">La carga no está lista</option>
+        <option value="Cambio de fechas">Cambio de fechas</option>
+        <option value="Cambió el destino o la ruta">Cambió el destino o la ruta</option>
+        <option value="Ya no requiero el servicio">Ya no requiero el servicio</option>
+        <option value="Problema con la empresa asignada">Problema con la empresa asignada</option>
+        <option value="Encontré otra opción">Encontré otra opción</option>
+        <option value="Otro">Otro</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Detalle <span style="color:var(--text-muted);font-weight:400">(opcional)</span></label>
+      <textarea id="sc-detalle" rows="3" placeholder="Cuéntanos qué pasó, nos ayuda a resolverlo más rápido" style="resize:vertical"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="cerrarSolicitarCancelacion()">Cerrar</button>
+      <button class="btn-confirm" style="background:var(--danger);border-color:var(--danger)" onclick="confirmarSolicitudCancelacion()">Enviar solicitud</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL REGISTRAR PAGO ════════════════════════════ -->
 <div class="modal-overlay" id="modal-registrar-pago">
   <div class="modal" style="max-width:440px">
@@ -2343,19 +2377,19 @@
 </div>
 
 <!-- ══ SCRIPTS (orden importante) ══════════════════════ -->
-<script src="js/utils.js?v=5"></script>
+<script src="js/utils.js?v=6"></script>
 <script src="js/notificaciones.js?v=17"></script>
 <script src="js/detalle.js?v=12"></script>
 <script src="js/config.js?v=12"></script>
 <script src="js/auth.js?v=21"></script>
 <script src="js/theme.js?v=11"></script>
-<script src="js/views.js?v=25"></script>
+<script src="js/views.js?v=26"></script>
 <script src="js/camiones.js?v=11"></script>
 <script src="js/recursos.js?v=11"></script>
-<script src="js/reservaciones.js?v=32"></script>
+<script src="js/reservaciones.js?v=33"></script>
 <script src="js/modal.js?v=13"></script>
 <script src="js/pedidos.js?v=43"></script>
-<script src="js/aprobaciones.js?v=31"></script>
+<script src="js/aprobaciones.js?v=32"></script>
 <script src="js/admin.js?v=28"></script>
 <script src="js/operadores.js?v=10"></script>
 <script src="js/usuarios.js?v=21"></script>
