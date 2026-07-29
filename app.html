@@ -24,7 +24,7 @@
   <!-- Estilos -->
   <link rel="stylesheet" href="css/base.css?v=7">
   <link rel="stylesheet" href="css/layout.css?v=4">
-  <link rel="stylesheet" href="css/components.css?v=20">
+  <link rel="stylesheet" href="css/components.css?v=21">
   <link rel="stylesheet" href="css/login.css?v=5">
   <link rel="stylesheet" href="css/detalle.css?v=2">
   <link rel="stylesheet" href="css/theme.css?v=6">
@@ -140,6 +140,8 @@
         <button class="ped-filtro-pill"        data-rest="PorAprobar" onclick="filtrarReservas('PorAprobar')">Por aprobar</button>
         <button class="ped-filtro-pill"        data-rest="Completada" onclick="filtrarReservas('Completada')">Completadas</button>
         <button class="ped-filtro-pill"        data-rest="Cancelada"  onclick="filtrarReservas('Cancelada')">Canceladas</button>
+        <button class="ped-filtro-pill"        data-rest="PorCobrar"  onclick="filtrarReservas('PorCobrar')">Por cobrar</button>
+        <button class="ped-filtro-pill pill-alerta" data-rest="Vencido" onclick="filtrarReservas('Vencido')">Pago vencido</button>
         <button class="ped-filtro-pill"        data-rest="todas"      onclick="filtrarReservas('todas')">Todas</button>
       </div>
     </div>
@@ -2231,6 +2233,41 @@
   </div>
 </div>
 
+<!-- ══ MODAL REGISTRAR PAGO ════════════════════════════ -->
+<div class="modal-overlay" id="modal-registrar-pago">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <h2>Registrar pago</h2>
+      <button class="modal-close" title="Cerrar" onclick="cerrarRegistrarPago()">✕</button>
+    </div>
+    <p class="sub">Deja constancia de cómo y cuándo se recibió el pago de este servicio.</p>
+    <div class="form-group">
+      <label>Forma de pago</label>
+      <select id="pg-metodo">
+        <option value="">— Selecciona —</option>
+        <option value="Transferencia (SPEI)">Transferencia (SPEI)</option>
+        <option value="Depósito bancario">Depósito bancario</option>
+        <option value="Efectivo">Efectivo</option>
+        <option value="Cheque">Cheque</option>
+        <option value="Tarjeta">Tarjeta</option>
+        <option value="Otro">Otro</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Fecha del pago</label>
+      <input type="date" id="pg-fecha">
+    </div>
+    <div class="form-group">
+      <label>Referencia <span style="color:var(--text-muted);font-weight:400">(opcional)</span></label>
+      <input type="text" id="pg-referencia" placeholder="Folio, clave de rastreo o número de cheque">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="cerrarRegistrarPago()">Cancelar</button>
+      <button class="btn-confirm" onclick="confirmarRegistrarPago()">💰 Registrar pago</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL RECHAZAR OFERTA (cliente) ═════════════════ -->
 <div class="modal-overlay" id="modal-rechazar-oferta">
   <div class="modal" style="max-width:440px">
@@ -2312,18 +2349,19 @@
 <script src="js/config.js?v=12"></script>
 <script src="js/auth.js?v=21"></script>
 <script src="js/theme.js?v=11"></script>
-<script src="js/views.js?v=24"></script>
+<script src="js/views.js?v=25"></script>
 <script src="js/camiones.js?v=11"></script>
 <script src="js/recursos.js?v=11"></script>
-<script src="js/reservaciones.js?v=31"></script>
+<script src="js/reservaciones.js?v=32"></script>
 <script src="js/modal.js?v=13"></script>
-<script src="js/pedidos.js?v=42"></script>
-<script src="js/aprobaciones.js?v=30"></script>
+<script src="js/pedidos.js?v=43"></script>
+<script src="js/aprobaciones.js?v=31"></script>
 <script src="js/admin.js?v=28"></script>
 <script src="js/operadores.js?v=10"></script>
 <script src="js/usuarios.js?v=21"></script>
 <script src="js/verificacion.js?v=1"></script>
 <script src="js/privacidad.js?v=1"></script>
+<script src="js/cobros.js?v=1"></script>
 <script src="js/reportes.js?v=2"></script>
 <script src="js/chat.js?v=16"></script>
 <script src="js/catalogo.js?v=21"></script>

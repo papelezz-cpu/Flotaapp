@@ -1131,14 +1131,26 @@ function rechazarSolicitud(pedidoId) {
 
 async function aprobarFinalizacion(reservaId) {
   const { data: r } = await sb.from('reservaciones')
-    .select('unidad, recurso_tipo, cliente_user_id, propietario_id, cliente, pedido_id')
+    .select('unidad, recurso_tipo, cliente_user_id, propietario_id, cliente, pedido_id, plazo_pago')
     .eq('id', reservaId).single();
   if (!r) { showToast('No se encontró la reserva', 'error'); return; }
+
+  // Aquí arranca el reloj del cobro: el servicio quedó cerrado y, según el
+  // plazo pactado, se calcula cuándo vence el pago. Las reservaciones viejas
+  // no traen el plazo, así que se busca en el pedido como respaldo.
+  let plazo = r.plazo_pago;
+  if (!plazo && r.pedido_id) {
+    const { data: p } = await sb.from('pedidos').select('plazo_pago').eq('id', r.pedido_id).maybeSingle();
+    plazo = p?.plazo_pago || null;
+  }
+  const ahora = new Date().toISOString();
 
   const { error } = await sb.from('reservaciones').update({
     estado: 'Completada',
     finalizacion_aprobada_por: currentUser.id,
-    finalizacion_aprobada_en: new Date().toISOString(),
+    finalizacion_aprobada_en: ahora,
+    plazo_pago: plazo,
+    fecha_vencimiento_pago: calcularVencimientoPago(plazo, ahora),
   }).eq('id', reservaId);
   if (error) { showToast('Error al aprobar: ' + error.message, 'error'); return; }
 

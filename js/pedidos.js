@@ -1628,6 +1628,9 @@ async function cerrarAcuerdo(oferta, pedido) {
     descripcion:     pedido.descripcion,
     estado:          'Activa',
     precio_acordado: oferta.precio_oferta,
+    // Snapshot del plazo pactado: el pedido puede reabrirse o editarse después,
+    // y el cobro debe regirse por lo que se acordó en esta operación.
+    plazo_pago:      pedido.plazo_pago || null,
   });
   if (error) {
     if (error.message?.includes('RECURSO_NO_DISPONIBLE') || error.code === 'P0001') {

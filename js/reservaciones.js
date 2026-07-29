@@ -27,7 +27,7 @@ let _reservFiltro = 'Activa';
 
 const _RESERV_FILTRO_LABEL = {
   Activa: 'activas', Pendiente: 'pendientes', PorAprobar: 'por aprobar', Completada: 'completadas',
-  Cancelada: 'canceladas', todas: '',
+  Cancelada: 'canceladas', PorCobrar: 'por cobrar', Vencido: 'con pago vencido', todas: '',
 };
 
 // Texto legible del estado (la DB guarda 'PorAprobar' sin espacio)
@@ -37,6 +37,9 @@ const _estadoLabel = estado => _ESTADO_LABEL[estado] || estado;
 function _aplicaFiltroReserva(rows) {
   if (_reservFiltro === 'todas') return rows;
   if (_reservFiltro === 'Cancelada') return rows.filter(r => r.estado === 'Cancelada' || r.estado === 'Rechazada');
+  // Filtros de cobro: se apoyan en el estado derivado (ver js/cobros.js)
+  if (_reservFiltro === 'PorCobrar') return rows.filter(r => estadoCobro(r)?.clave === 'por_cobrar');
+  if (_reservFiltro === 'Vencido')   return rows.filter(r => estadoCobro(r)?.clave === 'vencido');
   return rows.filter(r => r.estado === _reservFiltro);
 }
 
@@ -157,9 +160,8 @@ async function renderReserv() {
       const calBtn = (r.estado === 'Completada' && !r.calificado && propId)
         ? `<button class="btn-calificar" onclick="openCalificar('${r.id}','${propId}','${escJs(empresaMap[r.unidad]||'')}')">⭐ Calificar</button>`
         : '';
-      const pagoLbl = (r.estado === 'Completada' && r.pagado)
-        ? `<span style="font-size:0.7rem;color:var(--green);font-weight:600">💰 Pagado</span>`
-        : '';
+      // El cliente ve su estado de cobro: pagado, por cobrar o vencido.
+      const pagoLbl = cobroBadgeHTML(r);
       const precioLbl = r.precio_acordado
         ? `<span style="font-size:0.7rem;color:var(--text-muted)">$${Number(r.precio_acordado).toLocaleString('es-MX')} MXN</span>`
         : '';
@@ -303,10 +305,11 @@ async function renderReserv() {
       const evBtn = diasPasados <= 5 || numEv > 0
         ? `<button class="btn-edit" style="font-size:0.72rem" onclick="abrirEvidencias('${r.id}','evidencias')">${evBtnLabel}</button>`
         : '';
-      acciones = (r.pagado
-        ? `<span style="font-size:0.72rem;color:var(--green);font-weight:600">💰 Pagado</span>`
-        : `<button class="btn-edit" style="font-size:0.72rem;color:var(--amber);border-color:rgba(245,158,11,0.4)" onclick="marcarPagado('${r.id}')">💰 Marcar pagado</button>`)
-        + evBtn;
+      // Cobro: quien recibe el dinero (la empresa) o el superadmin lo registra.
+      const cobroBtn = r.pagado
+        ? `<button class="btn-edit" style="font-size:0.72rem" title="Revertir el cobro registrado" onclick="revertirPago('${r.id}')">↩ Revertir cobro</button>`
+        : `<button class="btn-edit" style="font-size:0.72rem;color:var(--amber);border-color:rgba(245,158,11,0.4)" onclick="abrirRegistrarPago('${r.id}')">💰 Registrar pago</button>`;
+      acciones = cobroBadgeHTML(r) + cobroBtn + evBtn;
     }
 
     const cartaPorteBtnAdmin = (esActiva || esPorAprobar || esCompletada)
@@ -775,15 +778,8 @@ async function enviarCalificacion() {
   showToast('⭐ ¡Gracias por tu calificación!');
 }
 
-// ── MARCAR PAGO ────────────────────────────────────────
-function marcarPagado(reservaId) {
-  showConfirm('¿Confirmar que el pago fue recibido para esta reservación?', async () => {
-    const { error } = await sb.from('reservaciones').update({ pagado: true }).eq('id', reservaId);
-    if (error) { showToast('Error al registrar pago: ' + error.message, 'error'); return; }
-    await renderReserv();
-    showToast('💰 Pago registrado');
-  }, { confirmLabel: 'Confirmar pago' });
-}
+// El registro de cobros vive en js/cobros.js (abrirRegistrarPago /
+// revertirPago), que además captura forma de pago y referencia.
 
 // ── HISTORIAL DE RESERVACIONES ARCHIVADAS (superadmin) ─
 
