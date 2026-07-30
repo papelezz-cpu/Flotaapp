@@ -284,15 +284,25 @@ async function destinatariosEmpresas(
 
   const { data: cams } = await sb.from('camiones')
     .select('propietario_id, tipo').in('aprobacion', ['aprobada', 'pendiente']);
-  const conFlota = new Set(
+  const conAlgo = new Set(
+    (cams ?? []).map((c: { propietario_id: string }) => c.propietario_id),
+  );
+  const conCategoria = new Set(
     (cams ?? [])
       .filter((c: { tipo: string }) => categoriaTipo(c.tipo) === cat)
       .map((c: { propietario_id: string }) => c.propietario_id),
   );
-  const filtrados = todos.filter((id) => conFlota.has(id));
   // Si ninguna empresa tiene esa categoría, es mejor avisar a todas que dejar
-  // la solicitud sin una sola oferta.
-  return filtrados.length ? filtrados : todos;
+  // la solicitud sin una sola oferta. Ojo: esto se decide sobre la categoría,
+  // no sobre la lista ya filtrada — si no, basta una empresa sin flota para
+  // que la lista no quede vacía y el aviso general nunca se dispare.
+  if (!todos.some((id) => conCategoria.has(id))) return todos;
+
+  // Una empresa SIN unidades cargadas sí puede ofertar en la app (el gate de
+  // js/pedidos.js solo aplica cuando _adminCamionTipos.size > 0), así que
+  // también tiene que enterarse: es justo la empresa recién aprobada que
+  // todavía no sube su flota, y dejarla en silencio es el peor momento.
+  return todos.filter((id) => conCategoria.has(id) || !conAlgo.has(id));
 }
 
 // ── Main handler ───────────────────────────────────────
