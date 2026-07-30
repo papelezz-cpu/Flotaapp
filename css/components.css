@@ -1830,3 +1830,61 @@ body.light .cobro-pagado    { color: #15803d; }
 /* Pastilla de filtro que señala una alerta */
 .ped-filtro-pill.pill-alerta { color: var(--danger); border-color: rgba(239,68,68,0.35); }
 .ped-filtro-pill.pill-alerta.active { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* ── SOLICITUDES FRECUENTES (plantillas del cliente) ──── */
+.plant-titulo {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted);
+  margin: 4px 0 10px;
+}
+.plant-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 10px; margin-bottom: 22px;
+}
+.plant-card {
+  display: flex; align-items: stretch; gap: 0;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); overflow: hidden;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.plant-card:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(78,142,247,0.12); }
+.plant-usar {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+  padding: 12px 14px; background: none; border: none; cursor: pointer;
+  text-align: left; font-family: inherit;
+}
+.plant-nombre  { font-size: 0.9rem; font-weight: 700; color: var(--text-main);
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.plant-ruta    { font-size: 0.78rem; color: var(--accent); font-weight: 600;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.plant-detalle { font-size: 0.73rem; color: var(--text-muted); line-height: 1.35; }
+.plant-veces   { font-size: 0.68rem; color: var(--text-muted); opacity: 0.8; margin-top: 2px; }
+.plant-borrar {
+  flex-shrink: 0; width: 40px;
+  background: none; border: none; border-left: 1px solid var(--border);
+  color: var(--text-muted); cursor: pointer; font-size: 0.85rem;
+  transition: background 0.18s, color 0.18s;
+}
+.plant-borrar:hover { background: rgba(239,68,68,0.1); color: var(--danger); }
+
+/* Casilla "guardar como frecuente" en el formulario de solicitud */
+.np-frecuente {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 18px 0 4px; padding: 12px 14px;
+  background: rgba(78,142,247,0.07); border: 1px solid rgba(78,142,247,0.25);
+  border-radius: 10px; cursor: pointer;
+  font-size: 0.84rem; line-height: 1.45; color: var(--text-main);
+  text-transform: none; letter-spacing: 0; font-weight: 400;
+}
+.np-frecuente input[type=checkbox] {
+  flex-shrink: 0; width: 18px; height: 18px; margin-top: 1px;
+  accent-color: var(--accent); cursor: pointer;
+}
+
+/* Aviso de formulario precargado desde una frecuente */
+.np-plant-aviso {
+  background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.35);
+  border-radius: 10px; padding: 10px 14px; margin-bottom: 14px;
+  font-size: 0.82rem; line-height: 1.45; color: var(--text-main);
+}

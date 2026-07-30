@@ -1,0 +1,208 @@
+// ── SOLICITUDES FRECUENTES (plantillas del cliente) ────
+// El formulario de solicitud tiene ~20 campos y muchos clientes repiten la
+// misma ruta con la misma carga. Aquí se guardan como "frecuentes" para
+// reutilizarlas con un toque. Las fechas nunca se guardan: son lo único que
+// cambia siempre.
+
+let _plantillas = [];
+
+// Campos que viajan entre el formulario y la plantilla.
+// [idDelCampo, columna, tipo] — el tipo define cómo leer/escribir el valor.
+const PLANTILLA_CAMPOS = [
+  ['np-tipo',             'tipo_camion',      'txt'],
+  ['np-carga',            'tipo_carga',       'txt'],
+  ['np-cap',              'capacidad_min',    'num'],
+  ['np-peso',             'peso_carga',       'num'],
+  ['np-bultos',           'num_bultos',       'num'],
+  ['np-contenedor',       'tipo_contenedor',  'txt'],
+  ['np-origen',           'origen',           'txt'],
+  ['np-destino',          'destino',          'txt'],
+  ['np-hora',             'hora_carga',       'txt'],
+  ['np-contacto-nombre',  'contacto_nombre',  'txt'],
+  ['np-contacto-tel',     'contacto_tel',     'txt'],
+  ['np-peligrosa',        'carga_peligrosa',  'bool'],
+  ['np-temp',             'temp_controlada',  'bool'],
+  ['np-seguro',           'requiere_seguro',  'bool'],
+  ['np-factura',          'requiere_factura', 'bool'],
+  ['np-precio',           'precio_cliente',   'num'],
+  ['np-plazo-pago',       'plazo_pago',       'txt'],
+  ['np-desc',             'descripcion',      'txt'],
+  // Otros tipos de servicio (hoy deshabilitados, la plantilla ya los soporta)
+  ['np-num-custodios',    'num_custodios',    'num'],
+  ['np-zona',             'zona_cobertura',   'txt'],
+  ['np-horario',          'horario_servicio', 'txt'],
+  ['np-num-vehiculos',    'num_vehiculos',    'num'],
+  ['np-tipo-vehiculos',   'tipo_vehiculos',   'txt'],
+  ['np-area',             'area_necesaria',   'num'],
+];
+
+// ── GUARDAR ────────────────────────────────────────────
+
+// La casilla del formulario muestra u oculta el campo del nombre.
+function togglePlantillaNombre() {
+  const wrap = document.getElementById('np-plantilla-nombre-wrap');
+  const chk  = document.getElementById('np-guardar-plantilla');
+  if (!wrap || !chk) return;
+  wrap.style.display = chk.checked ? '' : 'none';
+  if (chk.checked) {
+    const el = document.getElementById('np-plantilla-nombre');
+    // Sugerir un nombre a partir de la ruta, para no obligar a escribirlo
+    if (el && !el.value) el.value = _nombreSugerido();
+    el?.focus();
+  }
+}
+
+function _nombreSugerido() {
+  const v = id => document.getElementById(id)?.value?.trim() || '';
+  const corto = s => s.split(',')[0].trim();   // "Veracruz, Veracruz" → "Veracruz"
+  const o = v('np-origen'), d = v('np-destino');
+  if (o && d) return `${corto(o)} → ${corto(d)}`;
+  if (o) return corto(o);
+  return v('np-tipo') || 'Mi solicitud frecuente';
+}
+
+// Se llama desde crearPedido() cuando el cliente marcó la casilla.
+async function guardarPlantillaDesdeFormulario() {
+  const chk = document.getElementById('np-guardar-plantilla');
+  if (!chk?.checked) return;
+
+  const nombre = document.getElementById('np-plantilla-nombre')?.value.trim() || _nombreSugerido();
+  const fila = { cliente_id: currentUser.id, nombre };
+
+  PLANTILLA_CAMPOS.forEach(([id, col, tipo]) => {
+    const el = document.getElementById(id);
+    if (!el) { if (tipo === 'bool') fila[col] = false; return; }
+    if (tipo === 'bool')      fila[col] = !!el.checked;
+    else if (tipo === 'num')  fila[col] = el.value !== '' ? Number(el.value) : null;
+    else                      fila[col] = el.value?.trim() || null;
+  });
+
+  const { error } = await sb.from('plantillas_pedido').insert(fila);
+  if (error) {
+    // El trigger de la BD limita a 12; ese mensaje sí le sirve al usuario.
+    showToast(error.message?.includes('maximo') || error.message?.includes('máximo')
+      ? error.message
+      : 'La solicitud se creó, pero no se pudo guardar como frecuente.', 'error');
+    return;
+  }
+  showToast(`✓ Guardada como frecuente: ${esc(nombre)}`);
+  await cargarPlantillas();
+}
+
+// ── USAR ───────────────────────────────────────────────
+
+async function usarPlantilla(id) {
+  const p = _plantillas.find(x => x.id === id);
+  if (!p) { showToast('No se encontró la solicitud frecuente', 'error'); return; }
+
+  // Abrir el modal ya con el tipo de servicio correcto, y luego rellenar.
+  openNuevoPedido(_servicioDePlantilla(p));
+
+  PLANTILLA_CAMPOS.forEach(([campoId, col, tipo]) => {
+    const el = document.getElementById(campoId);
+    if (!el) return;
+    const val = p[col];
+    if (tipo === 'bool')      el.checked = !!val;
+    else if (val === null || val === undefined) el.value = '';
+    else                      el.value = val;
+  });
+
+  // Si el tipo guardado ya no existe en el catálogo (por ejemplo si se renombró
+  // una opción), el select quedaría vacío y se podría publicar sin tipo. Se cae
+  // a la primera opción y se avisa, en vez de dejarlo en blanco.
+  let tipoNoDisponible = false;
+  const selTipo = document.getElementById('np-tipo');
+  if (selTipo) {
+    if (p.tipo_camion && [...selTipo.options].some(o => o.value === p.tipo_camion)) {
+      selTipo.value = p.tipo_camion;
+    } else if (!selTipo.value && selTipo.options.length) {
+      selTipo.value = selTipo.options[0].value;
+      tipoNoDisponible = !!p.tipo_camion;
+    }
+  }
+  actualizarSubtipoPedido();
+  if (typeof _renderInfoCapacidad === 'function') _renderInfoCapacidad(selTipo?.value);
+
+  // No se precargan fechas a propósito: son lo que el cliente debe elegir.
+  const aviso = document.getElementById('np-plantilla-aviso');
+  if (aviso) {
+    aviso.innerHTML = `✨ Precargado desde <strong>${esc(p.nombre)}</strong>. Solo elige las fechas y revisa los datos.`
+      + (tipoNoDisponible
+          ? `<br><span style="color:var(--amber)">⚠ El tipo de servicio guardado (${esc(p.tipo_camion)}) ya no está disponible. Elige uno.</span>`
+          : '');
+    aviso.style.display = '';
+  }
+  // Al reusar no se vuelve a guardar como frecuente
+  const chk = document.getElementById('np-guardar-plantilla');
+  if (chk) { chk.checked = false; togglePlantillaNombre(); }
+
+  // Contador de uso: sirve para ordenar por utilidad real (fire-and-forget)
+  sb.from('plantillas_pedido').update({
+    veces_usada: (p.veces_usada || 0) + 1,
+    ultima_vez_usada: new Date().toISOString(),
+  }).eq('id', id).then(() => {});
+}
+
+function _servicioDePlantilla(p) {
+  const t = p.tipo_camion || '';
+  if (t.startsWith('Custodio') || t === 'Supervisión remota') return 'custodio';
+  if (t.startsWith('Patio') || t === 'Bodega')                return 'patio';
+  if (t.startsWith('Lavado') || t === 'Desinfección' || t === 'Lavado Contenedor') return 'lavado';
+  return 'camion';
+}
+
+function eliminarPlantilla(id) {
+  const p = _plantillas.find(x => x.id === id);
+  showConfirm(`¿Eliminar "${p?.nombre || 'esta solicitud frecuente'}"? Tus solicitudes ya enviadas no se afectan.`, async () => {
+    const { error } = await sb.from('plantillas_pedido').delete().eq('id', id);
+    if (error) { showToast('Error al eliminar: ' + error.message, 'error'); return; }
+    showToast('Solicitud frecuente eliminada');
+    await cargarPlantillas();
+  }, { danger: true, confirmLabel: 'Eliminar' });
+}
+
+// ── LISTAR ─────────────────────────────────────────────
+
+async function cargarPlantillas() {
+  if (!currentUser.id || currentUser.rol !== 'cliente') { _plantillas = []; _renderPlantillas(); return; }
+  const { data, error } = await sb.from('plantillas_pedido')
+    .select('*')
+    .eq('cliente_id', currentUser.id)
+    .order('veces_usada', { ascending: false })
+    .order('created_at',  { ascending: false });
+  if (error) { console.error('Error al cargar frecuentes:', error); _plantillas = []; }
+  else _plantillas = data || [];
+  _renderPlantillas();
+}
+
+function _renderPlantillas() {
+  const cont = document.getElementById('ped-plantillas');
+  if (!cont) return;
+  if (!_plantillas.length) { cont.innerHTML = ''; cont.style.display = 'none'; return; }
+
+  cont.style.display = '';
+  cont.innerHTML = `
+    <div class="plant-titulo">⭐ Tus solicitudes frecuentes</div>
+    <div class="plant-grid">
+      ${_plantillas.map(p => {
+        const ruta = p.origen
+          ? `${esc(p.origen.split(',')[0])}${p.destino ? ' → ' + esc(p.destino.split(',')[0]) : ''}`
+          : esc(p.tipo_camion || '—');
+        const detalles = [
+          p.tipo_camion ? esc(p.tipo_camion) : '',
+          p.peso_carga  ? `${p.peso_carga} ton` : '',
+          p.tipo_carga  ? esc(p.tipo_carga) : '',
+        ].filter(Boolean).join(' · ');
+        return `
+          <div class="plant-card">
+            <button class="plant-usar" onclick="usarPlantilla('${p.id}')" title="Usar esta solicitud">
+              <span class="plant-nombre">${esc(p.nombre)}</span>
+              <span class="plant-ruta">${ruta}</span>
+              ${detalles ? `<span class="plant-detalle">${detalles}</span>` : ''}
+              ${p.veces_usada ? `<span class="plant-veces">Usada ${p.veces_usada} ${p.veces_usada === 1 ? 'vez' : 'veces'}</span>` : ''}
+            </button>
+            <button class="plant-borrar" onclick="eliminarPlantilla('${p.id}')" title="Eliminar">🗑</button>
+          </div>`;
+      }).join('')}
+    </div>`;
+}

@@ -144,14 +144,19 @@ async function renderPedidos(append = false) {
   const filtrosBar = document.getElementById('ped-filtros-bar');
   const esCliente  = currentUser.id && currentUser.rol === 'cliente';
 
+  const plantBox = document.getElementById('ped-plantillas');
+
   if (esCliente && _pedidosMode === 'solicitar') {
     if (btnServ)    btnServ.style.display    = 'grid';
     if (filtrosBar) filtrosBar.style.display = 'none';
     container.innerHTML = '';
+    // Sus solicitudes frecuentes, para no volver a llenar el formulario
+    cargarPlantillas();
     return;
   }
 
   if (btnServ)    btnServ.style.display    = 'none';
+  if (plantBox)   plantBox.style.display   = 'none';
   if (filtrosBar) filtrosBar.style.display = currentUser.id ? '' : 'none';
 
   let pedidosQ = sb.from('pedidos').select('*').order('created_at', { ascending: false })
@@ -791,6 +796,17 @@ function openNuevoPedido(servicio) {
     }
   }
 
+  // Estado limpio de la sección de frecuentes. usarPlantilla() llama a esta
+  // función primero y luego rellena, así que puede resetear sin conflicto.
+  const avisoPlant = document.getElementById('np-plantilla-aviso');
+  if (avisoPlant) { avisoPlant.style.display = 'none'; avisoPlant.innerHTML = ''; }
+  const chkPlant = document.getElementById('np-guardar-plantilla');
+  if (chkPlant) chkPlant.checked = false;
+  const nomPlantWrap = document.getElementById('np-plantilla-nombre-wrap');
+  if (nomPlantWrap) nomPlantWrap.style.display = 'none';
+  const nomPlant = document.getElementById('np-plantilla-nombre');
+  if (nomPlant) nomPlant.value = '';
+
   document.getElementById('modal-nuevo-pedido').classList.add('open');
   // Setup geo autocomplete on first open
   setTimeout(setupAllGeoInputs, 0);
@@ -886,6 +902,11 @@ async function crearPedido() {
   const { error } = await sb.from('pedidos').insert(payload);
   if (btnPublicar) { btnPublicar.disabled = false; btnPublicar.textContent = '📋 Publicar solicitud'; }
   if (error) { showToast('Error al publicar: ' + (error.message || ''), 'error'); return; }
+
+  // Si marcó "guardar como frecuente", se guarda la plantilla. Va después del
+  // insert del pedido: si falla, la solicitud ya quedó publicada de todos modos
+  // (ver guardarPlantillaDesdeFormulario).
+  await guardarPlantillaDesdeFormulario();
 
   // Notificar solo a superadmins para revisión
   const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
