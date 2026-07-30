@@ -154,6 +154,19 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: strin
     <p>Ingresa a <strong>Solicitudes</strong> para revisarlas y ofertar.</p>`
   ),
 
+  // Resolución del superadmin sobre algo que el usuario está esperando:
+  // su cuenta, su solicitud, su camión, la finalización de un servicio.
+  // Antes todas estas resoluciones llegaban SOLO a la campana, o sea que el
+  // usuario se enteraba si abría la app — justo lo que no hace mientras
+  // espera que le aprueben la cuenta para poder entrar.
+  resolucion: (p) => tpl(
+    `${String(p.titulo ?? 'Actualización').slice(0, 45)} - PortGo`,
+    `<h2 style="margin:0 0 12px;color:${p.aprobado === false ? '#dc2626' : '#16a34a'}">${p.aprobado === false ? '⚠' : '✓'} ${esc(p.titulo)}</h2>
+    <p>${esc(p.mensaje)}</p>
+    ${p.nota ? `<div style="background:${p.aprobado === false ? '#fef2f2' : '#f0fdf4'};border-left:3px solid ${p.aprobado === false ? '#dc2626' : '#16a34a'};padding:10px 14px;border-radius:4px;margin:14px 0"><strong>${p.aprobado === false ? 'Motivo' : 'Nota'}:</strong> ${esc(p.nota)}</div>` : ''}
+    <p>Ingresa a PortGo para ver los detalles.</p>`
+  ),
+
   acuerdo: (p) => tpl(
     `Acuerdo pendiente de aprobación — PortGo`,
     `<h2 style="margin:0 0 12px;color:#1a4fd6">Acuerdo listo para aprobar</h2>
@@ -411,6 +424,10 @@ Deno.serve(async (req) => {
     } else if (tipo === 'revision_solicitud' || tipo === 'acuerdo') {
       // Solo superadmins: son los que tienen que actuar.
       ids = await idsPorRol(sb, 'superadmin');
+
+    } else if (tipo === 'resolucion') {
+      ids = (Array.isArray(payload.destinoIds) ? payload.destinoIds : [])
+        .filter(Boolean) as string[];
 
     } else if (tipo === 'nueva_reserva' && payload.propietario_id) {
       ids = [payload.propietario_id as string];

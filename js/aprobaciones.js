@@ -1,5 +1,31 @@
 // ── MÓDULO DE REVISIONES (solo superadmin) ─────────────
 
+// Avisa de una resolución del superadmin por campana Y por correo.
+//
+// Todas estas resoluciones (cuenta aprobada, camión rechazado, solicitud
+// publicada, finalización aprobada…) llegaban solo a la campana, o sea que el
+// usuario se enteraba únicamente si abría la app — justo lo que no hace
+// mientras espera a que le aprueben la cuenta para poder entrar.
+//
+// El correo es transaccional: va sobre algo del propio usuario que él está
+// esperando, así que NO se puede silenciar desde el perfil (ver
+// TIPOS_SILENCIABLES en supabase/functions/enviar-notificacion).
+async function _notificarResolucion(destinos, { tipo, titulo, mensaje, nota = null, aprobado = true }) {
+  const ids = [...new Set((Array.isArray(destinos) ? destinos : [destinos]).filter(Boolean))];
+  if (!ids.length) return;
+
+  const { error } = await sb.from('notificaciones').insert(ids.map(uid => ({
+    user_id: uid,
+    tipo,
+    titulo,
+    mensaje: nota ? `${mensaje} Motivo: ${nota}` : mensaje,
+    leido:   false,
+  })));
+  if (error) console.error('No se pudo notificar en la campana:', error);
+
+  _notificarEmail({ tipo: 'resolucion', destinoIds: ids, titulo, mensaje, nota, aprobado });
+}
+
 // ─── Modal genérico para rechazo con nota ──────────────
 let _rechazarNotaCb = null;
 
@@ -881,14 +907,12 @@ async function aprobarCuenta(userId, metodo) {
   ]);
   if (error) { showToast('Error al aprobar', 'error'); return; }
 
-  await sb.from('notificaciones').insert({
-    user_id: userId,
+  await _notificarResolucion(userId, {
     tipo:    'cuenta_aprobada',
     titulo:  '¡Cuenta aprobada!',
     mensaje: esFisica
       ? 'Tu cuenta ha sido verificada con validación física. Ya puedes iniciar sesión en PortGo.'
       : 'Tu cuenta ha sido verificada mediante revisión documental. Ya puedes iniciar sesión en PortGo.',
-    leido:   false,
   });
 
   document.getElementById(`aprcuenta-${userId}`)?.remove();
@@ -907,6 +931,17 @@ function rechazarCuenta(userId) {
         sb.from('solicitudes_cuenta').update({ estado: 'rechazada', nota_rechazo: notaTrim }).eq('user_id', userId),
       ]);
       if (error) { showToast('Error al rechazar', 'error'); return; }
+
+      // El correo importa más que la campana aquí: el usuario no puede entrar
+      // a la app a leerla, precisamente porque su cuenta está rechazada.
+      await _notificarResolucion(userId, {
+        tipo:     'cuenta_rechazada',
+        titulo:   'Tu solicitud de cuenta no fue aprobada',
+        mensaje:  'Revisa el motivo y vuelve a enviar tu solicitud desde PortGo con la información corregida.',
+        nota:     notaTrim,
+        aprobado: false,
+      });
+
       document.getElementById(`aprcuenta-${userId}`)?.remove();
       showToast('Solicitud rechazada');
       _loadAprBadge();
@@ -982,12 +1017,10 @@ async function aprobarSolicitud(pedidoId) {
   // Notificar al cliente que su solicitud fue aprobada
   if (ped?.cliente_id) {
     const ruta = ped.origen ? ` (${ped.origen}${ped.destino ? ' → ' + ped.destino : ''})` : '';
-    await sb.from('notificaciones').insert({
-      user_id: ped.cliente_id,
+    await _notificarResolucion(ped.cliente_id, {
       tipo:    'solicitud_aprobada',
-      titulo:  '✅ Tu solicitud fue aprobada',
+      titulo:  'Tu solicitud fue aprobada',
       mensaje: `Tu solicitud de ${ped.tipo_camion || 'servicio'}${ruta} fue aprobada y ya está publicada. Pronto recibirás ofertas de proveedores.`,
-      leido:   false,
     });
   }
 
@@ -1037,12 +1070,12 @@ function rechazarSolicitud(pedidoId) {
       const { data: ped } = await sb.from('pedidos').select('cliente_id, tipo_camion').eq('id', pedidoId).single();
       await sb.from('pedidos').update({ estado: 'rechazado', rechazo_nota: nota || null }).eq('id', pedidoId);
       if (ped?.cliente_id) {
-        await sb.from('notificaciones').insert({
-          user_id: ped.cliente_id,
-          tipo:    'solicitud_rechazada',
-          titulo:  'Solicitud no aprobada',
-          mensaje: `Tu solicitud de ${esc(ped.tipo_camion || 'servicio')} no fue aprobada.${nota ? ' Motivo: ' + nota : ''}`,
-          leido:   false,
+        await _notificarResolucion(ped.cliente_id, {
+          tipo:     'solicitud_rechazada',
+          titulo:   'Tu solicitud no fue aprobada',
+          mensaje:  `Tu solicitud de ${ped.tipo_camion || 'servicio'} no fue aprobada. Puedes corregirla y volver a publicarla desde PortGo.`,
+          nota:     nota || null,
+          aprobado: false,
         });
       }
       showToast('Solicitud rechazada y notificada al cliente');
@@ -1087,16 +1120,16 @@ async function aprobarFinalizacion(reservaId) {
     await sb.from(tabla).update({ estado: 'disponible' }).eq('id', r.unidad);
   }
 
-  const notifs = [];
-  if (r.cliente_user_id) notifs.push({
-    user_id: r.cliente_user_id, tipo: 'servicio_completado', titulo: '✅ Servicio completado',
-    mensaje: 'El superadmin aprobó la finalización de tu servicio. Ya puedes calificarlo.', leido: false,
+  await _notificarResolucion(r.cliente_user_id, {
+    tipo:    'servicio_completado',
+    titulo:  'Servicio completado',
+    mensaje: 'Se aprobó la finalización de tu servicio. Ya puedes calificarlo en PortGo.',
   });
-  if (r.propietario_id) notifs.push({
-    user_id: r.propietario_id, tipo: 'servicio_completado', titulo: '✅ Finalización aprobada',
-    mensaje: `El servicio con ${esc(r.cliente || 'el cliente')} fue aprobado como completado.`, leido: false,
+  await _notificarResolucion(r.propietario_id, {
+    tipo:    'servicio_completado',
+    titulo:  'Finalización aprobada',
+    mensaje: `El servicio con ${r.cliente || 'el cliente'} fue aprobado como completado.`,
   });
-  if (notifs.length) await sb.from('notificaciones').insert(notifs);
 
   document.getElementById(`aprfin-${reservaId}`)?.remove();
   showToast('✓ Finalización aprobada');
@@ -1346,12 +1379,12 @@ async function confirmarRechazarOperador() {
 
   if (op?.propietario_id) {
     const camposStr = campos.length ? ` Corregir: ${campos.join(', ')}.` : '';
-    await sb.from('notificaciones').insert({
-      user_id: op.propietario_id,
-      tipo:    'recurso_rechazado',
-      titulo:  '⚠ Operador requiere correcciones',
-      mensaje: `El operador ${esc(op.nombre)} (${id}) necesita ajustes.${camposStr}${nota ? ' Comentario: ' + nota : ''} Entra al tab Operadores para corregir y reenviar.`,
-      leido:   false,
+    await _notificarResolucion(op.propietario_id, {
+      tipo:     'recurso_rechazado',
+      titulo:   'Operador requiere correcciones',
+      mensaje:  `El operador ${op.nombre} (${id}) necesita ajustes.${camposStr} Entra al tab Operadores para corregir y reenviar.`,
+      nota:     nota || null,
+      aprobado: false,
     });
   }
 
@@ -1368,12 +1401,10 @@ async function aprobarOperador(id) {
 
   if (op?.propietario_id) {
     const nombre = [op.nombre, op.primer_apellido].filter(Boolean).join(' ');
-    await sb.from('notificaciones').insert({
-      user_id: op.propietario_id,
+    await _notificarResolucion(op.propietario_id, {
       tipo:    'recurso_aprobado',
-      titulo:  '✓ Operador aprobado',
+      titulo:  'Operador aprobado',
       mensaje: `Tu operador ${nombre} (${id}) fue aprobado y ya puede asignarse a unidades.`,
-      leido:   false,
     });
   }
 
@@ -1448,12 +1479,10 @@ async function aprobarCamion(id) {
   const { data: c } = await sb.from('camiones').select('propietario_id, tipo').eq('id', id).single();
   await sb.from('camiones').update({ aprobacion: 'aprobada', es_edicion: false, campos_editados: null, snapshot_anterior: null }).eq('id', id);
   if (c?.propietario_id) {
-    await sb.from('notificaciones').insert({
-      user_id: c.propietario_id,
+    await _notificarResolucion(c.propietario_id, {
       tipo:    'recurso_aprobado',
-      titulo:  '✓ Unidad aprobada',
-      mensaje: `Tu unidad ${id} (${esc(c.tipo || '')}) fue aprobada y ya está visible en el catálogo.`,
-      leido:   false,
+      titulo:  'Unidad aprobada',
+      mensaje: `Tu unidad ${id} (${c.tipo || ''}) fue aprobada y ya está visible en el catálogo.`,
     });
   }
   document.getElementById(`aprcam-${id}`)?.remove();
@@ -1487,12 +1516,12 @@ async function confirmarRechazarCamion() {
 
   if (c?.propietario_id) {
     const camposStr = campos.length ? ` Corregir: ${campos.join(', ')}.` : '';
-    await sb.from('notificaciones').insert({
-      user_id: c.propietario_id,
-      tipo:    'recurso_rechazado',
-      titulo:  '⚠ Unidad requiere correcciones',
-      mensaje: `Tu unidad ${id} (${esc(c.tipo || '')}) necesita ajustes.${camposStr}${nota ? ' Comentario: ' + nota : ''} Entra al panel Admin para corregir y reenviar.`,
-      leido:   false,
+    await _notificarResolucion(c.propietario_id, {
+      tipo:     'recurso_rechazado',
+      titulo:   'Unidad requiere correcciones',
+      mensaje:  `Tu unidad ${id} (${c.tipo || ''}) necesita ajustes.${camposStr} Entra al panel Admin para corregir y reenviar.`,
+      nota:     nota || null,
+      aprobado: false,
     });
   }
 
@@ -1548,12 +1577,12 @@ async function confirmarRechazarRecurso() {
   if (r?.propietario_id) {
     const tipoLabel = tabla === 'custodios' ? 'custodio' : tabla === 'patios' ? 'patio' : 'servicio de lavado';
     const camposStr = campos.length ? ` Corregir: ${campos.join(', ')}.` : '';
-    await sb.from('notificaciones').insert({
-      user_id: r.propietario_id,
-      tipo:    'recurso_rechazado',
-      titulo:  `⚠ ${tipoLabel.charAt(0).toUpperCase() + tipoLabel.slice(1)} requiere correcciones`,
-      mensaje: `Tu ${tipoLabel} "${esc(r.nombre || id)}" necesita ajustes.${camposStr}${nota ? ' Comentario: ' + nota : ''} Entra al panel Admin para ver el motivo y corregir.`,
-      leido:   false,
+    await _notificarResolucion(r.propietario_id, {
+      tipo:     'recurso_rechazado',
+      titulo:   `${tipoLabel.charAt(0).toUpperCase() + tipoLabel.slice(1)} requiere correcciones`,
+      mensaje:  `Tu ${tipoLabel} "${r.nombre || id}" necesita ajustes.${camposStr} Entra al panel Admin para ver el motivo y corregir.`,
+      nota:     nota || null,
+      aprobado: false,
     });
   }
 
@@ -1661,11 +1690,10 @@ async function aprobarDocsEmpresa(userId) {
   const { error } = await sb.from('perfiles').update(upd).eq('user_id', userId);
   if (error) { showToast('Error al aprobar: ' + error.message, 'error'); return; }
 
-  await sb.from('notificaciones').insert({
-    user_id: userId, tipo: 'docs_empresa_aprobados',
-    titulo:  '✅ Documentos aprobados',
-    mensaje: 'El superadmin aprobó tus documentos legales de empresa. Ya están vigentes en la plataforma.',
-    leido:   false,
+  await _notificarResolucion(userId, {
+    tipo:    'docs_empresa_aprobados',
+    titulo:  'Documentos aprobados',
+    mensaje: 'Se aprobaron tus documentos legales de empresa. Ya están vigentes en la plataforma.',
   });
 
   document.getElementById(`apr-docs-${userId}`)?.remove();
@@ -1687,11 +1715,12 @@ function rechazarDocsEmpresa(userId, nombre) {
         doc_seguro_rc_pendiente:     null,
         doc_seguro_carga_pendiente:  null,
       }).eq('user_id', userId);
-      await sb.from('notificaciones').insert({
-        user_id: userId, tipo: 'docs_empresa_rechazados',
-        titulo:  '⚠ Documentos rechazados',
-        mensaje: `El superadmin rechazó tus documentos de empresa.${nota ? ' Motivo: ' + nota : ''} Corrígelos y vuelve a enviarlos.`,
-        leido:   false,
+      await _notificarResolucion(userId, {
+        tipo:     'docs_empresa_rechazados',
+        titulo:   'Documentos no aprobados',
+        mensaje:  'Tus documentos de empresa no fueron aprobados. Corrígelos y vuelve a enviarlos desde tu perfil.',
+        nota:     nota || null,
+        aprobado: false,
       });
       document.getElementById(`apr-docs-${userId}`)?.remove();
       showToast('Documentos rechazados y notificados');
