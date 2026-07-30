@@ -1921,3 +1921,99 @@ body.light .cobro-pagado    { color: #15803d; }
 /* La primera sección de un panel no necesita el margen superior que traen
    los títulos pensados para ir apilados uno tras otro. */
 .apr-panel > .apr-bloque-title:first-child { margin-top: 0 !important; }
+
+/* ── PREFERENCIAS DE AVISOS ──────────────────────────────
+   La casilla lleva tamaño explícito: .form-group input { width:100% } no la
+   alcanza aquí, pero el patrón de la app es dejarlo dicho para que un cambio
+   futuro en esa regla no vuelva a estirarla (ver .np-check, .decl-sensibles). */
+.pref-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  max-width: 620px;
+}
+.pref-switch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.pref-switch-row input[type=checkbox] {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.pref-switch-txt { display: flex; flex-direction: column; gap: 3px; }
+.pref-switch-txt strong { font-size: 0.95rem; }
+.pref-switch-txt small { color: var(--text-muted); font-size: 0.8rem; line-height: 1.4; }
+
+.pref-listas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+  margin: 16px 0 4px;
+}
+.pref-lista-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+.pref-lista ul { margin: 0; padding-left: 18px; }
+.pref-lista li { font-size: 0.85rem; margin: 4px 0; line-height: 1.4; }
+.pref-lista small {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.pref-lista--fija li { color: var(--text-muted); }
+
+.pref-estado { margin-top: 14px; }
+.pref-badge {
+  display: inline-block;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.pref-badge--on  { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.4); }
+.pref-badge--off { background: rgba(148,163,184,0.15); color: var(--text-muted); border: 1px solid rgba(148,163,184,0.35); }
+body.light .pref-badge--on { color: #15803d; }
+
+.pref-error {
+  background: rgba(239,68,68,0.13);
+  border: 1px solid rgba(239,68,68,0.4);
+  color: var(--danger);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 0.87rem;
+}
+body.light .pref-error { color: #b3261e; }
+
+/* Enlace desde el perfil de la empresa hacia la vista de avisos */
+.pref-link-row {
+  margin-top: 14px;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.pref-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}

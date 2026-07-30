@@ -264,6 +264,38 @@ async function idsPorRol(sb: ReturnType<typeof createClient>, rol: string): Prom
   return (data ?? []).map((p: { user_id: string }) => p.user_id);
 }
 
+// Correos que el usuario puede apagar desde su perfil (perfiles.notif_email).
+// Son los frecuentes: oportunidades, ofertas recibidas y cola de revisión.
+// Los transaccionales (reserva confirmada, aceptada, rechazada, acuerdo
+// aprobado) NO están aquí a propósito: son parte del servicio contratado, no
+// avisos, y apagarlos dejaría a alguien enterándose tarde de algo que ya se
+// comprometió a cumplir. La campana dentro de la app tampoco se ve afectada.
+const TIPOS_SILENCIABLES = new Set([
+  'nueva_solicitud', 'solicitudes_lote', 'revision_solicitud', 'acuerdo', 'nueva_oferta',
+]);
+
+async function quierenCorreo(
+  sb: ReturnType<typeof createClient>,
+  ids: string[],
+): Promise<string[]> {
+  if (!ids.length) return [];
+  const { data, error } = await sb.from('perfiles')
+    .select('user_id').in('user_id', ids).eq('notif_email', true);
+
+  // Falla abierto a propósito. Si la consulta truena — típicamente porque la
+  // migración de notif_email todavía no se corrió — filtrar dejaría la lista
+  // vacía y NADIE recibiría correo, en silencio y sin que nadie se entere.
+  // Mandar un correo que alguien no quería es molesto; no mandar ninguno rompe
+  // el negocio.
+  if (error) {
+    console.error('No se pudo leer notif_email, se envía sin filtrar:', error);
+    return ids;
+  }
+
+  const sí = new Set((data ?? []).map((p: { user_id: string }) => p.user_id));
+  return ids.filter((id) => sí.has(id));
+}
+
 // Empresas activas que podrían ofertar por este tipo de servicio. Con
 // tipoCamion = null (aprobación en lote) van todas.
 // Se excluyen las cuentas no activas: aprobacion_cuenta null = activa;
@@ -373,6 +405,9 @@ Deno.serve(async (req) => {
     } else if (tipo === 'acuerdo_aprobado') {
       ids = [payload.clienteId, payload.adminId].filter(Boolean) as string[];
     }
+
+    // Respetar la preferencia del usuario, solo en los tipos silenciables.
+    if (TIPOS_SILENCIABLES.has(tipo)) ids = await quierenCorreo(sb, ids);
 
     let emails = [...directos, ...(await emailsDeIds(sb, ids))];
     emails = [...new Set(emails.filter(Boolean))];
