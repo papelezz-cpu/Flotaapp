@@ -93,44 +93,28 @@ function filasSolicitud(p: Record<string, unknown>): string {
 // El asunto va en texto plano — no lleva esc(), o un cliente llamado
 // "Ruiz & Co" aparece como "Ruiz &amp; Co" en la bandeja.
 //
-// Y tiene que ser CORTO y casi todo ASCII. origen/destino vienen del
-// autocompletado de direcciones, así que traen la dirección completa
-// ("Manzanillo, Colima, 28200"); metidas enteras en el asunto daban una
-// cabecera de ~120 caracteres con acentos, flechas y guiones largos.
-// denomailer la codifica como un solo encoded-word sin plegar, queda inválida
-// según RFC 2047, y el cliente ya no puede parsear el mensaje: lo muestra en
-// crudo, con headers y fronteras MIME. En el CUERPO sí va la dirección
-// completa, que ahí no hay límite de longitud ni codificación de cabecera.
-const ASUNTO_MAX = 45;
-
-// Saca la ciudad de una dirección del autocompletado. Vienen con la forma
-// "…, ciudad, estado[, CP]", así que se lee por la cola y no por la cabeza:
-// "Manzanillo, Colima, 28200"                              → Manzanillo
-// "Circuito del Nogal, Privadas del Bosque, Hermosillo, Sonora, 83288" → Hermosillo
-// Leyendo por la cabeza, la segunda daba "Circuito del Nogal" — la calle.
-function ciudad(v: unknown): string {
-  let partes = String(v ?? '').split(',').map((x) => x.trim()).filter(Boolean);
-  if (!partes.length) return '';
-  // Fuera el código postal y el país, que no aportan al asunto.
-  const sobra = (x: string) => /^\d+$/.test(x) || /^(m[eé]xico|mx)$/i.test(x);
-  while (partes.length > 1 && sobra(partes[partes.length - 1])) {
-    partes = partes.slice(0, -1);
-  }
-  // Con "ciudad, estado" la ciudad es la penúltima; con un solo dato, ese.
-  return partes.length >= 2 ? partes[partes.length - 2] : partes[0];
-}
-
-function recorta(s: string, max: number): string {
-  return s.length <= max ? s : s.slice(0, max - 1).trimEnd() + '…';
-}
+// Y tiene que ser CORTO: denomailer codifica el Subject como un único
+// encoded-word RFC 2047, además con los espacios sin escapar. Mientras cabe
+// en una línea los clientes lo toleran (los asuntos de siempre, ~40
+// caracteres, llegan bien), pero en cuanto pasa de ~75 la cabecera se pliega
+// a media palabra codificada, queda inválida, y el cliente ya no puede
+// parsear el mensaje: lo muestra en crudo, con headers y fronteras MIME.
+//
+// Por eso la RUTA NO va en el asunto. Dos razones:
+//   1. origen/destino traen la dirección completa del autocompletado, que por
+//      sí sola revienta el límite.
+//   2. No hay campo de ciudad en la base, y sacarla del texto libre no tiene
+//      regla fiable: en "Manzanillo, Colima, 28200" la ciudad es el primer
+//      segmento, y en "Circuito del Nogal, Privadas del Bosque, Hermosillo"
+//      es el último. Cualquier heurística acierta en una y falla en la otra.
+//
+// La ruta completa y correcta va en el CUERPO, que no tiene límite de
+// longitud ni codificación de cabecera.
+const TIPO_MAX = 30;
 
 function asuntoSolicitud(p: Record<string, unknown>): string {
-  const t = String(p.tipo_camion ?? 'servicio');
-  const o = ciudad(p.origen);
-  const d = ciudad(p.destino);
-  // "a" en vez de "→": se lee igual de bien y es ASCII puro.
-  const ruta = o ? `: ${o}${d ? ` a ${d}` : ''}` : '';
-  return recorta(`${t}${ruta}`, ASUNTO_MAX);
+  const t = String(p.tipo_camion ?? '').trim() || 'servicio';
+  return t.length <= TIPO_MAX ? t : t.slice(0, TIPO_MAX - 3).trimEnd() + '...';
 }
 
 const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: string; html: string }> = {
