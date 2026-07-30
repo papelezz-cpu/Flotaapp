@@ -21,6 +21,40 @@ function esc(v: unknown): string {
   }[c] as string));
 }
 
+// dd/mm/aaaa — mismo formato que fmtFecha() en js/utils.js
+function fmtF(v: unknown): string {
+  const p = String(v ?? '').slice(0, 10).split('-');
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : esc(v);
+}
+
+// ── Quién puede ofertar por un tipo de servicio ─────────
+// Réplica de _categoriaTipo() y del gate esCamionPed de js/pedidos.js. Tiene
+// que dar el mismo resultado que el cliente: si aquí avisamos a una empresa
+// que la app luego no deja ofertar, el correo es basura; y si callamos a una
+// que sí podía, le quitamos la oportunidad.
+function categoriaTipo(tipo: unknown): string | null {
+  const t = String(tipo ?? '');
+  if (!t || t === 'Cualquiera') return null;
+  if (t.startsWith('Full')) return 'full';
+  if (t.startsWith('Torton')) return 'torton';
+  if (t.startsWith('Sencillo')) return 'sencillo';
+  if (t.startsWith('Camioneta 1.5')) return 'cam15';
+  if (t.startsWith('Camioneta 3.5')) return 'cam35';
+  if (t === 'Rabón') return 'rabon';
+  if (t.startsWith('Plataforma')) return 'plataforma';
+  if (t === 'Lowboy' || t === 'Cama baja') return 'lowboy';
+  if (t === 'HAZMAT') return 'hazmat';
+  return t;
+}
+
+function esServicioCamion(tipo: unknown): boolean {
+  const t = String(tipo ?? '');
+  if (!t) return false;
+  return !t.startsWith('Custodio') && t !== 'Supervisión remota' &&
+         !t.startsWith('Patio') && t !== 'Bodega' &&
+         !t.startsWith('Lavado') && t !== 'Desinfección';
+}
+
 // ── HTML email templates ───────────────────────────────
 const BRAND = `<div style="font-family:Inter,sans-serif;max-width:520px;margin:auto;color:#1e293b">
   <div style="background:#1a4fd6;padding:18px 24px;border-radius:12px 12px 0 0">
@@ -34,15 +68,71 @@ function tpl(subject: string, body: string) {
   return { subject, html: `${BRAND}${body}${END_BRAND}` };
 }
 
+// Tabla de detalles de una solicitud, compartida por los correos de revisión
+// (al superadmin) y de publicación (a las empresas). Una empresa decide si
+// vale la pena ofertar por la ruta y las fechas, no por el tipo de unidad.
+function filasSolicitud(p: Record<string, unknown>): string {
+  const fila = (k: string, v: string) =>
+    `<tr><td style="padding:6px 0;color:#64748b;width:140px">${k}</td><td>${v}</td></tr>`;
+  const ruta = p.origen
+    ? `${esc(p.origen)}${p.destino ? ` <strong>→</strong> ${esc(p.destino)}` : ''}`
+    : null;
+  const fechas = p.fecha_ini
+    ? `${fmtF(p.fecha_ini)}${p.fecha_fin ? ` – ${fmtF(p.fecha_fin)}` : ''}`
+    : null;
+  return `<table style="width:100%;border-collapse:collapse;margin:16px 0">
+    ${fila('Servicio:', `<strong>${esc(p.tipo_camion) || '—'}</strong>`)}
+    ${ruta ? fila('Ruta:', `<strong>${ruta}</strong>`) : ''}
+    ${fechas ? fila('Fechas:', fechas) : ''}
+    ${p.tipo_carga ? fila('Carga:', esc(p.tipo_carga)) : ''}
+    ${p.precio_cliente ? fila('Presupuesto:', `<strong>$${Number(p.precio_cliente).toLocaleString('es-MX')} MXN</strong>`) : ''}
+    ${p.plazo_pago ? fila('Plazo de pago:', esc(p.plazo_pago)) : ''}
+  </table>`;
+}
+
+// El asunto va en texto plano — no lleva esc(), o un cliente llamado
+// "Ruiz & Co" aparece como "Ruiz &amp; Co" en la bandeja.
+function asuntoSolicitud(p: Record<string, unknown>): string {
+  const t = String(p.tipo_camion ?? 'servicio');
+  const ruta = p.origen ? `: ${p.origen}${p.destino ? ` → ${p.destino}` : ''}` : '';
+  return `${t}${ruta}`;
+}
+
 const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: string; html: string }> = {
+  // A las empresas, cuando el superadmin YA publicó la solicitud y por lo
+  // tanto ya se puede ofertar.
   nueva_solicitud: (p) => tpl(
-    `Nueva solicitud de ${esc(p.cliente_nombre)} — PortGo`,
-    `<h2 style="margin:0 0 12px;color:#1a4fd6">Nueva solicitud de servicio</h2>
-    <p><strong>${esc(p.cliente_nombre) || 'Un cliente'}</strong> publicó una solicitud en PortGo.</p>
-    <table style="width:100%;border-collapse:collapse;margin:16px 0">
-      <tr><td style="padding:6px 0;color:#64748b;width:140px">Servicio:</td><td><strong>${esc(p.tipo_camion) || '—'}</strong></td></tr>
-    </table>
-    <p>Ingresa a la plataforma para revisar y hacer tu oferta.</p>`
+    `Nueva solicitud — ${asuntoSolicitud(p)} — PortGo`,
+    `<h2 style="margin:0 0 12px;color:#1a4fd6">Nueva solicitud disponible para ofertar</h2>
+    <p>Se publicó una solicitud que coincide con tu flota.</p>
+    ${filasSolicitud(p)}
+    <p>Ingresa a <strong>Solicitudes</strong> en PortGo para revisarla y hacer tu oferta.</p>
+    <p style="color:#64748b;font-size:0.85rem">Las ofertas tienen vigencia limitada: entre más pronto ofertes, más posibilidades tienes.</p>`
+  ),
+
+  // Al superadmin, cuando el cliente acaba de crear la solicitud y está en
+  // pendiente_revision. Las empresas todavía NO deben recibir nada: la
+  // solicitud aún no es visible ni ofertable para ellas.
+  revision_solicitud: (p) => tpl(
+    `Solicitud por revisar — ${asuntoSolicitud(p)} — PortGo`,
+    `<h2 style="margin:0 0 12px;color:#b45309">⏳ Solicitud pendiente de tu revisión</h2>
+    <p><strong>${esc(p.cliente_nombre) || 'Un cliente'}</strong> creó una solicitud que requiere tu aprobación antes de publicarse.</p>
+    ${filasSolicitud(p)}
+    <p>Ingresa a <strong>Pendientes de aprobación → Solicitudes</strong> para publicarla o devolverla con comentarios.</p>`
+  ),
+
+  // Aprobación en lote: un solo correo con el resumen, en lugar de N blasts.
+  solicitudes_lote: (p) => tpl(
+    `${Number(p.total) || 0} solicitudes nuevas para ofertar — PortGo`,
+    `<h2 style="margin:0 0 12px;color:#1a4fd6">Se publicaron ${Number(p.total) || 0} solicitudes</h2>
+    <p>Ya están disponibles para ofertar en PortGo:</p>
+    <ul style="padding-left:18px;margin:16px 0">
+      ${(Array.isArray(p.rutas) ? p.rutas as string[] : []).slice(0, 15)
+        .map((r) => `<li style="margin:4px 0">${esc(r)}</li>`).join('')}
+    </ul>
+    ${(Array.isArray(p.rutas) ? (p.rutas as string[]).length : 0) > 15
+      ? `<p style="color:#64748b;font-size:0.85rem">…y ${(p.rutas as string[]).length - 15} más.</p>` : ''}
+    <p>Ingresa a <strong>Solicitudes</strong> para revisarlas y ofertar.</p>`
   ),
 
   acuerdo: (p) => tpl(
@@ -121,13 +211,88 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: strin
 };
 
 // ── Email sender ───────────────────────────────────────
-async function sendEmail(to: string, subject: string, html: string) {
+// Una sola conexión SMTP por invocación. Antes se abría (y cerraba) una
+// conexión a Gmail por destinatario, en serie: con 30 empresas eran 30
+// conexiones dentro de la misma llamada, lo bastante lento para topar con el
+// límite de tiempo de la Edge Function y con el rate limit de Gmail.
+// Para varios destinatarios se usa BCC: nadie ve el correo de los demás.
+async function sendEmailBulk(to: string[], subject: string, html: string) {
+  if (!to.length) return;
   const client = new SMTPClient({
     connection: { hostname: 'smtp.gmail.com', port: 465, tls: true,
       auth: { username: GMAIL_USER, password: GMAIL_PASS } },
   });
-  await client.send({ from: `PortGo <${GMAIL_USER}>`, to, subject, html });
-  await client.close();
+  try {
+    const from = `PortGo <${GMAIL_USER}>`;
+    if (to.length === 1) {
+      await client.send({ from, to: to[0], subject, html });
+    } else {
+      await client.send({ from, to: from, bcc: to, subject, html });
+    }
+  } finally {
+    await client.close();
+  }
+}
+
+// listUsers() pagina de 50 en 50 por default: sin esto, en cuanto PortGo pase
+// de 50 usuarios los destinatarios que caen fuera de la primera página se
+// quedan sin correo y sin error visible.
+async function emailsDeIds(sb: ReturnType<typeof createClient>, ids: string[]): Promise<string[]> {
+  if (!ids.length) return [];
+
+  // Pocos destinatarios (oferta, reserva, acuerdo): una consulta puntual por
+  // usuario sale mucho más barato que listar el directorio completo.
+  if (ids.length <= 5) {
+    const res = await Promise.all(ids.map((id) => sb.auth.admin.getUserById(id)));
+    return res.map((r) => r.data?.user?.email).filter(Boolean) as string[];
+  }
+
+  // Muchos destinatarios (aviso a empresas): conviene una sola pasada.
+  const map: Record<string, string> = {};
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await sb.auth.admin.listUsers({ page, perPage: 200 });
+    const users = data?.users ?? [];
+    if (error || !users.length) break;
+    users.forEach((u: { id: string; email?: string }) => { if (u.email) map[u.id] = u.email; });
+    if (users.length < 200) break;
+  }
+  return ids.map((id) => map[id]).filter(Boolean);
+}
+
+async function idsPorRol(sb: ReturnType<typeof createClient>, rol: string): Promise<string[]> {
+  const { data } = await sb.from('perfiles').select('user_id').eq('rol', rol);
+  return (data ?? []).map((p: { user_id: string }) => p.user_id);
+}
+
+// Empresas activas que podrían ofertar por este tipo de servicio. Con
+// tipoCamion = null (aprobación en lote) van todas.
+// Se excluyen las cuentas no activas: aprobacion_cuenta null = activa;
+// pendiente / rechazada / suspendida no deben recibir avisos de negocio.
+async function destinatariosEmpresas(
+  sb: ReturnType<typeof createClient>,
+  tipoCamion: unknown,
+): Promise<string[]> {
+  const { data } = await sb.from('perfiles')
+    .select('user_id').eq('rol', 'admin').is('aprobacion_cuenta', null);
+  const todos = (data ?? []).map((p: { user_id: string }) => p.user_id);
+  if (!todos.length) return [];
+
+  const cat = categoriaTipo(tipoCamion);
+  // Custodios, patios, lavados y "Cualquiera" no dependen de la flota de
+  // camiones: cualquier empresa puede ofertar, igual que en la app.
+  if (!cat || !esServicioCamion(tipoCamion)) return todos;
+
+  const { data: cams } = await sb.from('camiones')
+    .select('propietario_id, tipo').in('aprobacion', ['aprobada', 'pendiente']);
+  const conFlota = new Set(
+    (cams ?? [])
+      .filter((c: { tipo: string }) => categoriaTipo(c.tipo) === cat)
+      .map((c: { propietario_id: string }) => c.propietario_id),
+  );
+  const filtrados = todos.filter((id) => conFlota.has(id));
+  // Si ninguna empresa tiene esa categoría, es mejor avisar a todas que dejar
+  // la solicitud sin una sola oferta.
+  return filtrados.length ? filtrados : todos;
 }
 
 // ── Main handler ───────────────────────────────────────
@@ -152,58 +317,61 @@ Deno.serve(async (req) => {
     }
 
     const payload = await req.json();
-    const { data: { users } } = await sb.auth.admin.listUsers();
-    const userById: Record<string, string> = {};
-    users.forEach((u: { id: string; email?: string }) => { if (u.email) userById[u.id] = u.email; });
 
     // Determine event type — support both legacy shape and new `tipo` field
     const tipo: string = payload.tipo || (payload.tipo_evento === 'acuerdo' ? 'acuerdo' : 'nueva_solicitud');
     const tplFn = TEMPLATES[tipo];
     if (!tplFn) return json({ ok: true, skipped: true });
 
-    const { subject, html } = tplFn(payload);
-    const sent: string[] = [];
-
-    if (['nueva_solicitud', 'acuerdo'].includes(tipo)) {
-      // Send to all admins + superadmins
-      const targetRol = tipo === 'acuerdo' ? 'superadmin' : 'admin';
-      const { data: perfiles } = await sb.from('perfiles').select('user_id').eq('rol', targetRol);
-      if (!perfiles?.length) return json({ ok: true, sent: 0 });
-      // For 'nueva_solicitud' also include superadmins
-      const ids = new Set(perfiles.map((p: { user_id: string }) => p.user_id));
-      if (tipo === 'nueva_solicitud') {
-        const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-        sas?.forEach((p: { user_id: string }) => ids.add(p.user_id));
-      }
-      for (const id of ids) {
-        const email = userById[id];
-        if (email) { await sendEmail(email, subject, html); sent.push(email); }
-      }
-
-    } else if (tipo === 'nueva_reserva' && payload.propietario_id) {
-      // Send to the resource owner
-      const email = userById[payload.propietario_id as string];
-      if (email) { await sendEmail(email, subject, html); sent.push(email); }
-
-    } else if (payload.clienteEmail) {
-      // Send to the client directly
-      await sendEmail(payload.clienteEmail as string, subject, html);
-      sent.push(payload.clienteEmail as string);
-
-    } else if (tipo === 'nueva_oferta' && payload.clienteId) {
-      // Send to the client by user id
-      const email = userById[payload.clienteId as string];
-      if (email) { await sendEmail(email, subject, html); sent.push(email); }
-
-    } else if (tipo === 'acuerdo_aprobado') {
-      // Send to both cliente and admin
-      for (const uid of [payload.clienteId, payload.adminId].filter(Boolean) as string[]) {
-        const email = userById[uid];
-        if (email) { await sendEmail(email, subject, html); sent.push(email); }
+    // Los correos masivos a empresas solo los puede disparar un superadmin
+    // (es él quien publica las solicitudes). Sin esto, cualquier usuario con
+    // sesión podía usar la función como relay para mandarle a TODAS las
+    // empresas un correo con texto que él controla, desde el dominio de PortGo.
+    if (tipo === 'nueva_solicitud' || tipo === 'solicitudes_lote') {
+      const { data: perfilCaller } = await sb.from('perfiles')
+        .select('rol').eq('user_id', caller.id).maybeSingle();
+      if (perfilCaller?.rol !== 'superadmin') {
+        return json({ error: 'No autorizado' }, 403);
       }
     }
 
-    return json({ ok: true, sent: sent.length, emails: sent });
+    const { subject, html } = tplFn(payload);
+
+    // ── A quién le toca este correo ───────────────────────
+    // Se resuelven primero los user_id y hasta el final se traducen a correos,
+    // para no traer el directorio de usuarios cuando el destinatario es uno.
+    let ids: string[] = [];
+    let directos: string[] = [];
+
+    if (tipo === 'nueva_solicitud' || tipo === 'solicitudes_lote') {
+      ids = await destinatariosEmpresas(
+        sb, tipo === 'nueva_solicitud' ? payload.tipo_camion : null);
+
+    } else if (tipo === 'revision_solicitud' || tipo === 'acuerdo') {
+      // Solo superadmins: son los que tienen que actuar.
+      ids = await idsPorRol(sb, 'superadmin');
+
+    } else if (tipo === 'nueva_reserva' && payload.propietario_id) {
+      ids = [payload.propietario_id as string];
+
+    } else if (payload.clienteEmail) {
+      directos = [payload.clienteEmail as string];
+
+    } else if (tipo === 'nueva_oferta' && payload.clienteId) {
+      ids = [payload.clienteId as string];
+
+    } else if (tipo === 'acuerdo_aprobado') {
+      ids = [payload.clienteId, payload.adminId].filter(Boolean) as string[];
+    }
+
+    let emails = [...directos, ...(await emailsDeIds(sb, ids))];
+    emails = [...new Set(emails.filter(Boolean))];
+    if (!emails.length) return json({ ok: true, sent: 0 });
+
+    await sendEmailBulk(emails, subject, html);
+    // Solo el conteo: devolver la lista de correos permitía a cualquier
+    // usuario con sesión enumerar las direcciones de todas las empresas.
+    return json({ ok: true, sent: emails.length });
   } catch (err) {
     console.error(err);
     return json({ ok: false, error: String(err) }, 500);

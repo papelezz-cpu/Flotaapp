@@ -77,6 +77,41 @@ const _INFO_CAP = {
 };
 
 // Categoría simplificada para verificar si admin tiene el tipo solicitado
+// Los servicios que no son de camión (custodio, patio, lavado, bodega…) no
+// dependen de la flota: cualquier empresa puede ofertar por ellos.
+function _esServicioCamion(tipo) {
+  const t = String(tipo || '');
+  if (!t) return false;
+  return !t.startsWith('Custodio') && t !== 'Supervisión remota'
+      && !t.startsWith('Patio') && t !== 'Bodega'
+      && !t.startsWith('Lavado') && t !== 'Desinfección';
+}
+
+// Empresas activas que podrían ofertar por una solicitud de este tipo: las que
+// tienen al menos una unidad de la misma categoría. Se usa para no avisarle
+// (campana y correo) a empresas que la app no va a dejar ofertar — antes se
+// avisaba a todas y la campana se volvía ruido que se aprende a ignorar.
+// La Edge Function enviar-notificacion replica esta misma regla para el correo.
+async function _adminsConFlotaPara(tipoCamion) {
+  const { data: admins } = await sb.from('perfiles')
+    .select('user_id').eq('rol', 'admin').is('aprobacion_cuenta', null);
+  const todos = (admins || []).map(a => a.user_id);
+  if (!todos.length) return [];
+
+  const cat = _categoriaTipo(tipoCamion);
+  if (!cat || !_esServicioCamion(tipoCamion)) return todos;
+
+  const { data: cams } = await sb.from('camiones')
+    .select('propietario_id, tipo').in('aprobacion', ['aprobada', 'pendiente']);
+  const conFlota = new Set((cams || [])
+    .filter(c => _categoriaTipo(c.tipo) === cat)
+    .map(c => c.propietario_id));
+  const filtrados = todos.filter(id => conFlota.has(id));
+  // Si ninguna tiene esa categoría, mejor avisarle a todas que dejar la
+  // solicitud sin una sola oferta.
+  return filtrados.length ? filtrados : todos;
+}
+
 function _categoriaTipo(tipo) {
   if (!tipo || tipo === 'Cualquiera') return null;
   if (tipo.startsWith('Full'))              return 'full';
@@ -512,9 +547,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
 
   } else if (vista === 'admin') {
     const tipoPed = p.tipo_camion || '';
-    const esCamionPed = !tipoPed.startsWith('Custodio') && tipoPed !== 'Supervisión remota'
-                     && !tipoPed.startsWith('Patio') && tipoPed !== 'Bodega'
-                     && !tipoPed.startsWith('Lavado') && tipoPed !== 'Desinfección';
+    const esCamionPed = _esServicioCamion(tipoPed);
     let puedeOfertar = true;
     if (esCamionPed && _adminCamionTipos && !_adminCamionTipos.has('*') && _adminCamionTipos.size > 0) {
       const catPed = _categoriaTipo(tipoPed);
@@ -920,8 +953,24 @@ async function crearPedido() {
     })));
   }
 
-  // Enviar correo a admins y superadmins
-  _notificarEmail({ tipo_camion: tipo, cliente_nombre: currentUser.nombre });
+  // Correo SOLO a superadmins: son los que tienen que revisarla.
+  // Antes esta misma línea caía en la plantilla 'nueva_solicitud' (sin campo
+  // `tipo` la Edge Function la asumía por default) y le avisaba a todas las
+  // empresas de una solicitud que seguía en pendiente_revision: entraban a
+  // PortGo y no estaba ahí. El aviso a empresas ahora sale al publicarse,
+  // desde aprobarSolicitud() en js/aprobaciones.js.
+  _notificarEmail({
+    tipo:           'revision_solicitud',
+    cliente_nombre: currentUser.nombre,
+    tipo_camion:    tipo,
+    origen:         payload.origen,
+    destino:        payload.destino,
+    fecha_ini:      payload.fecha_ini,
+    fecha_fin:      payload.fecha_fin,
+    tipo_carga:     payload.tipo_carga,
+    precio_cliente: payload.precio_cliente,
+    plazo_pago:     payload.plazo_pago,
+  });
 
   closeNuevoPedido();
   document.getElementById('modal-nuevo-pedido').querySelectorAll('input, textarea, select').forEach(el => {

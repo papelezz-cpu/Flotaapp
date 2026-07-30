@@ -975,7 +975,9 @@ function _buildChipsSol(p) {
 async function aprobarSolicitud(pedidoId) {
   await sb.from('pedidos').update({ estado: 'abierto', rechazo_nota: null }).eq('id', pedidoId);
 
-  const { data: ped } = await sb.from('pedidos').select('tipo_camion, origen, destino, cliente_id').eq('id', pedidoId).single();
+  const { data: ped } = await sb.from('pedidos')
+    .select('tipo_camion, origen, destino, cliente_id, cliente_nombre, fecha_ini, fecha_fin, tipo_carga, precio_cliente, plazo_pago')
+    .eq('id', pedidoId).single();
 
   // Notificar al cliente que su solicitud fue aprobada
   if (ped?.cliente_id) {
@@ -989,17 +991,35 @@ async function aprobarSolicitud(pedidoId) {
     });
   }
 
-  // Notificar a todos los admins que hay nueva solicitud disponible
-  const { data: admins } = await sb.from('perfiles').select('user_id').in('rol', ['admin', 'superadmin']);
-  if (admins?.length) {
-    await sb.from('notificaciones').insert(admins.map(a => ({
-      user_id: a.user_id,
+  // Avisar solo a las empresas que podrían ofertar por este tipo de servicio.
+  // Antes iba a todos los admins + superadmins: una empresa que solo tiene
+  // plataformas recibía aviso de cada torton, y eso entrena a ignorar la campana.
+  const destinatarios = await _adminsConFlotaPara(ped?.tipo_camion);
+  const rutaTxt = ped?.origen ? ` ${ped.origen}${ped.destino ? ' → ' + ped.destino : ''}` : '';
+  if (destinatarios.length) {
+    await sb.from('notificaciones').insert(destinatarios.map(uid => ({
+      user_id: uid,
       tipo:    'nueva_solicitud',
-      titulo:  'Nueva solicitud publicada',
-      mensaje: `Se aprobó una solicitud de ${esc(ped?.tipo_camion || 'servicio')}. Ya está disponible para ofertar.`,
+      titulo:  'Nueva solicitud para ofertar',
+      mensaje: `${ped?.tipo_camion || 'Servicio'}${rutaTxt} — ya está disponible para ofertar.`,
       leido:   false,
     })));
   }
+
+  // Correo a esas mismas empresas. La Edge Function vuelve a resolver los
+  // destinatarios del lado del servidor con la misma regla; el cliente nunca
+  // manda la lista de correos.
+  _notificarEmail({
+    tipo:           'nueva_solicitud',
+    tipo_camion:    ped?.tipo_camion,
+    origen:         ped?.origen,
+    destino:        ped?.destino,
+    fecha_ini:      ped?.fecha_ini,
+    fecha_fin:      ped?.fecha_fin,
+    tipo_carga:     ped?.tipo_carga,
+    precio_cliente: ped?.precio_cliente,
+    plazo_pago:     ped?.plazo_pago,
+  });
 
   document.getElementById(`aprsol-${pedidoId}`)?.remove();
   showToast('✓ Solicitud aprobada y publicada');
@@ -1565,16 +1585,28 @@ function aprobarTodasSolicitudes() {
     });
     if (notifClientes.length) await sb.from('notificaciones').insert(notifClientes);
 
-    const { data: admins } = await sb.from('perfiles').select('user_id').in('rol', ['admin', 'superadmin']);
-    if (admins?.length) {
-      await sb.from('notificaciones').insert(admins.map(a => ({
-        user_id: a.user_id,
+    // En lote los tipos son mixtos, así que va a todas las empresas activas.
+    // Un solo correo con el resumen: mandar uno por solicitud serían N correos
+    // a la vez y Gmail empieza a limitar.
+    const destinatarios = await _adminsConFlotaPara(null);
+    if (destinatarios.length) {
+      await sb.from('notificaciones').insert(destinatarios.map(uid => ({
+        user_id: uid,
         tipo:    'nueva_solicitud',
         titulo:  `${solic.length} solicitudes publicadas`,
         mensaje: `Se aprobaron ${solic.length} solicitudes. Ya están disponibles para ofertar.`,
         leido:   false,
       })));
     }
+    _notificarEmail({
+      tipo:  'solicitudes_lote',
+      total: solic.length,
+      rutas: solic.map(p => {
+        const r = p.origen ? ` — ${p.origen}${p.destino ? ' → ' + p.destino : ''}` : '';
+        return `${p.tipo_camion || 'Servicio'}${r}`;
+      }),
+    });
+
     await renderAprobaciones();
     if (document.getElementById('view-pedidos')?.classList.contains('active')) renderPedidos();
     showToast(`✓ ${solic.length} solicitud${solic.length !== 1 ? 'es' : ''} aprobada${solic.length !== 1 ? 's' : ''} y publicada${solic.length !== 1 ? 's' : ''}`);
