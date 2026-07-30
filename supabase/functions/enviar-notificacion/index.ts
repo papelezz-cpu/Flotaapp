@@ -92,17 +92,52 @@ function filasSolicitud(p: Record<string, unknown>): string {
 
 // El asunto va en texto plano — no lleva esc(), o un cliente llamado
 // "Ruiz & Co" aparece como "Ruiz &amp; Co" en la bandeja.
+//
+// Y tiene que ser CORTO y casi todo ASCII. origen/destino vienen del
+// autocompletado de direcciones, así que traen la dirección completa
+// ("Manzanillo, Colima, 28200"); metidas enteras en el asunto daban una
+// cabecera de ~120 caracteres con acentos, flechas y guiones largos.
+// denomailer la codifica como un solo encoded-word sin plegar, queda inválida
+// según RFC 2047, y el cliente ya no puede parsear el mensaje: lo muestra en
+// crudo, con headers y fronteras MIME. En el CUERPO sí va la dirección
+// completa, que ahí no hay límite de longitud ni codificación de cabecera.
+const ASUNTO_MAX = 45;
+
+// Saca la ciudad de una dirección del autocompletado. Vienen con la forma
+// "…, ciudad, estado[, CP]", así que se lee por la cola y no por la cabeza:
+// "Manzanillo, Colima, 28200"                              → Manzanillo
+// "Circuito del Nogal, Privadas del Bosque, Hermosillo, Sonora, 83288" → Hermosillo
+// Leyendo por la cabeza, la segunda daba "Circuito del Nogal" — la calle.
+function ciudad(v: unknown): string {
+  let partes = String(v ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  if (!partes.length) return '';
+  // Fuera el código postal y el país, que no aportan al asunto.
+  const sobra = (x: string) => /^\d+$/.test(x) || /^(m[eé]xico|mx)$/i.test(x);
+  while (partes.length > 1 && sobra(partes[partes.length - 1])) {
+    partes = partes.slice(0, -1);
+  }
+  // Con "ciudad, estado" la ciudad es la penúltima; con un solo dato, ese.
+  return partes.length >= 2 ? partes[partes.length - 2] : partes[0];
+}
+
+function recorta(s: string, max: number): string {
+  return s.length <= max ? s : s.slice(0, max - 1).trimEnd() + '…';
+}
+
 function asuntoSolicitud(p: Record<string, unknown>): string {
   const t = String(p.tipo_camion ?? 'servicio');
-  const ruta = p.origen ? `: ${p.origen}${p.destino ? ` → ${p.destino}` : ''}` : '';
-  return `${t}${ruta}`;
+  const o = ciudad(p.origen);
+  const d = ciudad(p.destino);
+  // "a" en vez de "→": se lee igual de bien y es ASCII puro.
+  const ruta = o ? `: ${o}${d ? ` a ${d}` : ''}` : '';
+  return recorta(`${t}${ruta}`, ASUNTO_MAX);
 }
 
 const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: string; html: string }> = {
   // A las empresas, cuando el superadmin YA publicó la solicitud y por lo
   // tanto ya se puede ofertar.
   nueva_solicitud: (p) => tpl(
-    `Nueva solicitud — ${asuntoSolicitud(p)} — PortGo`,
+    `Nueva solicitud - ${asuntoSolicitud(p)} - PortGo`,
     `<h2 style="margin:0 0 12px;color:#1a4fd6">Nueva solicitud disponible para ofertar</h2>
     <p>Se publicó una solicitud que coincide con tu flota.</p>
     ${filasSolicitud(p)}
@@ -114,7 +149,7 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: strin
   // pendiente_revision. Las empresas todavía NO deben recibir nada: la
   // solicitud aún no es visible ni ofertable para ellas.
   revision_solicitud: (p) => tpl(
-    `Solicitud por revisar — ${asuntoSolicitud(p)} — PortGo`,
+    `Solicitud por revisar - ${asuntoSolicitud(p)} - PortGo`,
     `<h2 style="margin:0 0 12px;color:#b45309">⏳ Solicitud pendiente de tu revisión</h2>
     <p><strong>${esc(p.cliente_nombre) || 'Un cliente'}</strong> creó una solicitud que requiere tu aprobación antes de publicarse.</p>
     ${filasSolicitud(p)}
@@ -123,7 +158,7 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: strin
 
   // Aprobación en lote: un solo correo con el resumen, en lugar de N blasts.
   solicitudes_lote: (p) => tpl(
-    `${Number(p.total) || 0} solicitudes nuevas para ofertar — PortGo`,
+    `${Number(p.total) || 0} solicitudes nuevas para ofertar - PortGo`,
     `<h2 style="margin:0 0 12px;color:#1a4fd6">Se publicaron ${Number(p.total) || 0} solicitudes</h2>
     <p>Ya están disponibles para ofertar en PortGo:</p>
     <ul style="padding-left:18px;margin:16px 0">
