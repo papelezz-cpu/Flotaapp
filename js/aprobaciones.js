@@ -129,6 +129,10 @@ async function renderAprobaciones() {
       </div>
     </div>`;
 
+  // Paneles por pestaña. Cada bloque escribe en el suyo con `html +=` a través
+  // de la variable `html`, que se reasigna antes de cada sección (ver más
+  // abajo cómo se ensamblan al final).
+  const P = { cuentas: '', solicitudes: '', acuerdos: '', servicios: '', recursos: '' };
   let html = '';
 
   // ── DOCUMENTOS DE EMPRESA PENDIENTES ─────────────────
@@ -234,6 +238,8 @@ async function renderAprobaciones() {
     }).join('');
   }
 
+  P.cuentas = html; html = '';
+
   // ── SOLICITUDES POR REVISAR (agrupadas por cliente) ──
   const batchSol = (solicitudes||[]).length > 1
     ? `<button class="btn-apr-batch" onclick="aprobarTodasSolicitudes()">✓ Aprobar todas</button>` : '';
@@ -274,6 +280,8 @@ async function renderAprobaciones() {
       return _colapseCard(`solg-${key}`, header, body);
     }).join('');
   }
+
+  P.solicitudes = html; html = '';
 
   // ── ACUERDOS POR APROBAR (agrupados por cliente) ─────
   const batchAcu = (acuerdos||[]).length > 1
@@ -333,6 +341,8 @@ async function renderAprobaciones() {
     }).join('');
   }
 
+  P.acuerdos = html; html = '';
+
   // ── FINALIZACIONES DE SERVICIO POR APROBAR ───────────
   html += `<div class="apr-bloque-title" style="margin-top:28px">🏁 Finalizaciones por aprobar <span class="apr-count">${(finalizaciones||[]).length}</span></div>`;
   if (!finalizaciones?.length) {
@@ -382,7 +392,26 @@ async function renderAprobaciones() {
           </div>
         </div>`;
     }));
-    html += bodies.join('');
+    // Agrupadas por empresa: el superadmin normalmente resuelve "los pendientes
+    // de tal transportista", y es quien opera el servicio.
+    const finPorEmpresa = {};
+    finalizaciones.forEach((r, i) => {
+      const key = r.propietario_id || 'sin-empresa';
+      if (!finPorEmpresa[key]) finPorEmpresa[key] = { nombre: finEmpresaMap[r.propietario_id] || 'Empresa sin nombre', items: [] };
+      finPorEmpresa[key].items.push(bodies[i]);
+    });
+    html += Object.entries(finPorEmpresa).map(([key, g]) => {
+      const n = g.items.length;
+      const header = `
+        <div style="flex:1;min-width:0">
+          <div class="apr-empresa-name">🏢 ${esc(g.nombre)}</div>
+          <div class="apr-empresa-counts">
+            <span class="apr-ec">🏁 ${n} finalizaci${n > 1 ? 'ones' : 'ón'}</span>
+            <span class="apr-ec-total">Por aprobar</span>
+          </div>
+        </div>`;
+      return _colapseCard(`fing-${key}`, header, g.items.join(''));
+    }).join('');
   }
 
   // ── CANCELACIONES SOLICITADAS POR EL CLIENTE ─────────
@@ -392,7 +421,7 @@ async function renderAprobaciones() {
   if (!cancelaciones?.length) {
     html += `<div class="apr-empty">Sin solicitudes de cancelación</div>`;
   } else {
-    html += cancelaciones.map(r => {
+    const _tarjetaCancel = r => {
       const punto = r.cancelacion_tracking_estado || r.tracking_estado || 'Confirmado';
       const arranco = punto !== 'Confirmado';
       return `
@@ -424,8 +453,34 @@ async function renderAprobaciones() {
             <button class="btn-apr-rechazar" onclick="rechazarCancelacionCliente('${r.id}')">✕ Rechazar</button>
           </div>
         </div>`;
+    };
+    // Agrupadas por empresa, igual que las finalizaciones: quedan juntas las
+    // dos decisiones sobre servicios del mismo transportista.
+    const cancelPorEmpresa = {};
+    cancelaciones.forEach(r => {
+      const key = r.propietario_id || 'sin-empresa';
+      if (!cancelPorEmpresa[key]) cancelPorEmpresa[key] = { nombre: finEmpresaMap[r.propietario_id] || 'Empresa sin nombre', items: [], iniciados: 0 };
+      cancelPorEmpresa[key].items.push(_tarjetaCancel(r));
+      const punto = r.cancelacion_tracking_estado || r.tracking_estado || 'Confirmado';
+      if (punto !== 'Confirmado') cancelPorEmpresa[key].iniciados++;
+    });
+    html += Object.entries(cancelPorEmpresa).map(([key, g]) => {
+      const n = g.items.length;
+      const header = `
+        <div style="flex:1;min-width:0">
+          <div class="apr-empresa-name">🏢 ${esc(g.nombre)}</div>
+          <div class="apr-empresa-counts">
+            <span class="apr-ec">🚫 ${n} cancelaci${n > 1 ? 'ones' : 'ón'}</span>
+            ${g.iniciados
+              ? `<span class="apr-ec" style="color:var(--danger)">⚠ ${g.iniciados} con servicio iniciado</span>`
+              : '<span class="apr-ec-total">Sin iniciar</span>'}
+          </div>
+        </div>`;
+      return _colapseCard(`cancelg-${key}`, header, g.items.join(''));
     }).join('');
   }
+
+  P.servicios = html; html = '';
 
   // ── RECURSOS POR EMPRESA ─────────────────────────────
   html += `<div class="apr-bloque-title" style="margin-top:28px">📦 Recursos por aprobar <span class="apr-count">${totalRecursos}</span></div>`;
@@ -464,262 +519,67 @@ async function renderAprobaciones() {
   html += `<!-- fin recursos por empresa -->`;
 
   // ── OPERADORES POR APROBAR (legacy placeholder — eliminado) ───────────────────────────
-  html += ``; if (false) {
-  html += `<div class="apr-bloque-title" style="margin-top:28px">👷 Operadores por aprobar <span class="apr-count">${(operadores || []).length}</span></div>`;
+  // Las secciones sueltas por tipo de recurso (operadores, camiones,
+  // custodios, patios, lavados) se reemplazaron por la agrupación por
+  // empresa de arriba. Vivían aquí dentro de un `if (false)`.
 
-  if (!operadores?.length) {
-    html += `<div class="apr-empty">Sin operadores pendientes de aprobación</div>`;
-  } else {
-    html += (operadores || []).map(op => {
-      const nombre = [op.nombre, op.primer_apellido, op.segundo_apellido].filter(Boolean).join(' ');
-      const foto   = op.foto_operador
-        ? `<img src="${esc(op.foto_operador)}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--border);flex-shrink:0" alt="foto">`
-        : `<div style="width:56px;height:56px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700;flex-shrink:0">${(op.nombre||'?')[0].toUpperCase()}</div>`;
-      const venceColor  = op.fecha_vencimiento && new Date(op.fecha_vencimiento) < new Date() ? 'var(--danger)' : 'inherit';
-      const diffOpHtml  = _diffHtml(op, {
-        nombre:'Nombre', primer_apellido:'Primer apellido', segundo_apellido:'Segundo apellido',
-        curp:'CURP', rfc:'RFC', nss:'NSS', sexo:'Sexo', tipo_sanguineo:'Tipo sanguíneo',
-        correo:'Correo', telefono:'Teléfono', num_trabajador:'Núm. trabajador',
-        nivel_estudio:'Nivel de estudio', area:'Área', puesto:'Puesto',
-        num_licencia:'Núm. licencia', clase_licencia:'Clase licencia', tipo_licencia:'Tipo licencia',
-        fecha_expedicion:'Fecha expedición', fecha_vencimiento:'Vencimiento',
-        fecha_examen_medico:'Examen médico',
-      });
-      return `
-        <div class="apr-card" id="aprop-${op.id}">
-          <div class="apr-card-header">
-            <div style="display:flex;align-items:center;gap:14px">
-              ${foto}
-              <div>
-                <div class="apr-tipo">👷 ${esc(nombre)}</div>
-                <div class="apr-sub">${esc(op.id)} · Empresa: <strong>${esc(op.propietario?.nombre || '—')}</strong></div>
-              </div>
-            </div>
-            ${op.es_edicion ? '<span class="apr-edicion-tag">✏️ Edición</span>' : '<span class="badge badge-revision">Pendiente</span>'}
-          </div>
-          ${diffOpHtml}
-          <div class="apr-op-detalle">
-            <div class="apr-op-section-title">Datos personales</div>
-            <div class="apr-op-grid">
-              <div class="apr-op-row"><span>CURP</span><strong>${esc(op.curp || '—')}</strong></div>
-              <div class="apr-op-row"><span>RFC</span><strong>${esc(op.rfc || '—')}</strong></div>
-              <div class="apr-op-row"><span>NSS</span><strong>${esc(op.nss || '—')}</strong></div>
-              <div class="apr-op-row"><span>Sexo</span><strong>${esc(op.sexo || '—')}</strong></div>
-              <div class="apr-op-row"><span>Tipo sanguíneo</span><strong>${esc(op.tipo_sanguineo || '—')}</strong></div>
-              <div class="apr-op-row"><span>Correo</span><strong>${esc(op.correo || '—')}</strong></div>
-              <div class="apr-op-row"><span>Teléfono</span><strong>${esc(op.telefono || '—')}</strong></div>
-            </div>
-            <div class="apr-op-section-title">Datos laborales</div>
-            <div class="apr-op-grid">
-              <div class="apr-op-row"><span>Núm. trabajador</span><strong>${esc(op.num_trabajador || '—')}</strong></div>
-              <div class="apr-op-row"><span>Nivel de estudio</span><strong>${esc(op.nivel_estudio || '—')}</strong></div>
-              <div class="apr-op-row"><span>Área</span><strong>${esc(op.area || '—')}</strong></div>
-              <div class="apr-op-row"><span>Puesto</span><strong>${esc(op.puesto || '—')}</strong></div>
-              <div class="apr-op-row"><span>Examen médico</span><strong>${op.fecha_examen_medico ? fmtFecha(op.fecha_examen_medico) : '—'}</strong></div>
-            </div>
-            <div class="apr-op-section-title">Licencia de conducir</div>
-            <div class="apr-op-grid">
-              <div class="apr-op-row"><span>Número</span><strong>${esc(op.num_licencia || '—')}</strong></div>
-              <div class="apr-op-row"><span>Clase</span><strong>${esc(op.clase_licencia || '—')}</strong></div>
-              <div class="apr-op-row"><span>Tipo</span><strong>${esc(op.tipo_licencia || '—')}</strong></div>
-              <div class="apr-op-row"><span>Expedición</span><strong>${op.fecha_expedicion ? fmtFecha(op.fecha_expedicion) : '—'}</strong></div>
-              <div class="apr-op-row"><span>Vencimiento</span><strong style="color:${venceColor}">${op.fecha_vencimiento ? fmtFecha(op.fecha_vencimiento) : '—'}</strong></div>
-            </div>
-            ${op.foto_licencia ? `<a href="${esc(op.foto_licencia)}" target="_blank" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:8px">🪪 Ver foto de licencia</a>` : ''}
-          </div>
-          <div class="apr-actions">
-            <button class="btn-apr-aprobar"  onclick="aprobarOperador('${op.id}')">✓ Aprobar</button>
-            <button class="btn-apr-rechazar" onclick="rechazarOperador('${op.id}')">✕ Rechazar con comentarios</button>
-          </div>
-        </div>`;
-    }).join('');
+  P.recursos = html;
+
+  content.innerHTML = _aprTabsHTML(P, {
+    cuentas:     (docsEmpresa?.length || 0) + (cuentasPend?.length || 0),
+    solicitudes: (solicitudes || []).length,
+    acuerdos:    (acuerdos || []).length,
+    servicios:   (finalizaciones || []).length + (cancelaciones || []).length,
+    recursos:    totalRecursos,
+  });
+}
+
+// ── PESTAÑAS DEL PANEL ─────────────────────────────────
+// Antes era una sola página con 7 secciones apiladas. Se agrupan por tipo de
+// decisión: al revisar, normalmente estás en un modo ("validar empresas",
+// "despachar acuerdos"), y saltar entre ellos cuesta.
+const APR_TABS = [
+  { id: 'cuentas',     icon: '👤', label: 'Cuentas'     },
+  { id: 'solicitudes', icon: '📋', label: 'Solicitudes' },
+  { id: 'acuerdos',    icon: '🤝', label: 'Acuerdos'    },
+  { id: 'servicios',   icon: '🏁', label: 'Servicios'   },
+  { id: 'recursos',    icon: '📦', label: 'Recursos'    },
+];
+
+// Se recuerda entre re-renders: al aprobar algo la vista se recarga, y volver
+// siempre a la primera pestaña sería perder el lugar.
+let _aprTabActiva = null;
+
+function _aprTabsHTML(paneles, conteos) {
+  // Si no hay pestaña recordada (o la recordada quedó vacía), abrir la primera
+  // que tenga pendientes.
+  if (!_aprTabActiva || !conteos[_aprTabActiva]) {
+    _aprTabActiva = APR_TABS.find(t => conteos[t.id] > 0)?.id || 'cuentas';
   }
 
-  // ── UNIDADES POR APROBAR ─────────────────────────────
-  html += `<div class="apr-bloque-title" style="margin-top:28px">🚛 Unidades por aprobar <span class="apr-count">${(camiones || []).length}</span></div>`;
-  if (!camiones?.length) {
-    html += `<div class="apr-empty">Sin unidades pendientes</div>`;
-  } else {
-    html += (camiones || []).map(c => {
-      const campos = `
-        <div class="apr-op-detalle">
-          <div class="apr-op-section-title">Vehículo</div>
-          <div class="apr-op-grid">
-            <div class="apr-op-row"><span>Tipo</span><strong>${esc(c.tipo || '—')}</strong></div>
-            <div class="apr-op-row"><span>Marca</span><strong>${esc(c.marca || '—')}</strong></div>
-            <div class="apr-op-row"><span>Versión</span><strong>${esc(c.version || '—')}</strong></div>
-            <div class="apr-op-row"><span>Año</span><strong>${c.modelo_anio || '—'}</strong></div>
-            <div class="apr-op-row"><span>Color</span><strong>${esc(c.color || '—')}</strong></div>
-            <div class="apr-op-row"><span>Capacidad</span><strong>${c.capacidad ? c.capacidad + ' ton' : '—'}</strong></div>
-            <div class="apr-op-row"><span>Dimensiones</span><strong>${esc(c.dimensiones || '—')}</strong></div>
-            <div class="apr-op-row"><span>Combustible</span><strong>${esc(c.tipo_combustible || '—')}</strong></div>
-          </div>
-          <div class="apr-op-section-title">Identificación</div>
-          <div class="apr-op-grid">
-            <div class="apr-op-row"><span>Placas</span><strong>${esc(c.placas || '—')}</strong></div>
-            <div class="apr-op-row"><span>Tipo placa</span><strong>${esc(c.tipo_placa || '—')}</strong></div>
-            <div class="apr-op-row"><span>Núm. serie (NIV)</span><strong>${esc(c.num_serie || '—')}</strong></div>
-            <div class="apr-op-row"><span>Núm. motor</span><strong>${esc(c.num_motor || '—')}</strong></div>
-            <div class="apr-op-row"><span>Núm. económico</span><strong>${esc(c.num_economico || '—')}</strong></div>
-          </div>
-          <div class="apr-op-section-title">Tarjeta de circulación</div>
-          <div class="apr-op-grid">
-            <div class="apr-op-row"><span>Número TC</span><strong>${esc(c.tarjeta_circulacion || '—')}</strong></div>
-            <div class="apr-op-row"><span>Fecha expedición</span><strong>${c.fecha_expedicion_tc ? fmtFecha(c.fecha_expedicion_tc) : '—'}</strong></div>
-          </div>
-          ${c.imagen_tc ? `<a href="#" onclick="verArchivoPublico('${escJs(c.imagen_tc)}')" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:4px 0">🪪 Ver imagen TC</a>` : ''}
-          <div class="apr-op-section-title">CAAT</div>
-          <div class="apr-op-grid">
-            <div class="apr-op-row"><span>Número CAAT</span><strong>${esc(c.caat || '—')}</strong></div>
-            <div class="apr-op-row"><span>Vigencia</span><strong>${c.vigencia_caat ? fmtFecha(c.vigencia_caat) : '—'}</strong></div>
-          </div>
-          ${c.imagen_caat ? `<a href="#" onclick="verArchivoPublico('${escJs(c.imagen_caat)}')" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:4px 0">📄 Ver imagen CAAT</a>` : ''}
-          ${(c.archivos || []).length ? `<div style="margin-top:6px"><button class="btn-edit" onclick="verArchivos('${c.id}')">📎 Ver fotos/documentos</button></div>` : ''}
-        </div>`;
-      const diffHtml = _diffHtml(c, {
-        tipo:'Tipo', marca:'Marca', version:'Versión', modelo_anio:'Año',
-        color:'Color', capacidad:'Capacidad (ton)', dimensiones:'Dimensiones',
-        tipo_combustible:'Combustible', placas:'Placas', tipo_placa:'Tipo placa',
-        num_serie:'Núm. serie', num_motor:'Núm. motor', num_economico:'Núm. económico',
-        tarjeta_circulacion:'Núm. TC', fecha_expedicion_tc:'Fecha TC',
-        caat:'CAAT', vigencia_caat:'Vigencia CAAT', precio_dia:'Precio/día',
-      });
-      return `
-        <div class="apr-card" id="aprcam-${c.id}">
-          <div class="apr-card-header">
-            <div>
-              <div class="apr-tipo">${c.emoji || '🚛'} ${c.id} — ${esc(c.tipo)}</div>
-              <div class="apr-sub">Empresa: <strong>${esc(c.propietario?.nombre || '—')}</strong> · ${c.capacidad || '—'} ton</div>
-            </div>
-            ${c.es_edicion ? '<span class="apr-edicion-tag">✏️ Edición</span>' : '<span class="badge badge-revision">Pendiente</span>'}
-          </div>
-          ${diffHtml}
-          ${campos}
-          <div class="apr-actions">
-            <button class="btn-apr-aprobar"  onclick="aprobarCamion('${c.id}')">✓ Aprobar</button>
-            <button class="btn-apr-rechazar" onclick="rechazarCamion('${c.id}')">✕ Rechazar con comentarios</button>
-          </div>
-        </div>`;
-    }).join('');
-  }
+  const tabs = APR_TABS.map(t => {
+    const n = conteos[t.id] || 0;
+    return `<button class="apr-tab ${t.id === _aprTabActiva ? 'active' : ''}"
+              onclick="cambiarAprTab('${t.id}')">
+              ${t.icon} ${t.label}
+              <span class="apr-tab-count ${n ? '' : 'cero'}">${n}</span>
+            </button>`;
+  }).join('');
 
-  // ── CUSTODIOS ─────────────────────────────────────────
-  if (custodios?.length) {
-    html += `<div class="apr-bloque-title" style="margin-top:28px">👮 Custodios por aprobar <span class="apr-count">${custodios.length}</span></div>`;
-    html += custodios.map(c => {
-      const diffCustHtml = _diffHtml(c, {
-        nombre:'Nombre', tipo:'Tipo', descripcion:'Descripción',
-        disponibilidad:'Disponibilidad', precio_dia:'Precio/día',
-        certificaciones:'Certificaciones',
-      });
-      return `
-      <div class="apr-card" id="aprec-${c.id}">
-        <div class="apr-card-header">
-          <div>
-            <div class="apr-tipo">👮 ${c.id} — ${esc(c.nombre)}</div>
-            <div class="apr-sub">Empresa: <strong>${esc(c.propietario?.nombre || '—')}</strong></div>
-          </div>
-          ${c.es_edicion ? '<span class="apr-edicion-tag">✏️ Edición</span>' : '<span class="badge badge-revision">Pendiente</span>'}
-        </div>
-        ${diffCustHtml}
-        <div class="apr-op-detalle">
-          <div class="apr-op-section-title">Datos del custodio</div>
-          <div class="apr-op-grid">
-            <div class="apr-op-row"><span>Tipo</span><strong>${esc(c.tipo || '—')}</strong></div>
-            <div class="apr-op-row"><span>Disponibilidad</span><strong>${esc(c.disponibilidad || '—')}</strong></div>
-            <div class="apr-op-row"><span>Precio / día</span><strong>${c.precio_dia ? '$'+Number(c.precio_dia).toLocaleString('es-MX')+' MXN' : '—'}</strong></div>
-          </div>
-          ${c.descripcion ? `<div class="apr-op-section-title">Descripción</div><div class="apr-desc">${esc(c.descripcion)}</div>` : ''}
-          ${(c.certificaciones||[]).length ? `<div class="apr-op-section-title">Certificaciones</div><div class="pedido-chips">${(c.certificaciones||[]).map(x=>`<span class="cargo-chip">${esc(x)}</span>`).join('')}</div>` : ''}
-        </div>
-        <div class="apr-actions">
-          <button class="btn-apr-aprobar"  onclick="aprobarRecurso('custodios','${c.id}')">✓ Aprobar</button>
-          <button class="btn-apr-rechazar" onclick="rechazarRecursoCompleto('custodios','${c.id}')">✕ Rechazar con comentarios</button>
-        </div>
-      </div>`;
-    }).join('');
-  }
+  const panels = APR_TABS.map(t => `
+    <div class="apr-panel ${t.id === _aprTabActiva ? 'active' : ''}" id="apr-panel-${t.id}">
+      ${paneles[t.id] || `<div class="apr-empty">Sin pendientes en esta sección</div>`}
+    </div>`).join('');
 
-  // ── PATIOS ────────────────────────────────────────────
-  if (patios?.length) {
-    html += `<div class="apr-bloque-title" style="margin-top:28px">🏭 Patios por aprobar <span class="apr-count">${patios.length}</span></div>`;
-    html += patios.map(p => {
-      const diffPatHtml = _diffHtml(p, {
-        nombre:'Nombre', tipo:'Tipo', ubicacion:'Ubicación',
-        area_m2:'Área (m²)', capacidad_vehiculos:'Capacidad (veh.)',
-        precio_dia:'Precio/día', servicios:'Servicios',
-      });
-      return `
-      <div class="apr-card" id="aprec-${p.id}">
-        <div class="apr-card-header">
-          <div>
-            <div class="apr-tipo">🏭 ${p.id} — ${esc(p.nombre)}</div>
-            <div class="apr-sub">Empresa: <strong>${esc(p.propietario?.nombre || '—')}</strong></div>
-          </div>
-          ${p.es_edicion ? '<span class="apr-edicion-tag">✏️ Edición</span>' : '<span class="badge badge-revision">Pendiente</span>'}
-        </div>
-        ${diffPatHtml}
-        <div class="apr-op-detalle">
-          <div class="apr-op-section-title">Datos del patio</div>
-          <div class="apr-op-grid">
-            <div class="apr-op-row"><span>Tipo</span><strong>${esc(p.tipo || '—')}</strong></div>
-            <div class="apr-op-row"><span>Ubicación</span><strong>${esc(p.ubicacion || '—')}</strong></div>
-            <div class="apr-op-row"><span>Área</span><strong>${p.area_m2 ? p.area_m2+' m²' : '—'}</strong></div>
-            <div class="apr-op-row"><span>Capacidad</span><strong>${p.capacidad_vehiculos ? p.capacidad_vehiculos+' veh.' : '—'}</strong></div>
-            <div class="apr-op-row"><span>Precio / día</span><strong>${p.precio_dia ? '$'+Number(p.precio_dia).toLocaleString('es-MX')+' MXN' : '—'}</strong></div>
-          </div>
-          ${(p.servicios||[]).length ? `<div class="apr-op-section-title">Servicios</div><div class="pedido-chips">${(p.servicios||[]).map(x=>`<span class="cargo-chip">${esc(x)}</span>`).join('')}</div>` : ''}
-        </div>
-        <div class="apr-actions">
-          <button class="btn-apr-aprobar"  onclick="aprobarRecurso('patios','${p.id}')">✓ Aprobar</button>
-          <button class="btn-apr-rechazar" onclick="rechazarRecursoCompleto('patios','${p.id}')">✕ Rechazar con comentarios</button>
-        </div>
-      </div>`;
-    }).join('');
-  }
+  return `<div class="apr-tabs">${tabs}</div>${panels}`;
+}
 
-  // ── LAVADOS ───────────────────────────────────────────
-  if (lavados?.length) {
-    html += `<div class="apr-bloque-title" style="margin-top:28px">🚿 Lavados por aprobar <span class="apr-count">${lavados.length}</span></div>`;
-    html += lavados.map(l => {
-      const diffLavHtml = _diffHtml(l, {
-        nombre:'Nombre', ubicacion:'Ubicación', capacidad:'Cap. simultánea',
-        horario:'Horario', precio_lavado:'Precio',
-        tipos_vehiculo:'Tipos de vehículo', tipos_lavado:'Tipos de lavado',
-        descripcion:'Descripción',
-      });
-      return `
-      <div class="apr-card" id="aprec-${l.id}">
-        <div class="apr-card-header">
-          <div>
-            <div class="apr-tipo">🚿 ${l.id} — ${esc(l.nombre)}</div>
-            <div class="apr-sub">Empresa: <strong>${esc(l.propietario?.nombre || '—')}</strong></div>
-          </div>
-          ${l.es_edicion ? '<span class="apr-edicion-tag">✏️ Edición</span>' : '<span class="badge badge-revision">Pendiente</span>'}
-        </div>
-        ${diffLavHtml}
-        <div class="apr-op-detalle">
-          <div class="apr-op-section-title">Datos del servicio</div>
-          <div class="apr-op-grid">
-            <div class="apr-op-row"><span>Ubicación</span><strong>${esc(l.ubicacion || '—')}</strong></div>
-            <div class="apr-op-row"><span>Capacidad simultánea</span><strong>${l.capacidad || '—'}</strong></div>
-            <div class="apr-op-row"><span>Horario</span><strong>${esc(l.horario || '—')}</strong></div>
-            <div class="apr-op-row"><span>Precio</span><strong>${l.precio_lavado ? '$'+Number(l.precio_lavado).toLocaleString('es-MX')+' MXN' : '—'}</strong></div>
-          </div>
-          ${(l.tipos_vehiculo||[]).length ? `<div class="apr-op-section-title">Tipos de vehículo</div><div class="pedido-chips">${(l.tipos_vehiculo||[]).map(x=>`<span class="cargo-chip">${esc(x)}</span>`).join('')}</div>` : ''}
-          ${(l.tipos_lavado||[]).length ? `<div class="apr-op-section-title">Tipos de lavado</div><div class="pedido-chips">${(l.tipos_lavado||[]).map(x=>`<span class="cargo-chip">${esc(x)}</span>`).join('')}</div>` : ''}
-          ${l.descripcion ? `<div class="apr-desc" style="margin-top:6px">${esc(l.descripcion)}</div>` : ''}
-        </div>
-        <div class="apr-actions">
-          <button class="btn-apr-aprobar"  onclick="aprobarRecurso('lavados','${l.id}')">✓ Aprobar</button>
-          <button class="btn-apr-rechazar" onclick="rechazarRecursoCompleto('lavados','${l.id}')">✕ Rechazar con comentarios</button>
-        </div>
-      </div>`;
-    }).join('');
-  }
-  } // fin if(false) — secciones legacy reemplazadas por empresa
-
-  content.innerHTML = html;
+function cambiarAprTab(id) {
+  _aprTabActiva = id;
+  document.querySelectorAll('.apr-tab').forEach(t =>
+    t.classList.toggle('active', t.getAttribute('onclick')?.includes(`'${id}'`)));
+  document.querySelectorAll('.apr-panel').forEach(p =>
+    p.classList.toggle('active', p.id === `apr-panel-${id}`));
 }
 
 function toggleEmpresaApr(empId) {

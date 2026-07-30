@@ -1888,3 +1888,36 @@ body.light .cobro-pagado    { color: #15803d; }
   border-radius: 10px; padding: 10px 14px; margin-bottom: 14px;
   font-size: 0.82rem; line-height: 1.45; color: var(--text-main);
 }
+
+/* ── PESTAÑAS DEL PANEL DE APROBACIONES ───────────────── */
+.apr-tabs {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding-bottom: 14px; margin-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.apr-tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 15px; border-radius: 10px; min-height: 40px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-muted); font-size: 0.85rem; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+  transition: background .18s, border-color .18s, color .18s;
+}
+.apr-tab:hover  { border-color: var(--accent); color: var(--text-main); }
+.apr-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.apr-tab-count {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px;
+  padding: 0 6px; border-radius: 10px; font-size: 0.72rem; font-weight: 700;
+  background: rgba(239,68,68,0.15); color: var(--danger);
+  border: 1px solid rgba(239,68,68,0.35);
+}
+/* En cero no debe llamar la atención: no hay nada que hacer ahí */
+.apr-tab-count.cero { background: rgba(120,120,120,0.12); color: var(--text-muted); border-color: var(--border); }
+.apr-tab.active .apr-tab-count      { background: rgba(255,255,255,0.25); color: #fff; border-color: transparent; }
+.apr-tab.active .apr-tab-count.cero { background: rgba(255,255,255,0.2);  color: #fff; }
+
+.apr-panel { display: none; }
+.apr-panel.active { display: block; }
+/* La primera sección de un panel no necesita el margen superior que traen
+   los títulos pensados para ir apilados uno tras otro. */
+.apr-panel > .apr-bloque-title:first-child { margin-top: 0 !important; }
