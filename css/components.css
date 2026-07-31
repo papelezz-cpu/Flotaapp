@@ -2017,3 +2017,111 @@ body.light .pref-error { color: #b3261e; }
   cursor: pointer;
   text-decoration: underline;
 }
+
+/* ── SOLICITUD POR TIPO DE CARGA ─────────────────────────
+   El cliente elige QUÉ mueve, no qué camión quiere. */
+.carga-tipos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.carga-tipo {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 12px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+  cursor: pointer;
+  font: inherit;
+  color: var(--text-main);
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  min-height: 74px;
+}
+.carga-tipo:hover { border-color: var(--accent); }
+.carga-tipo:active { transform: scale(0.98); }
+.carga-tipo.active {
+  border-color: var(--accent);
+  background: rgba(78,142,247,0.1);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.carga-tipo-icon  { font-size: 1.35rem; line-height: 1; }
+.carga-tipo-label {
+  font-size: 0.76rem; font-weight: 700; text-align: center; line-height: 1.2;
+  /* "Sobredimensionada" y "Contenerizada" no caben en una línea a 320-375px:
+     sin esto se salían de la tarjeta y quedaban cortadas. */
+  overflow-wrap: anywhere; hyphens: auto; max-width: 100%;
+}
+
+.carga-desc  { font-size: 0.83rem; color: var(--text-muted); margin-bottom: 4px; line-height: 1.45; }
+.carga-aviso {
+  font-size: 0.81rem; line-height: 1.45;
+  background: rgba(245,158,11,0.13);
+  border-left: 3px solid var(--amber);
+  border-radius: 4px;
+  padding: 9px 12px;
+  margin: 8px 0 4px;
+}
+
+.carga-radios { display: flex; flex-wrap: wrap; gap: 8px; }
+.carga-radio {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 13px;
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.carga-radio input[type=radio] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.carga-radio:has(input:checked) { border-color: var(--accent); background: rgba(78,142,247,0.09); }
+
+.carga-switch {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 11px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+.carga-switch:has(input:checked) { border-color: var(--accent); background: rgba(78,142,247,0.07); }
+.carga-switch input[type=checkbox] {
+  width: 19px; height: 19px; min-width: 19px; margin: 1px 0 0;
+  accent-color: var(--accent); cursor: pointer;
+}
+.carga-switch span   { display: flex; flex-direction: column; gap: 2px; }
+.carga-switch small  { color: var(--text-muted); font-size: 0.78rem; }
+
+.campo-nota {
+  display: block; margin-top: 5px;
+  font-size: 0.75rem; color: var(--text-muted); line-height: 1.4;
+}
+
+/* Recomendación del sistema */
+.np-reco {
+  margin-top: 16px;
+  border: 1.5px solid var(--accent);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: rgba(78,142,247,0.07);
+}
+.np-reco--incompleta { border-color: var(--border); background: var(--surface); }
+.np-reco-head  { display: flex; align-items: center; gap: 12px; }
+.np-reco-icon  { font-size: 1.7rem; line-height: 1; }
+.np-reco-label {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-muted); font-weight: 700;
+}
+.np-reco-tipo  { font-size: 1.02rem; font-weight: 700; line-height: 1.3; }
+.np-reco-razon { font-size: 0.82rem; color: var(--text-muted); margin-top: 8px; line-height: 1.45; }
+.np-reco-cambiar {
+  background: none; border: none; padding: 0; margin-top: 10px;
+  font: inherit; font-size: 0.82rem; font-weight: 700;
+  color: var(--accent); cursor: pointer; text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .carga-tipos { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .carga-tipo { padding: 10px 4px; min-height: 82px; }
+  .carga-tipo-label { font-size: 0.66rem; }
+  .carga-tipo-icon  { font-size: 1.2rem; }
+}

@@ -24,7 +24,7 @@
   <!-- Estilos -->
   <link rel="stylesheet" href="css/base.css?v=7">
   <link rel="stylesheet" href="css/layout.css?v=4">
-  <link rel="stylesheet" href="css/components.css?v=24">
+  <link rel="stylesheet" href="css/components.css?v=26">
   <link rel="stylesheet" href="css/login.css?v=5">
   <link rel="stylesheet" href="css/detalle.css?v=2">
   <link rel="stylesheet" href="css/theme.css?v=6">
@@ -1279,7 +1279,7 @@
     <div id="np-plantilla-aviso" class="np-plant-aviso" style="display:none"></div>
 
     <!-- Tipo de servicio -->
-    <div class="form-group">
+    <div class="form-group" id="np-tipo-wrap-servicio">
       <label>Tipo de servicio *</label>
       <select id="np-tipo" onchange="actualizarSubtipoPedido()"></select>
     </div>
@@ -1288,44 +1288,129 @@
 
     <!-- ══ CAMPOS CAMIÓN ═══════════════════════════════ -->
     <div id="np-group-camion">
-      <div class="np-section-title">📦 Información de la carga</div>
-      <div class="admin-grid" style="gap:12px">
-        <div class="form-group" id="np-cap-group">
-          <label>Capacidad mínima requerida (ton)</label>
-          <input type="number" id="np-cap" min="0" placeholder="Ej. 20">
+      <div class="np-section-title">📦 ¿Qué vas a mover?</div>
+      <div class="carga-tipos" id="np-carga-tipos"></div>
+      <div class="carga-hint" id="np-carga-hint"></div>
+
+      <!-- Campos que cambian según el tipo de carga -->
+      <div id="np-carga-campos">
+        <div class="admin-grid" style="gap:12px">
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Descripción de la mercancía *</label>
+            <input type="text" id="np-carga" placeholder="Ej. Electrónicos, refacciones automotrices">
+          </div>
+
+          <!-- Contenedores: contenerizada y general -->
+          <div class="form-group carga-cond" data-cond="contenedores" style="grid-column:1/-1">
+            <label>¿Cuántos contenedores?</label>
+            <div class="carga-radios" id="np-num-cont-wrap">
+              <label class="carga-radio"><input type="radio" name="np-num-cont" value="1" checked onchange="actualizarFormularioCarga()"> 1 contenedor</label>
+              <label class="carga-radio"><input type="radio" name="np-num-cont" value="2" onchange="actualizarFormularioCarga()"> 2 (doble remolque)</label>
+            </div>
+          </div>
+          <div class="form-group carga-cond" data-cond="cont1">
+            <label id="np-cont1-label">Contenedor</label>
+            <select id="np-contenedor" onchange="actualizarFormularioCarga()"></select>
+          </div>
+          <div class="form-group carga-cond" data-cond="cont1">
+            <label>Peso del contenedor 1 (ton)</label>
+            <input type="number" id="np-cont1-peso" min="0" step="0.1" placeholder="Ej. 22" oninput="actualizarRecomendacion()">
+          </div>
+          <div class="form-group carga-cond" data-cond="cont2">
+            <label>Contenedor 2</label>
+            <select id="np-contenedor-2" onchange="actualizarFormularioCarga()"></select>
+          </div>
+          <div class="form-group carga-cond" data-cond="cont2">
+            <label>Peso del contenedor 2 (ton)</label>
+            <input type="number" id="np-cont2-peso" min="0" step="0.1" placeholder="Ej. 18" oninput="actualizarRecomendacion()">
+          </div>
+
+          <!-- Peso: siempre -->
+          <div class="form-group carga-cond" data-cond="peso">
+            <label>Peso real de la carga (ton) *</label>
+            <input type="number" id="np-peso" min="0" step="0.1" placeholder="Ej. 15.5" oninput="actualizarRecomendacion()">
+            <small class="campo-nota">⚖️ Considera el peso de la tara — contenedor, tarimas y embalaje cuentan.</small>
+          </div>
+
+          <!-- Bultos: solo carga suelta -->
+          <div class="form-group carga-cond" data-cond="bultos">
+            <label>Número de bultos / pallets *</label>
+            <input type="number" id="np-bultos" min="0" placeholder="Ej. 48">
+          </div>
+
+          <!-- Sobredimensionada -->
+          <div class="form-group carga-cond" data-cond="dim">
+            <label>Largo (m) *</label>
+            <input type="number" id="np-largo" min="0" step="0.01" placeholder="Ej. 12.5" oninput="actualizarRecomendacion()">
+          </div>
+          <div class="form-group carga-cond" data-cond="dim">
+            <label>Ancho (m) *</label>
+            <input type="number" id="np-ancho" min="0" step="0.01" placeholder="Ej. 3.2" oninput="actualizarRecomendacion()">
+          </div>
+          <div class="form-group carga-cond" data-cond="dim">
+            <label>Alto (m) *</label>
+            <input type="number" id="np-alto" min="0" step="0.01" placeholder="Ej. 4.5" oninput="actualizarRecomendacion()">
+          </div>
+
+          <!-- Hazmat -->
+          <div class="form-group carga-cond" data-cond="hazmat">
+            <label>Clase de riesgo *</label>
+            <select id="np-hazmat-clase">
+              <option value="">— Selecciona —</option>
+              <option value="1">1 — Explosivos</option>
+              <option value="2">2 — Gases</option>
+              <option value="3">3 — Líquidos inflamables</option>
+              <option value="4">4 — Sólidos inflamables</option>
+              <option value="5">5 — Oxidantes y peróxidos</option>
+              <option value="6">6 — Tóxicos e infecciosos</option>
+              <option value="7">7 — Radiactivos</option>
+              <option value="8">8 — Corrosivos</option>
+              <option value="9">9 — Misceláneos</option>
+            </select>
+          </div>
+          <div class="form-group carga-cond" data-cond="hazmat">
+            <label>Número UN *</label>
+            <input type="text" id="np-hazmat-un" placeholder="Ej. UN1203" maxlength="12">
+          </div>
         </div>
-        <div class="form-group" id="np-carga-group">
-          <label>Tipo de carga *</label>
-          <input type="text" id="np-carga" placeholder="Ej. Electrónicos, Maquinaria pesada">
-        </div>
-        <div class="form-group">
-          <label>Peso real de la carga (ton)</label>
-          <input type="number" id="np-peso" min="0" step="0.1" placeholder="Ej. 15.5">
-        </div>
-        <div class="form-group">
-          <label>Número de bultos / pallets</label>
-          <input type="number" id="np-bultos" min="0" placeholder="Ej. 48">
-        </div>
-        <div class="form-group">
-          <label>Tipo de contenedor <span style="font-weight:400;color:var(--text-muted)">(si aplica)</span></label>
-          <select id="np-contenedor">
-            <option value="">— No aplica —</option>
-            <option>20' Standard</option>
-            <option>40' Standard</option>
-            <option>40' High Cube</option>
-            <option>20' Refrigerado (Reefer)</option>
-            <option>40' Refrigerado (Reefer)</option>
-            <option>Open Top</option>
-            <option>Flat Rack</option>
-            <option>Tank Container</option>
-          </select>
+
+        <!-- Refrigeración: atributo, no tipo de carga -->
+        <div class="carga-cond" data-cond="refri">
+          <label class="carga-switch">
+            <input type="checkbox" id="np-refrigerado" onchange="actualizarFormularioCarga()">
+            <span><strong>Requiere refrigeración</strong><small>Cadena de frío durante todo el traslado</small></span>
+          </label>
+          <div class="admin-grid" id="np-temp-wrap" style="gap:12px;display:none;margin-top:10px">
+            <div class="form-group">
+              <label>Temperatura mínima (°C) *</label>
+              <input type="number" id="np-temp-min" step="0.5" placeholder="Ej. -18">
+            </div>
+            <div class="form-group">
+              <label>Temperatura máxima (°C) *</label>
+              <input type="number" id="np-temp-max" step="0.5" placeholder="Ej. -12">
+            </div>
+          </div>
         </div>
       </div>
-      <div class="np-check-row">
-        <label class="np-check"><input type="checkbox" id="np-peligrosa"> Carga peligrosa / materiales peligrosos</label>
-        <label class="np-check"><input type="checkbox" id="np-temp"> Requiere temperatura controlada</label>
-        <label class="np-check"><input type="checkbox" id="np-seguro"> Requiere seguro de carga</label>
-        <label class="np-check"><input type="checkbox" id="np-factura"> Requiere factura</label>
+
+      <!-- Recomendación del sistema -->
+      <div class="np-reco" id="np-reco" style="display:none">
+        <div class="np-reco-head">
+          <span class="np-reco-icon">🚛</span>
+          <div>
+            <div class="np-reco-label">Unidad recomendada</div>
+            <div class="np-reco-tipo" id="np-reco-tipo">—</div>
+          </div>
+        </div>
+        <div class="np-reco-razon" id="np-reco-razon"></div>
+        <button type="button" class="np-reco-cambiar" id="np-reco-cambiar" onclick="toggleCambiarUnidad()">
+          Prefiero elegir otra unidad
+        </button>
+        <div class="form-group" id="np-tipo-wrap" style="display:none;margin-top:10px">
+          <label>Tipo de unidad</label>
+          <select id="np-tipo-camion" onchange="actualizarRecomendacion(true)"></select>
+          <small class="campo-nota">Cambiarlo hace que solo las empresas con esa unidad reciban tu solicitud.</small>
+        </div>
       </div>
 
       <div class="np-section-title">🗺️ Ruta</div>
@@ -2418,8 +2503,8 @@
 <script src="js/recursos.js?v=11"></script>
 <script src="js/reservaciones.js?v=33"></script>
 <script src="js/modal.js?v=13"></script>
-<script src="js/pedidos.js?v=46"></script>
-<script src="js/plantillas.js?v=1"></script>
+<script src="js/pedidos.js?v=47"></script>
+<script src="js/plantillas.js?v=2"></script>
 <script src="js/aprobaciones.js?v=35"></script>
 <script src="js/admin.js?v=28"></script>
 <script src="js/operadores.js?v=10"></script>

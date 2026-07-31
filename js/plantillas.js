@@ -9,21 +9,28 @@ let _plantillas = [];
 // Campos que viajan entre el formulario y la plantilla.
 // [idDelCampo, columna, tipo] — el tipo define cómo leer/escribir el valor.
 const PLANTILLA_CAMPOS = [
-  ['np-tipo',             'tipo_camion',      'txt'],
+  // np-tipo ya no existe en el flujo de camión: la unidad la calcula el
+  // sistema. La categoría de carga se restaura aparte, en usarPlantilla().
   ['np-carga',            'tipo_carga',       'txt'],
-  ['np-cap',              'capacidad_min',    'num'],
   ['np-peso',             'peso_carga',       'num'],
   ['np-bultos',           'num_bultos',       'num'],
-  ['np-contenedor',       'tipo_contenedor',  'txt'],
+  ['np-contenedor',       'contenedor_1_tipo','txt'],
+  ['np-cont1-peso',       'contenedor_1_peso','num'],
+  ['np-contenedor-2',     'contenedor_2_tipo','txt'],
+  ['np-cont2-peso',       'contenedor_2_peso','num'],
+  ['np-largo',            'largo_m',          'num'],
+  ['np-ancho',            'ancho_m',          'num'],
+  ['np-alto',             'alto_m',           'num'],
+  ['np-hazmat-clase',     'hazmat_clase',     'txt'],
+  ['np-hazmat-un',        'hazmat_un',        'txt'],
+  ['np-refrigerado',      'refrigerado',      'bool'],
+  ['np-temp-min',         'temp_min',         'num'],
+  ['np-temp-max',         'temp_max',         'num'],
   ['np-origen',           'origen',           'txt'],
   ['np-destino',          'destino',          'txt'],
   ['np-hora',             'hora_carga',       'txt'],
   ['np-contacto-nombre',  'contacto_nombre',  'txt'],
   ['np-contacto-tel',     'contacto_tel',     'txt'],
-  ['np-peligrosa',        'carga_peligrosa',  'bool'],
-  ['np-temp',             'temp_controlada',  'bool'],
-  ['np-seguro',           'requiere_seguro',  'bool'],
-  ['np-factura',          'requiere_factura', 'bool'],
   ['np-precio',           'precio_cliente',   'num'],
   ['np-plazo-pago',       'plazo_pago',       'txt'],
   ['np-desc',             'descripcion',      'txt'],
@@ -77,6 +84,16 @@ async function guardarPlantillaDesdeFormulario() {
     else                      fila[col] = el.value?.trim() || null;
   });
 
+  // La categoría de carga y el número de contenedores no son inputs con id
+  // fijo (una es estado del módulo, el otro un radio), así que van aparte.
+  if (typeof _npCategoria !== 'undefined') fila.categoria_carga = _npCategoria;
+  fila.num_contenedores = Number(document.querySelector('input[name="np-num-cont"]:checked')?.value) || null;
+  // Se guarda la unidad que el sistema propuso, para que la plantilla siga
+  // sirviendo aunque cambien las reglas de recomendación.
+  if (typeof _recomendarCamion === 'function' && typeof _cargaDatosActuales === 'function') {
+    fila.tipo_camion = _npUnidadManual || _recomendarCamion(_cargaDatosActuales()).tipo || null;
+  }
+
   const { error } = await sb.from('plantillas_pedido').insert(fila);
   if (error) {
     // El trigger de la BD limita a 12; ese mensaje sí le sirve al usuario.
@@ -107,28 +124,35 @@ async function usarPlantilla(id) {
     else                      el.value = val;
   });
 
-  // Si el tipo guardado ya no existe en el catálogo (por ejemplo si se renombró
-  // una opción), el select quedaría vacío y se podría publicar sin tipo. Se cae
-  // a la primera opción y se avisa, en vez de dejarlo en blanco.
+  // La categoría de carga manda el resto del formulario, así que se restaura
+  // antes que nada. Si la plantilla es vieja (de cuando se guardaba el tipo de
+  // camión y no la carga), se cae a General y el sistema recalcula la unidad:
+  // es mejor recomendarle algo coherente con el peso que restaurar un tipo que
+  // quizá ya ni exista.
   let tipoNoDisponible = false;
-  const selTipo = document.getElementById('np-tipo');
-  if (selTipo) {
-    if (p.tipo_camion && [...selTipo.options].some(o => o.value === p.tipo_camion)) {
-      selTipo.value = p.tipo_camion;
-    } else if (!selTipo.value && selTipo.options.length) {
-      selTipo.value = selTipo.options[0].value;
-      tipoNoDisponible = !!p.tipo_camion;
+  if (typeof _npCategoria !== 'undefined') {
+    if (p.categoria_carga && NP_CARGA[p.categoria_carga]) {
+      _npCategoria = p.categoria_carga;
+    } else {
+      _npCategoria = 'General';
+      tipoNoDisponible = !!p.tipo_camion && !p.categoria_carga;
     }
+    _npUnidadManual = null;
   }
+
+  // Número de contenedores, que es un radio y no entra en PLANTILLA_CAMPOS.
+  const nCont = Number(p.num_contenedores) || 1;
+  const radio = document.querySelector(`input[name="np-num-cont"][value="${nCont >= 2 ? 2 : 1}"]`);
+  if (radio) radio.checked = true;
+
   actualizarSubtipoPedido();
-  if (typeof _renderInfoCapacidad === 'function') _renderInfoCapacidad(selTipo?.value);
 
   // No se precargan fechas a propósito: son lo que el cliente debe elegir.
   const aviso = document.getElementById('np-plantilla-aviso');
   if (aviso) {
     aviso.innerHTML = `✨ Precargado desde <strong>${esc(p.nombre)}</strong>. Solo elige las fechas y revisa los datos.`
       + (tipoNoDisponible
-          ? `<br><span style="color:var(--amber)">⚠ El tipo de servicio guardado (${esc(p.tipo_camion)}) ya no está disponible. Elige uno.</span>`
+          ? `<br><span style="color:var(--amber)">⚠ Esta solicitud frecuente se guardó con el formulario anterior. Revisa el tipo de carga: el sistema recalculó la unidad.</span>`
           : '');
     aviso.style.display = '';
   }

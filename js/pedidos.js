@@ -726,6 +726,13 @@ function _renderInfoCapacidad(tipo) {
 
 function actualizarSubtipoPedido() {
   const val = document.getElementById('np-tipo')?.value || '';
+  // Con el selector de servicio oculto (flujo de camión) no hay nada que
+  // conmutar: el grupo de camión ya está visible y la unidad la calcula
+  // actualizarRecomendacion() desde la carga.
+  if (document.getElementById('np-tipo-wrap-servicio')?.style.display === 'none') {
+    actualizarFormularioCarga();
+    return;
+  }
   const esLavado   = val.startsWith('Lavado') || val === 'Desinfección';
   const esCustodio = val.startsWith('Custodio') || val === 'Supervisión remota';
   const esPatio    = val.startsWith('Patio') || val === 'Bodega';
@@ -739,6 +746,283 @@ function actualizarSubtipoPedido() {
 
   if (esCamion) _renderInfoCapacidad(val);
   else { const e = g('np-info-cap'); if (e) { e.style.display='none'; e.innerHTML=''; } }
+}
+
+// ── SOLICITUD POR TIPO DE CARGA ─────────────────────────
+// El cliente describe su carga y el sistema le propone la unidad. Antes tenía
+// que elegir "Full porta contenedor 40/20" — o sea, saber de camiones.
+//
+// `campos` lista qué secciones del formulario se muestran (los data-cond del
+// HTML). El resto se oculta, así nadie ve "número de bultos" para un
+// contenedor ni "clase de riesgo" para carga general.
+const NP_CARGA = {
+  General: {
+    icon: '📦', label: 'General',
+    desc: 'Mercancía normal, paletizada o en cajas, que ocupa toda la unidad.',
+    campos: ['peso', 'contenedores', 'refri'],
+  },
+  Consolidada: {
+    icon: '🧩', label: 'Consolidada',
+    desc: 'Mercancía variada en un mismo viaje, con unidad completa.',
+    campos: ['peso', 'refri'],
+  },
+  Suelta: {
+    icon: '📮', label: 'Suelta',
+    desc: 'Bultos o pallets sueltos, sin contenedor.',
+    campos: ['peso', 'bultos', 'refri'],
+  },
+  Sobredimensionada: {
+    icon: '🏗️', label: 'Sobredimensionada',
+    desc: 'Excede medidas o peso estándar. Puede requerir permiso especial.',
+    campos: ['peso', 'dim'],
+    aviso: '⚠️ La carga sobredimensionada puede requerir permiso de la SCT, escoltas y horarios restringidos. La empresa lo considerará en su oferta.',
+  },
+  Hazmat: {
+    icon: '☣️', label: 'Hazmat',
+    desc: 'Materiales peligrosos. Requiere unidad y operador certificados.',
+    campos: ['peso', 'hazmat'],
+    aviso: '⚠️ Necesitarás entregar la hoja de seguridad (HDS) del material al operador. Solo empresas con permiso HAZMAT podrán ofertar.',
+  },
+  Contenerizada: {
+    icon: '🚢', label: 'Contenerizada',
+    desc: 'Carga dentro de contenedor marítimo.',
+    campos: ['peso', 'contenedores', 'refri'],
+  },
+};
+
+const NP_CONTENEDORES = [
+  "20' Standard", "40' Standard", "40' High Cube",
+  "20' Refrigerado (Reefer)", "40' Refrigerado (Reefer)",
+  'Open Top', 'Flat Rack', 'Tank Container',
+];
+
+// Umbrales de peso para recomendar la unidad, en toneladas.
+// SUPUESTO: son valores de referencia, no confirmados con la operación.
+// Si hay que moverlos, se cambian aquí y nada más.
+const NP_PESO_UNIDAD = [
+  { max: 1.5, tipo: 'Camioneta 1.5 ton caja seca' },
+  { max: 3.5, tipo: 'Camioneta 3.5 ton caja seca' },
+  { max: 8,   tipo: 'Rabón' },
+  { max: 20,  tipo: 'Torton caja seca' },
+  { max: Infinity, tipo: 'Full' },
+];
+
+// Sobredimensionada: por encima de estos valores ya no basta una plataforma.
+const NP_ALTO_LOWBOY = 4.25;   // metros
+const NP_PESO_LOWBOY = 30;     // toneladas
+
+// Devuelve { tipo, razon } — la unidad que se propone y por qué.
+// El "por qué" no es adorno: si el cliente no entiende de dónde salió la
+// recomendación, no va a confiar en ella y la va a cambiar a lo loco.
+function _recomendarCamion(d) {
+  const cat  = d.categoria || 'General';
+  const peso = Number(d.peso) || 0;
+
+  if (cat === 'Hazmat') {
+    return { tipo: 'HAZMAT', razon: 'Los materiales peligrosos solo pueden moverse en unidades con permiso HAZMAT.' };
+  }
+
+  if (cat === 'Sobredimensionada') {
+    const alto = Number(d.alto) || 0;
+    if (alto > NP_ALTO_LOWBOY || peso > NP_PESO_LOWBOY) {
+      return {
+        tipo:  'Lowboy',
+        razon: alto > NP_ALTO_LOWBOY
+          ? `Con ${alto} m de alto necesitas una cama baja para no exceder el gálibo de puentes.`
+          : `Con ${peso} ton necesitas una cama baja por distribución de peso.`,
+      };
+    }
+    return { tipo: 'Plataforma de 3 ejes (sobrepeso)', razon: 'Carga que excede medidas estándar pero entra en plataforma reforzada.' };
+  }
+
+  const nCont = Number(d.numContenedores) || 0;
+  if (cat === 'Contenerizada' || nCont > 0) {
+    if (nCont >= 2) {
+      return { tipo: 'Full porta contenedor 40/20', razon: 'Dos contenedores requieren doble remolque (full).' };
+    }
+    return { tipo: 'Sencillo porta contenedor 40/20', razon: 'Un contenedor va en un sencillo porta contenedor.' };
+  }
+
+  const fila = NP_PESO_UNIDAD.find(f => peso <= f.max) || NP_PESO_UNIDAD[NP_PESO_UNIDAD.length - 1];
+  if (!peso) {
+    return { tipo: null, razon: 'Captura el peso de la carga para calcular la unidad.' };
+  }
+  return {
+    tipo:  fila.tipo,
+    razon: `Para ${peso} ton de carga ${cat.toLowerCase()}, esta unidad es la que corresponde.`,
+  };
+}
+
+let _npCategoria = 'General';
+let _npUnidadManual = null;   // si el cliente eligió otra unidad, se respeta
+
+// ¿Este grupo de campos aplica a la categoría elegida? Si el flujo no es el
+// de camión (custodio, patio, lavado) nada de esto aplica.
+function _campoAplica(cond) {
+  if (document.getElementById('np-tipo-wrap-servicio')?.style.display !== 'none') return false;
+  return (NP_CARGA[_npCategoria] || NP_CARGA.General).campos.includes(cond);
+}
+
+function _cargaDatosActuales() {
+  const v  = id => document.getElementById(id)?.value?.trim() || '';
+  const vn = id => { const x = parseFloat(v(id)); return isNaN(x) ? null : x; };
+  const nCont = _npCategoria === 'Contenerizada' || _npCategoria === 'General'
+    ? Number(document.querySelector('input[name="np-num-cont"]:checked')?.value || 0)
+    : 0;
+  // En "General" los contenedores son opcionales: solo cuentan si eligió tipo.
+  const contElegido = !!v('np-contenedor');
+  return {
+    categoria: _npCategoria,
+    peso:      vn('np-peso'),
+    alto:      vn('np-alto'),
+    numContenedores: (_npCategoria === 'Contenerizada' || contElegido) ? nCont : 0,
+  };
+}
+
+function _pintarTiposCarga() {
+  const cont = document.getElementById('np-carga-tipos');
+  if (!cont) return;
+  cont.innerHTML = Object.entries(NP_CARGA).map(([k, c]) => `
+    <button type="button" class="carga-tipo${k === _npCategoria ? ' active' : ''}"
+            data-cat="${k}" onclick="seleccionarCategoriaCarga('${k}')">
+      <span class="carga-tipo-icon">${c.icon}</span>
+      <span class="carga-tipo-label">${esc(c.label)}</span>
+    </button>`).join('');
+}
+
+function _poblarSelectsContenedor() {
+  const opts = '<option value="">— Selecciona —</option>' +
+    NP_CONTENEDORES.map(c => `<option>${c}</option>`).join('');
+  ['np-contenedor', 'np-contenedor-2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = opts;
+  });
+}
+
+// Al cambiar de categoría hay que BORRAR lo que ya no aplica, no solo
+// ocultarlo: un campo escondido conserva su valor y sigue contando. Elegir
+// contenedor, cambiar a "Suelta" y publicar guardaba un contenedor fantasma;
+// y dejar marcado "refrigerado" en una categoría que ya no lo muestra
+// bloqueaba el guardado pidiendo una temperatura que nadie podía ver.
+function _limpiarCamposCarga() {
+  const need = new Set((NP_CARGA[_npCategoria] || NP_CARGA.General).campos);
+  const set  = (id, val = '') => { const el = document.getElementById(id); if (el) el.value = val; };
+
+  if (!need.has('bultos')) set('np-bultos');
+  if (!need.has('dim'))    ['np-largo', 'np-ancho', 'np-alto'].forEach(id => set(id));
+  if (!need.has('hazmat')) ['np-hazmat-clase', 'np-hazmat-un'].forEach(id => set(id));
+  if (!need.has('refri')) {
+    const chk = document.getElementById('np-refrigerado');
+    if (chk) chk.checked = false;
+    ['np-temp-min', 'np-temp-max'].forEach(id => set(id));
+  }
+  if (!need.has('contenedores')) {
+    ['np-contenedor', 'np-contenedor-2', 'np-cont1-peso', 'np-cont2-peso'].forEach(id => set(id));
+    const r1 = document.querySelector('input[name="np-num-cont"][value="1"]');
+    if (r1) r1.checked = true;
+  }
+}
+
+function seleccionarCategoriaCarga(cat) {
+  if (!NP_CARGA[cat]) return;
+  _npCategoria = cat;
+  _npUnidadManual = null;
+  _limpiarCamposCarga();
+  actualizarFormularioCarga();
+}
+
+// Muestra u oculta los campos según la categoría elegida.
+function actualizarFormularioCarga() {
+  const cfg = NP_CARGA[_npCategoria] || NP_CARGA.General;
+
+  document.querySelectorAll('#np-carga-tipos .carga-tipo').forEach(b =>
+    b.classList.toggle('active', b.dataset.cat === _npCategoria));
+
+  const hint = document.getElementById('np-carga-hint');
+  if (hint) {
+    hint.innerHTML = cfg.aviso
+      ? `<div class="carga-desc">${esc(cfg.desc)}</div><div class="carga-aviso">${esc(cfg.aviso)}</div>`
+      : `<div class="carga-desc">${esc(cfg.desc)}</div>`;
+  }
+
+  const activos = new Set(cfg.campos);
+  const nCont = Number(document.querySelector('input[name="np-num-cont"]:checked')?.value || 1);
+  const contElegido = !!document.getElementById('np-contenedor')?.value;
+  const mostrarCont = activos.has('contenedores');
+
+  document.querySelectorAll('#np-carga-campos .carga-cond').forEach(el => {
+    const cond = el.dataset.cond;
+    let ver;
+    if (cond === 'cont1')      ver = mostrarCont;
+    else if (cond === 'cont2') ver = mostrarCont && nCont >= 2 && contElegido;
+    else                       ver = activos.has(cond);
+    el.style.display = ver ? '' : 'none';
+  });
+
+  // El segundo contenedor solo tiene sentido si ya eligió el primero.
+  const wrapNum = document.querySelector('[data-cond="contenedores"]');
+  if (wrapNum) wrapNum.style.display = mostrarCont ? '' : 'none';
+
+  const tempWrap = document.getElementById('np-temp-wrap');
+  if (tempWrap) tempWrap.style.display = document.getElementById('np-refrigerado')?.checked ? '' : 'none';
+
+  const lbl = document.getElementById('np-cont1-label');
+  if (lbl) lbl.textContent = nCont >= 2 ? 'Contenedor 1' : 'Contenedor';
+
+  // Si volvió a un solo contenedor, el segundo no debe quedar guardado.
+  if (nCont < 2) {
+    ['np-contenedor-2', 'np-cont2-peso'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+  }
+
+  actualizarRecomendacion();
+}
+
+// Recalcula y pinta la recomendación. Con manual=true respeta lo que el
+// cliente eligió a mano y solo actualiza el texto.
+function actualizarRecomendacion(manual = false) {
+  const box = document.getElementById('np-reco');
+  if (!box) return;
+
+  if (manual) {
+    _npUnidadManual = document.getElementById('np-tipo-camion')?.value || null;
+  }
+
+  const { tipo, razon } = _recomendarCamion(_cargaDatosActuales());
+  const elegido = _npUnidadManual || tipo;
+
+  box.style.display = '';
+  const elTipo  = document.getElementById('np-reco-tipo');
+  const elRazon = document.getElementById('np-reco-razon');
+
+  if (!elegido) {
+    if (elTipo)  elTipo.textContent = 'Falta información';
+    if (elRazon) elRazon.textContent = razon;
+    box.classList.add('np-reco--incompleta');
+    return;
+  }
+  box.classList.remove('np-reco--incompleta');
+  if (elTipo)  elTipo.textContent = elegido;
+  if (elRazon) {
+    elRazon.textContent = _npUnidadManual && _npUnidadManual !== tipo
+      ? `Elegiste esta unidad. El sistema habría propuesto: ${tipo || '—'}.`
+      : razon;
+  }
+}
+
+function toggleCambiarUnidad() {
+  const wrap = document.getElementById('np-tipo-wrap');
+  const btn  = document.getElementById('np-reco-cambiar');
+  if (!wrap) return;
+  const abierto = wrap.style.display !== 'none';
+  wrap.style.display = abierto ? 'none' : '';
+  if (btn) btn.textContent = abierto ? 'Prefiero elegir otra unidad' : 'Usar la recomendación del sistema';
+  if (abierto) {
+    // Volver a la recomendación automática
+    _npUnidadManual = null;
+    actualizarRecomendacion();
+  }
 }
 
 const NP_OPCIONES = {
@@ -812,6 +1096,31 @@ function openNuevoPedido(servicio) {
   const select = document.getElementById('np-tipo');
   const cat    = NP_OPCIONES[servicio];
 
+  const esCamionServ = servicio === 'camion';
+
+  // El selector de "tipo de servicio" solo aplica a custodio / patio / lavado.
+  // En camión la unidad la propone el sistema desde la carga.
+  const wrapServ = document.getElementById('np-tipo-wrap-servicio');
+  if (wrapServ) wrapServ.style.display = esCamionServ ? 'none' : '';
+
+  if (esCamionServ) {
+    _npCategoria = 'General';
+    _npUnidadManual = null;
+    _pintarTiposCarga();
+    _poblarSelectsContenedor();
+    // El select de unidad (override) lleva los mismos tipos que antes.
+    const selUni = document.getElementById('np-tipo-camion');
+    if (selUni) {
+      selUni.innerHTML = cat.opciones
+        .filter(o => o.value !== 'Cualquiera')
+        .map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+    }
+    const wrapCambio = document.getElementById('np-tipo-wrap');
+    if (wrapCambio) wrapCambio.style.display = 'none';
+    const btnCambio = document.getElementById('np-reco-cambiar');
+    if (btnCambio) btnCambio.textContent = 'Prefiero elegir otra unidad';
+  }
+
   if (cat) {
     // Mostrar banner descriptivo
     if (banner) {
@@ -863,7 +1172,14 @@ async function crearPedido() {
   const vn   = id => parseFloat(document.getElementById(id)?.value) || null;
   const vi   = id => parseInt(document.getElementById(id)?.value) || null;
 
-  const tipo = document.getElementById('np-tipo').value;
+  // En el flujo de camión el selector de servicio está oculto y la unidad la
+  // calcula el sistema desde la carga (o la eligió el cliente a mano).
+  const flujoCamion = document.getElementById('np-tipo-wrap-servicio')?.style.display === 'none';
+  const reco = flujoCamion ? _recomendarCamion(_cargaDatosActuales()) : { tipo: null };
+  const tipo = flujoCamion
+    ? (_npUnidadManual || reco.tipo || '')
+    : document.getElementById('np-tipo').value;
+
   const esLavado   = tipo.startsWith('Lavado') || tipo === 'Desinfección';
   const esCustodio = tipo.startsWith('Custodio') || tipo === 'Supervisión remota';
   const esPatio    = tipo.startsWith('Patio') || tipo === 'Bodega';
@@ -872,7 +1188,30 @@ async function crearPedido() {
   // Validaciones por tipo
   if (esCamion) {
     if (!v('np-origen') || !v('np-carga') || !v('np-fecha-ini')) {
-      showToast('Completa: tipo de carga, origen y fecha de carga.', 'error'); return;
+      showToast('Completa: descripción de la mercancía, origen y fecha de carga.', 'error'); return;
+    }
+    if (flujoCamion) {
+      const cfg = NP_CARGA[_npCategoria] || NP_CARGA.General;
+      const need = new Set(cfg.campos);
+      if (!tipo) { showToast('Captura el peso de la carga para calcular la unidad.', 'error'); return; }
+      if (need.has('peso') && !vn('np-peso')) {
+        showToast('Captura el peso real de la carga.', 'error'); return;
+      }
+      if (need.has('bultos') && !vi('np-bultos')) {
+        showToast('La carga suelta necesita el número de bultos o pallets.', 'error'); return;
+      }
+      if (need.has('dim') && (!vn('np-largo') || !vn('np-ancho') || !vn('np-alto'))) {
+        showToast('La carga sobredimensionada necesita largo, ancho y alto.', 'error'); return;
+      }
+      if (need.has('hazmat') && (!v('np-hazmat-clase') || !v('np-hazmat-un'))) {
+        showToast('La carga Hazmat necesita clase de riesgo y número UN.', 'error'); return;
+      }
+      if (vb('np-refrigerado') && (vn('np-temp-min') === null || vn('np-temp-max') === null)) {
+        showToast('Captura la temperatura mínima y máxima requeridas.', 'error'); return;
+      }
+      if (_npCategoria === 'Contenerizada' && !v('np-contenedor')) {
+        showToast('Elige el tipo de contenedor.', 'error'); return;
+      }
     }
   } else if (esCustodio) {
     if (!v('np-zona') || !v('np-fecha-ini-cust')) {
@@ -913,15 +1252,39 @@ async function crearPedido() {
     capacidad_min:    esCamion ? vi('np-cap')    : null,
     tipo_carga:       esCamion ? v('np-carga')   : null,
     peso_carga:       esCamion ? vn('np-peso')   : null,
-    num_bultos:       esCamion ? vi('np-bultos') : null,
+    num_bultos:       _campoAplica('bultos') ? vi('np-bultos') : null,
     hora_carga:       esCamion ? v('np-hora')    : null,
     contacto_nombre:  esCamion ? v('np-contacto-nombre') : null,
     contacto_tel:     esCamion ? v('np-contacto-tel')    : null,
-    carga_peligrosa:  esCamion ? vb('np-peligrosa')      : false,
-    temp_controlada:  esCamion ? vb('np-temp')           : false,
-    requiere_seguro:  esCamion ? vb('np-seguro')         : false,
-    requiere_factura: esCamion ? vb('np-factura')        : false,
+    // Los cuatro checkboxes desaparecieron del formulario. Dos de ellos se
+    // derivan de la categoría de carga y se siguen guardando porque hay
+    // pedidos históricos y vistas que los leen. Seguro y factura se asumen:
+    // en el mercado mexicano son estándar y preguntarlo cada vez era ruido.
+    carga_peligrosa:  esCamion && _npCategoria === 'Hazmat',
+    temp_controlada:  _campoAplica('refri') && vb('np-refrigerado'),
+    requiere_seguro:  esCamion,
+    requiere_factura: esCamion,
     tipo_contenedor:  esCamion ? (v('np-contenedor') || null) : null,
+
+    // ── Carga (formulario nuevo) ──
+    categoria_carga:      esCamion && flujoCamion ? _npCategoria : null,
+    tipo_camion_sugerido: esCamion && flujoCamion ? (reco.tipo || null) : null,
+    refrigerado:          _campoAplica('refri') && vb('np-refrigerado'),
+    temp_min:             _campoAplica('refri') && vb('np-refrigerado') ? vn('np-temp-min') : null,
+    temp_max:             _campoAplica('refri') && vb('np-refrigerado') ? vn('np-temp-max') : null,
+    // Cada campo solo se guarda si su categoría lo pide. La limpieza al
+    // cambiar de categoría ya deja el formulario coherente, pero esto lo
+    // vuelve imposible de romper desde una plantilla vieja o un autocompletado.
+    num_contenedores:     _campoAplica('contenedores') ? (_cargaDatosActuales().numContenedores || null) : null,
+    contenedor_1_tipo:    _campoAplica('contenedores') ? (v('np-contenedor')   || null) : null,
+    contenedor_1_peso:    _campoAplica('contenedores') ? vn('np-cont1-peso') : null,
+    contenedor_2_tipo:    _campoAplica('contenedores') ? (v('np-contenedor-2') || null) : null,
+    contenedor_2_peso:    _campoAplica('contenedores') ? vn('np-cont2-peso') : null,
+    largo_m:              _campoAplica('dim') ? vn('np-largo') : null,
+    ancho_m:              _campoAplica('dim') ? vn('np-ancho') : null,
+    alto_m:               _campoAplica('dim') ? vn('np-alto')  : null,
+    hazmat_clase:         _campoAplica('hazmat') ? (v('np-hazmat-clase') || null) : null,
+    hazmat_un:            _campoAplica('hazmat') ? (v('np-hazmat-un')    || null) : null,
     // Custodio
     num_custodios:    esCustodio ? vi('np-num-custodios') : null,
     zona_cobertura:   esCustodio ? v('np-zona')           : null,
