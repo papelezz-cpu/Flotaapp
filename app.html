@@ -1335,22 +1335,15 @@
             <small class="campo-nota">⚖️ Considera el peso de la tara — contenedor, tarimas y embalaje cuentan.</small>
           </div>
 
-          <!-- Volumen: lo que evita recomendar de menos en carga voluminosa -->
-          <div class="form-group carga-cond" data-cond="peso" style="grid-column:1/-1">
-            <label>Volumen aproximado (m³) <span style="font-weight:400;color:var(--text-muted)">— opcional pero recomendado</span></label>
-            <input type="number" id="np-volumen" min="0" step="0.1" placeholder="Ej. 45" oninput="actualizarRecomendacion()">
-            <small class="campo-nota">📐 Un camión se llena por peso <strong>o</strong> por espacio, lo que ocurra primero. Sin este dato la recomendación puede quedarse corta con carga voluminosa y ligera.</small>
-            <details class="vol-calc">
-              <summary>No lo sé — calcularlo por medidas</summary>
-              <div class="vol-calc-grid">
-                <input type="number" id="np-vol-largo" min="0" step="0.01" placeholder="Largo m" oninput="calcularVolumenDesdeMedidas()">
-                <span>×</span>
-                <input type="number" id="np-vol-ancho" min="0" step="0.01" placeholder="Ancho m" oninput="calcularVolumenDesdeMedidas()">
-                <span>×</span>
-                <input type="number" id="np-vol-alto" min="0" step="0.01" placeholder="Alto m" oninput="calcularVolumenDesdeMedidas()">
-              </div>
-              <small class="campo-nota">Si son varios bultos iguales, mide uno y multiplica por la cantidad.</small>
-            </details>
+          <!-- Espacio que ocupa. Antes se pedía en m³ con una calculadora de
+               largo × ancho × alto: nadie sabe cuántos metros cúbicos trae,
+               pero todos saben cuántas tarimas. Es el mismo dato en el idioma
+               del cliente, y sin él la recomendación se queda corta con carga
+               voluminosa y ligera. -->
+          <div class="form-group carga-cond" data-cond="tarimas">
+            <label>¿Cuántas tarimas o pallets ocupa? <span style="font-weight:400;color:var(--text-muted)">— opcional</span></label>
+            <input type="number" id="np-tarimas" min="0" step="1" placeholder="Ej. 14" oninput="actualizarRecomendacion()">
+            <small class="campo-nota">🪵 Si no va en tarimas, déjalo vacío. Un camión se llena por peso <strong>o</strong> por espacio, lo que ocurra primero.</small>
           </div>
 
           <!-- Bultos: solo carga suelta -->
@@ -2555,8 +2548,8 @@
 <script src="js/reservaciones.js?v=33"></script>
 <script src="js/modal.js?v=13"></script>
 <script src="js/mapa.js?v=1"></script>
-<script src="js/pedidos.js?v=50"></script>
-<script src="js/plantillas.js?v=4"></script>
+<script src="js/pedidos.js?v=51"></script>
+<script src="js/plantillas.js?v=5"></script>
 <script src="js/aprobaciones.js?v=36"></script>
 <script src="js/admin.js?v=28"></script>
 <script src="js/operadores.js?v=10"></script>

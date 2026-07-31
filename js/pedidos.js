@@ -762,17 +762,17 @@ const NP_CARGA = {
   General: {
     icon: '📦', label: 'General',
     desc: 'Mercancía normal, paletizada o en cajas, que ocupa toda la unidad.',
-    campos: ['peso', 'contenedores', 'refri'],
+    campos: ['peso', 'tarimas', 'contenedores', 'refri'],
   },
   Consolidada: {
     icon: '🧩', label: 'Consolidada',
     desc: 'Mercancía variada en un mismo viaje, con unidad completa.',
-    campos: ['peso', 'refri'],
+    campos: ['peso', 'tarimas', 'refri'],
   },
   Suelta: {
     icon: '📮', label: 'Suelta',
     desc: 'Bultos o pallets sueltos, sin contenedor.',
-    campos: ['peso', 'bultos', 'refri'],
+    campos: ['peso', 'tarimas', 'bultos', 'refri'],
   },
   Sobredimensionada: {
     icon: '🏗️', label: 'Sobredimensionada',
@@ -809,17 +809,21 @@ const NP_CONTENEDORES = [
 // SUPUESTO: los números son de referencia de mercado, no confirmados con la
 // operación. Están todos aquí para que cambiarlos sea una sola edición.
 // El límite legal de altura (4.25 m) sí viene de la NOM-012-SCT-2-2017.
+// El espacio se mide en TARIMAS, no en m³. El dato es el mismo, pero nadie
+// sabe cuántos metros cúbicos trae y todos saben cuántas tarimas: preguntar en
+// m³ (con calculadora de largo × ancho × alto) era pedirle tarea al cliente.
 const NP_UNIDADES = [
-  { tipo: 'Camioneta 1.5 ton caja seca', ton: 1.5, m3: 8   },
-  { tipo: 'Camioneta 3.5 ton caja seca', ton: 3.5, m3: 18  },
-  { tipo: 'Rabón',                       ton: 8,   m3: 40  },
-  { tipo: 'Torton caja seca',            ton: 20,  m3: 60  },
-  { tipo: 'Full',                        ton: 30,  m3: 110 },
+  { tipo: 'Camioneta 1.5 ton caja seca', ton: 1.5, tarimas: 4  },
+  { tipo: 'Camioneta 3.5 ton caja seca', ton: 3.5, tarimas: 8  },
+  { tipo: 'Rabón',                       ton: 8,   tarimas: 12 },
+  { tipo: 'Torton caja seca',            ton: 20,  tarimas: 20 },
+  { tipo: 'Full',                        ton: 30,  tarimas: 32 },
 ];
 
-// Densidad típica de carga general, para estimar el volumen cuando el cliente
-// no lo captura: 1 ton ≈ 3 m³. Sirve solo para avisar, nunca para decidir.
-const NP_M3_POR_TON = 3;
+// Tarima estándar mexicana (1.2 × 1.0 m) apilada a ~1.5 m. Se usa solo para
+// dejar guardado el volumen equivalente, útil para reportes; la decisión se
+// toma con las tarimas directamente.
+const NP_M3_POR_TARIMA = 1.8;
 
 // Sobredimensionada: por encima de estos valores ya no basta una plataforma.
 const NP_ALTO_LOWBOY = 4.25;   // metros
@@ -861,43 +865,27 @@ function _recomendarCamion(d) {
     return { tipo: null, razon: 'Captura el peso de la carga para calcular la unidad.' };
   }
 
-  const vol = Number(d.volumen) || 0;
+  const tar = Number(d.tarimas) || 0;
 
-  // La unidad tiene que aguantar el peso Y el volumen. La que manda es la
-  // restricción más exigente: eso es cubicaje.
-  const u = NP_UNIDADES.find(x => peso <= x.ton && (!vol || vol <= x.m3))
+  // La unidad tiene que aguantar el peso Y el espacio. Manda la restricción
+  // más exigente: eso es cubicaje.
+  const u = NP_UNIDADES.find(x => peso <= x.ton && (!tar || tar <= x.tarimas))
          || NP_UNIDADES[NP_UNIDADES.length - 1];
 
-  // ¿Qué la definió? Sirve para explicarle al cliente por qué le tocó una
+  // ¿Cuál la definió? Sirve para explicarle al cliente por qué le tocó una
   // unidad más grande de la que esperaba por su tonelaje.
   const porPeso = NP_UNIDADES.find(x => peso <= x.ton) || NP_UNIDADES[NP_UNIDADES.length - 1];
-  const mandaVolumen = vol && porPeso.tipo !== u.tipo;
+  const mandaEspacio = tar && porPeso.tipo !== u.tipo;
 
   let razon;
-  if (mandaVolumen) {
-    razon = `Tus ${vol} m³ son los que mandan: por las ${peso} ton bastaría un ${porPeso.tipo.toLowerCase()}, pero la carga no cabría. Un camión se llena por peso o por espacio, lo que ocurra primero.`;
-  } else if (vol) {
-    razon = `Para ${peso} ton y ${vol} m³ de carga ${cat.toLowerCase()}, esta unidad es la que corresponde.`;
+  if (mandaEspacio) {
+    razon = `Tus ${tar} tarimas son las que mandan: por las ${peso} ton bastaría un ${porPeso.tipo.toLowerCase()}, pero no cabrían. Un camión se llena por peso o por espacio, lo que ocurra primero.`;
+  } else if (tar) {
+    razon = `Para ${peso} ton en ${tar} tarima${tar === 1 ? '' : 's'} de carga ${cat.toLowerCase()}, esta unidad es la que corresponde.`;
   } else {
-    razon = `Para ${peso} ton de carga ${cat.toLowerCase()}, esta unidad es la que corresponde. Si tu carga es voluminosa, captura el volumen: puede cambiar la recomendación.`;
+    razon = `Para ${peso} ton de carga ${cat.toLowerCase()}, esta unidad es la que corresponde. Si va en tarimas, captura cuántas: puede cambiar la recomendación.`;
   }
-  return { tipo: u.tipo, razon, sinVolumen: !vol };
-}
-
-// Volumen en m³ a partir de largo × ancho × alto, para que el cliente no tenga
-// que sacar la cuenta. Devuelve null si falta alguna medida.
-function _volumenDeMedidas() {
-  const n = id => { const x = parseFloat(document.getElementById(id)?.value); return isNaN(x) ? null : x; };
-  const [l, a, h] = [n('np-vol-largo'), n('np-vol-ancho'), n('np-vol-alto')];
-  if (l === null || a === null || h === null) return null;
-  return Math.round(l * a * h * 100) / 100;
-}
-
-function calcularVolumenDesdeMedidas() {
-  const v = _volumenDeMedidas();
-  const el = document.getElementById('np-volumen');
-  if (el && v !== null) el.value = v;
-  actualizarRecomendacion();
+  return { tipo: u.tipo, razon, sinEspacio: !tar };
 }
 
 let _npCategoria = 'General';
@@ -921,7 +909,7 @@ function _cargaDatosActuales() {
   return {
     categoria: _npCategoria,
     peso:      vn('np-peso'),
-    volumen:   vn('np-volumen'),
+    tarimas:   vn('np-tarimas'),
     alto:      vn('np-alto'),
     numContenedores: (_npCategoria === 'Contenerizada' || contElegido) ? nCont : 0,
   };
@@ -957,7 +945,7 @@ function _limpiarCamposCarga() {
   const set  = (id, val = '') => { const el = document.getElementById(id); if (el) el.value = val; };
 
   if (!need.has('bultos')) set('np-bultos');
-  if (!need.has('peso'))   ['np-volumen', 'np-vol-largo', 'np-vol-ancho', 'np-vol-alto'].forEach(id => set(id));
+  if (!need.has('tarimas')) set('np-tarimas');
   if (!need.has('dim'))    ['np-largo', 'np-ancho', 'np-alto'].forEach(id => set(id));
   if (!need.has('hazmat')) ['np-hazmat-clase', 'np-hazmat-un'].forEach(id => set(id));
   if (!need.has('refri')) {
@@ -1318,7 +1306,11 @@ async function crearPedido() {
     capacidad_min:    esCamion ? vi('np-cap')    : null,
     tipo_carga:       esCamion ? v('np-carga')   : null,
     peso_carga:       esCamion ? vn('np-peso')   : null,
-    volumen_m3:       _campoAplica('peso') ? vn('np-volumen') : null,
+    num_tarimas:      _campoAplica('tarimas') ? vi('np-tarimas') : null,
+    // Volumen equivalente, derivado: sirve para reportes sin volver a pedirle
+    // al cliente un dato que no maneja.
+    volumen_m3:       _campoAplica('tarimas') && vi('np-tarimas')
+                        ? Math.round(vi('np-tarimas') * NP_M3_POR_TARIMA * 10) / 10 : null,
     num_bultos:       _campoAplica('bultos') ? vi('np-bultos') : null,
     // La hora de carga se quitó: lo que importa es el arribo del buque y la
     // fecha en que pueden sacar la mercancía, que son días distintos. La

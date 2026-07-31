@@ -104,3 +104,15 @@ ALTER TABLE public.pedidos
 
 COMMENT ON COLUMN public.pedidos.fecha_arribo_puerto IS
   'Arribo estimado del buque. Nula si la carga no viene por puerto. Siempre anterior o igual a fecha_ini (la recolección).';
+
+-- ── El espacio se pregunta en tarimas, no en m³ ─────────────────────────────
+-- Nadie sabe cuántos metros cúbicos trae, pero todos saben cuántas tarimas.
+-- volumen_m3 se conserva y se sigue escribiendo, derivado (1 tarima ≈ 1.8 m³),
+-- para reportes; la recomendación se decide con las tarimas.
+ALTER TABLE public.pedidos
+  ADD COLUMN IF NOT EXISTS num_tarimas smallint;
+ALTER TABLE public.plantillas_pedido
+  ADD COLUMN IF NOT EXISTS num_tarimas smallint;
+
+COMMENT ON COLUMN public.pedidos.num_tarimas IS
+  'Tarimas o pallets que ocupa la carga. Junto con peso_carga determina la unidad: manda la restricción más exigente (cubicaje).';

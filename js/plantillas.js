@@ -13,6 +13,7 @@ const PLANTILLA_CAMPOS = [
   // sistema. La categoría de carga se restaura aparte, en usarPlantilla().
   ['np-carga',            'tipo_carga',       'txt'],
   ['np-peso',             'peso_carga',       'num'],
+  ['np-tarimas',          'num_tarimas',      'num'],
   ['np-bultos',           'num_bultos',       'num'],
   ['np-contenedor',       'contenedor_1_tipo','txt'],
   ['np-cont1-peso',       'contenedor_1_peso','num'],
