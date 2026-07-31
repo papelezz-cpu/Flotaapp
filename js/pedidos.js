@@ -518,8 +518,11 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
     ? `<span class="ped-precio">Ofrece: $${Number(p.precio_cliente).toLocaleString('es-MX')} MXN</span>`
     : '';
 
+  // El arribo va antes que la carga: para la empresa es la diferencia entre
+  // "sale mañana" y "el buque llega mañana, la carga se saca en 3 días".
+  const arriboTxt = p.fecha_arribo_puerto ? `🚢 Arribo ${fmtFecha(p.fecha_arribo_puerto)} · ` : '';
   const fechasTxt = p.fecha_ini
-    ? `📅 ${fmtFecha(p.fecha_ini)}${p.fecha_fin && p.fecha_fin !== p.fecha_ini ? ' — ' + fmtFecha(p.fecha_fin) : ''}`
+    ? `${arriboTxt}📅 ${fmtFecha(p.fecha_ini)}${p.fecha_fin && p.fecha_fin !== p.fecha_ini ? ' — ' + fmtFecha(p.fecha_fin) : ''}`
     : '';
 
   let acciones = '';
@@ -1259,6 +1262,16 @@ async function crearPedido() {
       if (_npCategoria === 'Contenerizada' && !v('np-contenedor')) {
         showToast('Elige el tipo de contenedor.', 'error'); return;
       }
+      // Fechas coherentes: el arribo no puede ser posterior a la carga, ni la
+      // entrega anterior. Son errores de dedo caros — una empresa oferta sobre
+      // una ventana imposible y el acuerdo se cae después.
+      const fArribo = v('np-fecha-arribo'), fCarga = v('np-fecha-ini'), fEntrega = v('np-fecha-fin');
+      if (fArribo && fCarga && fArribo > fCarga) {
+        showToast('La carga no puede recogerse antes de que el buque arribe.', 'error'); return;
+      }
+      if (fEntrega && fCarga && fEntrega < fCarga) {
+        showToast('La fecha de entrega no puede ser anterior a la de carga.', 'error'); return;
+      }
     }
   } else if (esCustodio) {
     if (!v('np-zona') || !v('np-fecha-ini-cust')) {
@@ -1307,7 +1320,11 @@ async function crearPedido() {
     peso_carga:       esCamion ? vn('np-peso')   : null,
     volumen_m3:       _campoAplica('peso') ? vn('np-volumen') : null,
     num_bultos:       _campoAplica('bultos') ? vi('np-bultos') : null,
-    hora_carga:       esCamion ? v('np-hora')    : null,
+    // La hora de carga se quitó: lo que importa es el arribo del buque y la
+    // fecha en que pueden sacar la mercancía, que son días distintos. La
+    // columna se conserva por los pedidos históricos.
+    hora_carga:          null,
+    fecha_arribo_puerto: esCamion ? (v('np-fecha-arribo') || null) : null,
     // El contacto en origen se quitó del formulario: toda la coordinación
     // pasa por el chat de la app, que además deja rastro. Las columnas siguen
     // porque hay pedidos históricos que las tienen.
@@ -1394,6 +1411,7 @@ async function crearPedido() {
     destino:        payload.destino,
     fecha_ini:      payload.fecha_ini,
     fecha_fin:      payload.fecha_fin,
+    fecha_arribo_puerto: payload.fecha_arribo_puerto,
     tipo_carga:     payload.tipo_carga,
     precio_cliente: payload.precio_cliente,
     plazo_pago:     payload.plazo_pago,

@@ -83,7 +83,8 @@ function filasSolicitud(p: Record<string, unknown>): string {
   return `<table style="width:100%;border-collapse:collapse;margin:16px 0">
     ${fila('Servicio:', `<strong>${esc(p.tipo_camion) || '—'}</strong>`)}
     ${ruta ? fila('Ruta:', `<strong>${ruta}</strong>`) : ''}
-    ${fechas ? fila('Fechas:', fechas) : ''}
+    ${p.fecha_arribo_puerto ? fila('Arribo a puerto:', fmtF(p.fecha_arribo_puerto)) : ''}
+    ${fechas ? fila('Carga / entrega:', fechas) : ''}
     ${p.tipo_carga ? fila('Carga:', esc(p.tipo_carga)) : ''}
     ${p.precio_cliente ? fila('Presupuesto:', `<strong>$${Number(p.precio_cliente).toLocaleString('es-MX')} MXN</strong>`) : ''}
     ${p.plazo_pago ? fila('Plazo de pago:', esc(p.plazo_pago)) : ''}

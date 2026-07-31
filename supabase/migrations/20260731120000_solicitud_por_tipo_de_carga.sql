@@ -94,3 +94,13 @@ ALTER TABLE public.pedidos
   ADD COLUMN IF NOT EXISTS origen_lng  numeric,
   ADD COLUMN IF NOT EXISTS destino_lat numeric,
   ADD COLUMN IF NOT EXISTS destino_lng numeric;
+
+-- ── Arribo a puerto ─────────────────────────────────────────────────────────
+-- La carga llega al puerto un día y se saca otro: son dos fechas distintas, y
+-- la de arribo es la que explica por qué la carga se recoge cuando se recoge.
+-- Reemplaza a hora_carga, que se conserva por los pedidos históricos.
+ALTER TABLE public.pedidos
+  ADD COLUMN IF NOT EXISTS fecha_arribo_puerto date;
+
+COMMENT ON COLUMN public.pedidos.fecha_arribo_puerto IS
+  'Arribo estimado del buque. Nula si la carga no viene por puerto. Siempre anterior o igual a fecha_ini (la recolección).';

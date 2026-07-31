@@ -1011,7 +1011,7 @@ async function aprobarSolicitud(pedidoId) {
   await sb.from('pedidos').update({ estado: 'abierto', rechazo_nota: null }).eq('id', pedidoId);
 
   const { data: ped } = await sb.from('pedidos')
-    .select('tipo_camion, origen, destino, cliente_id, cliente_nombre, fecha_ini, fecha_fin, tipo_carga, precio_cliente, plazo_pago')
+    .select('tipo_camion, origen, destino, cliente_id, cliente_nombre, fecha_ini, fecha_fin, fecha_arribo_puerto, tipo_carga, precio_cliente, plazo_pago')
     .eq('id', pedidoId).single();
 
   // Notificar al cliente que su solicitud fue aprobada
@@ -1049,6 +1049,7 @@ async function aprobarSolicitud(pedidoId) {
     destino:        ped?.destino,
     fecha_ini:      ped?.fecha_ini,
     fecha_fin:      ped?.fecha_fin,
+    fecha_arribo_puerto: ped?.fecha_arribo_puerto,
     tipo_carga:     ped?.tipo_carga,
     precio_cliente: ped?.precio_cliente,
     plazo_pago:     ped?.plazo_pago,
