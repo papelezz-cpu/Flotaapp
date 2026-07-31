@@ -24,7 +24,7 @@
   <!-- Estilos -->
   <link rel="stylesheet" href="css/base.css?v=7">
   <link rel="stylesheet" href="css/layout.css?v=4">
-  <link rel="stylesheet" href="css/components.css?v=27">
+  <link rel="stylesheet" href="css/components.css?v=28">
   <!-- Mapa para marcar origen y destino. Leaflet + OpenStreetMap: sin API key
        ni facturación, y ya usamos Nominatim (mismo proyecto) para geocodificar. -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -1452,20 +1452,28 @@
             <span class="mapa-coord" id="np-destino-coord"></span>
           </div>
         </div>
+      </div>
+
+      <!-- Las tres fechas van juntas y en su propia rejilla: en la de dos
+           columnas quedaban desalineadas (etiquetas de distinta altura
+           empujaban los inputs) y la de entrega huérfana en su renglón. -->
+      <div class="fechas-grid">
         <div class="form-group">
-          <label>Fecha estimada de arribo a puerto <span style="font-weight:400;color:var(--text-muted)">(si aplica)</span></label>
+          <label>Arribo a puerto <small>opcional</small></label>
           <input type="date" id="np-fecha-arribo">
-          <small class="campo-nota">🚢 Cuándo llega el buque. Déjala vacía si la carga no viene por puerto.</small>
         </div>
         <div class="form-group">
           <label>Fecha de carga *</label>
           <input type="date" id="np-fecha-ini">
-          <small class="campo-nota">📦 Cuándo se recoge la mercancía. Puede ser días después del arribo.</small>
         </div>
         <div class="form-group">
-          <label>Fecha de entrega estimada</label>
+          <label>Entrega estimada</label>
           <input type="date" id="np-fecha-fin">
         </div>
+      </div>
+      <div class="fechas-ayuda">
+        🚢 <strong>Arribo</strong> es cuándo atraca el buque — déjalo vacío si la carga no viene por puerto.
+        📦 <strong>Carga</strong> es cuándo se recoge la mercancía, que puede ser días después.
       </div>
 
     </div>

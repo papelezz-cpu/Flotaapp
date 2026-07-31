@@ -2172,3 +2172,44 @@ body.light .pref-error { color: #b3261e; }
   #mapa-canvas { height: 260px; }
   .mapa-buscar { flex-direction: column; }
 }
+
+/* ── LAS TRES FECHAS DE LA SOLICITUD ─────────────────────
+   En la rejilla de dos columnas quedaban torcidas: las etiquetas de
+   distinta altura ("Fecha estimada de arribo a puerto (si aplica)" ocupaba
+   dos renglones y "Fecha de carga" uno) empujaban los inputs a alturas
+   distintas, y la de entrega quedaba huérfana en su propio renglón.
+   Aquí van las tres en una sola fila, y la etiqueta reserva su altura para
+   que los campos siempre queden a la misma línea. */
+.fechas-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+.fechas-grid .form-group { margin-bottom: 0; }
+.fechas-grid label {
+  display: block;
+  min-height: 2.5em;          /* dos renglones: alinea aunque una etiqueta salte */
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.fechas-grid label small {
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.fechas-ayuda {
+  margin-top: 8px;
+  font-size: 0.77rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+@media (max-width: 560px) {
+  .fechas-grid { grid-template-columns: 1fr; }
+  .fechas-grid label { min-height: 0; }
+}
