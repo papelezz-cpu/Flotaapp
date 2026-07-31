@@ -2125,3 +2125,50 @@ body.light .pref-error { color: #b3261e; }
   .carga-tipo-label { font-size: 0.66rem; }
   .carga-tipo-icon  { font-size: 1.2rem; }
 }
+
+/* Volumen: calculadora opcional por medidas */
+.vol-calc { margin-top: 8px; }
+.vol-calc summary {
+  cursor: pointer; font-size: 0.78rem; font-weight: 700;
+  color: var(--accent); list-style: none;
+}
+.vol-calc summary::-webkit-details-marker { display: none; }
+.vol-calc summary::before { content: '📐 '; }
+.vol-calc-grid {
+  display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap;
+}
+.vol-calc-grid input { flex: 1 1 78px; min-width: 0; }
+.vol-calc-grid span  { color: var(--text-muted); font-weight: 700; }
+
+/* Marcar punto en el mapa */
+.mapa-fila { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+.mapa-btn {
+  background: none; border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 6px 11px; font: inherit; font-size: 0.79rem; font-weight: 700;
+  color: var(--accent); cursor: pointer;
+}
+.mapa-btn:hover { border-color: var(--accent); }
+.mapa-coord { font-size: 0.75rem; color: var(--green); font-weight: 700; }
+.mapa-quitar {
+  background: none; border: none; padding: 0 0 0 4px; font: inherit;
+  font-size: 0.72rem; color: var(--text-muted); cursor: pointer; text-decoration: underline;
+}
+.mapa-ayuda { font-size: 0.83rem; color: var(--text-muted); line-height: 1.45; margin: 0 0 12px; }
+.mapa-buscar { display: flex; gap: 8px; margin-bottom: 10px; }
+.mapa-buscar input { flex: 1; min-width: 0; }
+#mapa-canvas {
+  height: 340px; border-radius: 11px; border: 1px solid var(--border);
+  /* Leaflet pinta los tiles en capas absolutas: sin esto se salen del borde */
+  overflow: hidden; z-index: 0;
+}
+.mapa-sel {
+  margin-top: 10px; font-size: 0.84rem; line-height: 1.5;
+  background: var(--surface-2, rgba(148,163,184,0.1));
+  border-radius: 9px; padding: 9px 12px;
+}
+.mapa-sel-coord { display: block; font-size: 0.74rem; color: var(--text-muted); margin-top: 2px; }
+
+@media (max-width: 480px) {
+  #mapa-canvas { height: 260px; }
+  .mapa-buscar { flex-direction: column; }
+}

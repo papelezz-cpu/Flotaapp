@@ -29,8 +29,6 @@ const PLANTILLA_CAMPOS = [
   ['np-origen',           'origen',           'txt'],
   ['np-destino',          'destino',          'txt'],
   ['np-hora',             'hora_carga',       'txt'],
-  ['np-contacto-nombre',  'contacto_nombre',  'txt'],
-  ['np-contacto-tel',     'contacto_tel',     'txt'],
   ['np-precio',           'precio_cliente',   'num'],
   ['np-plazo-pago',       'plazo_pago',       'txt'],
   ['np-desc',             'descripcion',      'txt'],

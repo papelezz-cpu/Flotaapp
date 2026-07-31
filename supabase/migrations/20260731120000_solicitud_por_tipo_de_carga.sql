@@ -74,3 +74,23 @@ ALTER TABLE public.plantillas_pedido
   ADD COLUMN IF NOT EXISTS alto_m numeric,
   ADD COLUMN IF NOT EXISTS hazmat_clase text,
   ADD COLUMN IF NOT EXISTS hazmat_un text;
+
+-- ── Volumen: un camión se llena por peso O por espacio ──────────────────────
+-- Sin este dato, 2 toneladas de carga voluminosa (unicel, muebles, plástico)
+-- caían en una camioneta de 3.5 ton, cuando no entran ni en un tráiler.
+ALTER TABLE public.pedidos
+  ADD COLUMN IF NOT EXISTS volumen_m3 numeric;
+ALTER TABLE public.plantillas_pedido
+  ADD COLUMN IF NOT EXISTS volumen_m3 numeric;
+
+COMMENT ON COLUMN public.pedidos.volumen_m3 IS
+  'Volumen aproximado de la carga. Junto con peso_carga determina la unidad recomendada: manda la restricción más exigente (cubicaje).';
+
+-- ── Punto exacto de la maniobra ─────────────────────────────────────────────
+-- La dirección escrita es la referencia humana ("andén 4, portón azul"); estas
+-- coordenadas son para que el operador llegue al punto y no solo a la calle.
+ALTER TABLE public.pedidos
+  ADD COLUMN IF NOT EXISTS origen_lat  numeric,
+  ADD COLUMN IF NOT EXISTS origen_lng  numeric,
+  ADD COLUMN IF NOT EXISTS destino_lat numeric,
+  ADD COLUMN IF NOT EXISTS destino_lng numeric;

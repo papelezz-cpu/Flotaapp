@@ -796,16 +796,27 @@ const NP_CONTENEDORES = [
   'Open Top', 'Flat Rack', 'Tank Container',
 ];
 
-// Umbrales de peso para recomendar la unidad, en toneladas.
-// SUPUESTO: son valores de referencia, no confirmados con la operación.
-// Si hay que moverlos, se cambian aquí y nada más.
-const NP_PESO_UNIDAD = [
-  { max: 1.5, tipo: 'Camioneta 1.5 ton caja seca' },
-  { max: 3.5, tipo: 'Camioneta 3.5 ton caja seca' },
-  { max: 8,   tipo: 'Rabón' },
-  { max: 20,  tipo: 'Torton caja seca' },
-  { max: Infinity, tipo: 'Full' },
+// Capacidad de cada unidad, por PESO y por VOLUMEN.
+//
+// Un camión se llena por lo que ocurra primero: el tonelaje o el espacio.
+// Es el concepto de cubicaje. Sin el volumen, 2 toneladas de unicel en 800
+// cajas caían en "Camioneta 3.5 ton" — cuando no entran ni en un tráiler.
+// Por eso se elige la primera unidad que aguante AMBAS cosas.
+//
+// SUPUESTO: los números son de referencia de mercado, no confirmados con la
+// operación. Están todos aquí para que cambiarlos sea una sola edición.
+// El límite legal de altura (4.25 m) sí viene de la NOM-012-SCT-2-2017.
+const NP_UNIDADES = [
+  { tipo: 'Camioneta 1.5 ton caja seca', ton: 1.5, m3: 8   },
+  { tipo: 'Camioneta 3.5 ton caja seca', ton: 3.5, m3: 18  },
+  { tipo: 'Rabón',                       ton: 8,   m3: 40  },
+  { tipo: 'Torton caja seca',            ton: 20,  m3: 60  },
+  { tipo: 'Full',                        ton: 30,  m3: 110 },
 ];
+
+// Densidad típica de carga general, para estimar el volumen cuando el cliente
+// no lo captura: 1 ton ≈ 3 m³. Sirve solo para avisar, nunca para decidir.
+const NP_M3_POR_TON = 3;
 
 // Sobredimensionada: por encima de estos valores ya no basta una plataforma.
 const NP_ALTO_LOWBOY = 4.25;   // metros
@@ -843,14 +854,47 @@ function _recomendarCamion(d) {
     return { tipo: 'Sencillo porta contenedor 40/20', razon: 'Un contenedor va en un sencillo porta contenedor.' };
   }
 
-  const fila = NP_PESO_UNIDAD.find(f => peso <= f.max) || NP_PESO_UNIDAD[NP_PESO_UNIDAD.length - 1];
   if (!peso) {
     return { tipo: null, razon: 'Captura el peso de la carga para calcular la unidad.' };
   }
-  return {
-    tipo:  fila.tipo,
-    razon: `Para ${peso} ton de carga ${cat.toLowerCase()}, esta unidad es la que corresponde.`,
-  };
+
+  const vol = Number(d.volumen) || 0;
+
+  // La unidad tiene que aguantar el peso Y el volumen. La que manda es la
+  // restricción más exigente: eso es cubicaje.
+  const u = NP_UNIDADES.find(x => peso <= x.ton && (!vol || vol <= x.m3))
+         || NP_UNIDADES[NP_UNIDADES.length - 1];
+
+  // ¿Qué la definió? Sirve para explicarle al cliente por qué le tocó una
+  // unidad más grande de la que esperaba por su tonelaje.
+  const porPeso = NP_UNIDADES.find(x => peso <= x.ton) || NP_UNIDADES[NP_UNIDADES.length - 1];
+  const mandaVolumen = vol && porPeso.tipo !== u.tipo;
+
+  let razon;
+  if (mandaVolumen) {
+    razon = `Tus ${vol} m³ son los que mandan: por las ${peso} ton bastaría un ${porPeso.tipo.toLowerCase()}, pero la carga no cabría. Un camión se llena por peso o por espacio, lo que ocurra primero.`;
+  } else if (vol) {
+    razon = `Para ${peso} ton y ${vol} m³ de carga ${cat.toLowerCase()}, esta unidad es la que corresponde.`;
+  } else {
+    razon = `Para ${peso} ton de carga ${cat.toLowerCase()}, esta unidad es la que corresponde. Si tu carga es voluminosa, captura el volumen: puede cambiar la recomendación.`;
+  }
+  return { tipo: u.tipo, razon, sinVolumen: !vol };
+}
+
+// Volumen en m³ a partir de largo × ancho × alto, para que el cliente no tenga
+// que sacar la cuenta. Devuelve null si falta alguna medida.
+function _volumenDeMedidas() {
+  const n = id => { const x = parseFloat(document.getElementById(id)?.value); return isNaN(x) ? null : x; };
+  const [l, a, h] = [n('np-vol-largo'), n('np-vol-ancho'), n('np-vol-alto')];
+  if (l === null || a === null || h === null) return null;
+  return Math.round(l * a * h * 100) / 100;
+}
+
+function calcularVolumenDesdeMedidas() {
+  const v = _volumenDeMedidas();
+  const el = document.getElementById('np-volumen');
+  if (el && v !== null) el.value = v;
+  actualizarRecomendacion();
 }
 
 let _npCategoria = 'General';
@@ -874,6 +918,7 @@ function _cargaDatosActuales() {
   return {
     categoria: _npCategoria,
     peso:      vn('np-peso'),
+    volumen:   vn('np-volumen'),
     alto:      vn('np-alto'),
     numContenedores: (_npCategoria === 'Contenerizada' || contElegido) ? nCont : 0,
   };
@@ -909,6 +954,7 @@ function _limpiarCamposCarga() {
   const set  = (id, val = '') => { const el = document.getElementById(id); if (el) el.value = val; };
 
   if (!need.has('bultos')) set('np-bultos');
+  if (!need.has('peso'))   ['np-volumen', 'np-vol-largo', 'np-vol-ancho', 'np-vol-alto'].forEach(id => set(id));
   if (!need.has('dim'))    ['np-largo', 'np-ancho', 'np-alto'].forEach(id => set(id));
   if (!need.has('hazmat')) ['np-hazmat-clase', 'np-hazmat-un'].forEach(id => set(id));
   if (!need.has('refri')) {
@@ -1106,6 +1152,7 @@ function openNuevoPedido(servicio) {
   if (esCamionServ) {
     _npCategoria = 'General';
     _npUnidadManual = null;
+    if (typeof resetPuntosMapa === 'function') resetPuntosMapa();
     _pintarTiposCarga();
     _poblarSelectsContenedor();
     // El select de unidad (override) lleva los mismos tipos que antes.
@@ -1249,13 +1296,23 @@ async function crearPedido() {
     // Camión
     origen:           esCamion ? v('np-origen')  : esPatio ? v('np-origen') : esLavado ? v('np-ubic-lav') : null,
     destino:          esCamion ? v('np-destino') : null,
+    // Punto exacto de la maniobra, si lo marcó en el mapa. La dirección escrita
+    // sigue siendo la referencia humana; esto es para que el operador llegue.
+    origen_lat:       esCamion ? (_mapaPuntos?.origen?.lat  ?? null) : null,
+    origen_lng:       esCamion ? (_mapaPuntos?.origen?.lng  ?? null) : null,
+    destino_lat:      esCamion ? (_mapaPuntos?.destino?.lat ?? null) : null,
+    destino_lng:      esCamion ? (_mapaPuntos?.destino?.lng ?? null) : null,
     capacidad_min:    esCamion ? vi('np-cap')    : null,
     tipo_carga:       esCamion ? v('np-carga')   : null,
     peso_carga:       esCamion ? vn('np-peso')   : null,
+    volumen_m3:       _campoAplica('peso') ? vn('np-volumen') : null,
     num_bultos:       _campoAplica('bultos') ? vi('np-bultos') : null,
     hora_carga:       esCamion ? v('np-hora')    : null,
-    contacto_nombre:  esCamion ? v('np-contacto-nombre') : null,
-    contacto_tel:     esCamion ? v('np-contacto-tel')    : null,
+    // El contacto en origen se quitó del formulario: toda la coordinación
+    // pasa por el chat de la app, que además deja rastro. Las columnas siguen
+    // porque hay pedidos históricos que las tienen.
+    contacto_nombre:  null,
+    contacto_tel:     null,
     // Los cuatro checkboxes desaparecieron del formulario. Dos de ellos se
     // derivan de la categoría de carga y se siguen guardando porque hay
     // pedidos históricos y vistas que los leen. Seguro y factura se asumen:
@@ -1344,7 +1401,11 @@ async function crearPedido() {
 
   closeNuevoPedido();
   document.getElementById('modal-nuevo-pedido').querySelectorAll('input, textarea, select').forEach(el => {
+    // Los radios se resetean por `checked`: ponerles value='' les destruye el
+    // valor del atributo y deja de funcionar el selector [value="2"] la
+    // siguiente vez que se abre el formulario.
     if (el.type === 'checkbox') el.checked = false;
+    else if (el.type === 'radio') el.checked = el.defaultChecked;
     else if (el.tagName !== 'SELECT') el.value = '';
   });
   actualizarSubtipoPedido();

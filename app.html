@@ -24,7 +24,10 @@
   <!-- Estilos -->
   <link rel="stylesheet" href="css/base.css?v=7">
   <link rel="stylesheet" href="css/layout.css?v=4">
-  <link rel="stylesheet" href="css/components.css?v=26">
+  <link rel="stylesheet" href="css/components.css?v=27">
+  <!-- Mapa para marcar origen y destino. Leaflet + OpenStreetMap: sin API key
+       ni facturación, y ya usamos Nominatim (mismo proyecto) para geocodificar. -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="css/login.css?v=5">
   <link rel="stylesheet" href="css/detalle.css?v=2">
   <link rel="stylesheet" href="css/theme.css?v=6">
@@ -1332,6 +1335,24 @@
             <small class="campo-nota">⚖️ Considera el peso de la tara — contenedor, tarimas y embalaje cuentan.</small>
           </div>
 
+          <!-- Volumen: lo que evita recomendar de menos en carga voluminosa -->
+          <div class="form-group carga-cond" data-cond="peso" style="grid-column:1/-1">
+            <label>Volumen aproximado (m³) <span style="font-weight:400;color:var(--text-muted)">— opcional pero recomendado</span></label>
+            <input type="number" id="np-volumen" min="0" step="0.1" placeholder="Ej. 45" oninput="actualizarRecomendacion()">
+            <small class="campo-nota">📐 Un camión se llena por peso <strong>o</strong> por espacio, lo que ocurra primero. Sin este dato la recomendación puede quedarse corta con carga voluminosa y ligera.</small>
+            <details class="vol-calc">
+              <summary>No lo sé — calcularlo por medidas</summary>
+              <div class="vol-calc-grid">
+                <input type="number" id="np-vol-largo" min="0" step="0.01" placeholder="Largo m" oninput="calcularVolumenDesdeMedidas()">
+                <span>×</span>
+                <input type="number" id="np-vol-ancho" min="0" step="0.01" placeholder="Ancho m" oninput="calcularVolumenDesdeMedidas()">
+                <span>×</span>
+                <input type="number" id="np-vol-alto" min="0" step="0.01" placeholder="Alto m" oninput="calcularVolumenDesdeMedidas()">
+              </div>
+              <small class="campo-nota">Si son varios bultos iguales, mide uno y multiplica por la cantidad.</small>
+            </details>
+          </div>
+
           <!-- Bultos: solo carga suelta -->
           <div class="form-group carga-cond" data-cond="bultos">
             <label>Número de bultos / pallets *</label>
@@ -1418,10 +1439,18 @@
         <div class="form-group">
           <label>Origen — ciudad y dirección *</label>
           <input type="text" id="np-origen" placeholder="Ej. Guadalajara, Av. Industria 450">
+          <div class="mapa-fila">
+            <button type="button" class="mapa-btn" onclick="abrirMapa('origen')">📍 Marcar en el mapa</button>
+            <span class="mapa-coord" id="np-origen-coord"></span>
+          </div>
         </div>
         <div class="form-group">
           <label>Destino — ciudad y dirección *</label>
           <input type="text" id="np-destino" placeholder="Ej. CDMX, Bodega Industrial Norte">
+          <div class="mapa-fila">
+            <button type="button" class="mapa-btn" onclick="abrirMapa('destino')">📍 Marcar en el mapa</button>
+            <span class="mapa-coord" id="np-destino-coord"></span>
+          </div>
         </div>
         <div class="form-group">
           <label>Fecha de carga *</label>
@@ -1437,17 +1466,6 @@
         </div>
       </div>
 
-      <div class="np-section-title">📞 Contacto en origen</div>
-      <div class="admin-grid" style="gap:12px">
-        <div class="form-group">
-          <label>Nombre del contacto</label>
-          <input type="text" id="np-contacto-nombre" placeholder="Ej. Juan Pérez">
-        </div>
-        <div class="form-group">
-          <label>Teléfono del contacto</label>
-          <input type="tel" id="np-contacto-tel" placeholder="Ej. 33 1234 5678">
-        </div>
-      </div>
     </div>
 
     <!-- ══ CAMPOS CUSTODIO ════════════════════════════════ -->
@@ -2492,7 +2510,30 @@
 </div>
 
 <!-- ══ SCRIPTS (orden importante) ══════════════════════ -->
-<script src="js/utils.js?v=6"></script>
+<!-- ══ MODAL: MARCAR PUNTO EN EL MAPA ══════════════════ -->
+<div class="modal" id="modal-mapa">
+  <div class="modal-content" style="max-width:640px">
+    <div class="modal-header">
+      <h3 id="mapa-titulo">Marcar punto</h3>
+      <button class="modal-close" onclick="cerrarMapa()">&times;</button>
+    </div>
+    <p class="mapa-ayuda">Toca el mapa para poner el pin donde se hace la maniobra. Sirve para que el operador llegue al punto exacto, no solo a la calle.</p>
+    <div class="mapa-buscar">
+      <input type="text" id="mapa-buscar-input" placeholder="Buscar un lugar para acercar el mapa…"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();buscarEnMapa();}">
+      <button type="button" class="btn-add" onclick="buscarEnMapa()">Buscar</button>
+    </div>
+    <div id="mapa-canvas"></div>
+    <div class="mapa-sel" id="mapa-sel">Aún no has marcado un punto.</div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="cerrarMapa()">Cancelar</button>
+      <button class="btn-confirm" onclick="confirmarMapa()">Usar este punto</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/utils.js?v=7"></script>
 <script src="js/notificaciones.js?v=17"></script>
 <script src="js/detalle.js?v=12"></script>
 <script src="js/config.js?v=12"></script>
@@ -2503,8 +2544,9 @@
 <script src="js/recursos.js?v=11"></script>
 <script src="js/reservaciones.js?v=33"></script>
 <script src="js/modal.js?v=13"></script>
-<script src="js/pedidos.js?v=47"></script>
-<script src="js/plantillas.js?v=2"></script>
+<script src="js/mapa.js?v=1"></script>
+<script src="js/pedidos.js?v=49"></script>
+<script src="js/plantillas.js?v=3"></script>
 <script src="js/aprobaciones.js?v=35"></script>
 <script src="js/admin.js?v=28"></script>
 <script src="js/operadores.js?v=10"></script>

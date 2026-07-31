@@ -181,7 +181,11 @@ function _geoSelect(itemEl, value, e) {
 }
 
 function setupAllGeoInputs() {
-  document.querySelectorAll('[id="np-origen"],[id="np-destino"],[id="np-ubic-lav"],[id="np-zona-cust"],[id="np-ubic-patio"]').forEach(el => {
+  // np-origen y np-destino quedaron fuera a propósito: el cliente escribe la
+  // dirección con su propia referencia ("andén 4", "portón azul") y marca el
+  // punto exacto en el mapa. Las sugerencias reemplazaban lo que escribía por
+  // una dirección genérica del geocodificador, que era peor para el operador.
+  document.querySelectorAll('[id="np-ubic-lav"],[id="np-zona-cust"],[id="np-ubic-patio"]').forEach(el => {
     setupGeoAutocomplete(el);
   });
 }
