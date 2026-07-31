@@ -2509,10 +2509,9 @@
   </div>
 </div>
 
-<!-- ══ SCRIPTS (orden importante) ══════════════════════ -->
 <!-- ══ MODAL: MARCAR PUNTO EN EL MAPA ══════════════════ -->
-<div class="modal" id="modal-mapa">
-  <div class="modal-content" style="max-width:640px">
+<div class="modal-overlay" id="modal-mapa">
+  <div class="modal" style="max-width:640px">
     <div class="modal-header">
       <h3 id="mapa-titulo">Marcar punto</h3>
       <button class="modal-close" onclick="cerrarMapa()">&times;</button>
@@ -2532,6 +2531,7 @@
   </div>
 </div>
 
+<!-- ══ SCRIPTS (orden importante) ══════════════════════ -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/utils.js?v=7"></script>
 <script src="js/notificaciones.js?v=17"></script>
