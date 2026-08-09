@@ -196,6 +196,7 @@ async function renderReserv() {
           ${pagoLbl}
           ${precioLbl}
           ${pagarBtn}
+          ${typeof expedienteBotonesHTML === 'function' ? expedienteBotonesHTML(r, true) : ''}
           ${cartaPorteBtn}
           ${cancelBtn}
         </div>
@@ -273,6 +274,12 @@ async function renderReserv() {
   }
 
   const unreadMap = await _unreadPorReserva(data.map(r => r.id));
+  // Los expedientes documentales de todas las filas, en una sola consulta.
+  // renderReserv tiene DOS rutas de render —cliente y empresa/superadmin— y
+  // las dos necesitan esto: si solo se carga en una, la otra ve el botón de
+  // "Solicitar documentación" para siempre porque nunca se entera de que el
+  // expediente ya existe.
+  if (typeof cargarExpedientes === 'function') await cargarExpedientes(data);
 
   body.innerHTML = data.map(r => {
     const esCancelada = r.estado === 'Cancelada';
