@@ -25,6 +25,7 @@ const PLANTILLA_CAMPOS = [
   ['np-hazmat-clase',     'hazmat_clase',     'txt'],
   ['np-hazmat-un',        'hazmat_un',        'txt'],
   ['np-refrigerado',      'refrigerado',      'bool'],
+  ['np-entra-puerto',     'entra_a_puerto',   'bool'],
   ['np-temp-min',         'temp_min',         'num'],
   ['np-temp-max',         'temp_max',         'num'],
   ['np-origen',           'origen',           'txt'],

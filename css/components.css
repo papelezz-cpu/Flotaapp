@@ -2213,3 +2213,88 @@ body.light .pref-error { color: #b3261e; }
   .fechas-grid { grid-template-columns: 1fr; }
   .fechas-grid label { min-height: 0; }
 }
+
+/* ── EXPEDIENTES DOCUMENTALES DEL VIAJE ──────────────────
+   Checklist compartido entre cliente y transportista: los dos ven el mismo
+   semáforo, en vez de "sube tus documentos" a secas donde nadie sabe qué falta. */
+.exp-desc { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin: 0 0 14px; }
+
+.exp-progreso { display: flex; align-items: center; gap: 10px; font-size: 0.78rem; flex-wrap: wrap; }
+.exp-progreso-barra {
+  flex: 1 1 140px; height: 7px; border-radius: 99px;
+  background: rgba(148,163,184,0.25); overflow: hidden; min-width: 100px;
+}
+.exp-progreso-fill { height: 100%; background: var(--green); transition: width 0.25s; }
+.exp-rechazados { color: var(--danger); font-weight: 700; }
+
+/* Demoras: el aviso que evita que el cargo sorprenda a nadie */
+.exp-demoras {
+  margin-top: 12px; padding: 9px 13px; border-radius: 9px;
+  font-size: 0.83rem; font-weight: 700;
+}
+.exp-dem-ok        { background: rgba(148,163,184,0.15); color: var(--text-muted); }
+.exp-dem-porvencer { background: rgba(245,158,11,0.15);  color: var(--amber); }
+.exp-dem-hoy       { background: rgba(245,158,11,0.22);  color: var(--amber); }
+.exp-dem-vencido   { background: rgba(239,68,68,0.15);   color: var(--danger); }
+
+.exp-vacios {
+  margin-top: 14px; padding: 13px; border-radius: 11px;
+  border: 1px solid var(--border); background: var(--surface);
+}
+.exp-vacios .form-group { margin-bottom: 10px; }
+
+.exp-lista { margin-top: 16px; display: flex; flex-direction: column; gap: 9px; }
+.exp-doc {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: 11px;
+  background: var(--surface); flex-wrap: wrap;
+}
+.exp-doc--rech { border-color: rgba(239,68,68,0.45); }
+.exp-doc-info { flex: 1 1 220px; min-width: 0; }
+.exp-doc-nombre {
+  font-size: 0.89rem; font-weight: 700; line-height: 1.35;
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+}
+.exp-doc-nombre small { font-weight: 400; color: var(--text-muted); font-size: 0.75rem; }
+.exp-doc-desc    { font-size: 0.78rem; color: var(--text-muted); margin-top: 3px; line-height: 1.45; }
+.exp-doc-archivo { font-size: 0.76rem; color: var(--accent); margin-top: 5px; word-break: break-all; }
+.exp-doc-nota {
+  font-size: 0.78rem; color: var(--danger); margin-top: 6px; line-height: 1.45;
+  background: rgba(239,68,68,0.1); border-radius: 6px; padding: 6px 9px;
+}
+.exp-doc-acciones { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+.exp-badge { font-size: 0.68rem; font-weight: 700; border-radius: 99px; padding: 2px 8px; }
+.exp-badge--pend { background: rgba(148,163,184,0.2); color: var(--text-muted); }
+.exp-badge--sub  { background: rgba(78,142,247,0.15); color: var(--accent); }
+.exp-badge--ok   { background: rgba(34,197,94,0.15);  color: var(--green); }
+.exp-badge--rech { background: rgba(239,68,68,0.13);  color: var(--danger); }
+
+.exp-subir {
+  display: inline-block; padding: 6px 12px; border-radius: 8px;
+  border: 1.5px solid var(--accent); color: var(--accent);
+  font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.exp-subir input[type=file] { display: none; }
+.exp-btn {
+  background: none; border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 6px 11px; font: inherit; font-size: 0.75rem; font-weight: 700;
+  cursor: pointer; color: var(--text-main); white-space: nowrap;
+}
+.exp-btn--ok { border-color: rgba(34,197,94,0.5); color: var(--green); }
+.exp-btn--no { border-color: rgba(239,68,68,0.45); color: var(--danger); }
+.exp-esperando { font-size: 0.74rem; color: var(--text-muted); }
+
+.exp-completo {
+  margin-top: 14px; padding: 10px 14px; border-radius: 9px;
+  background: rgba(34,197,94,0.13); color: var(--green);
+  font-size: 0.84rem; font-weight: 700;
+}
+
+/* Pastillas en la fila de la reservación */
+.exp-pill, .exp-pedir {
+  background: none; border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 5px 10px; font: inherit; font-weight: 700; cursor: pointer;
+  color: var(--text-main); white-space: nowrap;
+}
+.exp-pill--pend { border-color: var(--amber); color: var(--amber); }

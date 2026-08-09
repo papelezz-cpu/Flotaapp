@@ -101,6 +101,13 @@ async function avanzarTracking() {
 
   const esUltimo = idx + 1 === TRACKING_ESTADOS.length - 1;
   if (esUltimo) showToast('✓ Servicio marcado como finalizado');
+
+  // Al entregar se abre solo el expediente de vacíos si hubo contenedor.
+  // Nadie se acuerda de pedirlo, y es justo donde empiezan a correr las
+  // demoras: se cobran por día hasta que el contenedor entra al depósito.
+  if (next.key === 'Entregado' && typeof abrirExpedienteVaciosSiAplica === 'function') {
+    await abrirExpedienteVaciosSiAplica(trackingReserva);
+  }
   if (document.getElementById('view-reservaciones').classList.contains('active')) renderReserv();
 
   // Notificar al cliente sobre el avance del tracking

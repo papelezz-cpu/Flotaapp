@@ -1330,6 +1330,7 @@ async function crearPedido() {
     temp_controlada:  _campoAplica('refri') && vb('np-refrigerado'),
     requiere_seguro:  esCamion,
     requiere_factura: esCamion,
+    entra_a_puerto:   esCamion && vb('np-entra-puerto'),
     tipo_contenedor:  esCamion ? (v('np-contenedor') || null) : null,
 
     // ── Carga (formulario nuevo) ──

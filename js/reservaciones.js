@@ -129,6 +129,8 @@ async function renderReserv() {
     }
 
     const unreadMap = await _unreadPorReserva(data.map(r => r.id));
+    // Los expedientes documentales de todas las filas, en una sola consulta.
+    if (typeof cargarExpedientes === 'function') await cargarExpedientes(data);
 
     body.innerHTML = data.map(r => {
       const badgeCls = r.estado === 'Pendiente'   ? 'badge-busy'
@@ -355,6 +357,8 @@ async function renderReserv() {
       <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
         <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
         ${acciones}
+        ${typeof expedienteBotonesHTML === 'function'
+            ? expedienteBotonesHTML(r, r.cliente_user_id === currentUser.id) : ''}
         ${cartaPorteBtnAdmin}
         ${chatBtn}
         ${elimBtn}
