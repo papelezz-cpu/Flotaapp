@@ -492,16 +492,12 @@ async function guardarEdicion() {
 
   let updatePayload = payload;
   if (!esSuperAdmin) {
-    const camposEditados = Object.keys(payload).filter(k =>
-      JSON.stringify(anterior?.[k]) !== JSON.stringify(payload[k])
-    );
-    updatePayload = {
-      ...payload,
-      aprobacion:        'pendiente',
-      es_edicion:        true,
-      campos_editados:   camposEditados,
-      snapshot_anterior: anterior,
-    };
+    updatePayload = _payloadEdicion(payload, anterior);
+    if (!updatePayload) {
+      closeEditarCamion();
+      showToast('No hubo cambios que guardar');
+      return;
+    }
   }
 
   const { error } = await sb.from('camiones').update(updatePayload).eq('id', id);
@@ -680,6 +676,27 @@ async function editarCamionRechazado(id) {
 }
 
 // Keep for backward compatibility (called after approving a resource via Pendientes tab)
+// Prepara el update de una edición hecha por la empresa.
+//
+// Guardar SIN cambiar nada no debe mandar el recurso de vuelta a revisión:
+// abrir el formulario y darle Guardar reabría una unidad ya aprobada, con un
+// diff vacío, y el superadmin tenía que volver a aprobarla sin entender por
+// qué — y de paso le llegaba un aviso de "la empresa editó la unidad" que era
+// mentira. Devuelve null cuando no hay nada que guardar.
+function _payloadEdicion(payload, anterior) {
+  const camposEditados = Object.keys(payload).filter(k =>
+    JSON.stringify(anterior?.[k]) !== JSON.stringify(payload[k])
+  );
+  if (!camposEditados.length) return null;
+  return {
+    ...payload,
+    aprobacion:        'pendiente',
+    es_edicion:        true,
+    campos_editados:   camposEditados,
+    snapshot_anterior: anterior,
+  };
+}
+
 async function aprobarRecurso(tabla, id) {
   const { data: recurso } = await sb.from(tabla).select('propietario_id, nombre').eq('id', id).single();
   // actualizarConfirmado ya avisa el motivo exacto si falla o no toca ninguna fila.
@@ -1141,9 +1158,8 @@ async function guardarEdicionCustodio() {
   let upd = payload;
   if (!esSA) {
     const { data: ant } = await sb.from('custodios').select('*').eq('id', id).single();
-    upd = { ...payload, aprobacion:'pendiente', es_edicion:true,
-      campos_editados: Object.keys(payload).filter(k => JSON.stringify(ant?.[k]) !== JSON.stringify(payload[k])),
-      snapshot_anterior: ant };
+    upd = _payloadEdicion(payload, ant);
+    if (!upd) { closeEditarCustodio(); showToast('No hubo cambios que guardar'); return; }
   }
   const { error } = await sb.from('custodios').update(upd).eq('id', id);
   if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
@@ -1297,9 +1313,8 @@ async function guardarEdicionPatio() {
   let upd = payload;
   if (!esSA) {
     const { data: ant } = await sb.from('patios').select('*').eq('id', id).single();
-    upd = { ...payload, aprobacion:'pendiente', es_edicion:true,
-      campos_editados: Object.keys(payload).filter(k => JSON.stringify(ant?.[k]) !== JSON.stringify(payload[k])),
-      snapshot_anterior: ant };
+    upd = _payloadEdicion(payload, ant);
+    if (!upd) { closeEditarPatio(); showToast('No hubo cambios que guardar'); return; }
   }
   const { error } = await sb.from('patios').update(upd).eq('id', id);
   if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
@@ -1443,9 +1458,8 @@ async function guardarEdicionLavado() {
   let upd = payload;
   if (!esSA) {
     const { data: ant } = await sb.from('lavados').select('*').eq('id', id).single();
-    upd = { ...payload, aprobacion:'pendiente', es_edicion:true,
-      campos_editados: Object.keys(payload).filter(k => JSON.stringify(ant?.[k]) !== JSON.stringify(payload[k])),
-      snapshot_anterior: ant };
+    upd = _payloadEdicion(payload, ant);
+    if (!upd) { closeEditarLavado(); showToast('No hubo cambios que guardar'); return; }
   }
   const { error } = await sb.from('lavados').update(upd).eq('id', id);
   if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
