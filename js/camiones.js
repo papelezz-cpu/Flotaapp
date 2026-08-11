@@ -141,7 +141,7 @@ async function renderCamiones(filtroTipo = '', fechaIni = '', fechaFin = '') {
         <div class="truck-specs">
           <div class="spec-item"><div class="spec-label">Capacidad</div><div class="spec-value">${esc(String(c.capacidad))} ton</div></div>
           <div class="spec-item"><div class="spec-label">Tipo</div><div class="spec-value">${esc(c.tipo)}</div></div>
-          <div class="spec-item"><div class="spec-label">Operador</div><div class="spec-value">${esc(c.operador)}</div></div>
+          <div class="spec-item"><div class="spec-label">Placas</div><div class="spec-value">${esc(c.placas || '—')}</div></div>
           <div class="spec-item"><div class="spec-label">Unidad</div><div class="spec-value">${esc(c.id)}</div></div>
         </div>
         ${formatPrecio(c.precio_dia) ? `<div class="truck-precio">${esc(formatPrecio(c.precio_dia))}</div>` : ''}

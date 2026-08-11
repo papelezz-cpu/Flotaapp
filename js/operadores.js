@@ -59,7 +59,6 @@ async function renderAdminOperadores() {
 
   if (aprobados?.length) {
     html += aprobados.map(op => _operadorCardHTML(op)).join('');
-    _poblarSelectOperadores(aprobados);
   } else if (!rechazados?.length) {
     html = `<div class="empty-state"><div class="icon">👷</div>Sin operadores registrados.<br><small style="color:var(--text-muted)">Completa el formulario y envía a aprobación.</small></div>`;
   }
@@ -412,36 +411,11 @@ function eliminarOperador(id) {
   showConfirm(`¿Eliminar al operador ${id}? Esta acción no se puede deshacer.`, async () => {
     await sb.from('operadores').delete().eq('id', id);
     document.getElementById(`opcard-${id}`)?.remove();
-    _poblarSelectOperadores();
     _prefillNumTrabajador();
     showToast(`Operador ${id} eliminado`);
   }, { danger: true, confirmLabel: 'Eliminar' });
 }
 
-// ── POPULAR SELECT EN FORMULARIOS DE CAMIÓN ───────────
-
-async function _poblarSelectOperadores(operadoresData) {
-  let data = operadoresData;
-  if (!data) {
-    let q = sb.from('operadores')
-      .select('id, nombre, primer_apellido, segundo_apellido')
-      .eq('aprobacion', 'aprobada').order('nombre');
-    if (currentUser.rol !== 'superadmin') q = q.eq('propietario_id', currentUser.id);
-    const res = await q;
-    data = res.data || [];
-  }
-
-  const opts = `<option value="">— Sin operador asignado —</option>` +
-    (data || []).map(op => {
-      const full = [op.nombre, op.primer_apellido, op.segundo_apellido].filter(Boolean).join(' ');
-      return `<option value="${esc(full)}">${esc(full)} (${op.id})</option>`;
-    }).join('');
-
-  ['admin-op', 'editar-op'].forEach(id => {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    const prev = sel.value;
-    sel.innerHTML = opts;
-    if (prev) sel.value = prev;
-  });
-}
+// El chofer ya no se asigna al dar de alta la unidad: se elige al ofertar un
+// viaje (openHacerOferta en js/pedidos.js), que es cuando de verdad se sabe
+// quién va a manejar. Por eso aquí ya no se puebla ningún select de camión.

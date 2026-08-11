@@ -117,7 +117,7 @@ async function renderAdmin() {
           <div class="truck-list-item-info">
             <div class="truck-list-item-name">${c.emoji} ${c.id} — ${c.tipo}</div>
             <div class="truck-list-item-sub">
-              ${c.operador} · ${c.capacidad} ton ·
+              ${c.placas ? esc(c.placas) + ' · ' : ''}${c.capacidad} ton ·
               <span class="badge ${badgeClass}" style="font-size:0.68rem">${c.estado}</span>
               ${currentUser.rol === 'superadmin' ? `· <em style="color:var(--text-muted)">${empresa}</em>` : ''}
             </div>
@@ -150,9 +150,6 @@ async function renderAdmin() {
   else if (currentAdminTab === 'patio') renderAdminPatios();
   else if (currentAdminTab === 'lavado') renderAdminLavados();
   else if (currentAdminTab === 'operador') renderAdminOperadores();
-
-  // Populate operator dropdowns in truck forms
-  _poblarSelectOperadores();
 }
 
 // ── TABS ADMIN ────────────────────────────────────────
@@ -387,7 +384,6 @@ async function editarCamion(id) {
   document.getElementById('editar-subtitulo').textContent = `Unidad ${c.id} — ${c.tipo}`;
   set('editar-tipo', c.tipo);
   set('editar-cap', c.capacidad);
-  set('editar-op', c.operador || '');
   set('editar-placas', c.placas || '');
   set('editar-tipo-placa', c.tipo_placa || '');
   set('editar-dim', c.dimensiones || '');
@@ -435,7 +431,6 @@ async function guardarEdicion() {
   const payload = {
     tipo,
     capacidad:           parseInt(document.getElementById('editar-cap').value)      || 0,
-    operador:            document.getElementById('editar-op').value.trim()          || null,
     placas:              g('editar-placas'),
     tipo_placa:          g('editar-tipo-placa'),
     dimensiones:         g('editar-dim'),
@@ -577,7 +572,7 @@ async function renderMisPendientes() {
 
   const rows = [
     ...(camAll || []).map(c => _card(c, c.emoji || '🚛', `${c.id} — ${c.tipo}`,
-        `${c.operador || '—'} · ${c.capacidad} ton`,
+        `${c.placas ? esc(c.placas) + ' · ' : ''}${c.capacidad} ton`,
         'camiones', `editarCamionRechazado('${c.id}')`)),
     ...(cusAll || []).map(c => _card(c, '👮', `${c.id} — ${esc(c.nombre)}`,
         `${c.tipo} · ${c.disponibilidad || '—'}`,
@@ -804,7 +799,6 @@ async function verArchivos(id) {
 async function agregarCamion() {
   const tipo   = document.getElementById('admin-tipo').value;
   const cap    = parseInt(document.getElementById('admin-cap').value) || 0;
-  const op     = document.getElementById('admin-op').value.trim();
   const estado = document.getElementById('admin-estado').value;
   const precio = parseFloat(document.getElementById('admin-precio').value) || null;
   const placas = document.getElementById('admin-placas').value.trim() || null;
@@ -896,7 +890,7 @@ async function agregarCamion() {
   const targetId = isEdit ? _camionRechazadoId : id;
 
   const camionPayload = {
-    tipo, capacidad: cap, operador: op || null, estado,
+    tipo, capacidad: cap, estado,
     emoji: emojis[tipo] || '🚛',
     archivos,
     aprobacion:          isEdit ? 'pendiente' : (esSuperAdmin ? 'aprobada' : 'pendiente'),

@@ -486,12 +486,8 @@
         </div>
 
         <div class="op-form-section-title" style="margin-top:16px">Operación</div>
-        <div class="form-group">
-          <label>Operador asignado</label>
-          <select id="admin-op">
-            <option value="">— Sin operador asignado —</option>
-          </select>
-        </div>
+        <!-- El chofer NO se asigna aquí: se elige al ofertar un viaje (modal Hacer
+             oferta), que es cuando de verdad se sabe quién va a manejar. -->
         <div class="form-group">
           <label>Tipo de carga que maneja</label>
           <div class="cargo-chips-select" id="admin-tipo-carga"></div>
@@ -1809,12 +1805,6 @@
       <input type="number" id="editar-cap" placeholder="Ej. 24.5" step="0.5" min="0">
     </div>
     <div class="form-group">
-      <label>Operador</label>
-      <select id="editar-op">
-        <option value="">— Sin operador asignado —</option>
-      </select>
-    </div>
-    <div class="form-group">
       <label>Placas</label>
       <input type="text" id="editar-placas" placeholder="Ej. MNZ-123-A">
     </div>
@@ -2561,22 +2551,22 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/utils.js?v=8"></script>
 <script src="js/notificaciones.js?v=17"></script>
-<script src="js/detalle.js?v=12"></script>
+<script src="js/detalle.js?v=13"></script>
 <script src="js/config.js?v=12"></script>
 <script src="js/auth.js?v=21"></script>
 <script src="js/theme.js?v=11"></script>
 <script src="js/views.js?v=27"></script>
-<script src="js/camiones.js?v=11"></script>
+<script src="js/camiones.js?v=12"></script>
 <script src="js/recursos.js?v=11"></script>
 <script src="js/reservaciones.js?v=35"></script>
 <script src="js/modal.js?v=13"></script>
 <script src="js/mapa.js?v=1"></script>
 <script src="js/expedientes.js?v=1"></script>
-<script src="js/pedidos.js?v=52"></script>
+<script src="js/pedidos.js?v=53"></script>
 <script src="js/plantillas.js?v=6"></script>
 <script src="js/aprobaciones.js?v=37"></script>
-<script src="js/admin.js?v=30"></script>
-<script src="js/operadores.js?v=10"></script>
+<script src="js/admin.js?v=31"></script>
+<script src="js/operadores.js?v=11"></script>
 <script src="js/usuarios.js?v=21"></script>
 <script src="js/verificacion.js?v=1"></script>
 <script src="js/privacidad.js?v=1"></script>

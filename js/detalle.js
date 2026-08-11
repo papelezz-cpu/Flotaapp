@@ -82,8 +82,6 @@ async function renderDetalleTab() {
           <div class="detalle-val">${esc(c.placas || '—')}</div></div>
         <div class="detalle-item detalle-full"><div class="detalle-lbl">Dimensiones del vehículo</div>
           <div class="detalle-val">📐 ${esc(c.dimensiones || '—')}</div></div>
-        <div class="detalle-item detalle-full"><div class="detalle-lbl">Operador asignado</div>
-          <div class="detalle-val">👤 ${esc(c.operador)}</div></div>
         ${cargaChips ? `
         <div class="detalle-item detalle-full">
           <div class="detalle-lbl">Tipo de carga que maneja</div>

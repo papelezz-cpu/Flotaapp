@@ -1827,7 +1827,6 @@ async function openHacerOferta(pedidoId) {
     recursos.forEach(c => {
       const opt = document.createElement('option');
       opt.value                  = c.id;
-      opt.dataset.operador       = c.operador || '';
       opt.dataset.venceTc        = c.fecha_vencimiento_tc                || '';
       opt.dataset.venceSeguro    = c.fecha_vencimiento_seguro            || '';
       opt.dataset.venceSct       = c.fecha_vencimiento_permiso_sct       || '';
@@ -1856,16 +1855,10 @@ async function openHacerOferta(pedidoId) {
       opRow.style.display = '';
     }
 
-    // Unified change handler: pre-select operator + show expiry warning
+    // Aviso de documentos vencidos de la unidad elegida.
     const recursoWarn = document.getElementById('ho-recurso-warn');
     select.onchange = () => {
       const selOpt = select.options[select.selectedIndex];
-      // Pre-select operator assigned to this truck
-      if (opSel) {
-        const opId = selOpt?.dataset.operador || '';
-        if (opId) opSel.value = opId;
-      }
-      // Expiry check
       if (recursoWarn) {
         const hoy = new Date().toISOString().slice(0, 10);
         const vencidos = [];
