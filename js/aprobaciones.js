@@ -1008,7 +1008,11 @@ function _buildChipsSol(p) {
 // ── APROBAR SOLICITUD ────────────────────────────────────
 
 async function aprobarSolicitud(pedidoId) {
-  await sb.from('pedidos').update({ estado: 'abierto', rechazo_nota: null }).eq('id', pedidoId);
+  // Mismo hueco que en aprobarCamion: si RLS no deja escribir, el update no
+  // falla, afecta 0 filas, y la solicitud se quedaba en pendiente_revision
+  // mientras la pantalla decía que ya estaba publicada.
+  if (!await actualizarConfirmado('pedidos', { id: pedidoId },
+        { estado: 'abierto', rechazo_nota: null }, 'la solicitud')) return;
 
   const { data: ped } = await sb.from('pedidos')
     .select('tipo_camion, origen, destino, cliente_id, cliente_nombre, fecha_ini, fecha_fin, fecha_arribo_puerto, tipo_carga, precio_cliente, plazo_pago')
@@ -1397,8 +1401,10 @@ async function confirmarRechazarOperador() {
 
 async function aprobarOperador(id) {
   const { data: op } = await sb.from('operadores').select('propietario_id, nombre, primer_apellido').eq('id', id).single();
-  const { error } = await sb.from('operadores').update({ aprobacion: 'aprobada', es_edicion: false, campos_editados: null, snapshot_anterior: null }).eq('id', id);
-  if (error) { showToast('Error al aprobar operador', 'error'); return; }
+  const ok = await actualizarConfirmado('operadores', { id },
+    { aprobacion: 'aprobada', es_edicion: false, campos_editados: null, snapshot_anterior: null },
+    `el operador ${id}`);
+  if (!ok) return;
 
   if (op?.propietario_id) {
     const nombre = [op.nombre, op.primer_apellido].filter(Boolean).join(' ');
@@ -1478,7 +1484,11 @@ async function _ejecutarRechazarAcuerdo(pedidoId, nota) {
 
 async function aprobarCamion(id) {
   const { data: c } = await sb.from('camiones').select('propietario_id, tipo').eq('id', id).single();
-  await sb.from('camiones').update({ aprobacion: 'aprobada', es_edicion: false, campos_editados: null, snapshot_anterior: null }).eq('id', id);
+  const ok = await actualizarConfirmado('camiones', { id },
+    { aprobacion: 'aprobada', es_edicion: false, campos_editados: null, snapshot_anterior: null },
+    `la unidad ${id}`);
+  if (!ok) return;
+
   if (c?.propietario_id) {
     await _notificarResolucion(c.propietario_id, {
       tipo:    'recurso_aprobado',

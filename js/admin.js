@@ -682,8 +682,10 @@ async function editarCamionRechazado(id) {
 // Keep for backward compatibility (called after approving a resource via Pendientes tab)
 async function aprobarRecurso(tabla, id) {
   const { data: recurso } = await sb.from(tabla).select('propietario_id, nombre').eq('id', id).single();
-  const { error } = await sb.from(tabla).update({ aprobacion: 'aprobada', es_edicion: false, campos_editados: null, snapshot_anterior: null }).eq('id', id);
-  if (error) { showToast('Error al aprobar'); return; }
+  // actualizarConfirmado ya avisa el motivo exacto si falla o no toca ninguna fila.
+  if (!await actualizarConfirmado(tabla, { id },
+        { aprobacion: 'aprobada', es_edicion: false, campos_editados: null, snapshot_anterior: null },
+        `el recurso ${id}`)) return;
 
   if (recurso?.propietario_id) {
     const tipoLabel = tabla === 'custodios' ? 'custodio' : tabla === 'patios' ? 'patio' : 'servicio de lavado';
@@ -704,8 +706,7 @@ async function aprobarRecurso(tabla, id) {
 
 async function aprobarUnidad(id) {
   const { data: camion } = await sb.from('camiones').select('propietario_id').eq('id', id).single();
-  const { error } = await sb.from('camiones').update({ aprobacion: 'aprobada' }).eq('id', id);
-  if (error) { showToast('Error al aprobar'); return; }
+  if (!await actualizarConfirmado('camiones', { id }, { aprobacion: 'aprobada' }, `la unidad ${id}`)) return;
 
   if (camion?.propietario_id) {
     await sb.from('notificaciones').insert({

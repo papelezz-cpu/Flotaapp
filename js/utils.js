@@ -102,6 +102,33 @@ async function _notificarEmail(payload) {
   } catch (e) { console.warn('Email notificación falló:', e); }
 }
 
+// Actualiza y CONFIRMA que se escribió de verdad.
+//
+// Revisar solo `error` no alcanza: si RLS no deja tocar la fila, el UPDATE no
+// falla — simplemente afecta 0 filas y devuelve error null. Eso producía el
+// peor tipo de bug: la pantalla decía "✓ aprobado", la fila desaparecía, y al
+// volver a entrar el registro seguía pendiente. Con .select() sabemos cuántas
+// filas se escribieron realmente.
+//
+// Devuelve true solo si al menos una fila cambió.
+async function actualizarConfirmado(tabla, filtro, payload, etiqueta = 'el registro') {
+  let q = sb.from(tabla).update(payload);
+  Object.entries(filtro).forEach(([col, val]) => { q = q.eq(col, val); });
+  const { data, error } = await q.select('id');
+
+  if (error) {
+    console.error(`Error al actualizar ${tabla}:`, error, filtro, payload);
+    showToast(`No se pudo actualizar ${etiqueta}: ${error.message}`, 'error');
+    return false;
+  }
+  if (!data?.length) {
+    console.error(`UPDATE en ${tabla} no afectó ninguna fila`, filtro, payload);
+    showToast(`No se pudo actualizar ${etiqueta}: no tienes permiso o el registro ya no existe.`, 'error');
+    return false;
+  }
+  return true;
+}
+
 // ── CONFIRM MODAL (reemplaza window.confirm) ───────────
 
 let _confirmCb = null;
