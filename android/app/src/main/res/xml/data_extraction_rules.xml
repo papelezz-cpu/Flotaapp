@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La sesión vive en EncryptedSharedPreferences respaldada por el Keystore,
+     cuyas claves no salen del dispositivo. Respaldar el archivo cifrado
+     produciría un blob que no se puede descifrar en otro equipo, así que se
+     excluye de backup y de transferencia. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="portgo_session.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="portgo_session.xml" />
+    </device-transfer>
+</data-extraction-rules>

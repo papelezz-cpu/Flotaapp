@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Azul PortGo, el mismo de la marca en la web (#1a4fd6). -->
+    <color name="ic_launcher_background">#1A4FD6</color>
+</resources>
