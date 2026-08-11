@@ -47,6 +47,7 @@ import mx.portgo.app.ui.components.BannerError
 import mx.portgo.app.ui.components.ChipEstadoPedido
 import mx.portgo.app.ui.components.EsqueletoLista
 import mx.portgo.app.ui.components.EstadoVacio
+import mx.portgo.app.ui.components.RecargarAlVolver
 import mx.portgo.app.ui.theme.Espacio
 import mx.portgo.app.ui.viewmodel.EstadoCarga
 import mx.portgo.app.ui.viewmodel.SolicitudesViewModel
@@ -82,6 +83,10 @@ fun PantallaSolicitudes(
     androidx.compose.runtime.LaunchedEffect(cercaDelFinal) {
         if (cercaDelFinal) vm.cargarMas()
     }
+
+    // Las solicitudes se publican y se aprueban desde la web, así que el
+    // mercado cambia mientras la app está abierta.
+    RecargarAlVolver(vm::cargar)
 
     Scaffold(
         floatingActionButton = {

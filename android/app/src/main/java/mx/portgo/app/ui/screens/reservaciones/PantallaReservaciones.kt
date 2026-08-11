@@ -46,6 +46,7 @@ import mx.portgo.app.ui.components.BannerError
 import mx.portgo.app.ui.components.ChipEstadoReserva
 import mx.portgo.app.ui.components.EsqueletoLista
 import mx.portgo.app.ui.components.EstadoVacio
+import mx.portgo.app.ui.components.RecargarAlVolver
 import mx.portgo.app.ui.theme.ColoresEstado
 import mx.portgo.app.ui.theme.Espacio
 import mx.portgo.app.ui.viewmodel.EstadoCarga
@@ -68,6 +69,10 @@ fun PantallaReservaciones(
     val estado by vm.estado.collectAsStateWithLifecycle()
     val filtro by vm.filtro.collectAsStateWithLifecycle()
     val refrescando by vm.refrescando.collectAsStateWithLifecycle()
+
+    // El superadmin aprueba acuerdos y cierres desde la web: un servicio puede
+    // aparecer o cambiar de estado con la app abierta.
+    RecargarAlVolver(vm::cargar)
 
     Column(Modifier.fillMaxSize()) {
         Row(

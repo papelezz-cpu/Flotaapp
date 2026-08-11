@@ -21,6 +21,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -228,6 +234,31 @@ fun BannerError(
         if (onReintentar != null) {
             TextButton(onClick = onReintentar) { Text("Reintentar") }
         }
+    }
+}
+
+/**
+ * Vuelve a pedir los datos cada vez que se regresa a la pantalla.
+ *
+ * Hace falta porque la barra inferior conserva el estado de cada pestaña
+ * (`saveState`/`restoreState`), así que el ViewModel **sobrevive** al cambio de
+ * pestaña y su `init` solo corre una vez. Sin esto, algo dado de alta en la web
+ * —una unidad nueva, una solicitud— no aparece en la app hasta que el usuario
+ * desliza para actualizar, y no tiene forma de saber que debe hacerlo.
+ *
+ * Se salta la primera vez a propósito: el `init` del ViewModel ya cargó, y
+ * pedir lo mismo dos veces al abrir sería tráfico regalado en una red de puerto.
+ * La bandera va en `rememberSaveable` para que sobreviva a la salida y regreso
+ * de la pantalla, que es justo cuando sí hay que recargar.
+ *
+ * También cubre volver a la app desde segundo plano, que es cuando más
+ * probable es que los datos hayan cambiado.
+ */
+@Composable
+fun RecargarAlVolver(onRecargar: () -> Unit) {
+    var primeraVez by rememberSaveable { mutableStateOf(true) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (primeraVez) primeraVez = false else onRecargar()
     }
 }
 

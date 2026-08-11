@@ -48,6 +48,7 @@ import mx.portgo.app.ui.components.BannerError
 import mx.portgo.app.ui.components.ChipEstado
 import mx.portgo.app.ui.components.EsqueletoLista
 import mx.portgo.app.ui.components.EstadoVacio
+import mx.portgo.app.ui.components.RecargarAlVolver
 import mx.portgo.app.ui.theme.ColoresEstado
 import mx.portgo.app.ui.theme.Espacio
 import mx.portgo.app.ui.viewmodel.EstadoCarga
@@ -84,6 +85,11 @@ fun PantallaFlota(
     // Sacar una unidad de servicio puede fallar por RLS o por el guard de
     // flota. Un switch que se mueve y no guarda nada es peor que un error.
     LaunchedEffect(Unit) { vm.avisos.collect { snackbar.showSnackbar(it) } }
+
+    // Las unidades se dan de alta en la web y se aprueban desde el panel, así
+    // que la flota cambia estando la app abierta. Sin esto, una unidad recién
+    // aprobada no aparecía hasta deslizar para actualizar.
+    RecargarAlVolver(vm::cargar)
 
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { relleno ->
         Column(Modifier.fillMaxSize().padding(relleno)) {

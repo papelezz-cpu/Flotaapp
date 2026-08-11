@@ -35,6 +35,7 @@ import mx.portgo.app.di.AppContainer
 import mx.portgo.app.ui.LocalCatalogos
 import mx.portgo.app.ui.components.BannerError
 import mx.portgo.app.ui.components.EsqueletoLista
+import mx.portgo.app.ui.components.RecargarAlVolver
 import mx.portgo.app.ui.navigation.Rutas
 import mx.portgo.app.ui.theme.ColoresEstado
 import mx.portgo.app.ui.theme.Espacio
@@ -67,6 +68,9 @@ fun PantallaInicio(
     )
     val estado by vm.estado.collectAsStateWithLifecycle()
     val refrescando by vm.refrescando.collectAsStateWithLifecycle()
+
+    // Es la pantalla de "qué me toca hacer": si está desactualizada, no sirve.
+    RecargarAlVolver(vm::cargar)
 
     PullToRefreshBox(
         isRefreshing = refrescando,
