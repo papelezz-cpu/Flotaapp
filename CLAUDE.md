@@ -4,6 +4,34 @@ This file provides guidance to Claude Code when working with the **PortGo** code
 
 ---
 
+## 🛑 RULE #1 — ASK BEFORE DELETING ANYTHING
+
+**This rule overrides every permission setting, with no exception.** Even with `bypassPermissions` / auto-accept enabled, **never delete anything without asking the user first and getting an explicit yes.** A permission mode that suppresses prompts does **not** grant deletion authority: it removes the tool's confirmation, not this project's requirement.
+
+Before any deletion, stop and state these three things:
+
+1. **WHAT** — the exact target: full paths, file names, table and row identifiers, branch names, how many items. Never a vague summary like "some old files".
+2. **WHAT IT IS FOR** — what that thing does or holds, and what depends on it. If you don't know, **find out before asking**, not after deleting.
+3. **WHY** — the concrete reason it should be deleted, and what breaks or is lost if the deletion is wrong.
+
+Then **wait for an explicit yes**. Silence, an unrelated reply, or a general "adelante" about another topic is not authorization.
+
+This covers every form of deletion, including:
+
+- Files and directories (`Remove-Item`, `rm`, `git clean`)
+- Git history and refs — `git reset --hard`, force-push, deleting branches or tags, `git stash drop`
+- Database — `DROP` / `TRUNCATE` / `DELETE`, dropping columns, policies, functions or triggers. **There is no staging: every deletion hits production immediately.**
+- Supabase Storage objects, in any bucket
+- Auth users — `auth.admin.deleteUser`, the `eliminar` action of `gestionar-usuario`
+- Edge Functions and migrations
+- Overwriting an existing file with `Write` when doing so destroys content
+
+**Authorization is per-deletion and never carries over.** Approval to delete one thing does not extend to the next, however similar it looks.
+
+When in doubt, do not delete — ask.
+
+---
+
 ## Project Overview
 
 **PortGo** is a PWA logistics platform for port transport services built as a fully client-side app with Supabase as the backend (PostgreSQL + Auth + Realtime + Storage).
@@ -198,3 +226,4 @@ Deploy with `mcp__supabase__deploy_edge_function` (or `supabase functions deploy
 - **Don't use `alert()`/`confirm()`** — `showToast()` / `showConfirm()`.
 - **Don't ship without bumping `?v=` + sw.js cache + pushing** — see the deployment checklist.
 - **Don't put the service role key anywhere near client code.**
+- **Don't delete anything without explicit authorization** — even under `bypassPermissions`. See [Rule #1](#-rule-1--ask-before-deleting-anything) at the top of this file.
