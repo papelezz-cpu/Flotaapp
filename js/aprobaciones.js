@@ -96,10 +96,33 @@ async function renderAprobaciones() {
   // hayan generado antes siguen ahí y nadie los va a encontrar solos.
   let acuerdosRotos = [];
   if (cerrados?.length) {
-    const { data: reservasDeEsos } = await sb.from('reservaciones')
-      .select('pedido_id').in('pedido_id', cerrados.map(p => p.id));
+    const idsCerrados = cerrados.map(p => p.id);
+    const [{ data: reservasDeEsos }, { data: archivadas }] = await Promise.all([
+      sb.from('reservaciones').select('pedido_id').in('pedido_id', idsCerrados),
+      // Archivar MUEVE la fila: eliminarReserva la copia al histórico y la
+      // borra de `reservaciones`. Sin mirar aquí, un servicio archivado se ve
+      // idéntico a uno que nunca se creó, y "rescatarlo" produciría una
+      // reservación duplicada de algo que ya ocurrió.
+      sb.from('reservaciones_historico').select('*').limit(500),
+    ]);
+
     const conReserva = new Set((reservasDeEsos || []).map(r => r.pedido_id));
-    acuerdosRotos = cerrados.filter(p => !conReserva.has(p.id));
+
+    // Las filas archivadas por la versión vieja de eliminarReserva no guardan
+    // pedido_id, así que el vínculo se reconstruye por cliente + fechas: es lo
+    // único que sobrevivió. Ante la duda se prefiere NO listar el pedido —
+    // dejar uno roto fuera cuesta menos que ofrecer un rescate que duplica.
+    const clavesArchivadas = new Set();
+    (archivadas || []).forEach(h => {
+      if (h.pedido_id) clavesArchivadas.add(h.pedido_id);
+      clavesArchivadas.add(`${h.cliente_user_id || ''}|${h.fecha_ini}|${h.fecha_fin}`);
+    });
+
+    acuerdosRotos = cerrados.filter(p =>
+      !conReserva.has(p.id) &&
+      !clavesArchivadas.has(p.id) &&
+      !clavesArchivadas.has(`${p.cliente_id || ''}|${p.fecha_ini}|${p.fecha_fin}`)
+    );
   }
 
   // Nombre de empresa para finalizaciones y cancelaciones pendientes
@@ -1501,7 +1524,8 @@ async function aprobarOperador(id) {
 // estaba tomada) casi siempre sigue vigente y hay que decidirlo a mano.
 function repararAcuerdoSinReserva(pedidoId) {
   showConfirm(
-    'La solicitud volverá a "Acuerdos por aprobar" para que la apruebes con otra unidad o la rechaces. No se avisa a nadie todavía.',
+    'La solicitud volverá a "Acuerdos por aprobar" para que la apruebes con otra unidad o la rechaces. No se avisa a nadie todavía.\n\n' +
+    'Antes de aprobarla de nuevo, confirma en el Historial que el servicio no se haya prestado ya y archivado: aprobarlo otra vez crearía una reservación duplicada.',
     async () => {
       const { data: ped } = await sb.from('pedidos').select('*').eq('id', pedidoId).single();
 
