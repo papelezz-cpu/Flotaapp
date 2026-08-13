@@ -170,16 +170,22 @@ async function enviarMensaje() {
   input.value = '';
   input.focus();
 
-  const { error } = await sb.from('mensajes').insert({
-    de_user_id:    currentUser.id,
-    de_nombre:     currentUser.nombre || currentUser.email || 'Usuario',
-    texto,
-    leido:         false,
-    reserva_id:    chatState.reservaId || null,
-    pedido_id:     chatState.pedidoId  || null,
-    participantes: chatState.participantes,
+  // Vía RPC, no INSERT directo. El candado anti-desintermediación de arriba
+  // vive en el navegador: un curl con el token lo saltaba y el trato se salía
+  // de la plataforma. enviar_mensaje() lo aplica en el servidor, valida que
+  // seas participante de la conversación y firma `de_nombre` con mi_nombre()
+  // en vez de creerle al cliente. La verificación local se conserva porque da
+  // respuesta inmediata y no pierde lo escrito.
+  const { error } = await sb.rpc('enviar_mensaje', {
+    p_texto:         texto,
+    p_participantes: chatState.participantes,
+    p_reserva_id:    chatState.reservaId || null,
+    p_pedido_id:     chatState.pedidoId  || null,
   });
-  if (error) showToast('Error al enviar mensaje');
+  if (error) {
+    input.value = texto;   // no perder el mensaje si el servidor lo rechaza
+    showToast(error.message || 'Error al enviar mensaje', 'error');
+  }
 }
 
 // ─── Suscripción realtime ───────────────────────────────

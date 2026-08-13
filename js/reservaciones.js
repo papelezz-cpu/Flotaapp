@@ -457,13 +457,37 @@ function cancelarReserva(reservaId, unidad) {
     const { data: rv } = await sb.from('reservaciones').select('*').eq('id', reservaId).single();
     const tipoFinal = rv?.recurso_tipo || 'camion';
 
-    // Cancelar la reserva
-    await sb.from('reservaciones').update({ estado: 'Cancelada' }).eq('id', reservaId);
+    // ── Camino normal: la empresa dueña cancela ────────────────────────
+    // Baja a la base como UNA transacción. Eran siete escrituras sueltas
+    // desde el navegador: cerrar la pestaña a la mitad dejaba la unidad en
+    // 'ocupado' con el pedido colgado en 'acordado'. Además la RPC valida
+    // autoría y estado del lado del servidor, y respeta el orden que exige
+    // guard_pedido_update (reabrir el pedido ANTES de rechazar la oferta
+    // aceptada, o el guard deja de aplicar y la reapertura falla).
+    if (rv?.propietario_id && rv.propietario_id === currentUser.id) {
+      const { error } = await sb.rpc('cancelar_reservacion', {
+        p_reserva_id: reservaId,
+        p_motivo:     null,
+      });
+      _reservaActiva = false;
+      if (error) { showToast('No se pudo cancelar: ' + error.message, 'error'); return; }
+      await renderReserv();
+      showToast('Reserva cancelada — solicitud reabierta para nuevas ofertas');
+      return;
+    }
+
+    // ── Superadmin cancelando la reserva de otra empresa ───────────────
+    // cancelar_reservacion() exige propietario_id = auth.uid() y lo
+    // rechazaría, así que aquí se conserva la secuencia paso a paso — pero
+    // verificando cada escritura, que antes era lo que faltaba.
+    if (!await actualizarConfirmado('reservaciones', { id: reservaId },
+          { estado: 'Cancelada' }, 'la reservación')) { _reservaActiva = false; return; }
 
     // Liberar el recurso
     if (unidad) {
       const tabla = tipoFinal === 'custodio' ? 'custodios' : tipoFinal === 'patio' ? 'patios' : 'camiones';
-      await sb.from(tabla).update({ estado: 'disponible' }).eq('id', unidad);
+      const { error: errRec } = await sb.from(tabla).update({ estado: 'disponible' }).eq('id', unidad);
+      if (errRec) console.error(`No se pudo liberar ${unidad}:`, errRec.message);
     }
 
     // Regresar el pedido a abierto para que puedan ofertar de nuevo
@@ -482,41 +506,45 @@ function cancelarReserva(reservaId, unidad) {
       // La oferta que ya estaba aceptada (la de quien canceló el viaje) queda
       // bloqueada para volver a ofertar en esta misma solicitud — canceló un
       // acuerdo ya cerrado, no es lo mismo que una oferta simplemente rechazada.
-      await sb.from('ofertas')
+      const { error: errAcep } = await sb.from('ofertas')
         .update({ estado: 'rechazada', permite_reoferta: false })
         .eq('pedido_id', rv.pedido_id)
         .eq('estado', 'aceptada');
+      if (errAcep) console.error('No se pudo invalidar la oferta aceptada:', errAcep.message);
 
       // Las demás ofertas que seguían activas (de otras empresas) también se
       // invalidan para el ciclo de negociación anterior, pero sí podrán
       // volver a ofertar en la solicitud reabierta.
-      await sb.from('ofertas')
+      const { error: errResto } = await sb.from('ofertas')
         .update({ estado: 'rechazada' })
         .eq('pedido_id', rv.pedido_id)
         .in('estado', ['enviada', 'contra_oferta']);
+      if (errResto) console.error('No se pudieron invalidar las demás ofertas:', errResto.message);
     }
 
     // Notificar al cliente
     if (rv?.cliente_user_id) {
-      await sb.from('notificaciones').insert({
+      const { error: errNotifCli } = await sb.from('notificaciones').insert({
         user_id: rv.cliente_user_id,
         tipo:    'reserva_cancelada',
         titulo:  'Reserva cancelada',
         mensaje: `Tu reserva fue cancelada por el proveedor. Tu solicitud está abierta de nuevo para recibir ofertas.`,
         leido:   false,
       });
+      if (errNotifCli) console.error('No se pudo notificar al cliente:', errNotifCli.message);
     }
 
     // Notificar a superadmin — un acuerdo ya aprobado se cayó, debe saberlo
     const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
     if (supers?.length) {
-      await sb.from('notificaciones').insert(supers.map(a => ({
+      const { error: errNotifSA } = await sb.from('notificaciones').insert(supers.map(a => ({
         user_id: a.user_id,
         tipo:    'reserva_cancelada_admin',
         titulo:  'Un acuerdo aprobado se canceló',
         mensaje: `${currentUser.nombre} canceló la reserva con ${rv?.cliente || 'un cliente'} después de que el acuerdo ya había sido aprobado. La solicitud volvió a estar abierta.`,
         leido:   false,
       })));
+      if (errNotifSA) console.error('No se pudo notificar a los superadmins:', errNotifSA.message);
     }
 
     _reservaActiva = false;
