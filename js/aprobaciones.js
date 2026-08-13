@@ -72,7 +72,7 @@ async function renderAprobaciones() {
   const [{ data: solicitudes }, { data: acuerdos }, { data: operadores },
          { data: camiones }, { data: custodios }, { data: patios }, { data: lavados },
          { data: cuentasPend }, { data: docsEmpresa }, { data: finalizaciones },
-         { data: cancelaciones }] = await Promise.all([
+         { data: cancelaciones }, { data: cerrados }] = await Promise.all([
     sb.from('pedidos').select('*').eq('estado', 'pendiente_revision').order('created_at'),
     sb.from('pedidos').select('*').eq('estado', 'pendiente_acuerdo').order('created_at'),
     sb.from('operadores').select('*, propietario:perfiles(nombre)').eq('aprobacion', 'pendiente').order('created_at'),
@@ -84,7 +84,23 @@ async function renderAprobaciones() {
     sb.from('perfiles').select('user_id, nombre, fecha_vencimiento_permiso_sct, fecha_vencimiento_permiso_sct_pendiente, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_rc_pendiente, fecha_vencimiento_seguro_carga, fecha_vencimiento_seguro_carga_pendiente, doc_permiso_sct, doc_permiso_sct_pendiente, doc_seguro_rc, doc_seguro_rc_pendiente, doc_seguro_carga, doc_seguro_carga_pendiente').eq('perfil_docs_pendiente', true),
     sb.from('reservaciones').select('*').eq('estado', 'PorAprobar').order('completado_en'),
     sb.from('reservaciones').select('*').eq('estado', 'CancelacionSolicitada').order('cancelacion_solicitada_en'),
+    // Candidatos a "acuerdo sin reservación" — se filtran abajo.
+    sb.from('pedidos').select('*').in('estado', ['acordado', 'expirado'])
+      .order('created_at', { ascending: false }).limit(200),
   ]);
+
+  // ── ACUERDOS ROTOS ───────────────────────────────────
+  // Un pedido cerrado que se quedó sin reservación: el servicio nunca se creó
+  // pero el pedido ya salió del circuito de aprobación. El orden de escrituras
+  // de cerrarAcuerdo ya no los produce (ver el comentario ahí), pero los que se
+  // hayan generado antes siguen ahí y nadie los va a encontrar solos.
+  let acuerdosRotos = [];
+  if (cerrados?.length) {
+    const { data: reservasDeEsos } = await sb.from('reservaciones')
+      .select('pedido_id').in('pedido_id', cerrados.map(p => p.id));
+    const conReserva = new Set((reservasDeEsos || []).map(r => r.pedido_id));
+    acuerdosRotos = cerrados.filter(p => !conReserva.has(p.id));
+  }
 
   // Nombre de empresa para finalizaciones y cancelaciones pendientes
   const finEmpresaMap = {};
@@ -308,6 +324,23 @@ async function renderAprobaciones() {
   }
 
   P.solicitudes = html; html = '';
+
+  // ── ACUERDOS ROTOS (cerrados sin reservación) ────────
+  // Va antes de los pendientes a propósito: es lo único de este panel donde
+  // hay un cliente y un proveedor esperando un servicio que no existe.
+  if (acuerdosRotos.length) {
+    html += `<div class="apr-bloque-title" style="margin-top:8px;color:var(--danger)">⛔ Acuerdos sin reservación <span class="apr-count">${acuerdosRotos.length}</span></div>`;
+    html += `<div class="apr-desc" style="margin-bottom:10px">El pedido se cerró pero la reservación nunca se creó, casi siempre porque la unidad ya estaba reservada en esas fechas. Regrésalo a revisión para aprobarlo con otra unidad o rechazarlo.</div>`;
+    html += acuerdosRotos.map(p => `
+      <div class="apr-card" id="aprroto-${p.id}" style="margin:8px 0;border-radius:8px;border-color:var(--danger)">
+        <div class="apr-empresa-subtitulo">${TIPO_EMOJI[p.tipo_camion] || '🚛'} ${esc(p.tipo_camion || '—')} · 👤 ${esc(p.cliente_nombre || '—')}${p.fecha_ini ? ` · 📅 ${fmtFecha(p.fecha_ini)}` : ''}</div>
+        ${p.origen || p.destino ? `<div class="apr-ruta">📍 ${esc(p.origen||'—')}${p.destino ? ' → '+esc(p.destino) : ''}</div>` : ''}
+        <div class="apr-desc">Estado actual: <strong>${esc(p.estado)}</strong>${p.fecha_fin && p.fecha_fin < today() ? ' · <span style="color:var(--danger)">la fecha del servicio ya pasó</span>' : ''}</div>
+        <div class="apr-actions">
+          <button class="btn-apr-aprobar" onclick="repararAcuerdoSinReserva('${escJs(p.id)}')">↩ Regresar a revisión</button>
+        </div>
+      </div>`).join('');
+  }
 
   // ── ACUERDOS POR APROBAR (agrupados por cliente) ─────
   const batchAcu = (acuerdos||[]).length > 1
@@ -554,7 +587,7 @@ async function renderAprobaciones() {
   content.innerHTML = _aprTabsHTML(P, {
     cuentas:     (docsEmpresa?.length || 0) + (cuentasPend?.length || 0),
     solicitudes: (solicitudes || []).length,
-    acuerdos:    (acuerdos || []).length,
+    acuerdos:    (acuerdos || []).length + acuerdosRotos.length,
     servicios:   (finalizaciones || []).length + (cancelaciones || []).length,
     recursos:    totalRecursos,
   });
@@ -1272,12 +1305,44 @@ async function _ejecutarRechazarCancelacion(reservaId, nota) {
 
 // ── APROBAR ACUERDO ──────────────────────────────────────
 
+// ¿La unidad de esta oferta ya está reservada en las fechas del pedido?
+// La base también lo rechaza (trigger check_reservacion_disponibilidad), pero
+// detenerlo antes de escribir nada deja el pedido intacto en
+// 'pendiente_acuerdo' — con sus botones Aprobar/Rechazar todavía en pantalla —
+// y permite decir CON QUÉ choca en vez de un "recurso no disponible" a secas.
+//
+// No es un caso raro: el filtro de disponibilidad al ofertar solo mira
+// reservaciones existentes, así que la misma unidad se puede ofertar en dos
+// pedidos con fechas traslapadas y ambos llegar a revisión.
+async function _conflictoDeUnidad(ped, oferta) {
+  if (!oferta?.camion_id || !ped?.fecha_ini) return null;
+  const fechaFin = ped.fecha_fin || ped.fecha_ini;
+  const { data: choques } = await sb.from('reservaciones')
+    .select('pedido_id, cliente, fecha_ini, fecha_fin')
+    .eq('unidad', oferta.camion_id)
+    .in('estado', ['Pendiente', 'Activa'])
+    .lte('fecha_ini', fechaFin)
+    .gte('fecha_fin', ped.fecha_ini);
+
+  // Una reservación de ESTE pedido no es un choque: es un reintento.
+  return (choques || []).find(r => r.pedido_id !== ped.id) || null;
+}
+
 async function aprobarAcuerdo(pedidoId) {
   const { data: ped } = await sb.from('pedidos').select('*').eq('id', pedidoId).single();
   if (!ped?.oferta_pendiente_id) { showToast('Error: no hay oferta asociada', 'error'); return; }
 
   const { data: oferta } = await sb.from('ofertas').select('*').eq('id', ped.oferta_pendiente_id).single();
   if (!oferta) { showToast('Error: oferta no encontrada', 'error'); return; }
+
+  const conflicto = await _conflictoDeUnidad(ped, oferta);
+  if (conflicto) {
+    showToast(
+      `⛔ La unidad ${oferta.camion_id} ya está reservada del ${fmtFecha(conflicto.fecha_ini)} al ${fmtFecha(conflicto.fecha_fin)}` +
+      `${conflicto.cliente ? ` (cliente ${conflicto.cliente})` : ''}. Rechaza este acuerdo para que la empresa ofrezca otra unidad.`,
+      'error');
+    return;
+  }
 
   // Verificar documentos de empresa del proveedor
   const hoy = new Date().toISOString().slice(0, 10);
@@ -1305,17 +1370,22 @@ async function aprobarAcuerdo(pedidoId) {
   }
 }
 
-async function _ejecutarAprobarAcuerdo(ped, oferta) {
-  // Ejecutar el cierre real (rechaza otras ofertas, crea reservación, marca recurso ocupado)
+// Devuelve true solo si el acuerdo quedó cerrado. `aprobarTodosAcuerdos`
+// contaba como aprobado todo lo que no lanzara excepción, y como los fallos se
+// resolvían con un showToast + return, el resumen final decía "✓ 4 acuerdos
+// aprobados" cuando alguno no se había creado.
+async function _ejecutarAprobarAcuerdo(ped, oferta, { batch = false } = {}) {
+  // Ejecutar el cierre real (crea reservación, marca el pedido, rechaza las
+  // otras ofertas, marca el recurso ocupado)
   try {
     await cerrarAcuerdo(oferta, ped);
   } catch (e) {
-    if (e.message === 'RECURSO_NO_DISPONIBLE') {
-      showToast('❌ El recurso ya tiene una reserva activa en esas fechas. Rechaza el acuerdo antes de asignar otro recurso.', 'error');
-    } else {
-      showToast('Error al crear reservación: ' + e.message, 'error');
-    }
-    return;
+    const msg = e.message === 'RECURSO_NO_DISPONIBLE'
+      ? '❌ El recurso ya tiene una reserva activa en esas fechas. Rechaza el acuerdo antes de asignar otro recurso.'
+      : 'Error al crear reservación: ' + e.message;
+    if (batch) console.error(`Acuerdo ${ped.id}: ${msg}`);
+    else showToast(msg, 'error');
+    return false;
   }
 
   // Notificar a cliente y proveedor
@@ -1345,9 +1415,12 @@ async function _ejecutarAprobarAcuerdo(ped, oferta) {
     adminId:     oferta.admin_id,
   });
 
-  showToast('✓ Acuerdo aprobado. Reservación creada');
-  renderAprobaciones();
-  if (document.getElementById('view-pedidos')?.classList.contains('active')) renderPedidos();
+  if (!batch) {
+    showToast('✓ Acuerdo aprobado. Reservación creada');
+    renderAprobaciones();
+    if (document.getElementById('view-pedidos')?.classList.contains('active')) renderPedidos();
+  }
+  return true;
 }
 
 // ── RECHAZAR ACUERDO ─────────────────────────────────────
@@ -1421,6 +1494,42 @@ async function aprobarOperador(id) {
   renderAdminOperadores();
 }
 
+
+// Rescate de un acuerdo que se cerró sin reservación: lo devuelve a
+// 'pendiente_acuerdo' para que reaparezca con sus botones Aprobar/Rechazar.
+// No crea la reservación por su cuenta — el motivo del fallo (la unidad ya
+// estaba tomada) casi siempre sigue vigente y hay que decidirlo a mano.
+function repararAcuerdoSinReserva(pedidoId) {
+  showConfirm(
+    'La solicitud volverá a "Acuerdos por aprobar" para que la apruebes con otra unidad o la rechaces. No se avisa a nadie todavía.',
+    async () => {
+      const { data: ped } = await sb.from('pedidos').select('*').eq('id', pedidoId).single();
+
+      // Sin oferta asociada la tarjeta sale vacía y Aprobar se niega a correr:
+      // recuperar la aceptada evita devolverlo a un estado igual de muerto.
+      let ofertaId = ped?.oferta_pendiente_id || null;
+      if (!ofertaId) {
+        const { data: acep } = await sb.from('ofertas')
+          .select('id').eq('pedido_id', pedidoId).eq('estado', 'aceptada')
+          .order('created_at', { ascending: false }).limit(1);
+        ofertaId = acep?.[0]?.id || null;
+      }
+      if (!ofertaId) {
+        showToast('No se encontró la oferta aceptada de esta solicitud. Revísala en Solicitudes.', 'error');
+        return;
+      }
+
+      const ok = await actualizarConfirmado('pedidos', { id: pedidoId },
+        { estado: 'pendiente_acuerdo', oferta_pendiente_id: ofertaId },
+        `la solicitud ${pedidoId}`);
+      if (!ok) return;
+
+      showToast('✓ Regresó a "Acuerdos por aprobar"');
+      renderAprobaciones();
+    },
+    { confirmLabel: '↩ Regresar a revisión' }
+  );
+}
 
 function rechazarAcuerdo(pedidoId) {
   _abrirRechazarNota(
@@ -1657,18 +1766,36 @@ function aprobarTodosAcuerdos() {
   showConfirm('¿Aprobar todos los acuerdos pendientes? Se crearán reservaciones para cada uno.', async () => {
     const { data: acuerdos } = await sb.from('pedidos').select('id, oferta_pendiente_id').eq('estado', 'pendiente_acuerdo');
     if (!acuerdos?.length) { showToast('No hay acuerdos pendientes'); return; }
-    let ok = 0, err = 0;
+
+    let ok = 0;
+    const fallos = [];
     for (const a of acuerdos) {
       try {
         const { data: ped } = await sb.from('pedidos').select('*').eq('id', a.id).single();
-        if (!ped?.oferta_pendiente_id) { err++; continue; }
+        if (!ped?.oferta_pendiente_id) { fallos.push(`${a.id}: sin oferta asociada`); continue; }
         const { data: oferta } = await sb.from('ofertas').select('*').eq('id', ped.oferta_pendiente_id).single();
-        if (!oferta) { err++; continue; }
-        await _ejecutarAprobarAcuerdo(ped, oferta);
-        ok++;
-      } catch (_) { err++; }
+        if (!oferta) { fallos.push(`${a.id}: oferta no encontrada`); continue; }
+
+        // Aprobar en lote es justo donde dos acuerdos se pelean la misma
+        // unidad: se saltan en vez de intentar y fallar a media escritura.
+        const choque = await _conflictoDeUnidad(ped, oferta);
+        // Sin esc(): showToast escribe con textContent, escapar aquí mostraría
+        // las entidades en crudo.
+        if (choque) { fallos.push(`${ped.tipo_camion || a.id}: unidad ${oferta.camion_id} ya reservada`); continue; }
+
+        if (await _ejecutarAprobarAcuerdo(ped, oferta, { batch: true })) ok++;
+        else fallos.push(`${ped.tipo_camion || a.id}: no se pudo crear la reservación`);
+      } catch (e) { fallos.push(`${a.id}: ${e.message}`); }
     }
-    showToast(`✓ ${ok} acuerdo${ok !== 1 ? 's' : ''} aprobado${ok !== 1 ? 's' : ''}${err ? ` · ${err} con error` : ''}`);
+
+    const detalle = fallos.slice(0, 2).join(' · ') + (fallos.length > 2 ? ` y ${fallos.length - 2} más` : '');
+    showToast(
+      `✓ ${ok} acuerdo${ok !== 1 ? 's' : ''} aprobado${ok !== 1 ? 's' : ''}` +
+      (fallos.length ? ` · ${fallos.length} sin aprobar — ${detalle}` : ''),
+      fallos.length ? 'error' : undefined);
+
+    renderAprobaciones();
+    if (document.getElementById('view-pedidos')?.classList.contains('active')) renderPedidos();
   }, { confirmLabel: 'Aprobar todos' });
 }
 

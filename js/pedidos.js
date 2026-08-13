@@ -2080,35 +2080,30 @@ async function responderContra(accion) {
 
 // ── CERRAR ACUERDO → CREAR RESERVACIÓN ────────────────
 
+// ⚠ EL ORDEN DE LAS ESCRITURAS IMPORTA — no las reacomodes sin leer esto.
+//
+// Son cuatro escrituras sueltas (no hay transacción desde el cliente) y solo
+// UNA puede fallar por reglas de negocio: el insert de la reservación, que el
+// trigger check_reservacion_disponibilidad rechaza si el recurso ya está
+// reservado en esas fechas. Por eso va primero.
+//
+// Cuando iba al final, ese fallo dejaba el pedido ya en 'acordado' y las demás
+// ofertas ya rechazadas (con su aviso de "no fuiste seleccionado" enviado),
+// pero sin reservación. Y era irrecuperable: el panel de aprobaciones solo
+// lista 'pendiente_revision' y 'pendiente_acuerdo', así que la tarjeta con los
+// botones Aprobar/Rechazar desaparecía justo cuando el toast le pedía al
+// superadmin "rechaza el acuerdo antes de asignar otro recurso". Más tarde la
+// expiración perezosa lo marcaba 'expirado' y enterraba la evidencia.
+//
+// No hace falta una carrera para llegar ahí: el filtro de disponibilidad al
+// ofertar (openHacerOferta) solo mira reservaciones existentes, así que la
+// misma unidad se puede ofertar en dos pedidos con fechas traslapadas. Aprobar
+// el segundo bastaba.
+//
+// Con la reservación primero, si falla no se tocó nada: el pedido sigue en
+// 'pendiente_acuerdo', la tarjeta sigue en el panel y el toast por fin pide
+// algo que se puede hacer.
 async function cerrarAcuerdo(oferta, pedido) {
-  // Obtener las otras ofertas activas ANTES de rechazarlas (para notificar)
-  const { data: otrasOfertas } = await sb.from('ofertas')
-    .select('id, admin_id, admin_nombre')
-    .eq('pedido_id', pedido.id)
-    .neq('id', oferta.id)
-    .in('estado', ['enviada','contra_oferta']);
-
-  // Rechazar todas las demás ofertas pendientes del pedido
-  if (otrasOfertas?.length) {
-    await sb.from('ofertas')
-      .update({ estado: 'rechazada' })
-      .in('id', otrasOfertas.map(o => o.id));
-
-    // Notificar a cada admin cuya oferta quedó rechazada
-    const notifs = otrasOfertas.map(o => ({
-      user_id: o.admin_id,
-      tipo:    'oferta_no_seleccionada',
-      titulo:  'Tu oferta no fue seleccionada',
-      mensaje: `El cliente eligió otro proveedor para su solicitud de ${esc(pedido.tipo_camion || 'servicio')} (${esc(pedido.origen || '')}${pedido.destino ? ' → ' + esc(pedido.destino) : ''}). Gracias por participar.`,
-      leido:   false,
-    }));
-    await sb.from('notificaciones').insert(notifs);
-  }
-
-  // Marcar pedido como acordado
-  const { error: errAcuerdo } = await sb.from('pedidos').update({ estado: 'acordado' }).eq('id', pedido.id);
-  if (errAcuerdo) throw new Error(errAcuerdo.message || 'Error al marcar pedido como acordado');
-
   // Detectar tipo de recurso del pedido para guardarlo en la reservación
   const tipoPedido = pedido.tipo_camion || '';
   const recursoTipo = tipoPedido.startsWith('Custodio') || tipoPedido === 'Supervisión remota'
@@ -2119,32 +2114,73 @@ async function cerrarAcuerdo(oferta, pedido) {
         ? 'lavado'
         : 'camion';
 
-  // Crear reservación automáticamente
-  const { error } = await sb.from('reservaciones').insert({
-    pedido_id:       pedido.id,
-    unidad:          oferta.camion_id || null,
-    recurso_tipo:    recursoTipo,
-    cliente:         pedido.cliente_nombre,
-    cliente_email:   pedido.cliente_email,
-    cliente_user_id: pedido.cliente_id,
-    propietario_id:  oferta.admin_id,
-    fecha_ini:       pedido.fecha_ini,
-    fecha_fin:       pedido.fecha_fin || pedido.fecha_ini,
-    descripcion:     pedido.descripcion,
-    estado:          'Activa',
-    precio_acordado: oferta.precio_oferta,
-    // Snapshot del plazo pactado: el pedido puede reabrirse o editarse después,
-    // y el cobro debe regirse por lo que se acordó en esta operación.
-    plazo_pago:      pedido.plazo_pago || null,
-  });
-  if (error) {
-    if (error.message?.includes('RECURSO_NO_DISPONIBLE') || error.code === 'P0001') {
-      throw new Error('RECURSO_NO_DISPONIBLE');
+  // ── 1) Reservación — la única escritura que puede fallar ────────────
+  // Si una pasada anterior creó la reservación pero murió antes de terminar,
+  // reintentar no debe chocar contra el trigger con su propia reservación.
+  const { data: yaExiste } = await sb.from('reservaciones')
+    .select('id').eq('pedido_id', pedido.id).limit(1);
+
+  if (!yaExiste?.length) {
+    const { error } = await sb.from('reservaciones').insert({
+      pedido_id:       pedido.id,
+      unidad:          oferta.camion_id || null,
+      recurso_tipo:    recursoTipo,
+      cliente:         pedido.cliente_nombre,
+      cliente_email:   pedido.cliente_email,
+      cliente_user_id: pedido.cliente_id,
+      propietario_id:  oferta.admin_id,
+      fecha_ini:       pedido.fecha_ini,
+      fecha_fin:       pedido.fecha_fin || pedido.fecha_ini,
+      descripcion:     pedido.descripcion,
+      estado:          'Activa',
+      precio_acordado: oferta.precio_oferta,
+      // Snapshot del plazo pactado: el pedido puede reabrirse o editarse después,
+      // y el cobro debe regirse por lo que se acordó en esta operación.
+      plazo_pago:      pedido.plazo_pago || null,
+    });
+    if (error) {
+      if (error.message?.includes('RECURSO_NO_DISPONIBLE') || error.code === 'P0001') {
+        throw new Error('RECURSO_NO_DISPONIBLE');
+      }
+      throw new Error(error.message || 'Error al crear reservación');
     }
-    throw new Error(error.message || 'Error al crear reservación');
   }
 
-  // Marcar recurso como ocupado si la reserva ya inició
+  // ── 2) Pedido → acordado ────────────────────────────────────────────
+  // Si esto falla, la reservación ya existe (el servicio va a ocurrir) y el
+  // pedido se queda en 'pendiente_acuerdo': volver a darle Aprobar reengancha
+  // desde aquí gracias al chequeo de arriba.
+  const { error: errAcuerdo } = await sb.from('pedidos').update({ estado: 'acordado' }).eq('id', pedido.id);
+  if (errAcuerdo) throw new Error(errAcuerdo.message || 'Error al marcar pedido como acordado');
+
+  // ── 3) Rechazar las demás ofertas y avisar a esos proveedores ───────
+  // De aquí en adelante el acuerdo ya es un hecho: un fallo se reporta en
+  // consola pero no se propaga, porque revertir sería peor que el descuadre.
+  const { data: otrasOfertas } = await sb.from('ofertas')
+    .select('id, admin_id, admin_nombre')
+    .eq('pedido_id', pedido.id)
+    .neq('id', oferta.id)
+    .in('estado', ['enviada','contra_oferta']);
+
+  if (otrasOfertas?.length) {
+    const { error: errOtras } = await sb.from('ofertas')
+      .update({ estado: 'rechazada' })
+      .in('id', otrasOfertas.map(o => o.id));
+    if (errOtras) console.error('No se pudieron rechazar las otras ofertas:', errOtras.message);
+
+    // Notificar a cada admin cuya oferta quedó rechazada
+    const notifs = otrasOfertas.map(o => ({
+      user_id: o.admin_id,
+      tipo:    'oferta_no_seleccionada',
+      titulo:  'Tu oferta no fue seleccionada',
+      mensaje: `El cliente eligió otro proveedor para su solicitud de ${esc(pedido.tipo_camion || 'servicio')} (${esc(pedido.origen || '')}${pedido.destino ? ' → ' + esc(pedido.destino) : ''}). Gracias por participar.`,
+      leido:   false,
+    }));
+    const { error: errNotif } = await sb.from('notificaciones').insert(notifs);
+    if (errNotif) console.error('No se pudo notificar a los proveedores descartados:', errNotif.message);
+  }
+
+  // ── 4) Marcar recurso como ocupado si la reserva ya inició ──────────
   if (oferta.camion_id && pedido.fecha_ini <= today()) {
     const tablaRecurso = recursoTipo === 'custodio' ? 'custodios'
       : recursoTipo === 'patio' ? 'patios'
