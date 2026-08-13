@@ -1222,7 +1222,7 @@ async function _ejecutarRechazarFinalizacion(reservaId, nota) {
   });
   if (r?.propietario_id) notifs.push({
     user_id: r.propietario_id, tipo: 'finalizacion_rechazada', titulo: 'Finalización no aprobada',
-    mensaje: `El superadmin no aprobó el cierre del servicio con ${esc(r?.cliente || 'el cliente')}.${nota ? ' Motivo: ' + nota : ''} El servicio sigue activo.`, leido: false,
+    mensaje: `El superadmin no aprobó el cierre del servicio con ${r?.cliente || 'el cliente'}.${nota ? ' Motivo: ' + nota : ''} El servicio sigue activo.`, leido: false,
   });
   if (notifs.length) await sb.from('notificaciones').insert(notifs);
 
@@ -1281,7 +1281,7 @@ async function _ejecutarAprobarCancelacion(reservaId, nota) {
   });
   if (r.propietario_id) notifs.push({
     user_id: r.propietario_id, tipo: 'cancelacion_aprobada', titulo: 'Servicio cancelado',
-    mensaje: `Se aprobó la cancelación del servicio con ${esc(r.cliente || 'el cliente')}. Tu unidad quedó disponible de nuevo.${nota ? ' Nota: ' + nota : ''}`, leido: false,
+    mensaje: `Se aprobó la cancelación del servicio con ${r.cliente || 'el cliente'}. Tu unidad quedó disponible de nuevo.${nota ? ' Nota: ' + nota : ''}`, leido: false,
   });
   if (notifs.length) await sb.from('notificaciones').insert(notifs);
 
@@ -1317,7 +1317,7 @@ async function _ejecutarRechazarCancelacion(reservaId, nota) {
   });
   if (r?.propietario_id) notifs.push({
     user_id: r.propietario_id, tipo: 'cancelacion_rechazada', titulo: 'El servicio continúa',
-    mensaje: `No se aprobó la cancelación solicitada por ${esc(r?.cliente || 'el cliente')}. El servicio sigue activo.`, leido: false,
+    mensaje: `No se aprobó la cancelación solicitada por ${r?.cliente || 'el cliente'}. El servicio sigue activo.`, leido: false,
   });
   if (notifs.length) await sb.from('notificaciones').insert(notifs);
 
@@ -1417,14 +1417,14 @@ async function _ejecutarAprobarAcuerdo(ped, oferta, { batch = false } = {}) {
       user_id: ped.cliente_id,
       tipo:    'acuerdo_aprobado',
       titulo:  '¡Acuerdo aprobado!',
-      mensaje: `Tu acuerdo de ${esc(ped.tipo_camion || 'servicio')} fue aprobado. Ya tienes una reservación activa.`,
+      mensaje: `Tu acuerdo de ${ped.tipo_camion || 'servicio'} fue aprobado. Ya tienes una reservación activa.`,
       leido:   false,
     },
     {
       user_id: oferta.admin_id,
       tipo:    'acuerdo_aprobado',
       titulo:  '¡Acuerdo aprobado!',
-      mensaje: `El acuerdo con ${esc(ped.cliente_nombre || 'el cliente')} para ${esc(ped.tipo_camion || 'servicio')} fue aprobado. Revisa tus reservaciones.`,
+      mensaje: `El acuerdo con ${ped.cliente_nombre || 'el cliente'} para ${ped.tipo_camion || 'servicio'} fue aprobado. Revisa tus reservaciones.`,
       leido:   false,
     },
   ];
@@ -1588,7 +1588,7 @@ async function _ejecutarRechazarAcuerdo(pedidoId, nota) {
       user_id: ped.cliente_id,
       tipo:    'acuerdo_rechazado',
       titulo:  'Acuerdo no aprobado',
-      mensaje: `El acuerdo de ${esc(ped.tipo_camion || 'servicio')} no fue aprobado y regresa a negociación.${nota ? ' Motivo: ' + nota : ''}`,
+      mensaje: `El acuerdo de ${ped.tipo_camion || 'servicio'} no fue aprobado y regresa a negociación.${nota ? ' Motivo: ' + nota : ''}`,
       leido:   false,
     });
   }
@@ -1601,7 +1601,7 @@ async function _ejecutarRechazarAcuerdo(pedidoId, nota) {
         user_id: of2.admin_id,
         tipo:    'acuerdo_rechazado',
         titulo:  'Acuerdo no aprobado',
-        mensaje: `El acuerdo con ${esc(ped?.cliente_nombre || 'el cliente')} no fue aprobado y regresa a negociación.${nota ? ' Motivo: ' + nota : ''}`,
+        mensaje: `El acuerdo con ${ped?.cliente_nombre || 'el cliente'} no fue aprobado y regresa a negociación.${nota ? ' Motivo: ' + nota : ''}`,
         leido:   false,
       });
     }

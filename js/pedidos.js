@@ -1643,16 +1643,28 @@ async function confirmarDetallesServicio() {
     detalles_contacto_tel:    v('ds-contacto-tel') || null,
   };
   if (fecha) update.fecha_ini = fecha;
-  await sb.from('pedidos').update(update).eq('id', pedido.id);
+
+  // Las tres escrituras se confirman. Iban sueltas y sin revisar: un UPDATE
+  // bloqueado por RLS devuelve error null y afecta 0 filas, así que el cliente
+  // veía "✓ Acuerdo enviado a revisión" sin que hubiera pasado nada.
+  const _restaurarBoton = () => {
+    if (btnConfirmar) { btnConfirmar.disabled = false; btnConfirmar.textContent = '✓ Guardar y confirmar'; }
+  };
+
+  if (!await actualizarConfirmado('pedidos', { id: pedido.id }, update,
+        'los detalles del servicio')) { _restaurarBoton(); return; }
 
   // Marcar oferta como aceptada
-  await sb.from('ofertas').update({ estado: 'aceptada' }).eq('id', oferta.id);
+  if (!await actualizarConfirmado('ofertas', { id: oferta.id }, { estado: 'aceptada' },
+        'la oferta aceptada')) { _restaurarBoton(); return; }
 
-  // Poner pedido en pendiente_acuerdo (superadmin revisa antes de crear reservación)
-  await sb.from('pedidos').update({
-    estado:              'pendiente_acuerdo',
-    oferta_pendiente_id: oferta.id,
-  }).eq('id', pedido.id);
+  // Poner pedido en pendiente_acuerdo (superadmin revisa antes de crear reservación).
+  // Si esto falla, la oferta ya quedó 'aceptada': la regla perezosa de
+  // renderPedidos (pedido en negociación con una oferta aceptada →
+  // pendiente_acuerdo) lo repara al siguiente listado.
+  if (!await actualizarConfirmado('pedidos', { id: pedido.id },
+        { estado: 'pendiente_acuerdo', oferta_pendiente_id: oferta.id },
+        'la solicitud')) { _restaurarBoton(); return; }
 
   // Notificar a superadmins para que aprueben el acuerdo
   const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
@@ -1661,7 +1673,7 @@ async function confirmarDetallesServicio() {
       user_id: a.user_id,
       tipo:    'revision_acuerdo',
       titulo:  'Acuerdo pendiente de aprobación',
-      mensaje: `${esc(pedido.cliente_nombre || 'Un cliente')} aceptó una oferta de ${esc(oferta.admin_nombre || 'un proveedor')} por $${Number(oferta.precio_oferta).toLocaleString('es-MX')} MXN. Revisa y aprueba.`,
+      mensaje: `${pedido.cliente_nombre || 'Un cliente'} aceptó una oferta de ${oferta.admin_nombre || 'un proveedor'} por $${Number(oferta.precio_oferta).toLocaleString('es-MX')} MXN. Revisa y aprueba.`,
       leido:   false,
     })));
   }
@@ -2048,7 +2060,7 @@ async function responderContra(accion) {
           user_id: a.user_id,
           tipo:    'revision_acuerdo',
           titulo:  'Acuerdo pendiente de aprobación',
-          mensaje: `${esc(currentUser.nombre)} aceptó una contraoferta de ${esc(pedido.cliente_nombre || 'cliente')} por $${Number(oferta.contra_precio).toLocaleString('es-MX')} MXN. Revisa y aprueba.`,
+          mensaje: `${currentUser.nombre} aceptó una contraoferta de ${pedido.cliente_nombre || 'cliente'} por $${Number(oferta.contra_precio).toLocaleString('es-MX')} MXN. Revisa y aprueba.`,
           leido:   false,
         })));
       }
@@ -2173,7 +2185,7 @@ async function cerrarAcuerdo(oferta, pedido) {
       user_id: o.admin_id,
       tipo:    'oferta_no_seleccionada',
       titulo:  'Tu oferta no fue seleccionada',
-      mensaje: `El cliente eligió otro proveedor para su solicitud de ${esc(pedido.tipo_camion || 'servicio')} (${esc(pedido.origen || '')}${pedido.destino ? ' → ' + esc(pedido.destino) : ''}). Gracias por participar.`,
+      mensaje: `El cliente eligió otro proveedor para su solicitud de ${pedido.tipo_camion || 'servicio'} (${pedido.origen || ''}${pedido.destino ? ' → ' + pedido.destino : ''}). Gracias por participar.`,
       leido:   false,
     }));
     const { error: errNotif } = await sb.from('notificaciones').insert(notifs);

@@ -392,7 +392,7 @@ async function aceptarReserva(reservaId, unidad, recurso_tipo) {
       user_id: r.cliente_user_id,
       tipo:    'reserva_aceptada',
       titulo:  '✓ Reservación confirmada',
-      mensaje: `${currentUser.nombre} confirmó tu servicio de ${r?.descripcion ? '' : ''}. Revisa tus reservaciones para más detalles.`,
+      mensaje: `${currentUser.nombre} confirmó tu servicio${r?.descripcion ? ` de ${r.descripcion}` : ''}. Revisa tus reservaciones para más detalles.`,
       leido:   false,
     });
   }
@@ -514,7 +514,7 @@ function cancelarReserva(reservaId, unidad) {
         user_id: a.user_id,
         tipo:    'reserva_cancelada_admin',
         titulo:  'Un acuerdo aprobado se canceló',
-        mensaje: `${esc(currentUser.nombre)} canceló la reserva con ${esc(rv?.cliente || 'un cliente')} después de que el acuerdo ya había sido aprobado. La solicitud volvió a estar abierta.`,
+        mensaje: `${currentUser.nombre} canceló la reserva con ${rv?.cliente || 'un cliente'} después de que el acuerdo ya había sido aprobado. La solicitud volvió a estar abierta.`,
         leido:   false,
       })));
     }
@@ -712,7 +712,7 @@ async function subirEvidencias() {
         user_id: a.user_id,
         tipo:    'revision_finalizacion',
         titulo:  '🏁 Finalización de servicio por revisar',
-        mensaje: `${esc(r.cliente || 'Un cliente')} tiene un servicio marcado como completado, pendiente de tu aprobación.`,
+        mensaje: `${r.cliente || 'Un cliente'} tiene un servicio marcado como completado, pendiente de tu aprobación.`,
         leido:   false,
       })));
     }
@@ -725,7 +725,7 @@ async function subirEvidencias() {
         user_id: a.user_id,
         tipo:    'revision_finalizacion',
         titulo:  '🏁 Ya están ambas evidencias',
-        mensaje: `${esc(r.cliente || 'Un cliente')} y la empresa ya subieron su evidencia de cierre. Puedes revisarla y aprobarla.`,
+        mensaje: `${r.cliente || 'Un cliente'} y la empresa ya subieron su evidencia de cierre. Puedes revisarla y aprobarla.`,
         leido:   false,
       })));
     }
@@ -851,7 +851,7 @@ async function confirmarSolicitudCancelacion() {
     user_id: r.propietario_id,
     tipo:    'cancelacion_solicitada',
     titulo:  '⚠ El cliente pidió cancelar un servicio',
-    mensaje: `${esc(currentUser.nombre || 'El cliente')} solicitó cancelar el servicio de ${esc(r.unidad || 'la unidad')}. Motivo: ${esc(motivo)}. Está en revisión — no continúes hasta que se resuelva.`,
+    mensaje: `${currentUser.nombre || 'El cliente'} solicitó cancelar el servicio de ${r.unidad || 'la unidad'}. Motivo: ${motivo}. Está en revisión — no continúes hasta que se resuelva.`,
     leido:   false,
   });
   const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
@@ -859,7 +859,7 @@ async function confirmarSolicitudCancelacion() {
     user_id: s.user_id,
     tipo:    'cancelacion_solicitada',
     titulo:  'Cancelación por revisar',
-    mensaje: `${esc(currentUser.nombre || 'Un cliente')} solicitó cancelar un servicio activo (${esc(r?.tracking_estado || 'Confirmado')}). Motivo: ${esc(motivo)}.`,
+    mensaje: `${currentUser.nombre || 'Un cliente'} solicitó cancelar un servicio activo (${r?.tracking_estado || 'Confirmado'}). Motivo: ${motivo}.`,
     leido:   false,
   }));
   if (notifs.length) await sb.from('notificaciones').insert(notifs);

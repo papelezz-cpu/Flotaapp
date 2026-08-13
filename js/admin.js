@@ -311,7 +311,7 @@ async function solicitarActualizacionDocs() {
   if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
     user_id: sa.user_id, tipo: 'docs_empresa_pendientes',
     titulo:  '📋 Documentos de empresa para revisar',
-    mensaje: `${esc(currentUser.nombre || '')} envió documentos de empresa para actualización.`,
+    mensaje: `${currentUser.nombre || ''} envió documentos de empresa para actualización.`,
     leido:   false,
   })));
 
@@ -502,7 +502,7 @@ async function guardarEdicion() {
     if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
       user_id: sa.user_id, tipo: 'nueva_unidad_pendiente',
       titulo:  'Unidad editada — revisión pendiente',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} editó la unidad ${id}. Revisa los cambios en Pendientes.`,
+      mensaje: `La empresa ${currentUser.nombre || ''} editó la unidad ${id}. Revisa los cambios en Pendientes.`,
       leido:   false,
     })));
   }
@@ -705,7 +705,7 @@ async function aprobarRecurso(tabla, id) {
       user_id: recurso.propietario_id,
       tipo:    'recurso_aprobado',
       titulo:  '✓ Recurso aprobado',
-      mensaje: `Tu ${tipoLabel} "${esc(recurso.nombre || id)}" fue aprobado y ya está visible en el catálogo.`,
+      mensaje: `Tu ${tipoLabel} "${recurso.nombre || id}" fue aprobado y ya está visible en el catálogo.`,
       leido:   false,
     });
   }
@@ -938,7 +938,7 @@ async function agregarCamion() {
     if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
       user_id: sa.user_id, tipo: 'nueva_unidad_pendiente',
       titulo:  'Nueva unidad pendiente de revisión',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta la unidad ${targetId} (${tipo}). Revísala en Pendientes.`,
+      mensaje: `La empresa ${currentUser.nombre || ''} dio de alta la unidad ${targetId} (${tipo}). Revísala en Pendientes.`,
       leido:   false,
     })));
   }
@@ -1069,7 +1069,7 @@ async function agregarCustodio() {
     if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
       user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
       titulo:  'Nuevo custodio pendiente de revisión',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta el custodio ${id} (${nombre}). Revísalo en Pendientes.`,
+      mensaje: `La empresa ${currentUser.nombre || ''} dio de alta el custodio ${id} (${nombre}). Revísalo en Pendientes.`,
       leido:   false,
     })));
   }
@@ -1162,7 +1162,7 @@ async function guardarEdicionCustodio() {
     if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
       user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
       titulo:  'Custodio editado — revisión pendiente',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} editó el custodio ${id}. Revisa los cambios en Pendientes.`,
+      mensaje: `La empresa ${currentUser.nombre || ''} editó el custodio ${id}. Revisa los cambios en Pendientes.`,
       leido:   false,
     })));
   }
@@ -1255,7 +1255,7 @@ async function agregarPatio() {
     if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
       user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
       titulo:  'Nuevo patio pendiente de revisión',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta el patio ${id} (${nombre}). Revísalo en Pendientes.`,
+      mensaje: `La empresa ${currentUser.nombre || ''} dio de alta el patio ${id} (${nombre}). Revísalo en Pendientes.`,
       leido:   false,
     })));
   }
@@ -1317,7 +1317,7 @@ async function guardarEdicionPatio() {
     if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
       user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
       titulo:  'Patio editado — revisión pendiente',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} editó el patio ${id}. Revisa los cambios en Pendientes.`,
+      mensaje: `La empresa ${currentUser.nombre || ''} editó el patio ${id}. Revisa los cambios en Pendientes.`,
       leido:   false,
     })));
   }
@@ -1402,7 +1402,7 @@ async function agregarLavado() {
     if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
       user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
       titulo:  'Nuevo servicio de lavado pendiente de revisión',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta el servicio ${id} (${nombre}). Revísalo en Pendientes.`,
+      mensaje: `La empresa ${currentUser.nombre || ''} dio de alta el servicio ${id} (${nombre}). Revísalo en Pendientes.`,
       leido:   false,
     })));
   }
@@ -1462,7 +1462,7 @@ async function guardarEdicionLavado() {
     if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
       user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
       titulo:  'Servicio de lavado editado — revisión pendiente',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} editó el servicio de lavado ${id}. Revisa los cambios en Pendientes.`,
+      mensaje: `La empresa ${currentUser.nombre || ''} editó el servicio de lavado ${id}. Revisa los cambios en Pendientes.`,
       leido:   false,
     })));
   }

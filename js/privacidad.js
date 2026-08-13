@@ -178,7 +178,7 @@ async function enviarSolicitudArco() {
       user_id: s.user_id,
       tipo:    'solicitud_arco',
       titulo:  'Nueva solicitud de derechos ARCO',
-      mensaje: `${esc(currentUser.nombre || 'Un usuario')} envió una solicitud de ${ARCO_TIPOS[tipo]?.label || tipo}. Tiene plazo de respuesta.`,
+      mensaje: `${currentUser.nombre || 'Un usuario'} envió una solicitud de ${ARCO_TIPOS[tipo]?.label || tipo}. Tiene plazo de respuesta.`,
       leido:   false,
     })));
   }
