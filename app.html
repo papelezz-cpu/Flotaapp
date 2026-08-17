@@ -1461,7 +1461,7 @@
           <label>Origen — ciudad y dirección *</label>
           <input type="text" id="np-origen" placeholder="Ej. Guadalajara, Av. Industria 450">
           <div class="mapa-fila">
-            <button type="button" class="mapa-btn" onclick="abrirMapa('origen')">📍 Marcar en el mapa</button>
+            <button type="button" class="mapa-btn" onclick="abrirMapa('origen')">📍 Asignar ubicación</button>
             <span class="mapa-coord" id="np-origen-coord"></span>
           </div>
         </div>
@@ -1469,7 +1469,7 @@
           <label>Destino — ciudad y dirección *</label>
           <input type="text" id="np-destino" placeholder="Ej. CDMX, Bodega Industrial Norte">
           <div class="mapa-fila">
-            <button type="button" class="mapa-btn" onclick="abrirMapa('destino')">📍 Marcar en el mapa</button>
+            <button type="button" class="mapa-btn" onclick="abrirMapa('destino')">📍 Asignar ubicación</button>
             <span class="mapa-coord" id="np-destino-coord"></span>
           </div>
         </div>
@@ -2632,10 +2632,10 @@
 <div class="modal-overlay" id="modal-mapa">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
-      <h3 id="mapa-titulo">Marcar punto</h3>
+      <h3 id="mapa-titulo">Asignar ubicación</h3>
       <button class="modal-close" onclick="cerrarMapa()">&times;</button>
     </div>
-    <p class="mapa-ayuda">Toca el mapa para poner el pin donde se hace la maniobra. Sirve para que el operador llegue al punto exacto, no solo a la calle.</p>
+    <p class="mapa-ayuda">Busca un lugar o toca el mapa para poner el pin — luego lo puedes arrastrar para ajustarlo. Sirve para que el operador llegue al punto exacto, no solo a la calle.</p>
     <div class="mapa-buscar">
       <input type="text" id="mapa-buscar-input" placeholder="Buscar un lugar para acercar el mapa…"
              onkeydown="if(event.key==='Enter'){event.preventDefault();buscarEnMapa();}">
@@ -2663,7 +2663,7 @@
 <script src="js/recursos.js?v=11"></script>
 <script src="js/reservaciones.js?v=39"></script>
 <script src="js/modal.js?v=13"></script>
-<script src="js/mapa.js?v=1"></script>
+<script src="js/mapa.js?v=2"></script>
 <script src="js/expedientes.js?v=5"></script>
 <script src="js/pedidos.js?v=59"></script>
 <script src="js/plantillas.js?v=8"></script>

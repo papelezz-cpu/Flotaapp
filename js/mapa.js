@@ -29,7 +29,7 @@ function abrirMapa(campo) {
   _mapaPunto = _mapaPuntos[campo] || null;
 
   document.getElementById('mapa-titulo').textContent =
-    campo === 'origen' ? 'Marcar el origen' : 'Marcar el destino';
+    campo === 'origen' ? 'Asignar ubicación de origen' : 'Asignar ubicación de destino';
   document.getElementById('mapa-buscar-input').value =
     document.getElementById(`np-${campo}`)?.value || '';
   document.getElementById('modal-mapa').classList.add('open');
@@ -66,8 +66,17 @@ function cerrarMapa() {
 
 function _ponerPin(lat, lng, etiqueta) {
   _mapaPunto = { lat, lng, etiqueta: etiqueta || null };
-  if (_mapaMarcador) _mapaMarcador.setLatLng([lat, lng]);
-  else _mapaMarcador = L.marker([lat, lng]).addTo(_mapa);
+  if (_mapaMarcador) {
+    _mapaMarcador.setLatLng([lat, lng]);
+  } else {
+    // Arrastrable: buscar solo acerca al lugar, el pin fino lo ajusta el
+    // usuario arrastrando en vez de tener que volver a tocar el mapa.
+    _mapaMarcador = L.marker([lat, lng], { draggable: true }).addTo(_mapa);
+    _mapaMarcador.on('dragend', () => {
+      const p = _mapaMarcador.getLatLng();
+      _ponerPin(p.lat, p.lng);
+    });
+  }
   _pintarSeleccion();
   if (!etiqueta) _reverseGeocode(lat, lng);
 }
@@ -105,7 +114,11 @@ async function buscarEnMapa(texto) {
       if (texto === undefined) showToast('No se encontró ese lugar. Marca el punto directo en el mapa.', 'error');
       return;
     }
-    _mapa.setView([+d[0].lat, +d[0].lon], 15);
+    const lat = +d[0].lat, lng = +d[0].lon;
+    _mapa.setView([lat, lng], 15);
+    // Buscar ya deja el pin puesto ahí — el usuario solo lo arrastra si el
+    // resultado no cayó exacto, en vez de tener que tocar el mapa aparte.
+    _ponerPin(lat, lng, d[0].display_name);
   } catch (e) {
     console.warn('Búsqueda en mapa falló:', e);
   }
