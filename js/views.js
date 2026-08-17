@@ -72,7 +72,7 @@ function renderHome() {
   const C = {
     cliente: [
       { i:'truck',         bg:'hc-blue',   t:'Solicitar servicio',     d:'Transporte, custodia y más',      fn:`_pedidosMode='solicitar';showView('pedidos',null)` },
-      { i:'clipboardList', bg:'hc-slate',  t:'Mis solicitudes',         d:'Revisa el estado de tus pedidos', fn:`_pedidosMode='lista';showView('pedidos',null)` },
+      { i:'clipboardList', bg:'hc-slate',  t:'Mis solicitudes',         d:'Revisa el estado de tus pedidos', fn:`_pedidosMode='lista';showView('pedidos',null)`, badge:'home-ped-badge' },
       { i:'building',      bg:'hc-teal',   t:'Catálogo',                d:'Empresas verificadas',            fn:`showView('cliente',null)` },
       { i:'calendarCheck', bg:'hc-purple', t:'Reservaciones',           d:'Tus reservas activas',            fn:`_reservFiltro='Activa';showView('reservaciones',null)`, badge:'home-res-badge' },
       { i:'wallet',        bg:'hc-orange', t:'Mis pagos',     d:'Servicios por pagar y pagados',    fn:`_reservFiltro='PorCobrar';showView('reservaciones',null)`, badge:'home-cobros-badge' },
@@ -117,6 +117,27 @@ function renderHome() {
   if (currentUser?.rol === 'superadmin') { _loadAprBadge(); _loadArcoBadge(); }
   if (['admin','superadmin'].includes(currentUser?.rol)) actualizarBadgeVigencias();
   if (currentUser?.id) { actualizarBadgeReservas(); actualizarBadgeCobros(); }
+  if (currentUser?.rol === 'cliente') actualizarBadgePedidos();
+}
+
+// Cuenta de solicitudes activas del cliente para el badge de "Mis
+// solicitudes" — mismos estados que cuenta como "activo" la propia lista
+// (ver ESTADOS_ACTIVOS en renderPedidos), para que el número no contradiga
+// lo que se ve al entrar.
+async function actualizarBadgePedidos() {
+  const badge = document.getElementById('home-ped-badge');
+  if (!badge || !currentUser.id) return;
+  const ESTADOS_ACTIVOS = ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado'];
+  const { count } = await sb.from('pedidos')
+    .select('id', { count: 'exact', head: true })
+    .eq('cliente_id', currentUser.id)
+    .in('estado', ESTADOS_ACTIVOS);
+  if (count > 0) {
+    badge.textContent = count > 99 ? '99+' : count;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 // Cuenta de reservaciones ACTIVAS para el badge del cuadro de Reservaciones.
