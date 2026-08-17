@@ -170,6 +170,11 @@ function _renderExpediente() {
 
     ${dem ? `<div class="exp-demoras ${dem.cls}">${esc(dem.label)}</div>` : ''}
 
+    ${e.incidente_motivo ? `
+      <div class="exp-demoras exp-dem-vencido">
+        ⚠ La transportista no pudo entregar el vacío${e.incidente_reportado_en ? ` (${fmtFecha(e.incidente_reportado_en)})` : ''}: ${esc(e.incidente_motivo)}
+      </div>` : ''}
+
     ${_expEntregaFisicaHTML(e, soyCliente)}
 
     ${e.etapa === 'entrega_vacios' ? _expVaciosHTML(e, soyCliente) : ''}
@@ -183,6 +188,10 @@ function _renderExpediente() {
     ${!soyCliente && e.estado !== 'completo' && (e.entrega_fisica || (listos === obligatorios.length && obligatorios.length)) ? `
       <button class="btn-confirm" style="width:100%;margin-top:14px" onclick="marcarExpedienteCompleto()">
         ✓ ${e.entrega_fisica ? 'Ya recibí los documentos en físico — dar por bueno' : 'Documentación completa — dar por bueno el expediente'}
+      </button>` : ''}
+    ${!soyCliente && e.etapa === 'entrega_vacios' && e.estado !== 'completo' ? `
+      <button class="btn-edit btn-rechazar" style="width:100%;margin-top:8px" onclick="reportarIncidenteVacios()">
+        ${e.incidente_motivo ? '⚠ Actualizar motivo' : '⚠ No puedo entregar el vacío'}
       </button>` : ''}
     ${e.estado === 'completo' ? '<div class="exp-completo">✓ El transportista dio por completo este expediente.</div>' : ''}
   `;
@@ -379,6 +388,56 @@ async function _guardarDictamen(docId, estado, nota) {
   }
   await _refrescarExpediente();
   showToast(estado === 'aceptado' ? '✓ Documento aceptado' : 'Corrección solicitada al cliente');
+}
+
+// Cuando la transportista no puede entregar el vacío (depósito lleno,
+// problema con la unidad, etc.), tiene que avisarle al cliente por qué en
+// vez de dejarlo sin noticias mientras corren las demoras.
+function reportarIncidenteVacios() {
+  if (!_expActual) return;
+  const { expediente: e } = _expActual;
+  _abrirRechazarNota(
+    '⚠ No se puede entregar el vacío',
+    'Explica el motivo — se notificará al cliente y al superadmin:',
+    nota => _guardarIncidenteVacios(e.id, nota),
+    { confirmLabel: '⚠ Notificar al cliente', danger: true }
+  );
+}
+
+async function _guardarIncidenteVacios(expedienteId, nota) {
+  if (!nota || !nota.trim()) { showToast('Indica el motivo', 'error'); return; }
+
+  const { error } = await sb.from('expedientes').update({
+    incidente_motivo:        nota,
+    incidente_reportado_en:  new Date().toISOString(),
+    incidente_reportado_por: currentUser.id,
+  }).eq('id', expedienteId);
+  if (error) { showToast('No se pudo guardar: ' + error.message, 'error'); return; }
+
+  const reserva = _expActual?.reserva;
+  if (reserva?.cliente_user_id) {
+    await sb.from('notificaciones').insert({
+      user_id: reserva.cliente_user_id,
+      tipo:    'incidente_entrega_vacios',
+      titulo:  '⚠ No se pudo entregar el vacío',
+      mensaje: `La empresa no pudo entregar el contenedor vacío de tu servicio "${esc(reserva.unidad || '')}". Motivo: ${nota}`,
+      leido:   false,
+    });
+  }
+  // También al superadmin: ahí corren las demoras (costo por día de retraso).
+  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+  if (supers?.length) {
+    await sb.from('notificaciones').insert(supers.map(s => ({
+      user_id: s.user_id,
+      tipo:    'incidente_entrega_vacios',
+      titulo:  '⚠ Incidente: entrega de vacíos',
+      mensaje: `${esc(currentUser.nombre || 'Una empresa')} reportó que no puede entregar el vacío del servicio de ${esc(reserva?.cliente || 'un cliente')}. Motivo: ${nota}`,
+      leido:   false,
+    })));
+  }
+
+  await _refrescarExpediente();
+  showToast('✓ Cliente notificado');
 }
 
 async function marcarExpedienteCompleto() {
