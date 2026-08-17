@@ -24,7 +24,7 @@
   <!-- Estilos -->
   <link rel="stylesheet" href="css/base.css?v=7">
   <link rel="stylesheet" href="css/layout.css?v=4">
-  <link rel="stylesheet" href="css/components.css?v=33">
+  <link rel="stylesheet" href="css/components.css?v=34">
   <!-- Mapa para marcar origen y destino. Leaflet + OpenStreetMap: sin API key
        ni facturación, y ya usamos Nominatim (mismo proyecto) para geocodificar. -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -1458,20 +1458,20 @@
       </label>
       <div class="admin-grid" style="gap:12px">
         <div class="form-group">
-          <label>Origen — ciudad y dirección *</label>
-          <input type="text" id="np-origen" placeholder="Ej. Guadalajara, Av. Industria 450">
+          <label>Origen *</label>
           <div class="mapa-fila">
             <button type="button" class="mapa-btn" onclick="abrirMapa('origen')">📍 Asignar ubicación</button>
-            <span class="mapa-coord" id="np-origen-coord"></span>
           </div>
+          <input type="text" id="np-origen" readonly placeholder="Toca “Asignar ubicación” y elige el punto en el mapa">
+          <span class="mapa-coord" id="np-origen-coord"></span>
         </div>
         <div class="form-group">
-          <label>Destino — ciudad y dirección *</label>
-          <input type="text" id="np-destino" placeholder="Ej. CDMX, Bodega Industrial Norte">
+          <label>Destino *</label>
           <div class="mapa-fila">
             <button type="button" class="mapa-btn" onclick="abrirMapa('destino')">📍 Asignar ubicación</button>
-            <span class="mapa-coord" id="np-destino-coord"></span>
           </div>
+          <input type="text" id="np-destino" readonly placeholder="Toca “Asignar ubicación” y elige el punto en el mapa">
+          <span class="mapa-coord" id="np-destino-coord"></span>
         </div>
       </div>
 
@@ -2665,7 +2665,7 @@
 <script src="js/recursos.js?v=11"></script>
 <script src="js/reservaciones.js?v=39"></script>
 <script src="js/modal.js?v=13"></script>
-<script src="js/mapa.js?v=3"></script>
+<script src="js/mapa.js?v=4"></script>
 <script src="js/expedientes.js?v=5"></script>
 <script src="js/pedidos.js?v=59"></script>
 <script src="js/plantillas.js?v=8"></script>

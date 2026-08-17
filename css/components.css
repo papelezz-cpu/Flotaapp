@@ -2183,7 +2183,14 @@ body.light .pref-error { color: #b3261e; }
   color: var(--accent); cursor: pointer;
 }
 .mapa-btn:hover { border-color: var(--accent); }
-.mapa-coord { font-size: 0.75rem; color: var(--green); font-weight: 700; }
+/* El origen/destino ya no se escribe a mano: lo llena el mapa al elegir el
+   punto. El input se queda de solo lectura para que se vea lo que quedó
+   guardado, en vez de invitar a teclear encima. */
+#np-origen[readonly], #np-destino[readonly] {
+  margin-top: 8px; background: var(--surface-2, rgba(148,163,184,0.08));
+  color: var(--text-muted); cursor: default;
+}
+.mapa-coord { font-size: 0.75rem; color: var(--green); font-weight: 700; display: block; margin-top: 4px; }
 .mapa-quitar {
   background: none; border: none; padding: 0 0 0 4px; font: inherit;
   font-size: 0.72rem; color: var(--text-muted); cursor: pointer; text-decoration: underline;

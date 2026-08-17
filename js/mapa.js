@@ -131,11 +131,13 @@ function confirmarMapa() {
   if (!_mapaPunto) { showToast('Toca el mapa para marcar el punto.', 'error'); return; }
   _mapaPuntos[_mapaCampo] = { ..._mapaPunto };
 
-  // La dirección escrita no se pisa: el cliente puso su referencia (andén,
-  // bodega, "portón azul") y eso vale más que lo que devuelve el geocodificador.
-  // Solo se rellena si el campo estaba vacío.
+  // El campo es de solo lectura: ya no se escribe a mano, lo llena el punto
+  // elegido en el mapa. Si el nombre del lugar no llegó a tiempo (reverse
+  // geocode es async), se usa la coordenada como referencia mientras tanto.
   const input = document.getElementById(`np-${_mapaCampo}`);
-  if (input && !input.value.trim() && _mapaPunto.etiqueta) input.value = _mapaPunto.etiqueta;
+  if (input) {
+    input.value = _mapaPunto.etiqueta || `${_mapaPunto.lat.toFixed(5)}, ${_mapaPunto.lng.toFixed(5)}`;
+  }
 
   _pintarCoordEnFormulario(_mapaCampo);
   cerrarMapa();
