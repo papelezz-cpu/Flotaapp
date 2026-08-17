@@ -727,6 +727,19 @@ function _renderInfoCapacidad(tipo) {
   el.style.display = '';
 }
 
+// El arribo a puerto solo tiene sentido si el transporte va a entrar al
+// recinto portuario; para el resto de los viajes es un campo confuso.
+function toggleArriboPuerto() {
+  const wrap = document.getElementById('np-arribo-wrap');
+  const chk  = document.getElementById('np-entra-puerto');
+  if (!wrap || !chk) return;
+  wrap.style.display = chk.checked ? '' : 'none';
+  if (!chk.checked) {
+    const el = document.getElementById('np-fecha-arribo');
+    if (el) el.value = '';
+  }
+}
+
 function actualizarSubtipoPedido() {
   const val = document.getElementById('np-tipo')?.value || '';
   // Con el selector de servicio oculto (flujo de camión) no hay nada que
@@ -1193,6 +1206,8 @@ function openNuevoPedido(servicio) {
   if (nomPlantWrap) nomPlantWrap.style.display = 'none';
   const nomPlant = document.getElementById('np-plantilla-nombre');
   if (nomPlant) nomPlant.value = '';
+
+  toggleArriboPuerto();
 
   document.getElementById('modal-nuevo-pedido').classList.add('open');
   // Setup geo autocomplete on first open

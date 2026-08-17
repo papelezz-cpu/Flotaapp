@@ -24,9 +24,19 @@ function plazoPagoADias(plazo) {
 }
 
 // Fecha de vencimiento a partir de la fecha de cierre del servicio.
+//
+// El plazo que se le muestra al cliente ("3 días") no es el mismo que se usa
+// para saber si la transportista ya debería haber cobrado: se le da un
+// colchón de 2 días (tiempo de proceso/dispersión) y, sin importar lo largo
+// que sea el plazo pactado, nunca se deja esperar más de 15 días — es el
+// límite que protege el flujo de caja de la transportista.
+const PLAZO_PAGO_COLCHON_DIAS = 2;
+const PLAZO_PAGO_MAX_DIAS     = 15;
+
 function calcularVencimientoPago(plazo, desdeISO) {
-  const dias = plazoPagoADias(plazo);
-  if (dias === null) return null;
+  const diasCliente = plazoPagoADias(plazo);
+  if (diasCliente === null) return null;
+  const dias = Math.min(diasCliente + PLAZO_PAGO_COLCHON_DIAS, PLAZO_PAGO_MAX_DIAS);
   const d = desdeISO ? new Date(desdeISO) : new Date();
   d.setDate(d.getDate() + dias);
   return d.toISOString().split('T')[0];

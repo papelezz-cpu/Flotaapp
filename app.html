@@ -1428,7 +1428,7 @@
            espera y riesgo de viaje en falso si faltan papeles. La empresa lo
            necesita para cotizar, y habilita el expediente documental. -->
       <label class="carga-switch" style="margin-bottom:12px">
-        <input type="checkbox" id="np-entra-puerto">
+        <input type="checkbox" id="np-entra-puerto" onchange="toggleArriboPuerto()">
         <span><strong>El transporte entra a puerto</strong><small>Se le pedirá al cliente la documentación de ingreso (pedimento, liberación de la naviera, BL)</small></span>
       </label>
       <!-- El vacío no siempre vuelve al recinto portuario: a veces la naviera
@@ -1461,8 +1461,8 @@
            columnas quedaban desalineadas (etiquetas de distinta altura
            empujaban los inputs) y la de entrega huérfana en su renglón. -->
       <div class="fechas-grid">
-        <div class="form-group">
-          <label>Arribo a puerto <small>opcional</small></label>
+        <div class="form-group" id="np-arribo-wrap" style="display:none">
+          <label>Arribo a puerto <small>tentativo</small></label>
           <input type="date" id="np-fecha-arribo">
         </div>
         <div class="form-group">
@@ -1475,7 +1475,7 @@
         </div>
       </div>
       <div class="fechas-ayuda">
-        🚢 <strong>Arribo</strong> es cuándo atraca el buque — déjalo vacío si la carga no viene por puerto.
+        🚢 <strong>Arribo</strong> es cuándo atraca el buque (solo si el transporte entra a puerto).
         📦 <strong>Carga</strong> es cuándo se recoge la mercancía, que puede ser días después.
       </div>
 
@@ -1584,9 +1584,6 @@
         <option value="3 días">3 días</option>
         <option value="7 días">7 días (1 semana)</option>
         <option value="15 días">15 días (quincena)</option>
-        <option value="30 días">30 días (1 mes)</option>
-        <option value="45 días">45 días</option>
-        <option value="60 días">60 días (2 meses)</option>
       </select>
     </div>
 
@@ -2590,8 +2587,8 @@
 <script src="js/modal.js?v=13"></script>
 <script src="js/mapa.js?v=1"></script>
 <script src="js/expedientes.js?v=2"></script>
-<script src="js/pedidos.js?v=55"></script>
-<script src="js/plantillas.js?v=7"></script>
+<script src="js/pedidos.js?v=56"></script>
+<script src="js/plantillas.js?v=8"></script>
 <script src="js/aprobaciones.js?v=38"></script>
 <script src="js/admin.js?v=32"></script>
 <script src="js/operadores.js?v=10"></script>
@@ -2599,7 +2596,7 @@
 <script src="js/verificacion.js?v=1"></script>
 <script src="js/privacidad.js?v=1"></script>
 <script src="js/preferencias.js?v=1"></script>
-<script src="js/cobros.js?v=1"></script>
+<script src="js/cobros.js?v=2"></script>
 <script src="js/reportes.js?v=2"></script>
 <script src="js/chat.js?v=16"></script>
 <script src="js/catalogo.js?v=21"></script>

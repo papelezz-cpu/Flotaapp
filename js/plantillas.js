@@ -123,6 +123,9 @@ async function usarPlantilla(id) {
     else if (val === null || val === undefined) el.value = '';
     else                      el.value = val;
   });
+  // La visibilidad del arribo depende de si "entra a puerto" quedó marcado
+  // al restaurar la plantilla (openNuevoPedido ya lo había ocultado).
+  if (typeof toggleArriboPuerto === 'function') toggleArriboPuerto();
 
   // La categoría de carga manda el resto del formulario, así que se restaura
   // antes que nada. Si la plantilla es vieja (de cuando se guardaba el tipo de
