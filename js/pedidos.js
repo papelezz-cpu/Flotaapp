@@ -738,6 +738,12 @@ function toggleArriboPuerto() {
     const el = document.getElementById('np-fecha-arribo');
     if (el) el.value = '';
   }
+  // El texto de ayuda que explica "Arribo" es tan condicional como el campo:
+  // mencionarlo cuando ni siquiera se está pidiendo la fecha solo confunde.
+  const ayuda      = document.getElementById('np-arribo-ayuda');
+  const ayudaExtra = document.getElementById('np-arribo-ayuda-extra');
+  if (ayuda)      ayuda.style.display      = chk.checked ? '' : 'none';
+  if (ayudaExtra) ayudaExtra.style.display = chk.checked ? '' : 'none';
 }
 
 function actualizarSubtipoPedido() {
