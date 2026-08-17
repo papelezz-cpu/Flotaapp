@@ -338,10 +338,19 @@ async function renderPedidos(append = false) {
     const ESTADOS_ACTIVOS = ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado'];
     const ESTADOS_HIST    = ['acordado', 'cancelado', 'finalizado', 'expirado'];
     const todosMios = _filtrar((pedidos || []).filter(p => p.cliente_id === currentUser.id));
-    const misPedidos   = _filtrarEstadoCli(todosMios.filter(p => ESTADOS_ACTIVOS.includes(p.estado)));
+    const misActivos    = _filtrarEstadoCli(todosMios.filter(p => ESTADOS_ACTIVOS.includes(p.estado)));
+    // Las que ya tienen ofertas que revisar o un acuerdo por cerrarse van
+    // primero: son las que de verdad requieren que el cliente haga algo,
+    // a diferencia de las que solo están esperando (abierto/revisión).
+    const misNegociaciones = misActivos.filter(p => ['en_negociacion', 'pendiente_acuerdo'].includes(p.estado));
+    const misPedidos       = misActivos.filter(p => !['en_negociacion', 'pendiente_acuerdo'].includes(p.estado));
     const misHistorial = _filtrarEstadoCli(todosMios.filter(p => ESTADOS_HIST.includes(p.estado)));
     const otrosPedidos = _filtrar((pedidos || []).filter(p => p.cliente_id !== currentUser.id && p.estado === 'abierto'));
 
+    if (misNegociaciones.length) {
+      html += `<div class="ped-seccion-title">Mis negociaciones</div>`;
+      html += misNegociaciones.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'cliente')).join('');
+    }
     if (misPedidos.length) {
       html += `<div class="ped-seccion-title">Mis solicitudes</div>`;
       html += misPedidos.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'cliente')).join('');
@@ -354,7 +363,7 @@ async function renderPedidos(append = false) {
       html += `<div class="ped-seccion-title" style="margin-top:24px">Historial</div>`;
       html += misHistorial.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'historial')).join('');
     }
-    if (!misPedidos.length && !otrosPedidos.length && !misHistorial.length) {
+    if (!misNegociaciones.length && !misPedidos.length && !otrosPedidos.length && !misHistorial.length) {
       html = `<div class="empty-state"><div class="icon">📋</div>Sin solicitudes activas.<br><small style="color:var(--text-muted)">Publica la primera con el botón de arriba.</small></div>`;
     }
 
