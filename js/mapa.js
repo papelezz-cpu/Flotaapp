@@ -39,7 +39,10 @@ function abrirMapa(campo) {
   // gris y a medias.
   setTimeout(() => {
     if (!_mapa) {
-      _mapa = L.map('mapa-canvas').setView(MAPA_CENTRO_MX, MAPA_ZOOM_INICIAL);
+      // Zoom control abajo a la derecha: arriba va la barra de búsqueda
+      // flotando sobre el mapa, y ahí chocaría con los botones +/-.
+      _mapa = L.map('mapa-canvas', { zoomControl: false }).setView(MAPA_CENTRO_MX, MAPA_ZOOM_INICIAL);
+      L.control.zoom({ position: 'bottomright' }).addTo(_mapa);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap',

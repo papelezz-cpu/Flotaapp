@@ -24,7 +24,7 @@
   <!-- Estilos -->
   <link rel="stylesheet" href="css/base.css?v=7">
   <link rel="stylesheet" href="css/layout.css?v=4">
-  <link rel="stylesheet" href="css/components.css?v=32">
+  <link rel="stylesheet" href="css/components.css?v=33">
   <!-- Mapa para marcar origen y destino. Leaflet + OpenStreetMap: sin API key
        ni facturación, y ya usamos Nominatim (mismo proyecto) para geocodificar. -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -2636,12 +2636,14 @@
       <button class="modal-close" onclick="cerrarMapa()">&times;</button>
     </div>
     <p class="mapa-ayuda">Busca un lugar o toca el mapa para poner el pin — luego lo puedes arrastrar para ajustarlo. Sirve para que el operador llegue al punto exacto, no solo a la calle.</p>
-    <div class="mapa-buscar">
-      <input type="text" id="mapa-buscar-input" placeholder="Buscar un lugar para acercar el mapa…"
-             onkeydown="if(event.key==='Enter'){event.preventDefault();buscarEnMapa();}">
-      <button type="button" class="btn-add" onclick="buscarEnMapa()">Buscar</button>
+    <div class="mapa-canvas-wrap">
+      <div class="mapa-buscar">
+        <input type="text" id="mapa-buscar-input" placeholder="Buscar un lugar…"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();buscarEnMapa();}">
+        <button type="button" class="btn-add" onclick="buscarEnMapa()">Buscar</button>
+      </div>
+      <div id="mapa-canvas"></div>
     </div>
-    <div id="mapa-canvas"></div>
     <div class="mapa-sel" id="mapa-sel">Aún no has marcado un punto.</div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="cerrarMapa()">Cancelar</button>
@@ -2663,7 +2665,7 @@
 <script src="js/recursos.js?v=11"></script>
 <script src="js/reservaciones.js?v=39"></script>
 <script src="js/modal.js?v=13"></script>
-<script src="js/mapa.js?v=2"></script>
+<script src="js/mapa.js?v=3"></script>
 <script src="js/expedientes.js?v=5"></script>
 <script src="js/pedidos.js?v=59"></script>
 <script src="js/plantillas.js?v=8"></script>
