@@ -377,9 +377,29 @@ function autoFillDimensiones(prefix = 'admin') {
 
 // ── EDITAR CAMIÓN ─────────────────────────────────────
 
+// Una unidad con oferta viva en un pedido no cerrado no se puede editar:
+// cambiar sus datos a medio de una negociación (o después de aceptada)
+// invalidaría lo que el cliente vio al aceptar. Solo aplica a la empresa;
+// el superadmin sí puede corregir lo que sea.
+async function _camionTieneOfertaActiva(camionId) {
+  const { data: ofertasCam } = await sb.from('ofertas')
+    .select('pedido_id').eq('camion_id', camionId).in('estado', ['enviada', 'contra_oferta', 'aceptada']);
+  if (!ofertasCam?.length) return false;
+
+  const pedidoIds = [...new Set(ofertasCam.map(o => o.pedido_id))];
+  const { data: peds } = await sb.from('pedidos').select('estado').in('id', pedidoIds);
+  const cerrados = new Set(['cancelado', 'rechazado', 'finalizado', 'expirado']);
+  return (peds || []).some(p => !cerrados.has(p.estado));
+}
+
 async function editarCamion(id) {
   const c = allCamiones.find(x => x.id === id);
   if (!c) return;
+
+  if (currentUser.rol !== 'superadmin' && await _camionTieneOfertaActiva(id)) {
+    showToast('No puedes editar esta unidad: tiene una oferta activa en un pedido. Espera a que se resuelva.', 'error');
+    return;
+  }
 
   const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val ?? ''; };
 
@@ -459,6 +479,13 @@ async function guardarEdicion() {
   };
 
   const esSuperAdmin = currentUser.rol === 'superadmin';
+
+  // Última línea de defensa por si la unidad recibió una oferta entre que se
+  // abrió el formulario y que se guardó (ver editarCamion).
+  if (!esSuperAdmin && await _camionTieneOfertaActiva(id)) {
+    showToast('No puedes guardar: la unidad recibió una oferta mientras editabas. Espera a que se resuelva.', 'error');
+    return;
+  }
 
   // Estado actual: necesario para detectar qué vigencia cambió y para la ruta
   // de storage de los documentos.
@@ -550,10 +577,16 @@ async function renderMisPendientes() {
         ${r.rechazo_nota ? `<div class="rechazo-nota" style="margin-top:6px">"${esc(r.rechazo_nota)}"</div>` : ''}
         <div class="rechazo-aviso-archivos">📎 Por favor vuelve a subir todos los documentos e imágenes al corregir.</div>
       </div>`;
+    // Si fue una EDICIÓN de un recurso ya aprobado la que se rechazó, no
+    // tiene caso ofrecer borrar la unidad completa — se puede deshacer la
+    // edición y volver a lo que ya estaba aprobado.
+    const puedeRevertir = r.es_edicion && r.snapshot_anterior;
     const actions = `
       <div style="display:flex;gap:6px;flex-shrink:0">
         ${corregirFn ? `<button class="btn-edit btn-aprobar" onclick="${corregirFn}">✏ Corregir</button>` : ''}
-        <button class="btn-edit btn-rechazar" onclick="eliminarMiRecurso('${tabla}','${r.id}')">🗑 Eliminar</button>
+        ${puedeRevertir
+          ? `<button class="btn-edit" onclick="revertirRecursoRechazado('${tabla}','${r.id}')">↺ Revertir</button>`
+          : `<button class="btn-edit btn-rechazar" onclick="eliminarMiRecurso('${tabla}','${r.id}')">🗑 Eliminar</button>`}
       </div>`;
     return { banner, actions };
   };
@@ -695,6 +728,31 @@ function _payloadEdicion(payload, anterior) {
     campos_editados:   camposEditados,
     snapshot_anterior: anterior,
   };
+}
+
+// Deshace una edición rechazada, restaurando los valores de snapshot_anterior
+// (el último estado aprobado). No pone aprobacion:'aprobada' directo — eso
+// solo lo puede hacer el superadmin (trg_guard_..._update) — así que reusa
+// el mismo camino de "corrección pendiente" que una edición normal: vuelve
+// a quedar 'pendiente' con la reversión como el "cambio" a revisar.
+const _META_COLS_RECURSO = ['id', 'created_at', 'aprobacion', 'es_edicion', 'campos_editados', 'snapshot_anterior', 'rechazo_nota', 'rechazo_campos', 'propietario_id'];
+
+async function revertirRecursoRechazado(tabla, id) {
+  const { data: r } = await sb.from(tabla).select('*').eq('id', id).single();
+  if (!r?.snapshot_anterior) { showToast('No hay una versión anterior guardada para revertir', 'error'); return; }
+
+  const prev = { ...r.snapshot_anterior };
+  _META_COLS_RECURSO.forEach(k => delete prev[k]);
+
+  const payload = _payloadEdicion(prev, r);
+  if (!payload) { showToast('No hay diferencias que revertir'); return; }
+  payload.rechazo_nota   = null;
+  payload.rechazo_campos = null;
+
+  const { error } = await sb.from(tabla).update(payload).eq('id', id).eq('propietario_id', currentUser.id);
+  if (error) { showToast('No se pudo revertir: ' + _dbError(error), 'error'); return; }
+  showToast(`✓ ${id} revertido a su versión anterior — enviado a revisión`);
+  renderAdmin();
 }
 
 async function aprobarRecurso(tabla, id) {

@@ -1712,6 +1712,19 @@ async function enviarContraoferta(ofertaId) {
 
 async function openHacerOferta(pedidoId) {
   if (!currentUser.id) { showLoginOverlay(); return; }
+
+  // La lista ya filtra los pedidos donde ya tengo oferta viva, pero esta es
+  // la validación real: cubre pestañas viejas, doble click antes de refrescar,
+  // etc. (ver _enviarOfertaCore para el chequeo final justo antes de insertar).
+  const { data: miOfertaActiva } = await sb.from('ofertas')
+    .select('id').eq('pedido_id', pedidoId).eq('admin_id', currentUser.id)
+    .in('estado', ['enviada', 'contra_oferta', 'aceptada']);
+  if (miOfertaActiva?.length) {
+    showToast('Ya tienes una oferta activa en esta solicitud.', 'error');
+    await renderPedidos();
+    return;
+  }
+
   pedidoParaOfertar = pedidoId;
 
   const select = document.getElementById('ho-camion');
@@ -1969,6 +1982,17 @@ async function _enviarOfertaCore() {
   // Validar chofer obligatorio cuando es un pedido de camión
   if (opRow && opRow.style.display !== 'none' && !operador) {
     showToast('Debes seleccionar un chofer para este servicio.', 'error'); return;
+  }
+
+  // Última línea de defensa contra oferta duplicada (ver openHacerOferta).
+  const { data: miOfertaActiva } = await sb.from('ofertas')
+    .select('id').eq('pedido_id', pedidoParaOfertar).eq('admin_id', currentUser.id)
+    .in('estado', ['enviada', 'contra_oferta', 'aceptada']);
+  if (miOfertaActiva?.length) {
+    showToast('Ya tienes una oferta activa en esta solicitud.', 'error');
+    closeHacerOferta();
+    await renderPedidos();
+    return;
   }
 
   const btnEnv = document.getElementById('btn-enviar-oferta');
