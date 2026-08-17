@@ -1331,6 +1331,7 @@ async function crearPedido() {
     requiere_seguro:  esCamion,
     requiere_factura: esCamion,
     entra_a_puerto:   esCamion && vb('np-entra-puerto'),
+    patio_externo:    esCamion && vb('np-patio-externo'),
     tipo_contenedor:  esCamion ? (v('np-contenedor') || null) : null,
 
     // ── Carga (formulario nuevo) ──
@@ -2147,7 +2148,7 @@ async function cerrarAcuerdo(oferta, pedido) {
         : 'camion';
 
   // Crear reservación automáticamente
-  const { error } = await sb.from('reservaciones').insert({
+  const { data: nuevaReserva, error } = await sb.from('reservaciones').insert({
     pedido_id:       pedido.id,
     unidad:          oferta.camion_id || null,
     recurso_tipo:    recursoTipo,
@@ -2163,7 +2164,7 @@ async function cerrarAcuerdo(oferta, pedido) {
     // Snapshot del plazo pactado: el pedido puede reabrirse o editarse después,
     // y el cobro debe regirse por lo que se acordó en esta operación.
     plazo_pago:      pedido.plazo_pago || null,
-  });
+  }).select('id').single();
   if (error) {
     if (error.message?.includes('RECURSO_NO_DISPONIBLE') || error.code === 'P0001') {
       throw new Error('RECURSO_NO_DISPONIBLE');
@@ -2178,6 +2179,13 @@ async function cerrarAcuerdo(oferta, pedido) {
       : recursoTipo === 'lavado' ? 'lavados'
       : 'camiones';
     await sb.from(tablaRecurso).update({ estado: 'ocupado' }).eq('id', oferta.camion_id);
+  }
+
+  // Documentación de puerto/vacíos: se abre sola al hacer match, sin que la
+  // empresa tenga que acordarse de solicitarla (ver js/expedientes.js).
+  if (nuevaReserva?.id && typeof _crearExpedienteAuto === 'function') {
+    if (pedido.entra_a_puerto) await _crearExpedienteAuto(nuevaReserva.id, 'ingreso_puerto');
+    if (pedido.patio_externo)  await _crearExpedienteAuto(nuevaReserva.id, 'entrega_vacios');
   }
 }
 

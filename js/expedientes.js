@@ -362,35 +362,46 @@ async function _refrescarExpediente() {
   _renderExpediente();
 }
 
-// ── Se dispara solo al entregar ─────────────────────────
-// El expediente de vacíos nadie se acuerda de pedirlo, y es justo donde corren
-// las demoras. Se abre al llegar el tracking a "Entregado" si hubo contenedor.
-async function abrirExpedienteVaciosSiAplica(reserva) {
-  if (!reserva?.pedido_id) return;
-  const { data: ped } = await sb.from('pedidos')
-    .select('categoria_carga, num_contenedores').eq('id', reserva.pedido_id).maybeSingle();
-  const hayContenedor = ped?.categoria_carga === 'Contenerizada' || (ped?.num_contenedores || 0) > 0;
-  if (!hayContenedor) return;
+// ── Crear el expediente automáticamente (sin que nadie se acuerde de pedirlo) ──
+// Copia el catálogo y avisa al cliente, igual que solicitarDocumentacion,
+// pero sin el diálogo de confirmación — es el sistema el que lo dispara.
+// No hace nada si ya existe (idempotente: seguro de llamar más de una vez).
+async function _crearExpedienteAuto(reservaId, etapa) {
+  const cfg = EXP_ETAPAS[etapa];
+  if (!cfg) return;
 
   const { data: exist } = await sb.from('expedientes')
-    .select('id').eq('reserva_id', reserva.id).eq('etapa', 'entrega_vacios').maybeSingle();
+    .select('id').eq('reserva_id', reservaId).eq('etapa', etapa).maybeSingle();
   if (exist) return;
 
   const { data: exp, error } = await sb.from('expedientes')
-    .insert({ reserva_id: reserva.id, etapa: 'entrega_vacios', solicitado_por: currentUser.id })
+    .insert({ reserva_id: reservaId, etapa, solicitado_por: currentUser.id })
     .select().single();
-  if (error) { console.error('No se pudo abrir el expediente de vacíos:', error); return; }
+  if (error) { console.error(`No se pudo abrir el expediente de ${etapa}:`, error); return; }
 
   const { data: cat } = await sb.from('documentos_catalogo')
-    .select('*').eq('etapa', 'entrega_vacios').eq('activo', true).order('orden');
+    .select('*').eq('etapa', etapa).eq('activo', true).order('orden');
   if (cat?.length) {
     await sb.from('expediente_documentos').insert(cat.map(c => ({
       expediente_id: exp.id, nombre: c.nombre, descripcion: c.descripcion,
       obligatorio: c.obligatorio, orden: c.orden,
     })));
   }
-  await _avisarCliente(reserva.id, 'entrega_vacios', 'solicitud');
-  showToast('📦 Se abrió el expediente de entrega de vacíos');
+  await _avisarCliente(reservaId, etapa, 'solicitud');
+  showToast(`${cfg.icon} Se abrió el expediente de ${cfg.titulo.toLowerCase()}`);
+}
+
+// ── Se dispara solo al entregar ─────────────────────────
+// El expediente de vacíos nadie se acuerda de pedirlo, y es justo donde corren
+// las demoras. Se abre al llegar el tracking a "Entregado" si hubo contenedor
+// (respaldo por si el pedido no traía marcado patio_externo al hacer match).
+async function abrirExpedienteVaciosSiAplica(reserva) {
+  if (!reserva?.pedido_id) return;
+  const { data: ped } = await sb.from('pedidos')
+    .select('categoria_carga, num_contenedores').eq('id', reserva.pedido_id).maybeSingle();
+  const hayContenedor = ped?.categoria_carga === 'Contenerizada' || (ped?.num_contenedores || 0) > 0;
+  if (!hayContenedor) return;
+  await _crearExpedienteAuto(reserva.id, 'entrega_vacios');
 }
 
 // ── Botones dentro de la fila de la reservación ─────────

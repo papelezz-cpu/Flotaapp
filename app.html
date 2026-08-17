@@ -1431,6 +1431,13 @@
         <input type="checkbox" id="np-entra-puerto">
         <span><strong>El transporte entra a puerto</strong><small>Se le pedirá al cliente la documentación de ingreso (pedimento, liberación de la naviera, BL)</small></span>
       </label>
+      <!-- El vacío no siempre vuelve al recinto portuario: a veces la naviera
+           lo manda a un depósito externo. Es un checklist distinto de "entra
+           a puerto" (puede aplicar uno, el otro, o ambos). -->
+      <label class="carga-switch" style="margin-bottom:12px">
+        <input type="checkbox" id="np-patio-externo">
+        <span><strong>El vacío se entrega en un patio/depósito externo</strong><small>Se le pedirá al cliente la carta de devolución de la naviera y los datos del depósito asignado</small></span>
+      </label>
       <div class="admin-grid" style="gap:12px">
         <div class="form-group">
           <label>Origen — ciudad y dirección *</label>
@@ -2582,9 +2589,9 @@
 <script src="js/reservaciones.js?v=36"></script>
 <script src="js/modal.js?v=13"></script>
 <script src="js/mapa.js?v=1"></script>
-<script src="js/expedientes.js?v=1"></script>
-<script src="js/pedidos.js?v=54"></script>
-<script src="js/plantillas.js?v=6"></script>
+<script src="js/expedientes.js?v=2"></script>
+<script src="js/pedidos.js?v=55"></script>
+<script src="js/plantillas.js?v=7"></script>
 <script src="js/aprobaciones.js?v=38"></script>
 <script src="js/admin.js?v=32"></script>
 <script src="js/operadores.js?v=10"></script>
