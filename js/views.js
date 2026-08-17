@@ -80,7 +80,7 @@ function renderHome() {
       { i:'bell',          bg:'hc-slate',  t:'Avisos',        d:'Qué te llega por correo',          fn:`showView('preferencias',null)` },
     ],
     admin: [
-      { i:'clipboardList', bg:'hc-blue',   t:'Solicitudes',   d:'Ofertas y pedidos activos',        fn:`showView('pedidos',null)` },
+      { i:'clipboardList', bg:'hc-blue',   t:'Solicitudes',   d:'Ofertas y pedidos activos',        fn:`showView('pedidos',null)`, badge:'home-ped-badge' },
       { i:'calendarCheck', bg:'hc-purple', t:'Reservaciones', d:'Viajes y servicios activos',       fn:`_reservFiltro='Activa';showView('reservaciones',null)`, badge:'home-res-badge' },
       { i:'truck',         bg:'hc-slate',  t:'Mis unidades',  d:'Gestiona tu flota de camiones',    fn:`_irAdmin('camion')` },
       { i:'hardHat',       bg:'hc-amber',  t:'Operadores',    d:'Personal de conducción',           fn:`_irAdmin('operador')` },
@@ -117,21 +117,39 @@ function renderHome() {
   if (currentUser?.rol === 'superadmin') { _loadAprBadge(); _loadArcoBadge(); }
   if (['admin','superadmin'].includes(currentUser?.rol)) actualizarBadgeVigencias();
   if (currentUser?.id) { actualizarBadgeReservas(); actualizarBadgeCobros(); }
-  if (currentUser?.rol === 'cliente') actualizarBadgePedidos();
+  if (['cliente', 'admin'].includes(currentUser?.rol)) actualizarBadgePedidos();
 }
 
-// Cuenta de solicitudes activas del cliente para el badge de "Mis
-// solicitudes" — mismos estados que cuenta como "activo" la propia lista
-// (ver ESTADOS_ACTIVOS en renderPedidos), para que el número no contradiga
-// lo que se ve al entrar.
+// Badge de la tarjeta de solicitudes: cliente ve cuántas de las suyas siguen
+// activas; empresa ve cuántas solicitudes nuevas puede ofertar. Mismos
+// criterios que usa renderPedidos() para cada rol, para que el número no
+// contradiga lo que se ve al entrar a la vista.
 async function actualizarBadgePedidos() {
   const badge = document.getElementById('home-ped-badge');
   if (!badge || !currentUser.id) return;
-  const ESTADOS_ACTIVOS = ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado'];
-  const { count } = await sb.from('pedidos')
-    .select('id', { count: 'exact', head: true })
-    .eq('cliente_id', currentUser.id)
-    .in('estado', ESTADOS_ACTIVOS);
+
+  let count = 0;
+  if (currentUser.rol === 'cliente') {
+    const ESTADOS_ACTIVOS = ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado'];
+    const r = await sb.from('pedidos')
+      .select('id', { count: 'exact', head: true })
+      .eq('cliente_id', currentUser.id)
+      .in('estado', ESTADOS_ACTIVOS);
+    count = r.count || 0;
+  } else if (currentUser.rol === 'admin') {
+    // "Disponibles" = abiertas y sin oferta mía todavía activa, ni bloqueada
+    // por el cliente tras un rechazo (ver confirmarRechazarOferta).
+    const [{ data: abiertos }, { data: misOfertas }] = await Promise.all([
+      sb.from('pedidos').select('id').eq('estado', 'abierto'),
+      sb.from('ofertas').select('pedido_id, estado, permite_reoferta').eq('admin_id', currentUser.id),
+    ]);
+    const noDisponible = new Set();
+    (misOfertas || []).forEach(o => {
+      if (o.estado !== 'rechazada' || o.permite_reoferta === false) noDisponible.add(o.pedido_id);
+    });
+    count = (abiertos || []).filter(p => !noDisponible.has(p.id)).length;
+  }
+
   if (count > 0) {
     badge.textContent = count > 99 ? '99+' : count;
     badge.style.display = 'inline-block';
