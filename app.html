@@ -1777,6 +1777,43 @@
 </div>
 
 <!-- ══ MODAL EVIDENCIAS DE SERVICIO ═════════════════════ -->
+<!-- ══ MODAL GPS TEMPORAL ═══════════════════════════════ -->
+<div class="modal-overlay" id="modal-gps-link">
+  <div class="modal" style="max-width:420px">
+    <h2>🛰️ Link de GPS temporal</h2>
+    <p class="sub">El cliente lo verá solo una vez que el viaje arranque (tracking avance del primer paso).</p>
+    <input type="hidden" id="gps-reserva-id">
+    <div class="form-group">
+      <label>Link de rastreo</label>
+      <input type="url" id="gps-link-input" placeholder="https://...">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="cerrarGpsLink()">Cancelar</button>
+      <button class="btn-confirm" onclick="guardarGpsLink()">✓ Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL DOCUMENTOS DE CARGA (Carta Porte, maniobra) ═ -->
+<div class="modal-overlay" id="modal-documentos-carga">
+  <div class="modal" style="max-width:480px">
+    <h2 id="dc-titulo">📄 Carta Porte / documentos de carga</h2>
+    <p class="sub">Carta Porte, documentación de maniobra u otros documentos de la carga.</p>
+    <input type="hidden" id="dc-reserva-id">
+    <div id="dc-lista-actual" style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px"></div>
+    <div id="dc-subir-wrap">
+      <div class="form-group">
+        <label>Adjuntar archivos <span style="font-weight:400;color:var(--text-muted)">(máx. 8 en total)</span></label>
+        <input type="file" id="dc-files" multiple accept="image/*,.pdf">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="cerrarDocumentosCarga()">Cerrar</button>
+      <button class="btn-confirm" id="dc-btn-subir" onclick="subirDocumentosCarga()">📤 Subir</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-evidencias">
   <div class="modal" style="max-width:480px">
     <h2 id="ev-titulo">📎 Evidencias del servicio</h2>
@@ -2615,7 +2652,7 @@
 
 <!-- ══ SCRIPTS (orden importante) ══════════════════════ -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="js/utils.js?v=8"></script>
+<script src="js/utils.js?v=9"></script>
 <script src="js/notificaciones.js?v=17"></script>
 <script src="js/detalle.js?v=12"></script>
 <script src="js/config.js?v=12"></script>
@@ -2624,11 +2661,11 @@
 <script src="js/views.js?v=27"></script>
 <script src="js/camiones.js?v=11"></script>
 <script src="js/recursos.js?v=11"></script>
-<script src="js/reservaciones.js?v=37"></script>
+<script src="js/reservaciones.js?v=38"></script>
 <script src="js/modal.js?v=13"></script>
 <script src="js/mapa.js?v=1"></script>
-<script src="js/expedientes.js?v=2"></script>
-<script src="js/pedidos.js?v=57"></script>
+<script src="js/expedientes.js?v=3"></script>
+<script src="js/pedidos.js?v=58"></script>
 <script src="js/plantillas.js?v=8"></script>
 <script src="js/aprobaciones.js?v=38"></script>
 <script src="js/admin.js?v=32"></script>

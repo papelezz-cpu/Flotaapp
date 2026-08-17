@@ -24,6 +24,14 @@ function today() {
   return new Date().toISOString().split('T')[0];
 }
 
+// Fecha de mañana YYYY-MM-DD — ningún servicio se puede pedir/ofertar para
+// el mismo día, siempre con al menos un día de anticipación.
+function manana() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().split('T')[0];
+}
+
 // Formatear fecha DD/MM/YYYY para mostrar
 function fmtFecha(str) {
   if (!str) return '—';

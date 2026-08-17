@@ -170,19 +170,69 @@ function _renderExpediente() {
 
     ${dem ? `<div class="exp-demoras ${dem.cls}">${esc(dem.label)}</div>` : ''}
 
+    ${_expEntregaFisicaHTML(e, soyCliente)}
+
     ${e.etapa === 'entrega_vacios' ? _expVaciosHTML(e, soyCliente) : ''}
 
+    ${e.entrega_fisica ? '' : `
     <div class="exp-lista">
       ${docs.map(d => _expDocHTML(d, soyCliente)).join('') ||
         '<div class="empty-state"><div class="icon">📄</div>Sin documentos en la lista. Revisa el catálogo.</div>'}
-    </div>
+    </div>`}
 
-    ${!soyCliente && e.estado !== 'completo' && listos === obligatorios.length && obligatorios.length ? `
+    ${!soyCliente && e.estado !== 'completo' && (e.entrega_fisica || (listos === obligatorios.length && obligatorios.length)) ? `
       <button class="btn-confirm" style="width:100%;margin-top:14px" onclick="marcarExpedienteCompleto()">
-        ✓ Documentación completa — dar por bueno el expediente
+        ✓ ${e.entrega_fisica ? 'Ya recibí los documentos en físico — dar por bueno' : 'Documentación completa — dar por bueno el expediente'}
       </button>` : ''}
     ${e.estado === 'completo' ? '<div class="exp-completo">✓ El transportista dio por completo este expediente.</div>' : ''}
   `;
+}
+
+// Alternativa a subir cada documento: el cliente declara que lo entrega en
+// persona, con dirección y con quién presentarse.
+function _expEntregaFisicaHTML(e, soyCliente) {
+  return `
+    <div class="exp-entrega-fisica">
+      <label class="carga-switch" style="margin:10px 0">
+        <input type="checkbox" id="exp-entrega-fisica" ${e.entrega_fisica ? 'checked' : ''}
+               ${soyCliente ? 'onchange="toggleEntregaFisica()"' : 'disabled'}>
+        <span><strong>Voy a entregar todo en físico</strong><small>En vez de subir cada documento, indica dirección y con quién presentarse</small></span>
+      </label>
+      ${e.entrega_fisica ? `
+        <div class="form-group">
+          <label>Dirección de entrega</label>
+          <input type="text" id="exp-fisica-direccion" value="${esc(e.entrega_fisica_direccion || '')}"
+                 placeholder="Ej. Av. Puerto 123, patio 4" ${soyCliente ? '' : 'disabled'}>
+        </div>
+        <div class="form-group">
+          <label>Presentarse con</label>
+          <input type="text" id="exp-fisica-contacto" value="${esc(e.entrega_fisica_contacto || '')}"
+                 placeholder="Ej. Juan Pérez, encargado de patio" ${soyCliente ? '' : 'disabled'}>
+        </div>
+        ${soyCliente ? `<button class="btn-add" onclick="guardarEntregaFisica()">💾 Guardar datos de entrega</button>` : ''}
+      ` : ''}
+    </div>`;
+}
+
+async function toggleEntregaFisica() {
+  if (!_expActual) return;
+  const chk = document.getElementById('exp-entrega-fisica');
+  const { error } = await sb.from('expedientes')
+    .update({ entrega_fisica: chk.checked }).eq('id', _expActual.expediente.id);
+  if (error) { showToast('No se pudo guardar: ' + error.message, 'error'); return; }
+  await _refrescarExpediente();
+  showToast(chk.checked ? '✓ Marcado como entrega física' : 'Entrega física desmarcada');
+}
+
+async function guardarEntregaFisica() {
+  if (!_expActual) return;
+  const dir = document.getElementById('exp-fisica-direccion')?.value?.trim() || null;
+  const con = document.getElementById('exp-fisica-contacto')?.value?.trim() || null;
+  const { error } = await sb.from('expedientes')
+    .update({ entrega_fisica_direccion: dir, entrega_fisica_contacto: con }).eq('id', _expActual.expediente.id);
+  if (error) { showToast('No se pudo guardar: ' + error.message, 'error'); return; }
+  await _refrescarExpediente();
+  showToast('✓ Datos de entrega guardados');
 }
 
 // Depósito y fecha límite: es donde está el dinero de las demoras.

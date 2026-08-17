@@ -1209,6 +1209,12 @@ function openNuevoPedido(servicio) {
 
   toggleArriboPuerto();
 
+  // Ningún servicio se puede pedir para el mismo día — mínimo mañana.
+  ['np-fecha-ini', 'np-fecha-ini-cust', 'np-fecha-ini-patio', 'np-fecha-ini-lav'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.min = manana();
+  });
+
   document.getElementById('modal-nuevo-pedido').classList.add('open');
   // Setup geo autocomplete on first open
   setTimeout(setupAllGeoInputs, 0);
@@ -1299,6 +1305,12 @@ async function crearPedido() {
     : esCustodio ? v('np-fecha-fin-cust')
     : esPatio    ? v('np-fecha-fin-patio')
     :              null;
+
+  // Ningún servicio se puede pedir para el mismo día — se necesita al menos
+  // un día de anticipación para que una empresa pueda organizarse y ofertar.
+  if (fechaIni && fechaIni < manana()) {
+    showToast('La fecha no puede ser hoy — elige al menos un día después.', 'error'); return;
+  }
 
   const payload = {
     cliente_id:     currentUser.id,
@@ -1801,6 +1813,13 @@ async function openHacerOferta(pedidoId) {
   const { data: pedido } = await sb.from('pedidos').select('tipo_camion, fecha_ini, fecha_fin, carga_peligrosa').eq('id', pedidoId).single();
   const tipo = pedido?.tipo_camion || '';
   const esCargaPeligrosa = !!pedido?.carga_peligrosa;
+
+  // No se puede ofertar para el mismo día — se necesita al menos un día de
+  // anticipación (mismo criterio que al crear el pedido).
+  if (pedido?.fecha_ini && pedido.fecha_ini < manana()) {
+    showToast('Esta solicitud ya es para hoy o una fecha pasada — no se puede ofertar.', 'error');
+    return;
+  }
 
   const esCustodio = tipo.startsWith('Custodio') || tipo === 'Supervisión remota';
   const esPatio    = tipo.startsWith('Patio')    || tipo === 'Bodega';

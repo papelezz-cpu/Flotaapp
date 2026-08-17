@@ -142,6 +142,13 @@ async function renderReserv() {
       const trackBtn = r.estado === 'Activa'
         ? `<button class="btn-edit" onclick="openTracking('${r.id}')" style="font-size:0.7rem">📍 ${esc(r.tracking_estado || 'Confirmado')}</button>`
         : '';
+      // El GPS solo se muestra una vez que el viaje realmente arrancó (mismo
+      // punto en que ya se exige tener chofer asignado) — antes de eso el
+      // link no sirve de nada.
+      const primerPasoKey = (typeof _getEstados === 'function' ? _getEstados(r.recurso_tipo)[0]?.key : 'Confirmado') || 'Confirmado';
+      const gpsBtnCli = (r.estado === 'Activa' && r.gps_link && r.tracking_estado && r.tracking_estado !== primerPasoKey)
+        ? `<a href="${esc(r.gps_link)}" target="_blank" class="btn-edit" style="font-size:0.7rem">📍 Ver ubicación en vivo</a>`
+        : '';
       // Cancelar un acuerdo ya aprobado no es unilateral: se solicita y el
       // superadmin decide (ver solicitarCancelacion).
       const cancelBtn = r.estado === 'Activa'
@@ -178,9 +185,10 @@ async function renderReserv() {
       const pagarBtn = (r.estado === 'Activa' && !r.pagado)
         ? `<button class="btn-prox" disabled title="Pagos en línea — próximamente">💳 Pagar <span class="prox-badge">Prox.</span></button>`
         : '';
-      const cartaPorteBtn = (r.estado === 'Activa' || r.estado === 'Completada')
-        ? `<button class="btn-prox" disabled title="Carta Porte digital — próximamente">📄 Carta Porte <span class="prox-badge">Prox.</span></button>`
-        : '';
+      // Carta Porte / documentos de carga y maniobra: subida libre, sin
+      // checklist, disponible en cuanto hay match (la reservación existe).
+      const numDocsCarga = r.documentos_carga?.length || 0;
+      const cartaPorteBtn = `<button class="btn-edit" style="font-size:0.7rem" onclick="abrirDocumentosCarga('${r.id}')">📄 ${numDocsCarga ? `Documentos (${numDocsCarga})` : 'Carta Porte / documentos'}</button>`;
       return `
       <div class="reserv-row reserv-row-cli">
         <div class="reserv-id">${unidadLabel}</div>
@@ -190,6 +198,7 @@ async function renderReserv() {
         <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
           <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
           ${trackBtn}
+          ${gpsBtnCli}
           ${completarBtn}
           ${chatBtn}
           ${calBtn}
@@ -311,9 +320,16 @@ async function renderReserv() {
       const choferBtn = r.recurso_tipo === 'camion' || !r.recurso_tipo
         ? `<button class="btn-edit" onclick="abrirAsignarChofer('${r.id}')" title="${r.operador_nombre ? 'Cambiar chofer' : 'Asignar chofer antes de iniciar el viaje'}">👷 ${r.operador_nombre ? esc(r.operador_nombre) : 'Asignar chofer'}</button>`
         : '';
+      // El link se puede guardar en cualquier momento; el cliente solo lo ve
+      // una vez que el tracking avanzó del primer paso (ver vista cliente).
+      const gpsBtn = `<button class="btn-edit" onclick="abrirGpsLink('${r.id}')" title="Link de GPS temporal">🛰️ GPS${r.gps_link ? ' ✓' : ''}</button>`;
+      const numDocsCargaDueno = r.documentos_carga?.length || 0;
+      const docsCargaBtnDueno = `<button class="btn-edit" onclick="abrirDocumentosCarga('${r.id}')" title="Ver Carta Porte y documentos que subió el cliente">📄 ${numDocsCargaDueno ? `Documentos (${numDocsCargaDueno})` : 'Documentos del cliente'}</button>`;
       acciones = `
         <button class="btn-edit" onclick="openTracking('${r.id}')" title="Ver seguimiento">📍 ${esc(trackStep)}</button>
         ${choferBtn}
+        ${gpsBtn}
+        ${docsCargaBtnDueno}
         <button class="btn-edit" onclick="abrirCambiarUnidad('${r.id}')" title="Reasignar a otra unidad (p. ej. si se descompuso)">🔧 Cambiar unidad</button>
         <button class="btn-completar-reserva" onclick="abrirEvidencias('${r.id}','evidencias')">✓ Completar</button>
         <button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${escJs(r.unidad)}')">Cancelar</button>`;
@@ -568,6 +584,104 @@ function eliminarReserva(reservaId) {
     await renderReserv();
     showToast('✓ Reservación archivada en el historial');
   });
+}
+
+// ── GPS TEMPORAL (empresa guarda, cliente ve al iniciar) ──
+// La empresa puede guardar el link en cualquier momento mientras la reserva
+// está Activa; el cliente solo lo ve una vez que el tracking avanzó del
+// primer paso (ver el botón en la vista cliente de renderReserv).
+
+async function abrirGpsLink(reservaId) {
+  const { data: r } = await sb.from('reservaciones').select('gps_link').eq('id', reservaId).single();
+  document.getElementById('gps-reserva-id').value = reservaId;
+  document.getElementById('gps-link-input').value = r?.gps_link || '';
+  document.getElementById('modal-gps-link').classList.add('open');
+}
+
+function cerrarGpsLink() {
+  document.getElementById('modal-gps-link').classList.remove('open');
+}
+
+async function guardarGpsLink() {
+  const reservaId = document.getElementById('gps-reserva-id').value;
+  const link = document.getElementById('gps-link-input')?.value?.trim() || null;
+  const { error } = await sb.from('reservaciones').update({ gps_link: link }).eq('id', reservaId);
+  if (error) { showToast('No se pudo guardar: ' + error.message, 'error'); return; }
+  cerrarGpsLink();
+  await renderReserv();
+  showToast(link ? '✓ Link de GPS guardado' : 'Link de GPS quitado');
+}
+
+// ── DOCUMENTOS DE CARGA (sube el cliente, ve la empresa) ──
+// Carta Porte, documentos de maniobra, etc. — subida libre, sin checklist
+// (a diferencia de los expedientes de puerto/vacíos). Disponible en cuanto
+// hay match, sin importar el estado de la reservación. Solo el cliente
+// sube (policy de storage + guard_reservacion_update); la empresa solo ve.
+
+async function abrirDocumentosCarga(reservaId) {
+  const { data: r } = await sb.from('reservaciones').select('documentos_carga, cliente_user_id').eq('id', reservaId).single();
+  const soyCliente = r?.cliente_user_id === currentUser.id;
+
+  document.getElementById('dc-reserva-id').value = reservaId;
+  document.getElementById('dc-files').value = '';
+  document.getElementById('dc-lista-actual').innerHTML = '<span style="color:var(--text-muted);font-size:0.82rem">Cargando…</span>';
+
+  const subirWrap = document.getElementById('dc-subir-wrap');
+  if (subirWrap) subirWrap.style.display = soyCliente ? '' : 'none';
+  const btnSubir = document.getElementById('dc-btn-subir');
+  if (btnSubir) btnSubir.style.display = soyCliente ? '' : 'none';
+  const titulo = document.getElementById('dc-titulo');
+  if (titulo) titulo.textContent = soyCliente ? '📄 Carta Porte / documentos de carga' : '📄 Documentos de carga del cliente';
+
+  document.getElementById('modal-documentos-carga').classList.add('open');
+
+  const existentes = r?.documentos_carga || [];
+  const listaEl = document.getElementById('dc-lista-actual');
+  if (existentes.length) {
+    const enlaces = await Promise.all(existentes.map(async (e) => {
+      const { data } = await sb.storage.from('unidades').createSignedUrl(e, 3600);
+      return data?.signedUrl || null;
+    }));
+    listaEl.innerHTML = enlaces.map((url, i) => url
+      ? `<a href="${esc(url)}" target="_blank" class="btn-edit" style="font-size:0.75rem">📄 Documento ${i + 1}</a>`
+      : `<span style="font-size:0.75rem;color:var(--text-muted)">📄 Documento ${i + 1} (no disponible)</span>`
+    ).join('');
+  } else {
+    listaEl.innerHTML = '<span style="font-size:0.78rem;color:var(--text-muted)">Sin documentos aún</span>';
+  }
+}
+
+function cerrarDocumentosCarga() {
+  document.getElementById('modal-documentos-carga').classList.remove('open');
+}
+
+async function subirDocumentosCarga() {
+  const reservaId = document.getElementById('dc-reserva-id').value;
+  const files = Array.from(document.getElementById('dc-files')?.files || []);
+  if (!files.length) { showToast('Selecciona al menos un archivo', 'error'); return; }
+
+  const { data: r } = await sb.from('reservaciones').select('documentos_carga').eq('id', reservaId).single();
+  const existentes = r?.documentos_carga || [];
+  if (existentes.length + files.length > 8) {
+    showToast(`Máximo 8 documentos. Ya tienes ${existentes.length}.`, 'error'); return;
+  }
+
+  const nuevosPaths = [];
+  for (const f of files) {
+    const ext  = f.name.split('.').pop();
+    const path = `${currentUser.id}/documentos-carga/${reservaId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: upErr } = await sb.storage.from('unidades').upload(path, f);
+    if (upErr) { showToast('Error al subir: ' + upErr.message, 'error'); return; }
+    nuevosPaths.push(path);
+  }
+
+  const { error } = await sb.from('reservaciones')
+    .update({ documentos_carga: [...existentes, ...nuevosPaths] }).eq('id', reservaId);
+  if (error) { showToast('No se pudo guardar: ' + error.message, 'error'); return; }
+
+  cerrarDocumentosCarga();
+  await renderReserv();
+  showToast(`✓ ${nuevosPaths.length} documento${nuevosPaths.length !== 1 ? 's' : ''} subido${nuevosPaths.length !== 1 ? 's' : ''}`);
 }
 
 // ── ASIGNAR CHOFER (empresa, reserva activa) ──────────
