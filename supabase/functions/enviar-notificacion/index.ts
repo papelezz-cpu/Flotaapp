@@ -168,15 +168,29 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: strin
     <p>Ingresa a PortGo para ver los detalles.</p>`
   ),
 
-  acuerdo: (p) => tpl(
+  // El acuerdo se cierra solo desde que existe cerrar_acuerdo — el
+  // superadmin ya no tiene que aprobarlo. Solo sigue necesitando actuar en
+  // el caso raro de que la empresa tenga documentos vencidos (p.cerrado
+  // llega false en ese caso); para el resto, este correo es puramente
+  // informativo.
+  acuerdo: (p) => p.cerrado === false ? tpl(
     `Acuerdo pendiente de aprobación — PortGo`,
-    `<h2 style="margin:0 0 12px;color:#1a4fd6">Acuerdo listo para aprobar</h2>
-    <p>El cliente <strong>${esc(p.cliente_nombre)}</strong> aceptó la oferta de <strong>${esc(p.admin_nombre)}</strong>.</p>
+    `<h2 style="margin:0 0 12px;color:#dc2626">⚠ Acuerdo bloqueado por documentos vencidos</h2>
+    <p>El cliente <strong>${esc(p.cliente_nombre)}</strong> aceptó la oferta de <strong>${esc(p.admin_nombre)}</strong>, pero la empresa tiene documentos vencidos y el acuerdo no se pudo cerrar solo.</p>
     <table style="width:100%;border-collapse:collapse;margin:16px 0">
       <tr><td style="padding:6px 0;color:#64748b;width:140px">Servicio:</td><td><strong>${esc(p.tipo_camion) || '—'}</strong></td></tr>
       <tr><td style="padding:6px 0;color:#64748b">Precio acordado:</td><td><strong>$${Number(p.precio||0).toLocaleString('es-MX')} MXN</strong></td></tr>
     </table>
-    <p>Ingresa al módulo de <strong>Aprobaciones</strong> para revisar y activar el acuerdo.</p>`
+    <p>Ingresa al módulo de <strong>Aprobaciones</strong> para revisarlo y activarlo.</p>`
+  ) : tpl(
+    `Nuevo acuerdo cerrado — PortGo`,
+    `<h2 style="margin:0 0 12px;color:#16a34a">✓ Se cerró un nuevo acuerdo</h2>
+    <p>El cliente <strong>${esc(p.cliente_nombre)}</strong> y <strong>${esc(p.admin_nombre)}</strong> cerraron un acuerdo — ya quedó como reservación activa, sin necesitar aprobación.</p>
+    <table style="width:100%;border-collapse:collapse;margin:16px 0">
+      <tr><td style="padding:6px 0;color:#64748b;width:140px">Servicio:</td><td><strong>${esc(p.tipo_camion) || '—'}</strong></td></tr>
+      <tr><td style="padding:6px 0;color:#64748b">Precio acordado:</td><td><strong>$${Number(p.precio||0).toLocaleString('es-MX')} MXN</strong></td></tr>
+    </table>
+    <p>Ingresa a <strong>Reservaciones</strong> si quieres verlo.</p>`
   ),
 
   nueva_reserva: (p) => tpl(

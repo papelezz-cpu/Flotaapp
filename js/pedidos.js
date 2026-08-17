@@ -1755,9 +1755,12 @@ async function confirmarDetallesServicio() {
     mensajeFinal = '✓ Acuerdo aceptado — quedó pendiente de revisión.';
   }
 
-  // Correo: acuerdo cerrado (o pendiente, según el caso)
+  // Correo: acuerdo cerrado (o pendiente, según el caso). El acuerdo ya se
+  // cierra solo en el caso normal — el superadmin solo tiene algo que hacer
+  // cuando quedó bloqueado por documentos vencidos.
   _notificarEmail({
     tipo_evento:    'acuerdo',
+    cerrado:        !errCierre,
     tipo_camion:    pedido.tipo_camion,
     cliente_nombre: pedido.cliente_nombre,
     admin_nombre:   oferta.admin_nombre,
@@ -2193,6 +2196,7 @@ async function responderContra(accion) {
 
     const { data: pedido } = await sb.from('pedidos').select('*').eq('id', oferta.pedido_id).single();
     let mensajeFinal = '✓ Acuerdo aceptado';
+    let errCierre = null;
     if (pedido) {
       await sb.from('pedidos').update({
         estado:              'pendiente_acuerdo',
@@ -2201,7 +2205,8 @@ async function responderContra(accion) {
 
       // El acuerdo se cierra solo — ya no requiere que el superadmin le dé
       // clic (los documentos vencidos son un bloqueo duro desde ofertas).
-      const { data: reservaId, error: errCierre } = await sb.rpc('cerrar_acuerdo', { p_oferta_id: oferta.id });
+      let reservaId;
+      ({ data: reservaId, error: errCierre } = await sb.rpc('cerrar_acuerdo', { p_oferta_id: oferta.id }));
 
       if (!errCierre) {
         mensajeFinal = '✓ Acuerdo cerrado — ya tienes una reservación activa';
@@ -2230,6 +2235,7 @@ async function responderContra(accion) {
     // Correo: acuerdo cerrado (o pendiente, según el caso)
     _notificarEmail({
       tipo_evento:    'acuerdo',
+      cerrado:        !errCierre,
       tipo_camion:    pedido.tipo_camion,
       cliente_nombre: pedido.cliente_nombre,
       admin_nombre:   currentUser.nombre,
