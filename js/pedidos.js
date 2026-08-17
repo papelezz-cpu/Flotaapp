@@ -1681,11 +1681,15 @@ async function confirmarDetallesServicio() {
 
   // El acuerdo se cierra solo (rechaza las demás ofertas, marca el pedido y
   // crea la reservación) — ya no requiere que el superadmin le dé clic.
-  const { error: errCierre } = await sb.rpc('cerrar_acuerdo', { p_oferta_id: oferta.id });
+  const { data: reservaId, error: errCierre } = await sb.rpc('cerrar_acuerdo', { p_oferta_id: oferta.id });
 
   let mensajeFinal;
   if (!errCierre) {
     mensajeFinal = '✓ Acuerdo cerrado — ya tienes una reservación activa';
+    if (reservaId && typeof _crearExpedienteAuto === 'function') {
+      if (pedido.entra_a_puerto) await _crearExpedienteAuto(reservaId, 'ingreso_puerto');
+      if (pedido.patio_externo)  await _crearExpedienteAuto(reservaId, 'entrega_vacios');
+    }
   } else if (errCierre.message?.includes('DOCUMENTOS_VENCIDOS')) {
     // Único caso que sigue necesitando al superadmin: la empresa tiene
     // documentos vencidos y no se puede cerrar el trato automáticamente.
@@ -2151,10 +2155,14 @@ async function responderContra(accion) {
 
       // El acuerdo se cierra solo — ya no requiere que el superadmin le dé
       // clic (los documentos vencidos son un bloqueo duro desde ofertas).
-      const { error: errCierre } = await sb.rpc('cerrar_acuerdo', { p_oferta_id: oferta.id });
+      const { data: reservaId, error: errCierre } = await sb.rpc('cerrar_acuerdo', { p_oferta_id: oferta.id });
 
       if (!errCierre) {
         mensajeFinal = '✓ Acuerdo cerrado — ya tienes una reservación activa';
+        if (reservaId && typeof _crearExpedienteAuto === 'function') {
+          if (pedido.entra_a_puerto) await _crearExpedienteAuto(reservaId, 'ingreso_puerto');
+          if (pedido.patio_externo)  await _crearExpedienteAuto(reservaId, 'entrega_vacios');
+        }
       } else if (errCierre.message?.includes('DOCUMENTOS_VENCIDOS')) {
         const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
         if (supers?.length) {
