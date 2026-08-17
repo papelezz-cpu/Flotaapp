@@ -404,10 +404,9 @@ async function renderPedidos(append = false) {
       p.estado === 'abierto' && !misOfertaIdsActivas.has(p.id) && !misOfertaIdsBloqueadas.has(p.id)
     ));
 
-    if (disponibles.length) {
-      html += `<div class="ped-seccion-title">Solicitudes disponibles</div>`;
-      html += disponibles.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'admin')).join('');
-    }
+    // Negociaciones y acuerdos primero: ahí es donde la empresa tiene que
+    // responder algo o está por cerrar un trato. Disponibles va al final —
+    // es solo para explorar, no pide ninguna acción todavía.
     if (misNegociaciones.length) {
       html += `<div class="ped-seccion-title">Mis negociaciones</div>`;
       html += misNegociaciones.map(p => {
@@ -421,6 +420,10 @@ async function renderPedidos(append = false) {
         const mia = (ofertasMap[p.id] || []).find(o => o.admin_id === currentUser.id && o.estado === 'aceptada');
         return pedidoCardHTML(p, ofertasMap[p.id] || [], 'admin_propio', mia);
       }).join('');
+    }
+    if (disponibles.length) {
+      html += `<div class="ped-seccion-title">Solicitudes disponibles</div>`;
+      html += disponibles.map(p => pedidoCardHTML(p, ofertasMap[p.id] || [], 'admin')).join('');
     }
     if (!disponibles.length && !misNegociaciones.length && !misAcuerdos.length) {
       html = `<div class="empty-state"><div class="icon">📋</div>No hay solicitudes abiertas en este momento.</div>`;
