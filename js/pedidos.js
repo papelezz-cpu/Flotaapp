@@ -1207,6 +1207,15 @@ function openNuevoPedido(servicio) {
   const nomPlant = document.getElementById('np-plantilla-nombre');
   if (nomPlant) nomPlant.value = '';
 
+  // Los checkboxes de puerto no se limpian solos entre una solicitud y otra
+  // (el navegador conserva el estado): sin esto, "entra a puerto" se quedaba
+  // marcado de la solicitud anterior y el arribo tentativo aparecía sin que
+  // el cliente lo hubiera tocado esta vez.
+  const chkEntraPuerto = document.getElementById('np-entra-puerto');
+  if (chkEntraPuerto) chkEntraPuerto.checked = false;
+  const chkPatioExterno = document.getElementById('np-patio-externo');
+  if (chkPatioExterno) chkPatioExterno.checked = false;
+
   toggleArriboPuerto();
 
   // Ningún servicio se puede pedir para el mismo día — mínimo mañana.
