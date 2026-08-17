@@ -497,10 +497,6 @@
           <div class="cargo-chips-select" id="admin-tipo-carga"></div>
         </div>
         <div class="form-group">
-          <label>Precio por día (MXN)</label>
-          <input type="number" id="admin-precio" placeholder="Ej. 8500" min="0">
-        </div>
-        <div class="form-group">
           <label>Estado inicial</label>
           <select id="admin-estado">
             <option value="disponible">Disponible</option>
@@ -1682,14 +1678,6 @@
       <label>Dirección / punto de encuentro</label>
       <input type="text" id="ds-lugar" placeholder="Ej. Terminal Lázaro Cárdenas, Patio 3…">
     </div>
-    <div class="form-group">
-      <label>Nombre del contacto en sitio</label>
-      <input type="text" id="ds-contacto-nombre" placeholder="Quien recibirá al proveedor">
-    </div>
-    <div class="form-group">
-      <label>Teléfono de contacto</label>
-      <input type="tel" id="ds-contacto-tel" placeholder="Ej. 314 123 4567">
-    </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="omitirDetallesServicio()">Omitir</button>
       <button class="btn-confirm" onclick="confirmarDetallesServicio()">✓ Guardar y confirmar</button>
@@ -1716,6 +1704,29 @@
     <div id="vcal-lista" style="display:flex;flex-direction:column;gap:12px;max-height:340px;overflow-y:auto"></div>
     <div class="modal-actions" style="margin-top:16px">
       <button class="btn-cancel" onclick="cerrarVerCalificaciones()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL CAMBIAR UNIDAD (reserva activa) ═══════════ -->
+<div class="modal-overlay" id="modal-cambiar-unidad">
+  <div class="modal" style="max-width:460px">
+    <h2>🔧 Cambiar unidad asignada</h2>
+    <p class="sub">Unidad actual: <strong id="cu-unidad-actual-label">—</strong></p>
+    <input type="hidden" id="cu-reserva-id">
+    <input type="hidden" id="cu-tabla">
+    <input type="hidden" id="cu-unidad-actual">
+    <div class="form-group">
+      <label>Nueva unidad</label>
+      <select id="cu-unidad-nueva"><option value="">Cargando…</option></select>
+    </div>
+    <div class="form-group">
+      <label>Motivo del cambio <span style="font-weight:400;color:var(--text-muted)">(obligatorio)</span></label>
+      <textarea id="cu-motivo" rows="3" placeholder="Ej. La unidad original se descompuso en ruta"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="cerrarCambiarUnidad()">Cancelar</button>
+      <button class="btn-confirm" onclick="confirmarCambiarUnidad()">✓ Cambiar unidad</button>
     </div>
   </div>
 </div>
@@ -2568,14 +2579,14 @@
 <script src="js/views.js?v=27"></script>
 <script src="js/camiones.js?v=11"></script>
 <script src="js/recursos.js?v=11"></script>
-<script src="js/reservaciones.js?v=35"></script>
+<script src="js/reservaciones.js?v=36"></script>
 <script src="js/modal.js?v=13"></script>
 <script src="js/mapa.js?v=1"></script>
 <script src="js/expedientes.js?v=1"></script>
-<script src="js/pedidos.js?v=53"></script>
+<script src="js/pedidos.js?v=54"></script>
 <script src="js/plantillas.js?v=6"></script>
-<script src="js/aprobaciones.js?v=37"></script>
-<script src="js/admin.js?v=31"></script>
+<script src="js/aprobaciones.js?v=38"></script>
+<script src="js/admin.js?v=32"></script>
 <script src="js/operadores.js?v=10"></script>
 <script src="js/usuarios.js?v=21"></script>
 <script src="js/verificacion.js?v=1"></script>

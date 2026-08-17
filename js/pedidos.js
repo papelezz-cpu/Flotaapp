@@ -1595,8 +1595,6 @@ function _openDetallesServicio(oferta, pedido) {
     document.getElementById('ds-fecha').value           = (pedido.fecha_ini || '').split('T')[0];
     document.getElementById('ds-hora').value            = pedido.hora_carga || '';
     document.getElementById('ds-lugar').value           = pedido.detalles_lugar || pedido.origen || '';
-    document.getElementById('ds-contacto-nombre').value = pedido.detalles_contacto_nombre || pedido.contacto_nombre || '';
-    document.getElementById('ds-contacto-tel').value    = pedido.detalles_contacto_tel || pedido.contacto_tel || '';
     document.getElementById('modal-detalles-servicio').classList.add('open');
   } catch (e) {
     console.error('_openDetallesServicio error:', e);
@@ -1637,10 +1635,8 @@ async function confirmarDetallesServicio() {
   // Guardar detalles en el pedido (solo los que se hayan ingresado)
   const update = {
     detalles_completados: true,
-    detalles_lugar:           lugar || null,
-    detalles_hora:            v('ds-hora') || null,
-    detalles_contacto_nombre: v('ds-contacto-nombre') || null,
-    detalles_contacto_tel:    v('ds-contacto-tel') || null,
+    detalles_lugar: lugar || null,
+    detalles_hora:  v('ds-hora') || null,
   };
   if (fecha) update.fecha_ini = fecha;
   await sb.from('pedidos').update(update).eq('id', pedido.id);

@@ -659,7 +659,7 @@ async function editarCamionRechazado(id) {
   if (!c) { showToast('No se encontró la unidad', 'error'); return; }
 
   // Limpiar form antes de rellenar para evitar datos sucios de una alta a medias
-  ['admin-cap','admin-precio','admin-placas','admin-dim','admin-version','admin-modelo-anio',
+  ['admin-cap','admin-placas','admin-dim','admin-version','admin-modelo-anio',
    'admin-num-serie','admin-num-motor','admin-num-economico','admin-tc','admin-fecha-tc',
    'admin-vence-tc','admin-vence-seguro','admin-vence-permiso-sct','admin-caat',
    'admin-vigencia-caat','admin-vence-verificacion','admin-vence-peligrosa'].forEach(fid => {
@@ -683,7 +683,6 @@ async function editarCamionRechazado(id) {
 
   setSelect('admin-tipo', c.tipo);
   set('admin-cap',          c.capacidad);
-  set('admin-precio',       c.precio_dia);
   set('admin-placas',       c.placas);
   set('admin-dim',          c.dimensiones);
   set('admin-version',      c.version);
@@ -864,7 +863,6 @@ async function agregarCamion() {
   const cap    = parseInt(document.getElementById('admin-cap').value) || 0;
   const op     = document.getElementById('admin-op').value.trim();
   const estado = document.getElementById('admin-estado').value;
-  const precio = parseFloat(document.getElementById('admin-precio').value) || null;
   const placas = document.getElementById('admin-placas').value.trim() || null;
   const dim    = document.getElementById('admin-dim').value.trim()    || null;
   const tipoCarga = getSelectedCargo('admin-tipo-carga');
@@ -962,7 +960,6 @@ async function agregarCamion() {
     ...(placas         && { placas }),
     ...(dim            && { dimensiones: dim }),
     ...(tipoCarga.length && { tipo_carga: tipoCarga }),
-    ...(precio         && { precio_dia: precio }),
     marca:               g('admin-marca'),
     version:             g('admin-version'),
     modelo_anio:         parseInt(document.getElementById('admin-modelo-anio')?.value) || null,
@@ -1008,7 +1005,7 @@ async function agregarCamion() {
   }
 
   // Limpiar formulario
-  ['admin-cap','admin-precio','admin-placas','admin-dim','admin-version','admin-modelo-anio',
+  ['admin-cap','admin-placas','admin-dim','admin-version','admin-modelo-anio',
    'admin-num-serie','admin-num-motor','admin-num-economico','admin-tc','admin-fecha-tc',
    'admin-vence-tc','admin-vence-seguro','admin-vence-permiso-sct','admin-caat','admin-vigencia-caat','admin-vence-verificacion'].forEach(fid => {
     const el = document.getElementById(fid); if (el) el.value = '';

@@ -353,7 +353,6 @@ async function renderAprobaciones() {
                 ${oferta.mensaje ? `<div class="apr-oferta-row"><span>Nota proveedor:</span>"${esc(oferta.mensaje)}"</div>` : ''}
                 ${p.detalles_lugar ? `<div class="apr-oferta-row"><span>Dirección:</span>${esc(p.detalles_lugar)}</div>` : ''}
                 ${p.detalles_hora  ? `<div class="apr-oferta-row"><span>Hora:</span>${esc(p.detalles_hora)}</div>` : ''}
-                ${p.detalles_contacto_nombre ? `<div class="apr-oferta-row"><span>Contacto:</span>${esc(p.detalles_contacto_nombre)} ${esc(p.detalles_contacto_tel||'')}</div>` : ''}
                 ${p.precio_cliente ? `<div class="apr-oferta-row"><span>Presupuesto original:</span>$${Number(p.precio_cliente).toLocaleString('es-MX')} MXN</div>` : ''}
               </div>`;
               })() : '<div class="apr-empty" style="margin:8px 0">⚠️ No se encontró la oferta asociada</div>'}

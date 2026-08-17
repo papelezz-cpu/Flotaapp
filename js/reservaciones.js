@@ -307,6 +307,7 @@ async function renderReserv() {
       const trackStep = r.tracking_estado || 'Confirmado';
       acciones = `
         <button class="btn-edit" onclick="openTracking('${r.id}')" title="Ver seguimiento">📍 ${esc(trackStep)}</button>
+        <button class="btn-edit" onclick="abrirCambiarUnidad('${r.id}')" title="Reasignar a otra unidad (p. ej. si se descompuso)">🔧 Cambiar unidad</button>
         <button class="btn-completar-reserva" onclick="abrirEvidencias('${r.id}','evidencias')">✓ Completar</button>
         <button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${escJs(r.unidad)}')">Cancelar</button>`;
     } else if (esDueno && esPorAprobar) {
@@ -560,6 +561,83 @@ function eliminarReserva(reservaId) {
     await renderReserv();
     showToast('✓ Reservación archivada en el historial');
   });
+}
+
+// ── CAMBIAR UNIDAD (empresa, reserva activa) ──────────
+// Para cuando la unidad asignada se descompone o no puede seguir el
+// servicio: la empresa reasigna a otra unidad propia disponible del mismo
+// tipo, con motivo obligatorio (lo exige guard_reservacion_update en DB).
+
+async function abrirCambiarUnidad(reservaId) {
+  const { data: r } = await sb.from('reservaciones')
+    .select('unidad, recurso_tipo').eq('id', reservaId).single();
+  if (!r) { showToast('No se encontró la reserva', 'error'); return; }
+
+  const tabla = r.recurso_tipo === 'custodio' ? 'custodios'
+    : r.recurso_tipo === 'patio' ? 'patios'
+    : r.recurso_tipo === 'lavado' ? 'lavados' : 'camiones';
+
+  const { data: opciones } = await sb.from(tabla)
+    .select('id, tipo, nombre')
+    .eq('propietario_id', currentUser.id)
+    .eq('aprobacion', 'aprobada')
+    .eq('estado', 'disponible')
+    .neq('id', r.unidad || '');
+
+  const sel = document.getElementById('cu-unidad-nueva');
+  sel.innerHTML = opciones?.length
+    ? '<option value="">Selecciona…</option>' + opciones.map(o =>
+        `<option value="${esc(o.id)}">${esc(o.id)}${o.tipo ? ' — ' + esc(o.tipo) : ''}${o.nombre ? ' — ' + esc(o.nombre) : ''}</option>`).join('')
+    : '<option value="">No tienes otra unidad disponible del mismo tipo</option>';
+
+  document.getElementById('cu-reserva-id').value     = reservaId;
+  document.getElementById('cu-tabla').value          = tabla;
+  document.getElementById('cu-unidad-actual').value  = r.unidad || '';
+  document.getElementById('cu-unidad-actual-label').textContent = r.unidad || '—';
+  document.getElementById('cu-motivo').value = '';
+  document.getElementById('modal-cambiar-unidad').classList.add('open');
+}
+
+function cerrarCambiarUnidad() {
+  document.getElementById('modal-cambiar-unidad').classList.remove('open');
+}
+
+async function confirmarCambiarUnidad() {
+  const reservaId   = document.getElementById('cu-reserva-id').value;
+  const tabla       = document.getElementById('cu-tabla').value;
+  const unidadVieja = document.getElementById('cu-unidad-actual').value;
+  const unidadNueva = document.getElementById('cu-unidad-nueva').value;
+  const motivo      = document.getElementById('cu-motivo').value.trim();
+
+  if (!unidadNueva) { showToast('Selecciona la nueva unidad', 'error'); return; }
+  if (!motivo) { showToast('Indica el motivo del cambio', 'error'); return; }
+
+  const { error } = await sb.from('reservaciones').update({
+    unidad: unidadNueva,
+    motivo_cambio_unidad: motivo,
+  }).eq('id', reservaId);
+  if (error) { showToast('No se pudo cambiar la unidad: ' + (error.message || ''), 'error'); return; }
+
+  if (unidadVieja) await sb.from(tabla).update({ estado: 'disponible' }).eq('id', unidadVieja);
+  await sb.from(tabla).update({ estado: 'ocupado' }).eq('id', unidadNueva);
+
+  const { data: r } = await sb.from('reservaciones').select('cliente_user_id, cliente').eq('id', reservaId).single();
+  const notifs = [];
+  if (r?.cliente_user_id) notifs.push({
+    user_id: r.cliente_user_id, tipo: 'unidad_cambiada', titulo: '🔧 Se cambió la unidad de tu servicio',
+    mensaje: `La empresa cambió la unidad asignada de "${unidadVieja}" a "${unidadNueva}". Motivo: ${motivo}`, leido: false,
+  });
+  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+  (supers || []).forEach(s => notifs.push({
+    user_id: s.user_id, tipo: 'unidad_cambiada', titulo: '🔧 Cambio de unidad en un servicio activo',
+    mensaje: `${esc(currentUser.nombre || 'Una empresa')} cambió la unidad de "${unidadVieja}" a "${unidadNueva}" en el servicio de ${esc(r?.cliente || 'un cliente')}. Motivo: ${motivo}`,
+    leido: false,
+  }));
+  if (notifs.length) await sb.from('notificaciones').insert(notifs);
+
+  cerrarCambiarUnidad();
+  await renderReserv();
+  showToast('✓ Unidad cambiada');
 }
 
 // ── COMPLETAR SERVICIO (cliente y empresa, con aprobación del superadmin) ──
