@@ -264,14 +264,18 @@ async function renderPedidos(append = false) {
       aReabrir.forEach(p => { p.estado = 'abierto'; });
     }
 
-    // Estado lazy: solicitudes sin ninguna oferta cuya fecha de carga ya
+    // Estado lazy: solicitudes sin ninguna oferta VIVA cuya fecha de carga ya
     // llegó o pasó (falta menos de un día) → nadie las va a poder atender a
     // tiempo, se marcan expiradas para que dejen de verse como activas.
+    // "Sin oferta viva" no es lo mismo que "sin fila en ofertas": una
+    // solicitud con solo ofertas rechazadas o vencidas también cuenta.
     const hoyLazy = today();
     const aExpirarSinOferta = (pedidosPage || []).filter(p =>
       ['abierto', 'pendiente_revision'].includes(p.estado) &&
       p.fecha_ini && p.fecha_ini <= hoyLazy &&
-      !(ofertasPorPedido[p.id] || []).length
+      (ofertasPorPedido[p.id] || []).every(o =>
+        o.estado === 'rechazada' || (o.estado === 'enviada' && o.expira_en && new Date(o.expira_en) < new Date())
+      )
     );
     if (aExpirarSinOferta.length) {
       sb.from('pedidos').update({ estado: 'expirado' })
