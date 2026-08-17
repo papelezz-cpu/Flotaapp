@@ -25,6 +25,23 @@ function _chatHiloBadge(n) {
 // estados se ven con las pills.
 let _reservFiltro = 'Activa';
 
+// Ids de reservación con el panel de acciones secundarias abierto. Se guarda
+// aparte del DOM porque renderReserv() se vuelve a llamar seguido (realtime,
+// notificaciones) y sin esto cada refresh cerraría lo que el usuario acababa
+// de abrir.
+const _reservAbiertas = new Set();
+
+function toggleReservDetalle(id) {
+  const panel  = document.getElementById(`reserv-detalle-${id}`);
+  const toggle = document.getElementById(`reserv-toggle-${id}`);
+  if (!panel || !toggle) return;
+  const abrir = !panel.classList.contains('open');
+  panel.classList.toggle('open', abrir);
+  toggle.classList.toggle('open', abrir);
+  toggle.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+  if (abrir) _reservAbiertas.add(id); else _reservAbiertas.delete(id);
+}
+
 const _RESERV_FILTRO_LABEL = {
   Activa: 'activas', Pendiente: 'pendientes', PorAprobar: 'por aprobar', Completada: 'completadas',
   Cancelada: 'canceladas', CancelacionSolicitada: 'con cancelación en revisión', PorCobrar: 'por cobrar', Vencido: 'con pago vencido', todas: '',
@@ -189,7 +206,15 @@ async function renderReserv() {
       // checklist, disponible en cuanto hay match (la reservación existe).
       const numDocsCarga = r.documentos_carga?.length || 0;
       const cartaPorteBtn = `<button class="btn-edit" style="font-size:0.7rem" onclick="abrirDocumentosCarga('${r.id}')">📄 ${numDocsCarga ? `Documentos (${numDocsCarga})` : 'Carta Porte / documentos'}</button>`;
+      const expedientePills = typeof expedienteBotonesHTML === 'function' ? expedienteBotonesHTML(r, true) : '';
+      const abierta = _reservAbiertas.has(r.id);
+      const grupo = (label, html) => html ? `
+        <div class="reserv-detail-group">
+          <span class="reserv-detail-group-label">${label}</span>
+          <div class="reserv-detail-group-btns">${html}</div>
+        </div>` : '';
       return `
+      <div class="reserv-item">
       <div class="reserv-row reserv-row-cli">
         <div class="reserv-id">${unidadLabel}</div>
         <div class="reserv-empresa">${esc(empresaMap[r.unidad] || '—')}</div>
@@ -198,17 +223,17 @@ async function renderReserv() {
         <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
           <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
           ${trackBtn}
-          ${gpsBtnCli}
-          ${completarBtn}
-          ${chatBtn}
-          ${calBtn}
           ${pagoLbl}
-          ${precioLbl}
-          ${pagarBtn}
-          ${typeof expedienteBotonesHTML === 'function' ? expedienteBotonesHTML(r, true) : ''}
-          ${cartaPorteBtn}
-          ${cancelBtn}
+          ${chatBtn}
+          <button id="reserv-toggle-${r.id}" class="reserv-toggle${abierta ? ' open' : ''}" aria-expanded="${abierta}" title="Más acciones" onclick="toggleReservDetalle('${r.id}')">▾</button>
         </div>
+      </div>
+      <div id="reserv-detalle-${r.id}" class="reserv-detail${abierta ? ' open' : ''}">
+        ${grupo('Operación', gpsBtnCli)}
+        ${grupo('Documentos', cartaPorteBtn + expedientePills)}
+        ${grupo('Pago', precioLbl + pagarBtn)}
+        ${grupo('Cierre', completarBtn + calBtn + cancelBtn)}
+      </div>
       </div>`;
     }).join('');
     return;
@@ -307,17 +332,28 @@ async function renderReserv() {
                    : 'badge-maint';
 
     const esDueno = currentUser.rol === 'superadmin' || ownerMap[r.unidad] === currentUser.id || r.propietario_id === currentUser.id;
-    let acciones = '';
+
+    // Fila compacta: solo lo decisivo a simple vista. Todo lo demás
+    // (chofer, unidad, GPS, documentos, cierre) vive en el panel expandible
+    // — ver toggleReservDetalle. Pendiente se deja tal cual: son solo 2
+    // botones y ambos son la decisión que importa, no hay nada que ocultar.
+    let primaria = '';
+    const gruposDetalle = [];
+    const grupo = (label, html) => { if (html) gruposDetalle.push({ label, html }); };
+
     if (esDueno && esPendiente) {
-      acciones = `
+      primaria = `
         <button class="btn-aceptar-reserva"  onclick="aceptarReserva('${r.id}','${escJs(r.unidad)}','${r.recurso_tipo||'camion'}')">✓ Aceptar</button>
         <button class="btn-rechazar-reserva" onclick="rechazarReserva('${r.id}','${escJs(r.unidad)}')">✕ Rechazar</button>`;
     } else if (esDueno && esActiva) {
       const trackStep = r.tracking_estado || 'Confirmado';
       // El chofer ya no es obligatorio al ofertar: se asigna aquí, en
       // cualquier momento mientras el viaje sigue Activo. El tracking no
-      // deja avanzar del primer paso sin uno asignado (ver tracking.js).
-      const choferBtn = r.recurso_tipo === 'camion' || !r.recurso_tipo
+      // deja avanzar del primer paso sin uno asignado (ver tracking.js) —
+      // por eso, si falta, se marca en la fila y no solo adentro del panel.
+      const esCamion = r.recurso_tipo === 'camion' || !r.recurso_tipo;
+      const choferFalta = esCamion && !r.operador_nombre;
+      const choferBtn = esCamion
         ? `<button class="btn-edit" onclick="abrirAsignarChofer('${r.id}')" title="${r.operador_nombre ? 'Cambiar chofer' : 'Asignar chofer antes de iniciar el viaje'}">👷 ${r.operador_nombre ? esc(r.operador_nombre) : 'Asignar chofer'}</button>`
         : '';
       // El link se puede guardar en cualquier momento; el cliente solo lo ve
@@ -325,21 +361,26 @@ async function renderReserv() {
       const gpsBtn = `<button class="btn-edit" onclick="abrirGpsLink('${r.id}')" title="Link de GPS temporal">🛰️ GPS${r.gps_link ? ' ✓' : ''}</button>`;
       const numDocsCargaDueno = r.documentos_carga?.length || 0;
       const docsCargaBtnDueno = `<button class="btn-edit" onclick="abrirDocumentosCarga('${r.id}')" title="Ver Carta Porte y documentos que subió el cliente">📄 ${numDocsCargaDueno ? `Documentos (${numDocsCargaDueno})` : 'Documentos del cliente'}</button>`;
-      acciones = `
+      const expedientePillsActiva = typeof expedienteBotonesHTML === 'function'
+        ? expedienteBotonesHTML(r, r.cliente_user_id === currentUser.id) : '';
+
+      primaria = `
         <button class="btn-edit" onclick="openTracking('${r.id}')" title="Ver seguimiento">📍 ${esc(trackStep)}</button>
-        ${choferBtn}
-        ${gpsBtn}
-        ${docsCargaBtnDueno}
-        <button class="btn-edit" onclick="abrirCambiarUnidad('${r.id}')" title="Reasignar a otra unidad (p. ej. si se descompuso)">🔧 Cambiar unidad</button>
-        <button class="btn-completar-reserva" onclick="abrirEvidencias('${r.id}','evidencias')">✓ Completar</button>
-        <button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${escJs(r.unidad)}')">Cancelar</button>`;
+        ${choferFalta ? `<span class="reserv-warn-chip" title="Bloquea avanzar el seguimiento">⚠ Sin chofer</span>` : ''}`;
+      grupo('Operación', choferBtn + `<button class="btn-edit" onclick="abrirCambiarUnidad('${r.id}')" title="Reasignar a otra unidad (p. ej. si se descompuso)">🔧 Cambiar unidad</button>` + gpsBtn);
+      grupo('Documentos', docsCargaBtnDueno + expedientePillsActiva);
+      grupo('Cierre', `<button class="btn-completar-reserva" onclick="abrirEvidencias('${r.id}','evidencias')">✓ Completar</button>` +
+        `<button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${escJs(r.unidad)}')">Cancelar</button>`);
     } else if (esDueno && esPorAprobar) {
       // El servicio se cierra cuando cliente Y empresa marcan completado (cada
       // quien sube su propia evidencia); el superadmin aprueba la revisión.
       const miEvidencia = r.evidencias?.length || 0;
-      acciones = miEvidencia
+      primaria = miEvidencia
         ? `<span style="font-size:0.72rem;color:var(--text-muted)">⏳ Esperando aprobación del superadmin</span>`
         : `<button class="btn-completar-reserva" style="font-size:0.72rem" onclick="abrirEvidencias('${r.id}','evidencias')">📎 Subir mi evidencia</button>`;
+      const expedientePillsAprobar = typeof expedienteBotonesHTML === 'function'
+        ? expedienteBotonesHTML(r, r.cliente_user_id === currentUser.id) : '';
+      grupo('Documentos', expedientePillsAprobar);
     } else if (esDueno && esCompletada) {
       const diasPasados = r.completado_en
         ? Math.floor((new Date() - new Date(r.completado_en)) / 86400000) : 99;
@@ -352,12 +393,9 @@ async function renderReserv() {
       const cobroBtn = r.pagado
         ? `<button class="btn-edit" style="font-size:0.72rem" title="Revertir el cobro registrado" onclick="revertirPago('${r.id}')">↩ Revertir cobro</button>`
         : `<button class="btn-edit" style="font-size:0.72rem;color:var(--amber);border-color:rgba(245,158,11,0.4)" onclick="abrirRegistrarPago('${r.id}')">💰 Registrar pago</button>`;
-      acciones = cobroBadgeHTML(r) + cobroBtn + evBtn;
+      primaria = cobroBadgeHTML(r);
+      grupo('Cierre', cobroBtn + evBtn);
     }
-
-    const cartaPorteBtnAdmin = (esActiva || esPorAprobar || esCompletada)
-      ? `<button class="btn-prox" disabled title="Carta Porte digital — próximamente">📄 Carta Porte <span class="prox-badge">Prox.</span></button>`
-      : '';
 
     const unidadLabel = recursoLabelMap[r.unidad] || esc(r.unidad) || '—';
     // Chat con el cliente. La empresa puede escribir mientras la reserva está
@@ -374,11 +412,21 @@ async function renderReserv() {
     } else if (esDueno && r.cliente_user_id && !inactiva) {
       chatBtn = `<button class="btn-chat-hilo" style="position:relative" title="${chatVigente ? 'Chat con el cliente' : 'Conversación cerrada (historial)'}" onclick="openChatReserva('${r.id}','${r.cliente_user_id}','${escJs(r.cliente||'')}'${chatVigente ? '' : ', {readonly:true}'})">💬${_chatHiloBadge(unreadMap[r.id])}</button>`;
     }
-    // Eliminar (mover a histórico) — solo superadmin
-    const elimBtn = currentUser.rol === 'superadmin'
-      ? `<button class="btn-edit btn-rechazar" style="font-size:0.72rem" onclick="eliminarReserva('${r.id}')">🗑</button>`
-      : '';
+    // Eliminar (mover a histórico) — solo superadmin. No es una acción de
+    // todos los días: va al panel, no a la fila.
+    if (currentUser.rol === 'superadmin') {
+      grupo('Superadmin', `<button class="btn-edit btn-rechazar" style="font-size:0.72rem" onclick="eliminarReserva('${r.id}')">🗑 Eliminar</button>`);
+    }
+
+    const abierta = _reservAbiertas.has(r.id);
+    const detalleHTML = gruposDetalle.map(g => `
+        <div class="reserv-detail-group">
+          <span class="reserv-detail-group-label">${g.label}</span>
+          <div class="reserv-detail-group-btns">${g.html}</div>
+        </div>`).join('');
+
     return `
+    <div class="reserv-item">
     <div class="reserv-row ${inactiva ? 'reserv-cancelada' : ''}">
       <div class="reserv-id">${unidadLabel}</div>
       <div class="reserv-empresa">${esc(empresaMap[r.unidad] || '—')}</div>
@@ -387,13 +435,12 @@ async function renderReserv() {
       <div>${fmtFecha(r.fecha_fin)}</div>
       <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
         <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
-        ${acciones}
-        ${typeof expedienteBotonesHTML === 'function'
-            ? expedienteBotonesHTML(r, r.cliente_user_id === currentUser.id) : ''}
-        ${cartaPorteBtnAdmin}
+        ${primaria}
         ${chatBtn}
-        ${elimBtn}
+        ${detalleHTML ? `<button id="reserv-toggle-${r.id}" class="reserv-toggle${abierta ? ' open' : ''}" aria-expanded="${abierta}" title="Más acciones" onclick="toggleReservDetalle('${r.id}')">▾</button>` : ''}
       </div>
+    </div>
+    ${detalleHTML ? `<div id="reserv-detalle-${r.id}" class="reserv-detail${abierta ? ' open' : ''}">${detalleHTML}</div>` : ''}
     </div>`;
   }).join('');
 }
