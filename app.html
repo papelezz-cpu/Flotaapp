@@ -24,7 +24,7 @@
   <!-- Estilos -->
   <link rel="stylesheet" href="css/base.css?v=7">
   <link rel="stylesheet" href="css/layout.css?v=4">
-  <link rel="stylesheet" href="css/components.css?v=29">
+  <link rel="stylesheet" href="css/components.css?v=30">
   <!-- Mapa para marcar origen y destino. Leaflet + OpenStreetMap: sin API key
        ni facturación, y ya usamos Nominatim (mismo proyecto) para geocodificar. -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -971,6 +971,24 @@
         </div>
 
         <div class="op-form-section">
+          <div class="op-form-section-title">Materiales peligrosos <small style="font-weight:400">(opcional — solo si va a manejar carga HAZMAT)</small></div>
+        </div>
+        <div class="form-group">
+          <label>Vigencia de la licencia de materiales peligrosos</label>
+          <input type="date" id="op-vence-peligrosa">
+        </div>
+        <div class="form-group">
+          <label>Documento de la licencia</label>
+          <label class="file-upload-area" for="op-doc-peligrosa">
+            <span class="file-upload-icon">☣️</span>
+            <span class="file-upload-text">Seleccionar documento</span>
+          </label>
+          <input type="file" id="op-doc-peligrosa" accept="image/*,.pdf" style="display:none"
+                 onchange="previewDocNombre(this,'op-doc-peligrosa-preview')">
+          <div id="op-doc-peligrosa-preview"></div>
+        </div>
+
+        <div class="op-form-section">
           <div class="op-form-section-title">Foto del operador</div>
         </div>
         <div class="form-group">
@@ -1630,7 +1648,7 @@
       </select>
     </div>
     <div class="form-group" id="ho-op-row" style="display:none">
-      <label>Chofer asignado *</label>
+      <label>Chofer asignado <span style="font-weight:400;color:var(--text-muted)">(opcional — puedes asignarlo después, antes de que el viaje arranque)</span></label>
       <select id="ho-operador">
         <option value="">— Selecciona un chofer —</option>
       </select>
@@ -1655,10 +1673,15 @@
   <div class="modal" style="max-width:420px">
     <h2>↩ Contraoferta del cliente</h2>
     <div id="contra-detalle-info" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;padding:14px;margin-bottom:20px;font-size:0.85rem"></div>
-    <p class="sub" style="margin-bottom:0">¿Aceptas la contraoferta o la rechazas?</p>
-    <div class="modal-actions">
+    <p class="sub" style="margin-bottom:12px">¿Aceptas, rechazas, o le regresas otro precio?</p>
+    <div class="form-group">
+      <label>Tu contraoferta (MXN) <span style="font-weight:400;color:var(--text-muted)">(solo si vas a contraofertar)</span></label>
+      <input type="number" id="rc-contra-precio" placeholder="Ej. 8800">
+    </div>
+    <div class="modal-actions" style="flex-wrap:wrap">
       <button class="btn-cancel" onclick="closeResponderContra()">Cancelar</button>
       <button class="btn-edit btn-rechazar" style="flex:1;padding:10px;font-size:0.85rem" onclick="responderContra('rechazar')">✕ Rechazar</button>
+      <button class="btn-edit" style="flex:1;padding:10px;font-size:0.85rem" onclick="responderContra('contraofertar')">↩ Contraofertar</button>
       <button class="btn-confirm" onclick="responderContra('aceptar')">✓ Aceptar</button>
     </div>
   </div>
@@ -1708,6 +1731,24 @@
     <div id="vcal-lista" style="display:flex;flex-direction:column;gap:12px;max-height:340px;overflow-y:auto"></div>
     <div class="modal-actions" style="margin-top:16px">
       <button class="btn-cancel" onclick="cerrarVerCalificaciones()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL ASIGNAR CHOFER (reserva activa) ═══════════ -->
+<div class="modal-overlay" id="modal-asignar-chofer">
+  <div class="modal" style="max-width:420px">
+    <h2>👷 Asignar chofer</h2>
+    <p class="sub">Puedes asignarlo o cambiarlo en cualquier momento antes de que el viaje arranque.</p>
+    <input type="hidden" id="ac-reserva-id">
+    <p class="sub" id="ac-aviso-hazmat" style="display:none;color:var(--amber)">⚠ Este pedido es de carga peligrosa: solo aparecen choferes con licencia HAZMAT vigente.</p>
+    <div class="form-group">
+      <label>Chofer</label>
+      <select id="ac-operador"><option value="">Cargando…</option></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="cerrarAsignarChofer()">Cancelar</button>
+      <button class="btn-confirm" onclick="confirmarAsignarChofer()">✓ Asignar</button>
     </div>
   </div>
 </div>
@@ -2583,15 +2624,15 @@
 <script src="js/views.js?v=27"></script>
 <script src="js/camiones.js?v=11"></script>
 <script src="js/recursos.js?v=11"></script>
-<script src="js/reservaciones.js?v=36"></script>
+<script src="js/reservaciones.js?v=37"></script>
 <script src="js/modal.js?v=13"></script>
 <script src="js/mapa.js?v=1"></script>
 <script src="js/expedientes.js?v=2"></script>
-<script src="js/pedidos.js?v=56"></script>
+<script src="js/pedidos.js?v=57"></script>
 <script src="js/plantillas.js?v=8"></script>
 <script src="js/aprobaciones.js?v=38"></script>
 <script src="js/admin.js?v=32"></script>
-<script src="js/operadores.js?v=10"></script>
+<script src="js/operadores.js?v=11"></script>
 <script src="js/usuarios.js?v=21"></script>
 <script src="js/verificacion.js?v=1"></script>
 <script src="js/privacidad.js?v=1"></script>
@@ -2600,7 +2641,7 @@
 <script src="js/reportes.js?v=2"></script>
 <script src="js/chat.js?v=16"></script>
 <script src="js/catalogo.js?v=21"></script>
-<script src="js/tracking.js?v=12"></script>
+<script src="js/tracking.js?v=13"></script>
 <script src="js/vigencias.js?v=4"></script>
 <script src="js/main.js?v=17"></script>
 

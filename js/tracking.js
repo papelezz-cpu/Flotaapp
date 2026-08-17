@@ -92,6 +92,14 @@ async function avanzarTracking() {
   const next = TRACKING_ESTADOS[idx + 1];
   if (!next) return;
 
+  // El chofer ya no es obligatorio al ofertar, pero sí para que el viaje
+  // arranque de verdad: no se puede avanzar del primer paso sin uno.
+  const esCamionServicio = trackingReserva.recurso_tipo === 'camion' || !trackingReserva.recurso_tipo;
+  if (idx === 0 && esCamionServicio && !trackingReserva.operador_id) {
+    showToast('Asigna un chofer antes de avanzar el seguimiento — botón "👷 Asignar chofer" en Reservaciones.', 'error');
+    return;
+  }
+
   await sb.from('reservaciones')
     .update({ tracking_estado: next.key })
     .eq('id', trackingReservaId);

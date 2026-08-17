@@ -672,6 +672,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
       <div class="pedido-top">
         <div class="pedido-info">
           <div class="pedido-tipo">${TIPO_EMOJI[p.tipo_camion] || '🚛'} ${esc(p.tipo_camion)}</div>
+          <div class="pedido-solicitante">👤 ${esc(p.cliente_nombre)}</div>
           ${p.origen || p.destino
             ? `<div class="pedido-ruta">📍 ${esc(p.origen || '—')}${p.destino ? ' → ' + esc(p.destino) : ''}</div>` : ''}
           ${fechasTxt ? `<div class="pedido-fecha">${fechasTxt}</div>` : ''}
@@ -687,7 +688,6 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           ${precioBadge}
           ${numOfertas ? `<span class="ped-num-ofertas">${numOfertas} ${numOfertas === 1 ? 'oferta' : 'ofertas'}</span>` : ''}
-          <span class="ped-cliente">👤 ${esc(p.cliente_nombre)}</span>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           ${acciones}
@@ -1660,25 +1660,40 @@ async function confirmarDetallesServicio() {
   // Marcar oferta como aceptada
   await sb.from('ofertas').update({ estado: 'aceptada' }).eq('id', oferta.id);
 
-  // Poner pedido en pendiente_acuerdo (superadmin revisa antes de crear reservación)
+  // Pendiente_acuerdo es el paso intermedio; se cierra solo abajo salvo que
+  // haya un impedimento real (documentos vencidos de la empresa).
   await sb.from('pedidos').update({
     estado:              'pendiente_acuerdo',
     oferta_pendiente_id: oferta.id,
   }).eq('id', pedido.id);
 
-  // Notificar a superadmins para que aprueben el acuerdo
-  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-  if (supers?.length) {
-    await sb.from('notificaciones').insert(supers.map(a => ({
-      user_id: a.user_id,
-      tipo:    'revision_acuerdo',
-      titulo:  'Acuerdo pendiente de aprobación',
-      mensaje: `${esc(pedido.cliente_nombre || 'Un cliente')} aceptó una oferta de ${esc(oferta.admin_nombre || 'un proveedor')} por $${Number(oferta.precio_oferta).toLocaleString('es-MX')} MXN. Revisa y aprueba.`,
-      leido:   false,
-    })));
+  // El acuerdo se cierra solo (rechaza las demás ofertas, marca el pedido y
+  // crea la reservación) — ya no requiere que el superadmin le dé clic.
+  const { error: errCierre } = await sb.rpc('cerrar_acuerdo', { p_oferta_id: oferta.id });
+
+  let mensajeFinal;
+  if (!errCierre) {
+    mensajeFinal = '✓ Acuerdo cerrado — ya tienes una reservación activa';
+  } else if (errCierre.message?.includes('DOCUMENTOS_VENCIDOS')) {
+    // Único caso que sigue necesitando al superadmin: la empresa tiene
+    // documentos vencidos y no se puede cerrar el trato automáticamente.
+    const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+    if (supers?.length) {
+      await sb.from('notificaciones').insert(supers.map(a => ({
+        user_id: a.user_id,
+        tipo:    'revision_acuerdo',
+        titulo:  '⚠ Acuerdo pendiente — documentos vencidos',
+        mensaje: `${esc(pedido.cliente_nombre || 'Un cliente')} aceptó una oferta de ${esc(oferta.admin_nombre || 'un proveedor')}, pero la empresa tiene documentos vencidos. Revísalo en Pendientes.`,
+        leido:   false,
+      })));
+    }
+    mensajeFinal = '✓ Acuerdo aceptado — la empresa tiene documentos vencidos, un administrador lo revisará antes de confirmar.';
+  } else {
+    console.error('Error al cerrar el acuerdo:', errCierre);
+    mensajeFinal = '✓ Acuerdo aceptado — quedó pendiente de revisión.';
   }
 
-  // Correo a superadmins: acuerdo pendiente de aprobación
+  // Correo: acuerdo cerrado (o pendiente, según el caso)
   _notificarEmail({
     tipo_evento:    'acuerdo',
     tipo_camion:    pedido.tipo_camion,
@@ -1695,7 +1710,7 @@ async function confirmarDetallesServicio() {
   await loadNotificaciones();
   closePedidoDetalle();
   await renderPedidos();
-  showToast('✓ Acuerdo enviado a revisión — te notificaremos pronto');
+  showToast(mensajeFinal);
 }
 
 async function enviarContraoferta(ofertaId) {
@@ -1783,8 +1798,9 @@ async function openHacerOferta(pedidoId) {
   }
 
   // Leer el pedido para saber qué tipo de recurso y fechas
-  const { data: pedido } = await sb.from('pedidos').select('tipo_camion, fecha_ini, fecha_fin').eq('id', pedidoId).single();
+  const { data: pedido } = await sb.from('pedidos').select('tipo_camion, fecha_ini, fecha_fin, carga_peligrosa').eq('id', pedidoId).single();
   const tipo = pedido?.tipo_camion || '';
+  const esCargaPeligrosa = !!pedido?.carga_peligrosa;
 
   const esCustodio = tipo.startsWith('Custodio') || tipo === 'Supervisión remota';
   const esPatio    = tipo.startsWith('Patio')    || tipo === 'Bodega';
@@ -1866,18 +1882,35 @@ async function openHacerOferta(pedidoId) {
     const opRow = document.getElementById('ho-op-row');
     const opSel = document.getElementById('ho-operador');
     if (opRow && opSel && !esLavadoOf) {
-      let opQ = sb.from('operadores').select('id, nombre, primer_apellido').eq('aprobacion', 'aprobada');
+      let opQ = sb.from('operadores').select('id, nombre, primer_apellido, fecha_vencimiento_licencia_peligrosa').eq('aprobacion', 'aprobada');
       if (currentUser.rol !== 'superadmin') opQ = opQ.eq('propietario_id', currentUser.id);
-      const { data: operadoresData } = await opQ;
-      opSel.innerHTML = (operadoresData?.length)
+      const { data: operadoresRaw } = await opQ;
+
+      // Carga peligrosa: solo choferes con licencia HAZMAT vigente pueden
+      // asignarse — no basta con tener la unidad certificada.
+      const hoy = today();
+      const operadoresData = esCargaPeligrosa
+        ? (operadoresRaw || []).filter(op => op.fecha_vencimiento_licencia_peligrosa && op.fecha_vencimiento_licencia_peligrosa >= hoy)
+        : (operadoresRaw || []);
+
+      opSel.innerHTML = operadoresData.length
         ? `<option value="">— Selecciona un chofer —</option>`
-        : `<option value="">Sin operadores registrados</option>`;
-      (operadoresData || []).forEach(op => {
+        : esCargaPeligrosa
+          ? `<option value="">Sin choferes con licencia HAZMAT vigente</option>`
+          : `<option value="">Sin operadores registrados</option>`;
+      operadoresData.forEach(op => {
         const opt = document.createElement('option');
         opt.value = op.id;
         opt.textContent = `${op.nombre} ${op.primer_apellido || ''}`.trim();
         opSel.appendChild(opt);
       });
+      if (esCargaPeligrosa) {
+        const avisoHazmat = document.getElementById('ho-recurso-warn');
+        if (avisoHazmat && !operadoresData.length) {
+          avisoHazmat.textContent = '⚠ Este pedido es de carga peligrosa. Ningún chofer registrado tiene licencia de materiales peligrosos vigente — no podrás ofertar hasta registrar uno.';
+          avisoHazmat.style.display = 'block';
+        }
+      }
       opRow.style.display = '';
     }
 
@@ -1991,9 +2024,19 @@ async function _enviarOfertaCore() {
     }
   }
 
-  // Validar chofer obligatorio cuando es un pedido de camión
-  if (opRow && opRow.style.display !== 'none' && !operador) {
-    showToast('Debes seleccionar un chofer para este servicio.', 'error'); return;
+  // El chofer ya no es obligatorio al ofertar — se puede asignar después,
+  // antes de que el viaje arranque (ver reservaciones.js:abrirAsignarChofer).
+
+  // Carga peligrosa: última línea de defensa, por si el select se llenó con
+  // datos obsoletos (el filtro real ya vive en openHacerOferta).
+  if (operador && pedParaValidar?.carga_peligrosa) {
+    const { data: opSel2 } = await sb.from('operadores')
+      .select('fecha_vencimiento_licencia_peligrosa').eq('id', operador).single();
+    const hoy = today();
+    if (!opSel2?.fecha_vencimiento_licencia_peligrosa || opSel2.fecha_vencimiento_licencia_peligrosa < hoy) {
+      showToast('El chofer seleccionado no tiene licencia de materiales peligrosos vigente.', 'error');
+      return;
+    }
   }
 
   // Última línea de defensa contra oferta duplicada (ver openHacerOferta).
@@ -2058,6 +2101,8 @@ async function openResponderContra(ofertaId) {
       <div><strong>Contraoferta del cliente:</strong> <span style="color:var(--amber);font-weight:700">${fmt(o.contra_precio)}</span></div>
       ${o.contra_mensaje ? `<div style="margin-top:6px;font-style:italic;color:var(--text-muted)">"${esc(o.contra_mensaje)}"</div>` : ''}`;
   }
+  const contraInput = document.getElementById('rc-contra-precio');
+  if (contraInput) contraInput.value = '';
   document.getElementById('modal-responder-contra').classList.add('open');
 }
 function closeResponderContra() {
@@ -2078,26 +2123,38 @@ async function responderContra(accion) {
     }).eq('id', ofertaDetalleId);
 
     const { data: pedido } = await sb.from('pedidos').select('*').eq('id', oferta.pedido_id).single();
+    let mensajeFinal = '✓ Acuerdo aceptado';
     if (pedido) {
-      // Enviar a revisión del superadmin (mismo flujo que confirmarDetallesServicio)
       await sb.from('pedidos').update({
         estado:              'pendiente_acuerdo',
         oferta_pendiente_id: oferta.id,
       }).eq('id', pedido.id);
 
-      const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-      if (supers?.length) {
-        await sb.from('notificaciones').insert(supers.map(a => ({
-          user_id: a.user_id,
-          tipo:    'revision_acuerdo',
-          titulo:  'Acuerdo pendiente de aprobación',
-          mensaje: `${esc(currentUser.nombre)} aceptó una contraoferta de ${esc(pedido.cliente_nombre || 'cliente')} por $${Number(oferta.contra_precio).toLocaleString('es-MX')} MXN. Revisa y aprueba.`,
-          leido:   false,
-        })));
+      // El acuerdo se cierra solo — ya no requiere que el superadmin le dé
+      // clic (los documentos vencidos son un bloqueo duro desde ofertas).
+      const { error: errCierre } = await sb.rpc('cerrar_acuerdo', { p_oferta_id: oferta.id });
+
+      if (!errCierre) {
+        mensajeFinal = '✓ Acuerdo cerrado — ya tienes una reservación activa';
+      } else if (errCierre.message?.includes('DOCUMENTOS_VENCIDOS')) {
+        const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+        if (supers?.length) {
+          await sb.from('notificaciones').insert(supers.map(a => ({
+            user_id: a.user_id,
+            tipo:    'revision_acuerdo',
+            titulo:  '⚠ Acuerdo pendiente — documentos vencidos',
+            mensaje: `${esc(currentUser.nombre)} aceptó una contraoferta de ${esc(pedido.cliente_nombre || 'cliente')}, pero tiene documentos vencidos. Revísalo en Pendientes.`,
+            leido:   false,
+          })));
+        }
+        mensajeFinal = '✓ Acuerdo aceptado — tienes documentos vencidos, un administrador lo revisará antes de confirmar.';
+      } else {
+        console.error('Error al cerrar el acuerdo:', errCierre);
+        mensajeFinal = '✓ Acuerdo aceptado — quedó pendiente de revisión.';
       }
     }
 
-    // Correo a superadmins: acuerdo pendiente de aprobación
+    // Correo: acuerdo cerrado (o pendiente, según el caso)
     _notificarEmail({
       tipo_evento:    'acuerdo',
       tipo_camion:    pedido.tipo_camion,
@@ -2109,9 +2166,40 @@ async function responderContra(accion) {
     closeResponderContra();
     await renderPedidos();
     await loadNotificaciones();
-    showToast('✓ Acuerdo enviado a revisión — el superadmin lo aprobará pronto');
-  } else {
-    // Rechazar contraoferta
+    showToast(mensajeFinal);
+  } else if (accion === 'contraofertar' && oferta) {
+    const nuevoPrecio = parseFloat(document.getElementById('rc-contra-precio')?.value);
+    if (!nuevoPrecio || nuevoPrecio <= 0) { showToast('Ingresa un precio válido para tu contraoferta.', 'error'); return; }
+
+    // Reabre la oferta para el cliente con el nuevo precio en la mesa —
+    // mismo camino que ya usa responderOferta()/ofertaItemHTML() para
+    // 'enviada', así que el cliente la ve y puede aceptar/rechazar/regresar
+    // otra contraoferta con la UI que ya existe.
+    const { error } = await sb.from('ofertas').update({
+      estado:         'enviada',
+      precio_oferta:  nuevoPrecio,
+      contra_precio:  null,
+      contra_mensaje: null,
+      ronda:          (oferta.ronda || 1) + 1,
+    }).eq('id', ofertaDetalleId);
+    if (error) { showToast('Error al enviar tu contraoferta: ' + error.message, 'error'); return; }
+
+    const { data: pedido } = await sb.from('pedidos').select('cliente_id').eq('id', oferta.pedido_id).maybeSingle();
+    if (pedido?.cliente_id) {
+      await sb.from('notificaciones').insert({
+        user_id: pedido.cliente_id,
+        tipo:    'respuesta_contra_oferta',
+        titulo:  '💬 Nueva contraoferta',
+        mensaje: `${esc(currentUser.nombre)} te regresó otro precio: $${nuevoPrecio.toLocaleString('es-MX')} MXN.`,
+        leido:   false,
+      });
+    }
+
+    closeResponderContra();
+    await renderPedidos();
+    await loadNotificaciones();
+    showToast('✓ Tu contraoferta fue enviada al cliente');
+  } else if (accion === 'rechazar') {
     const { error } = await sb.from('ofertas').update({ estado: 'rechazada' }).eq('id', ofertaDetalleId);
     if (error) { showToast('Error'); return; }
     closeResponderContra();

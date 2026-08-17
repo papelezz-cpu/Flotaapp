@@ -161,6 +161,7 @@ async function editarOperadorRechazado(id) {
   set('op-num-licencia',     op.num_licencia);
   set('op-fecha-expedicion', op.fecha_expedicion);
   set('op-fecha-vencimiento',op.fecha_vencimiento);
+  set('op-vence-peligrosa',  op.fecha_vencimiento_licencia_peligrosa);
 
   const selMap = { 'op-sexo': 'sexo', 'op-sangre': 'tipo_sanguineo', 'op-clase-licencia': 'clase_licencia', 'op-tipo-licencia': 'tipo_licencia', 'op-nivel-estudio': 'nivel_estudio' };
   Object.entries(selMap).forEach(([elId, field]) => {
@@ -190,7 +191,7 @@ function _limpiarFormOperador() {
   if (!contenedor) return;
   contenedor.querySelectorAll('input:not([type=file])').forEach(el => { el.value = ''; });
   contenedor.querySelectorAll('select').forEach(el => { el.selectedIndex = 0; });
-  ['op-foto-file', 'op-lic-file', 'op-doc-medico', 'op-doc-tox', 'op-doc-antecedentes'].forEach(id => {
+  ['op-foto-file', 'op-lic-file', 'op-doc-medico', 'op-doc-tox', 'op-doc-antecedentes', 'op-doc-peligrosa'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -311,10 +312,11 @@ async function agregarOperador() {
     if (error) return null;
     return sb.storage.from('operadores').getPublicUrl(path).data?.publicUrl || null;
   };
-  const [docMedUrl, docToxUrl, docAntUrl] = await Promise.all([
+  const [docMedUrl, docToxUrl, docAntUrl, docPeligrosaUrl] = await Promise.all([
     _uploadOpDoc('op-doc-medico',       'examen_medico'),
     _uploadOpDoc('op-doc-tox',          'examen_tox'),
     _uploadOpDoc('op-doc-antecedentes', 'antecedentes'),
+    _uploadOpDoc('op-doc-peligrosa',    'licencia_peligrosa'),
   ]);
 
   const payload = {
@@ -345,6 +347,8 @@ async function agregarOperador() {
     tipo_licencia:        v('op-tipo-licencia')     || null,
     fecha_expedicion:     v('op-fecha-expedicion')  || null,
     fecha_vencimiento:    v('op-fecha-vencimiento') || null,
+    fecha_vencimiento_licencia_peligrosa: v('op-vence-peligrosa') || null,
+    doc_licencia_peligrosa: docPeligrosaUrl,
     foto_operador:        fotoOperadorUrl,
     foto_licencia:        fotoLicenciaUrl,
     aprobacion:           'pendiente',

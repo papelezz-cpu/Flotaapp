@@ -797,6 +797,7 @@ body.light .cargo-chip {
 }
 .pedido-info { flex: 1; }
 .pedido-tipo  { font-family: 'Syne',sans-serif; font-weight: 700; font-size: 0.95rem; margin-bottom: 5px; }
+.pedido-solicitante { font-weight: 700; font-size: 0.86rem; color: var(--text-main); margin-bottom: 5px; }
 .pedido-ruta  { font-size: 0.83rem; color: var(--accent); font-weight: 500; margin-bottom: 3px; }
 .pedido-fecha { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 2px; }
 .pedido-carga { font-size: 0.78rem; color: var(--text-muted); }

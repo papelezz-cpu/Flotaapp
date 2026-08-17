@@ -305,8 +305,15 @@ async function renderReserv() {
         <button class="btn-rechazar-reserva" onclick="rechazarReserva('${r.id}','${escJs(r.unidad)}')">✕ Rechazar</button>`;
     } else if (esDueno && esActiva) {
       const trackStep = r.tracking_estado || 'Confirmado';
+      // El chofer ya no es obligatorio al ofertar: se asigna aquí, en
+      // cualquier momento mientras el viaje sigue Activo. El tracking no
+      // deja avanzar del primer paso sin uno asignado (ver tracking.js).
+      const choferBtn = r.recurso_tipo === 'camion' || !r.recurso_tipo
+        ? `<button class="btn-edit" onclick="abrirAsignarChofer('${r.id}')" title="${r.operador_nombre ? 'Cambiar chofer' : 'Asignar chofer antes de iniciar el viaje'}">👷 ${r.operador_nombre ? esc(r.operador_nombre) : 'Asignar chofer'}</button>`
+        : '';
       acciones = `
         <button class="btn-edit" onclick="openTracking('${r.id}')" title="Ver seguimiento">📍 ${esc(trackStep)}</button>
+        ${choferBtn}
         <button class="btn-edit" onclick="abrirCambiarUnidad('${r.id}')" title="Reasignar a otra unidad (p. ej. si se descompuso)">🔧 Cambiar unidad</button>
         <button class="btn-completar-reserva" onclick="abrirEvidencias('${r.id}','evidencias')">✓ Completar</button>
         <button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${escJs(r.unidad)}')">Cancelar</button>`;
@@ -561,6 +568,67 @@ function eliminarReserva(reservaId) {
     await renderReserv();
     showToast('✓ Reservación archivada en el historial');
   });
+}
+
+// ── ASIGNAR CHOFER (empresa, reserva activa) ──────────
+// El chofer ya no es obligatorio al ofertar: se puede asignar en cualquier
+// momento mientras el viaje sigue Activo, y tracking.js bloquea avanzar del
+// primer paso sin uno (ver avanzarTracking).
+
+async function abrirAsignarChofer(reservaId) {
+  const { data: r } = await sb.from('reservaciones')
+    .select('operador_id, pedido_id').eq('id', reservaId).single();
+  if (!r) { showToast('No se encontró la reserva', 'error'); return; }
+
+  let esCargaPeligrosa = false;
+  if (r.pedido_id) {
+    const { data: ped } = await sb.from('pedidos').select('carga_peligrosa').eq('id', r.pedido_id).maybeSingle();
+    esCargaPeligrosa = !!ped?.carga_peligrosa;
+  }
+
+  const { data: opsRaw } = await sb.from('operadores')
+    .select('id, nombre, primer_apellido, fecha_vencimiento_licencia_peligrosa')
+    .eq('propietario_id', currentUser.id).eq('aprobacion', 'aprobada');
+  const hoy = today();
+  const ops = esCargaPeligrosa
+    ? (opsRaw || []).filter(o => o.fecha_vencimiento_licencia_peligrosa && o.fecha_vencimiento_licencia_peligrosa >= hoy)
+    : (opsRaw || []);
+
+  const sel = document.getElementById('ac-operador');
+  sel.innerHTML = ops.length
+    ? '<option value="">— Selecciona un chofer —</option>' + ops.map(o =>
+        `<option value="${esc(o.id)}">${esc(`${o.nombre} ${o.primer_apellido || ''}`.trim())}</option>`).join('')
+    : esCargaPeligrosa
+      ? '<option value="">Sin choferes con licencia HAZMAT vigente</option>'
+      : '<option value="">Sin operadores registrados</option>';
+  if (r.operador_id) sel.value = r.operador_id;
+
+  document.getElementById('ac-reserva-id').value = reservaId;
+  const aviso = document.getElementById('ac-aviso-hazmat');
+  if (aviso) aviso.style.display = esCargaPeligrosa ? '' : 'none';
+  document.getElementById('modal-asignar-chofer').classList.add('open');
+}
+
+function cerrarAsignarChofer() {
+  document.getElementById('modal-asignar-chofer').classList.remove('open');
+}
+
+async function confirmarAsignarChofer() {
+  const reservaId = document.getElementById('ac-reserva-id').value;
+  const sel = document.getElementById('ac-operador');
+  const operadorId = sel?.value;
+  const operadorNombre = sel?.options[sel.selectedIndex]?.textContent?.trim() || null;
+  if (!operadorId) { showToast('Selecciona un chofer', 'error'); return; }
+
+  const { error } = await sb.from('reservaciones').update({
+    operador_id:     operadorId,
+    operador_nombre: operadorNombre,
+  }).eq('id', reservaId);
+  if (error) { showToast('No se pudo asignar: ' + error.message, 'error'); return; }
+
+  cerrarAsignarChofer();
+  await renderReserv();
+  showToast('✓ Chofer asignado');
 }
 
 // ── CAMBIAR UNIDAD (empresa, reserva activa) ──────────
