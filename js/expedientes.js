@@ -518,16 +518,23 @@ function expedienteBotonesHTML(r, soyCliente) {
   const btns = [];
   const pill = (etapa, exp) => {
     const cfg = EXP_ETAPAS[etapa];
+    const nombre = etapa === 'entrega_vacios' ? 'Vacíos' : 'Puerto';
     if (!exp) {
       if (soyCliente) return '';
       return `<button class="btn-edit exp-pedir" style="font-size:0.72rem"
-                onclick="solicitarDocumentacion('${r.id}','${etapa}')">${cfg.icon} Solicitar documentación</button>`;
+                onclick="solicitarDocumentacion('${r.id}','${etapa}')" title="Abrir expediente de ${nombre.toLowerCase()} y pedirle los documentos al cliente">${cfg.icon} Solicitar · ${nombre}</button>`;
     }
+    // Un solo estado por pastilla, nunca dos colores compitiendo: vencido/por
+    // vencer manda (ahí corre el dinero), luego completo, luego pendiente.
+    // El color + el ícono cargan el significado; el texto se queda corto.
     const dem = etapa === 'entrega_vacios' ? estadoVacios(exp) : null;
-    const alerta = exp.estado !== 'completo' && soyCliente ? ' exp-pill--pend' : '';
-    return `<button class="exp-pill${alerta}${dem && dem.clave !== 'ok' ? ' ' + dem.cls : ''}" style="font-size:0.72rem"
+    const completo = exp.estado === 'completo';
+    let estadoCls = 'exp-pill--pend', estadoIcon = '⏳', tip = 'Pendiente de completar';
+    if (completo) { estadoCls = 'exp-pill--ok'; estadoIcon = '✓'; tip = 'Expediente completo'; }
+    if (dem && dem.clave !== 'ok' && !completo) { estadoCls = dem.cls; estadoIcon = '⚠'; tip = dem.label; }
+    return `<button class="exp-pill ${estadoCls}" style="font-size:0.72rem" title="${esc(tip)}"
               onclick="abrirExpediente('${r.id}','${etapa}')">
-              ${cfg.icon} ${exp.estado === 'completo' ? '✓' : ''} ${etapa === 'entrega_vacios' ? 'Vacíos' : 'Puerto'}
+              ${cfg.icon} ${nombre} <span class="exp-pill-estado">${estadoIcon}</span>
             </button>`;
   };
   btns.push(pill('ingreso_puerto', r._expIngreso));

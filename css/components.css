@@ -514,14 +514,14 @@ input[type=date]::-webkit-calendar-picker-indicator { margin-left: 4px; }
    vive en el panel expandible de abajo para que la lista se pueda escanear
    de un vistazo (ver toggleReservDetalle en reservaciones.js). */
 .reserv-toggle {
-  background: none; border: 1px solid rgba(78,142,247,0.25); border-radius: 6px;
-  color: var(--text-muted); cursor: pointer; width: 24px; height: 24px;
-  font-size: 0.7rem; line-height: 1; flex: 0 0 auto;
-  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(78,142,247,0.14); border: 1.5px solid rgba(78,142,247,0.4);
+  border-radius: 50%; color: var(--accent); cursor: pointer;
+  width: 28px; height: 28px; font-size: 0.85rem; font-weight: 700; line-height: 1;
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
   transition: transform 0.15s, background 0.15s;
 }
-.reserv-toggle:hover { background: rgba(78,142,247,0.12); color: var(--text-main); }
-.reserv-toggle.open { transform: rotate(180deg); background: rgba(78,142,247,0.12); }
+.reserv-toggle:hover { background: rgba(78,142,247,0.26); }
+.reserv-toggle.open { transform: rotate(180deg); background: rgba(78,142,247,0.26); }
 
 .reserv-warn-chip {
   font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 8px;
@@ -2268,9 +2268,9 @@ body.light .pref-error { color: #b3261e; }
   font-size: 0.83rem; font-weight: 700;
 }
 .exp-dem-ok        { background: rgba(148,163,184,0.15); color: var(--text-muted); }
-.exp-dem-porvencer { background: rgba(245,158,11,0.15);  color: var(--amber); }
-.exp-dem-hoy       { background: rgba(245,158,11,0.22);  color: var(--amber); }
-.exp-dem-vencido   { background: rgba(239,68,68,0.15);   color: var(--danger); }
+.exp-dem-porvencer { background: rgba(245,158,11,0.15);  color: var(--amber);  border-color: rgba(245,158,11,0.45); }
+.exp-dem-hoy       { background: rgba(245,158,11,0.24);  color: var(--amber);  border-color: rgba(245,158,11,0.6); }
+.exp-dem-vencido   { background: rgba(239,68,68,0.16);   color: var(--danger); border-color: rgba(239,68,68,0.5); }
 
 .exp-vacios {
   margin-top: 14px; padding: 13px; border-radius: 11px;
@@ -2332,4 +2332,8 @@ body.light .pref-error { color: #b3261e; }
   padding: 5px 10px; font: inherit; font-weight: 700; cursor: pointer;
   color: var(--text-main); white-space: nowrap;
 }
-.exp-pill--pend { border-color: var(--amber); color: var(--amber); }
+/* Cada pastilla trae un solo color según su estado real (nunca dos
+   compitiendo) — así "Puerto"/"Vacíos" se leen sin tener que abrir nada. */
+.exp-pill--pend { background: rgba(245,158,11,0.13); border-color: rgba(245,158,11,0.45); color: var(--amber); }
+.exp-pill--ok   { background: rgba(34,197,94,0.13);  border-color: rgba(34,197,94,0.45);  color: var(--green); }
+.exp-pill-estado { display: inline-block; margin-left: 1px; }
