@@ -775,8 +775,11 @@ async function abrirReportarCambio(reservaId) {
   document.getElementById('rc-pedido-id').value = '';
   document.getElementById('rc-lugar').value = '';
   document.getElementById('rc-hora').value = '';
+  _ocultarFormActualizarViaje();
   document.getElementById('modal-reportar-cambio').classList.add('open');
 
+  // Se precarga el lugar/hora actuales aunque el formulario empiece oculto,
+  // para que ya estén listos si el usuario elige "Actualizar viaje".
   const { data: r } = await sb.from('reservaciones').select('pedido_id').eq('id', reservaId).single();
   if (!r?.pedido_id) return;
   document.getElementById('rc-pedido-id').value = r.pedido_id;
@@ -788,6 +791,14 @@ async function abrirReportarCambio(reservaId) {
 }
 function cerrarReportarCambio() {
   document.getElementById('modal-reportar-cambio').classList.remove('open');
+}
+function _mostrarFormActualizarViaje() {
+  document.getElementById('rc-menu').style.display = 'none';
+  document.getElementById('rc-form').style.display = '';
+}
+function _ocultarFormActualizarViaje() {
+  document.getElementById('rc-form').style.display = 'none';
+  document.getElementById('rc-menu').style.display = '';
 }
 
 // Le avisa a la empresa (dueña de la reservación) y a todo superadmin —

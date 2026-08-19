@@ -1815,33 +1815,45 @@
   </div>
 </div>
 
-<!-- ══ MODAL ACTUALIZAR LUGAR/HORA O REPORTAR PROBLEMA (cliente → empresa) ═
-     El lugar y la hora se editan de verdad (la empresa ve el dato real,
-     no solo un aviso de que "algo cambió"); los otros dos son alertas
-     fijas sin texto libre, porque no hay un campo concreto que editar. -->
+<!-- ══ MODAL REPORTAR CAMBIO O PROBLEMA (cliente → empresa) ═══
+     Se abre como un grupo de botones; "Actualizar viaje" es el único que
+     revela un formulario real (lugar/hora se editan de verdad, la empresa
+     ve el dato nuevo). Los otros dos son alertas fijas — no hay un campo
+     concreto que editar para "hay un problema con la carga". -->
 <div class="modal-overlay" id="modal-reportar-cambio">
   <div class="modal" style="max-width:440px">
-    <h2>✏️ Actualizar viaje / reportar problema</h2>
-    <p class="sub">Si cambió el lugar o la hora, actualízalo aquí — la empresa ve el dato nuevo, no solo un aviso.</p>
+    <div class="modal-header">
+      <h2>⚠ Reportar cambio o problema</h2>
+      <button class="modal-close" onclick="cerrarReportarCambio()">✕</button>
+    </div>
     <input type="hidden" id="rc-reserva-id">
     <input type="hidden" id="rc-pedido-id">
-    <div class="form-group">
-      <label>Lugar de carga/entrega</label>
-      <input type="text" id="rc-lugar" placeholder="Ej. Bodega Industrial Norte, andén 3">
+
+    <!-- Menú inicial -->
+    <div id="rc-menu">
+      <p class="sub">Elige qué pasó — se le avisa a la empresa y al superadmin.</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn-edit" style="text-align:left" onclick="_mostrarFormActualizarViaje()">✏️ Actualizar viaje (cambió el lugar o la hora)</button>
+        <button class="btn-edit" style="text-align:left" onclick="_enviarReporteCambio('carga')">📦 Hay un problema con la carga o documentos</button>
+        <button class="btn-edit" style="text-align:left" onclick="_enviarReporteCambio('otro')">⚠ Otro problema urgente — contáctenme</button>
+      </div>
     </div>
-    <div class="form-group">
-      <label>Hora</label>
-      <input type="text" id="rc-hora" placeholder="Ej. 14:00">
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="cerrarReportarCambio()">Cancelar</button>
-      <button class="btn-confirm" onclick="_guardarCambioLugarHora()">✓ Guardar y avisar</button>
-    </div>
-    <hr style="margin:16px 0;border-color:var(--border)">
-    <p class="sub" style="margin-bottom:8px">¿Es otro tipo de problema?</p>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      <button class="btn-edit" style="text-align:left" onclick="_enviarReporteCambio('carga')">📦 Hay un problema con la carga o documentos</button>
-      <button class="btn-edit" style="text-align:left" onclick="_enviarReporteCambio('otro')">⚠ Otro problema urgente — contáctenme</button>
+
+    <!-- Formulario de lugar/hora, oculto hasta elegir "Actualizar viaje" -->
+    <div id="rc-form" style="display:none">
+      <p class="sub">La empresa ve el dato nuevo, no solo un aviso de que algo cambió.</p>
+      <div class="form-group">
+        <label>Lugar de carga/entrega</label>
+        <input type="text" id="rc-lugar" placeholder="Ej. Bodega Industrial Norte, andén 3">
+      </div>
+      <div class="form-group">
+        <label>Hora</label>
+        <input type="text" id="rc-hora" placeholder="Ej. 14:00">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="_ocultarFormActualizarViaje()">← Atrás</button>
+        <button class="btn-confirm" onclick="_guardarCambioLugarHora()">✓ Guardar y avisar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2695,7 +2707,7 @@
 <script src="js/views.js?v=29"></script>
 <script src="js/camiones.js?v=11"></script>
 <script src="js/recursos.js?v=11"></script>
-<script src="js/reservaciones.js?v=43"></script>
+<script src="js/reservaciones.js?v=44"></script>
 <script src="js/modal.js?v=13"></script>
 <script src="js/mapa.js?v=4"></script>
 <script src="js/expedientes.js?v=5"></script>
