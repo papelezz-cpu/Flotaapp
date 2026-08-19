@@ -1,25 +1,5 @@
 // ── RESERVACIONES ─────────────────────────────────────
 
-// Mensajes sin leer para mí, agrupados por reserva → { reserva_id: count }
-async function _unreadPorReserva(reservaIds) {
-  const map = {};
-  if (!reservaIds.length || !currentUser.id) return map;
-  const { data } = await sb.from('mensajes')
-    .select('reserva_id')
-    .in('reserva_id', reservaIds)
-    .eq('leido', false)
-    .neq('de_user_id', currentUser.id)
-    .contains('participantes', [currentUser.id]);
-  (data || []).forEach(m => { map[m.reserva_id] = (map[m.reserva_id] || 0) + 1; });
-  return map;
-}
-
-// "Nubesita" de mensajes nuevos sobre el botón 💬 de una fila
-function _chatHiloBadge(n) {
-  if (!n) return '';
-  return `<span style="position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;padding:0 4px;background:#d4513a;color:#fff;border-radius:8px;font-size:9.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;box-shadow:0 1px 3px rgba(16,42,38,.3)">${n > 9 ? '9+' : n}</span>`;
-}
-
 // Filtro de estado de la vista de reservaciones. Por defecto "Activa": al
 // entrar desde el cuadro del home se ven primero las activas; los demás
 // estados se ven con las pills.
@@ -145,7 +125,6 @@ async function renderReserv() {
       });
     }
 
-    const unreadMap = await _unreadPorReserva(data.map(r => r.id));
     // Los expedientes documentales de todas las filas, en una sola consulta.
     if (typeof cargarExpedientes === 'function') await cargarExpedientes(data);
 
@@ -185,12 +164,6 @@ async function renderReserv() {
           : '';
       const unidadLabel = recursoNombreMap[r.unidad] || esc(r.unidad) || '—';
       const propId = ownerIdMap[r.unidad] || r.propietario_id || '';
-      // El chat solo se puede usar mientras la reserva está vigente; al finalizar
-      // queda como historial de solo lectura.
-      const chatAbierto = r.estado === 'Pendiente' || r.estado === 'Activa' || r.estado === 'PorAprobar';
-      const chatBtn = propId
-        ? `<button class="btn-chat-hilo" style="position:relative" title="${chatAbierto ? 'Chat con la empresa' : 'Conversación cerrada (historial)'}" onclick="openChatReserva('${r.id}','${propId}','${escJs(empresaMap[r.unidad]||'')}'${chatAbierto ? '' : ', {readonly:true}'})">💬${_chatHiloBadge(unreadMap[r.id])}</button>`
-        : '';
       const calBtn = (r.estado === 'Completada' && !r.calificado && propId)
         ? `<button class="btn-calificar" onclick="openCalificar('${r.id}','${propId}','${escJs(empresaMap[r.unidad]||'')}')">⭐ Calificar</button>`
         : '';
@@ -224,7 +197,6 @@ async function renderReserv() {
           <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
           ${trackBtn}
           ${pagoLbl}
-          ${chatBtn}
           <button id="reserv-toggle-${r.id}" class="reserv-toggle${abierta ? ' open' : ''}" aria-expanded="${abierta}" title="Más acciones" onclick="toggleReservDetalle('${r.id}')">▾</button>
         </div>
       </div>
@@ -232,6 +204,7 @@ async function renderReserv() {
         ${grupo('Operación', gpsBtnCli)}
         ${grupo('Documentos', cartaPorteBtn + expedientePills)}
         ${grupo('Pago', precioLbl + pagarBtn)}
+        ${grupo('Avisos', r.estado === 'Activa' ? `<button class="btn-edit" onclick="abrirReportarCambio('${r.id}')" title="Avisar a la empresa que algo cambió o hay un problema">⚠ Reportar cambio o problema</button>` : '')}
         ${grupo('Cierre', completarBtn + calBtn + cancelBtn)}
       </div>
       </div>`;
@@ -307,7 +280,6 @@ async function renderReserv() {
     });
   }
 
-  const unreadMap = await _unreadPorReserva(data.map(r => r.id));
   // Los expedientes documentales de todas las filas, en una sola consulta.
   // renderReserv tiene DOS rutas de render —cliente y empresa/superadmin— y
   // las dos necesitan esto: si solo se carga en una, la otra ve el botón de
@@ -369,6 +341,10 @@ async function renderReserv() {
         ${choferFalta ? `<span class="reserv-warn-chip" title="Bloquea avanzar el seguimiento">⚠ Sin chofer</span>` : ''}`;
       grupo('Operación', choferBtn + `<button class="btn-edit" onclick="abrirCambiarUnidad('${r.id}')" title="Reasignar a otra unidad (p. ej. si se descompuso)">🔧 Cambiar unidad</button>` + gpsBtn);
       grupo('Documentos', docsCargaBtnDueno + expedientePillsActiva);
+      // Avisos al cliente sin necesidad de chat: un aviso puntual (campana +
+      // correo) en vez de un mensaje libre.
+      grupo('Avisos', `<button class="btn-edit" onclick="confirmarLugarHora('${r.id}')" title="Pedirle al cliente que confirme lugar y hora">📍 Confirmar lugar y hora</button>` +
+        `<button class="btn-edit" onclick="avisarRetraso('${r.id}')" title="Avisar que el transporte va a llegar tarde">⏰ Avisar retraso</button>`);
       grupo('Cierre', `<button class="btn-completar-reserva" onclick="abrirEvidencias('${r.id}','evidencias')">✓ Completar</button>` +
         `<button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${escJs(r.unidad)}')">Cancelar</button>`);
     } else if (esDueno && esPorAprobar) {
@@ -398,20 +374,6 @@ async function renderReserv() {
     }
 
     const unidadLabel = recursoLabelMap[r.unidad] || esc(r.unidad) || '—';
-    // Chat con el cliente. La empresa puede escribir mientras la reserva está
-    // vigente (Pendiente/Activa/PorAprobar, para coordinar la evidencia); al
-    // finalizar queda como historial de lectura.
-    // El superadmin entra como observador del hilo real cliente↔empresa.
-    const esSuper      = currentUser.rol === 'superadmin';
-    const propietarioId = ownerMap[r.unidad] || r.propietario_id || '';
-    const chatVigente  = esPendiente || esActiva || esPorAprobar;
-    let chatBtn = '';
-    if (esSuper && r.cliente_user_id && propietarioId) {
-      const etiqueta = `${escJs(r.cliente || 'Cliente')} ↔ ${escJs(empresaMap[r.unidad] || 'Empresa')}`;
-      chatBtn = `<button class="btn-chat-hilo" title="Ver conversación (solo lectura)" onclick="openChatReserva('${r.id}','','${etiqueta}', {readonly:true, observador:true, participantes:['${r.cliente_user_id}','${propietarioId}']})">💬</button>`;
-    } else if (esDueno && r.cliente_user_id && !inactiva) {
-      chatBtn = `<button class="btn-chat-hilo" style="position:relative" title="${chatVigente ? 'Chat con el cliente' : 'Conversación cerrada (historial)'}" onclick="openChatReserva('${r.id}','${r.cliente_user_id}','${escJs(r.cliente||'')}'${chatVigente ? '' : ', {readonly:true}'})">💬${_chatHiloBadge(unreadMap[r.id])}</button>`;
-    }
     // Eliminar (mover a histórico) — solo superadmin. No es una acción de
     // todos los días: va al panel, no a la fila.
     if (currentUser.rol === 'superadmin') {
@@ -436,7 +398,6 @@ async function renderReserv() {
       <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
         <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
         ${primaria}
-        ${chatBtn}
         ${detalleHTML ? `<button id="reserv-toggle-${r.id}" class="reserv-toggle${abierta ? ' open' : ''}" aria-expanded="${abierta}" title="Más acciones" onclick="toggleReservDetalle('${r.id}')">▾</button>` : ''}
       </div>
     </div>
@@ -731,6 +692,115 @@ function solicitarDocumentosCarga() {
 
     showToast('✓ Solicitud enviada al cliente');
   });
+}
+
+// La empresa le pide al cliente que confirme lugar y hora — un aviso, no
+// una conversación. Si el pedido ya trae detalles capturados al aceptar la
+// oferta los usa; si no, cae a origen/fecha del pedido.
+function confirmarLugarHora(reservaId) {
+  showConfirm('¿Pedirle al cliente que confirme el lugar y la hora? Le llegará aviso por campana y correo.', async () => {
+    const { data: r } = await sb.from('reservaciones')
+      .select('cliente_user_id, unidad, pedido_id').eq('id', reservaId).single();
+    if (!r?.cliente_user_id) { showToast('No se pudo enviar', 'error'); return; }
+
+    let lugar = null, hora = null;
+    if (r.pedido_id) {
+      const { data: p } = await sb.from('pedidos')
+        .select('detalles_lugar, detalles_hora, origen, fecha_ini').eq('id', r.pedido_id).maybeSingle();
+      lugar = p?.detalles_lugar || p?.origen || null;
+      hora  = p?.detalles_hora  || (p?.fecha_ini ? fmtFecha(p.fecha_ini) : null);
+    }
+    const detalle = [lugar ? `lugar: ${lugar}` : null, hora ? `hora: ${hora}` : null].filter(Boolean).join(', ');
+    const mensaje = `${esc(currentUser.nombre)} quiere confirmar contigo${detalle ? ` — ${esc(detalle)}` : ''} para el servicio "${esc(r.unidad || '')}". Si algo cambió, repórtalo desde Reservaciones.`;
+
+    const { error } = await sb.from('notificaciones').insert({
+      user_id: r.cliente_user_id,
+      tipo:    'confirmar_lugar_hora',
+      titulo:  '📍 Confirma lugar y hora',
+      mensaje,
+      leido:   false,
+    });
+    if (error) { showToast('No se pudo enviar: ' + error.message, 'error'); return; }
+
+    _notificarEmail({
+      tipo: 'resolucion', destinoIds: [r.cliente_user_id],
+      titulo: 'Confirma lugar y hora', mensaje, aprobado: true,
+    });
+    showToast('✓ Aviso enviado al cliente');
+  });
+}
+
+// Aviso de retraso — mensaje fijo, sin pedir minutos ni ningún otro dato.
+function avisarRetraso(reservaId) {
+  showConfirm('¿Avisar al cliente que el transporte va a llegar tarde? Le llegará aviso por campana y correo.', async () => {
+    const { data: r } = await sb.from('reservaciones')
+      .select('cliente_user_id, unidad').eq('id', reservaId).single();
+    if (!r?.cliente_user_id) { showToast('No se pudo enviar', 'error'); return; }
+
+    const mensaje = `El transporte de tu servicio "${esc(r.unidad || '')}" va a llegar tarde.`;
+    const { error } = await sb.from('notificaciones').insert({
+      user_id: r.cliente_user_id,
+      tipo:    'aviso_retraso',
+      titulo:  '⏰ Aviso de retraso',
+      mensaje,
+      leido:   false,
+    });
+    if (error) { showToast('No se pudo enviar: ' + error.message, 'error'); return; }
+
+    _notificarEmail({
+      tipo: 'resolucion', destinoIds: [r.cliente_user_id],
+      titulo: 'Aviso de retraso', mensaje, aprobado: false,
+    });
+    showToast('✓ Aviso de retraso enviado');
+  });
+}
+
+// ── REPORTAR CAMBIO O PROBLEMA (cliente → empresa + superadmin) ──
+// Motivos fijos: cada botón es su propio mensaje completo, no hay textarea.
+const _RC_MOTIVOS = {
+  punto:   '📍 El cliente avisa que cambió el punto de recolección o entrega.',
+  horario: '🕐 El cliente avisa que cambió el horario.',
+  carga:   '📦 El cliente reporta un problema con la carga o los documentos.',
+  otro:    '⚠ El cliente reporta un problema urgente y pide que lo contacten.',
+};
+
+function abrirReportarCambio(reservaId) {
+  document.getElementById('rc-reserva-id').value = reservaId;
+  document.getElementById('modal-reportar-cambio').classList.add('open');
+}
+function cerrarReportarCambio() {
+  document.getElementById('modal-reportar-cambio').classList.remove('open');
+}
+
+async function _enviarReporteCambio(motivoClave) {
+  const reservaId = document.getElementById('rc-reserva-id').value;
+  const texto = _RC_MOTIVOS[motivoClave];
+  if (!reservaId || !texto) return;
+
+  const { data: r } = await sb.from('reservaciones')
+    .select('propietario_id, unidad, cliente').eq('id', reservaId).single();
+  if (!r?.propietario_id) { showToast('No se pudo enviar', 'error'); return; }
+
+  const mensaje = `${texto} Servicio "${esc(r.unidad || '')}" — ${esc(r.cliente || 'cliente')}.`;
+  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+  const destinatarios = [r.propietario_id, ...((supers || []).map(s => s.user_id))];
+
+  const { error } = await sb.from('notificaciones').insert(destinatarios.map(uid => ({
+    user_id: uid,
+    tipo:    'cambio_reportado',
+    titulo:  '⚠ Cliente reporta cambio o problema',
+    mensaje,
+    leido:   false,
+  })));
+  if (error) { showToast('No se pudo enviar: ' + error.message, 'error'); return; }
+
+  _notificarEmail({
+    tipo: 'resolucion', destinoIds: destinatarios,
+    titulo: 'Cliente reporta cambio o problema', mensaje, aprobado: false,
+  });
+
+  cerrarReportarCambio();
+  showToast('✓ Reporte enviado a la empresa y al superadmin');
 }
 
 async function subirDocumentosCarga() {

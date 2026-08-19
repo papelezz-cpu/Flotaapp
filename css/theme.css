@@ -253,15 +253,6 @@ body.light .apr-empresa-header { background: #f3faf8; }
 body.light .apr-empresa-header:hover { background: #e3f1ee; }
 body.light .apr-ec { background: rgba(13,148,136,0.12); color: #0d9488; }
 
-/* Chat */
-body.light .chat-panel    { background: #faf8f3; box-shadow: -4px 0 24px rgba(16,42,38,0.12); }
-body.light .chat-header   { background: #fff; border-color: #ece7da; }
-body.light .chat-footer   { background: #fff; border-color: #ece7da; }
-body.light .chat-msg-otro .chat-bubble { background: #eef5f3; color: #102a26; }
-body.light .chat-input-field { background: #fff; border-color: #e6e1d6; }
-body.light .chat-input-field:focus { border-color: #0d9488; }
-body.light .btn-chat-hilo { background: #f1efe9; border-color: #e0dacb; }
-body.light .btn-chat-hilo:hover { background: #e3f1ee; }
 
 /* Geo autocomplete */
 body.light .geo-dropdown { background: #fff; border-color: #e6e1d6; box-shadow: 0 8px 28px rgba(16,42,38,0.14); }

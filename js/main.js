@@ -12,7 +12,6 @@ function showToast(msg, tipo = 'ok') {
 // Solo refresca la vista activa; el resto ya cargó en el arranque público
 function init() {
   showView('home', null);
-  actualizarBadgeChat();
 }
 
 // ── SUSCRIPCIONES REALTIME (campanita + cambios globales) ─
@@ -66,16 +65,6 @@ function iniciarSuscripcionesRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ofertas' }, () => {
       if (pedidosActivo()) renderPedidos();
     })
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
-      // Mensaje dirigido a mí: refrescar la "nubesita" de la reserva si estoy
-      // viendo Reservaciones (la notificación en sí llega por la campana).
-      const m = payload.new;
-      if (currentUser.id && m.de_user_id !== currentUser.id &&
-          (m.participantes || []).includes(currentUser.id)) {
-        actualizarBadgeChat();
-        if (document.getElementById('view-reservaciones')?.classList.contains('active')) renderReserv();
-      }
-    })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificaciones' }, payload => {
       // Refrescar campanita cuando llega una notificación para mí
       if (currentUser.id && payload.new?.user_id === currentUser.id) {
@@ -116,7 +105,6 @@ function iniciarSuscripcionesRealtime() {
   // Cargar home y notificaciones
   renderHome();
   loadNotificaciones();
-  actualizarBadgeChat();
   iniciarSuscripcionesRealtime();
 })();
 

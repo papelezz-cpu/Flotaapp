@@ -89,20 +89,12 @@ async function onNotifClick(id, tipo) {
   // Navegar a la vista correspondiente
   const tabs = document.querySelectorAll('.nav-tab');
 
+  // El chat ya no existe: una notificación vieja sin leer de este tipo solo
+  // lleva a la vista correspondiente, sin intentar abrir un hilo.
   if (tipo === 'nuevo_mensaje' && notif?.meta) {
-    // Abrir el chat directamente en el hilo correspondiente
     const meta = notif.meta;
-    const deUserId = meta.de_user_id;
-    const deNombre = meta.de_nombre || '';
-    if (meta.ctx_tipo === 'reserva') {
-      const tab = [...tabs].find(t => t.textContent.trim() === 'Reservaciones');
-      if (tab) showView('reservaciones', tab);
-      setTimeout(() => openChatReserva(meta.ctx_id, deUserId, deNombre), 200);
-    } else {
-      const tab = [...tabs].find(t => t.textContent.trim() === 'Solicitudes');
-      if (tab) showView('pedidos', tab);
-      setTimeout(() => openChatPedido(meta.ctx_id, deUserId, deNombre), 200);
-    }
+    const tab = [...tabs].find(t => t.textContent.trim() === (meta.ctx_tipo === 'reserva' ? 'Reservaciones' : 'Solicitudes'));
+    showView(meta.ctx_tipo === 'reserva' ? 'reservaciones' : 'pedidos', tab);
     return;
   }
 
@@ -155,7 +147,8 @@ async function onNotifClick(id, tipo) {
       tipo === 'tracking_actualizado' || tipo === 'reserva_cancelada' || tipo === 'servicio_completado' ||
       tipo === 'finalizacion_solicitada' || tipo === 'finalizacion_rechazada' ||
       tipo === 'incidente_entrega_vacios' || tipo === 'documentos_solicitados' ||
-      tipo === 'documentos_carga_solicitados') {
+      tipo === 'documentos_carga_solicitados' || tipo === 'confirmar_lugar_hora' ||
+      tipo === 'aviso_retraso' || tipo === 'cambio_reportado') {
     goTo('reservaciones', 'Reservaciones', 0, null);
     return;
   }

@@ -175,7 +175,6 @@ async function doLogin() {
   showView('home', null);
   hideLoginOverlay();
   loadNotificaciones();
-  actualizarBadgeChat();
   iniciarSuscripcionesRealtime();
 }
 

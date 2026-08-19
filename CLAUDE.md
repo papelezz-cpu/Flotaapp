@@ -101,7 +101,6 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
 | `js/usuarios.js` | Superadmin user management (calls `gestionar-usuario` Edge Function via `FN_URL`) |
 | `js/operadores.js` | Driver registration with approval workflow |
 | `js/camiones.js` / `js/recursos.js` / `js/catalogo.js` | Truck/resource catalogs with filters |
-| `js/chat.js` | Per-pedido/per-reserva realtime chat (`mensajes` table, `participantes` array). `_contieneTelefono()` blocks phone numbers (anti-disintermediation) — **client-side only**, the server-side equivalent lives in the `enviar_mensaje` RPC |
 | `js/notificaciones.js` | Notification bell panel |
 | `js/tracking.js` | Shipment tracking state machine. `TRACKING_POR_TIPO` holds a **different 5-step sequence per `recurso_tipo`** — mirrored by `tracking_pasos()` in SQL; change one, change both |
 | `js/detalle.js` | Order detail modal |
@@ -206,7 +205,7 @@ Cargo-driven fields (the request is built from the load, not from the truck): `c
 **Cancellation:** `cancelacion_motivo`, `cancelacion_detalle`, `cancelacion_solicitada_en/_por`, `cancelacion_tracking_estado` (freezes how far the trip had gone).
 `reservaciones_historico`: archived rows + `archivado_at/_por`.
 
-### `mensajes` — chat. PK `id` (uuid)
+### `mensajes` — chat, **unused by the PWA** (see below). PK `id` (uuid)
 `de_user_id/_nombre`, `texto`, `pedido_id` | `reserva_id` (one set), `participantes uuid[]` (RLS checks membership), `leido`.
 
 ### `notificaciones` — PK `id` (uuid)
@@ -247,7 +246,7 @@ All `SECURITY DEFINER` with pinned `search_path`, not callable via REST.
 
 When fixing anything in these flows, prefer moving the call to the RPC over patching the client sequence. The native iOS/Android clients are expected to use the RPCs (see `docs/CONTRATO-MOVIL.md`), so logic left in JS will diverge across the three clients.
 
-Note this also means the **anti-disintermediation phone-number block is browser-only** today: `enviar_mensaje` enforces it server-side, `js/chat.js` does not stop a direct REST call.
+The PWA has no chat feature — free-text messaging between cliente/empresa was removed in favor of fixed request buttons that fire a `notificaciones` row (e.g. `solicitarDocumentosCarga()`, `confirmarLugarHora()`, `avisarRetraso()`, `_enviarReporteCambio()` in `js/reservaciones.js`). The `mensajes` table, its RLS policies, and the `enviar_mensaje` RPC (with its server-side phone-number block) are left in place but unused by the web client — they exist for the native iOS/Android contract (see `docs/CONTRATO-MOVIL.md`), which is a separate client from this PWA.
 
 ---
 
