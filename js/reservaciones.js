@@ -730,29 +730,35 @@ function confirmarLugarHora(reservaId) {
   });
 }
 
-// Aviso de retraso — mensaje fijo, sin pedir minutos ni ningún otro dato.
+// Aviso de retraso — el detalle (cuánto tiempo, por qué) es opcional, se
+// puede mandar solo el aviso sin nada más si no hace falta explicar.
 function avisarRetraso(reservaId) {
-  showConfirm('¿Avisar al cliente que el transporte va a llegar tarde? Le llegará aviso por campana y correo.', async () => {
-    const { data: r } = await sb.from('reservaciones')
-      .select('cliente_user_id, unidad').eq('id', reservaId).single();
-    if (!r?.cliente_user_id) { showToast('No se pudo enviar', 'error'); return; }
+  _abrirRechazarNota(
+    '⏰ Avisar retraso',
+    'Detalle (opcional) — cuánto tiempo o el motivo:',
+    async nota => {
+      const { data: r } = await sb.from('reservaciones')
+        .select('cliente_user_id, unidad').eq('id', reservaId).single();
+      if (!r?.cliente_user_id) { showToast('No se pudo enviar', 'error'); return; }
 
-    const mensaje = `El transporte de tu servicio "${esc(r.unidad || '')}" va a llegar tarde.`;
-    const { error } = await sb.from('notificaciones').insert({
-      user_id: r.cliente_user_id,
-      tipo:    'aviso_retraso',
-      titulo:  '⏰ Aviso de retraso',
-      mensaje,
-      leido:   false,
-    });
-    if (error) { showToast('No se pudo enviar: ' + error.message, 'error'); return; }
+      const mensaje = `El transporte de tu servicio "${esc(r.unidad || '')}" va a llegar tarde.${nota ? ` ${esc(nota)}` : ''}`;
+      const { error } = await sb.from('notificaciones').insert({
+        user_id: r.cliente_user_id,
+        tipo:    'aviso_retraso',
+        titulo:  '⏰ Aviso de retraso',
+        mensaje,
+        leido:   false,
+      });
+      if (error) { showToast('No se pudo enviar: ' + error.message, 'error'); return; }
 
-    _notificarEmail({
-      tipo: 'resolucion', destinoIds: [r.cliente_user_id],
-      titulo: 'Aviso de retraso', mensaje, aprobado: false,
-    });
-    showToast('✓ Aviso de retraso enviado');
-  });
+      _notificarEmail({
+        tipo: 'resolucion', destinoIds: [r.cliente_user_id],
+        titulo: 'Aviso de retraso', mensaje, aprobado: false,
+      });
+      showToast('✓ Aviso de retraso enviado');
+    },
+    { confirmLabel: '⏰ Enviar aviso', danger: false }
+  );
 }
 
 // ── ACTUALIZAR LUGAR/HORA O REPORTAR PROBLEMA (cliente → empresa + superadmin) ──
@@ -825,19 +831,28 @@ async function _guardarCambioLugarHora() {
   showToast('✓ Guardado y avisado a la empresa');
 }
 
-async function _enviarReporteCambio(motivoClave) {
+// El motivo ya viene fijo (no hay que elegirlo a mano), pero el detalle de
+// qué pasó exactamente sí se puede agregar — opcional, mismo modal de nota
+// que ya usa el resto del sitio para esto.
+function _enviarReporteCambio(motivoClave) {
   const reservaId = document.getElementById('rc-reserva-id').value;
   const texto = _RC_MOTIVOS[motivoClave];
   if (!reservaId || !texto) return;
-
-  const { data: r } = await sb.from('reservaciones')
-    .select('unidad, cliente').eq('id', reservaId).single();
-  const mensaje = `${texto} Servicio "${esc(r?.unidad || '')}" — ${esc(r?.cliente || 'cliente')}.`;
-  const ok = await _notificarCambioReserva(reservaId, '⚠ Cliente reporta un problema', mensaje);
-  if (!ok) return;
-
   cerrarReportarCambio();
-  showToast('✓ Reporte enviado a la empresa y al superadmin');
+
+  _abrirRechazarNota(
+    '⚠ Reportar problema',
+    'Detalle (opcional) — qué pasó exactamente:',
+    async nota => {
+      const { data: r } = await sb.from('reservaciones')
+        .select('unidad, cliente').eq('id', reservaId).single();
+      const mensaje = `${texto}${nota ? ` ${esc(nota)}` : ''} Servicio "${esc(r?.unidad || '')}" — ${esc(r?.cliente || 'cliente')}.`;
+      const ok = await _notificarCambioReserva(reservaId, '⚠ Cliente reporta un problema', mensaje);
+      if (!ok) return;
+      showToast('✓ Reporte enviado a la empresa y al superadmin');
+    },
+    { confirmLabel: '⚠ Enviar reporte', danger: false }
+  );
 }
 
 async function subirDocumentosCarga() {
