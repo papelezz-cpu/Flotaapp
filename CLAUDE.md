@@ -20,7 +20,7 @@ This covers every form of deletion, including:
 
 - Files and directories (`Remove-Item`, `rm`, `git clean`)
 - Git history and refs — `git reset --hard`, force-push, deleting branches or tags, `git stash drop`
-- Database — `DROP` / `TRUNCATE` / `DELETE`, dropping columns, policies, functions or triggers. **There is no staging: every deletion hits production immediately.**
+- Database — `DROP` / `TRUNCATE` / `DELETE`, dropping columns, policies, functions or triggers, **in either Supabase project** (production `xnyqsewaluezkkrlyhxg` or the test project `portgo-pruebas` / `xskgnudiznryhgagxadu`). "It's just the test database" is not a blanket exception — ask first either way.
 - Supabase Storage objects, in any bucket
 - Auth users — `auth.admin.deleteUser`, the `eliminar` action of `gestionar-usuario`
 - Edge Functions and migrations
@@ -42,14 +42,36 @@ When in doubt, do not delete — ask.
 
 ---
 
+## 🧪 Environments — `dev` first, `main` only when told to promote
+
+**Two branches in the same repo, two separate Supabase projects. New work goes to `dev` first — never straight to `main` — unless the user explicitly says otherwise.**
+
+| | `main` (production) | `dev` (test) |
+|---|---|---|
+| Supabase project | `xnyqsewaluezkkrlyhxg` | `portgo-pruebas` / `xskgnudiznryhgagxadu` |
+| Deployed URL | `https://portgo-six.vercel.app` | `https://portgo-git-dev-salvador-s-projects13.vercel.app` (Vercel's auto branch-preview URL — same Vercel project, just the `dev` branch; protected by Vercel SSO, not public) |
+| `js/config.js` | Points to production | Points to `portgo-pruebas` |
+
+**`js/config.js` is the one file that is deliberately different per branch, forever.** It must never travel from one branch to the other during a merge — that's the only thing standing between "tests happen safely" and "a test run corrupts production data". Everything else in the repo (all other JS/CSS/`app.html`/migrations) is meant to be identical between branches once promoted.
+
+**Workflow:**
+1. Do the work on `dev`: same deployment-checklist steps below, committed and pushed to `dev`. It deploys to the `dev` preview URL automatically and talks to `portgo-pruebas`, not production.
+2. The user tests on the `dev` URL with the same real accounts/passwords (the test project's data is a full clone of production — see below).
+3. **Only when the user says to promote** ("pasa esto a producción" or equivalent): merge `dev` → `main`, then **immediately restore `main`'s own `js/config.js`** (`git checkout main -- js/config.js` after the merge, before committing) so production's credentials are never overwritten. Push `main` — that's what actually deploys to production.
+4. Database/Edge Function changes follow the same order: apply to `portgo-pruebas` first via the Management API, verify, then apply the identical SQL/function to production when promoting.
+
+**`portgo-pruebas` data:** was seeded as a full clone of production (same schema, same triggers/RLS, same rows in every table, same 12 users with the same passwords) as of 2026-08-19. It will drift from production over time as both databases get used — re-sync manually if a fresh mirror is ever needed. Storage buckets were **not** cloned — file paths in `portgo-pruebas` rows point to files that only exist in production's storage, so documents/photos opened from `dev` will 404 unless the buckets get copied too.
+
+---
+
 ## ⚡ Deployment Checklist — DO THIS EVERY TIME
 
-The app is served from **Vercel** at **`https://portgo-six.vercel.app`** (repo `papelezz-cpu/Flotaapp`, root served as a static site — no build step). The app is `/app.html`; the landing is `/`. **`git push` to `main` auto-deploys** (usually live within ~30s). After ANY change:
+The app is served from **Vercel**, same project for both branches (repo `papelezz-cpu/Flotaapp`, root served as a static site — no build step): `main` → `https://portgo-six.vercel.app`, `dev` → the branch-preview URL above. The app is `/app.html`; the landing is `/`. **`git push` to either branch auto-deploys** (usually live within ~30s). After ANY change, on whichever branch you're working on:
 
 1. **Bump the `?v=` param in `app.html`** for every JS/CSS file you changed (e.g. `js/pedidos.js?v=36` → `?v=37`). `app.html` is the application; `index.html` is the static marketing landing. If you skip this, browsers serve the old cached file and the user reports "it's not fixed".
 2. **Bump the cache version in `sw.js`**: `const CACHE = 'portgo-vXX'` → `vXX+1`. On Vercel the Service Worker actually registers (the site is at the domain root), so the cache bump genuinely matters now — unlike on the old GitHub Pages subpath where `/sw.js` 404'd.
-3. **Commit AND `git push`** — Vercel deploys on push to `main`; a local commit alone deploys nothing.
-4. Schema changes: `mcp__supabase__apply_migration` (or run the SQL in the Supabase dashboard). Edge Functions: `mcp__supabase__deploy_edge_function`. Both hit **production immediately** — there is no staging.
+3. **Commit AND `git push`** — Vercel deploys on push; a local commit alone deploys nothing.
+4. Schema changes: apply to `portgo-pruebas` first (Management API or the Supabase dashboard), verify, then apply the same migration to production when the user asks to promote. Edge Functions follow the same order. Never skip straight to production unless the user says to.
 5. Tell the user to hard-refresh (**Ctrl+Shift+R**) if they're testing right away.
 
 `vercel.json` sets the static config: `cleanUrls:false` (keeps the `.html` URLs), no-cache for `sw.js`, revalidate for HTML/manifest.
