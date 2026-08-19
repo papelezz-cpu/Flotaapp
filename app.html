@@ -1815,22 +1815,33 @@
   </div>
 </div>
 
-<!-- ══ MODAL REPORTAR CAMBIO O PROBLEMA (cliente → empresa) ═
-     Motivos fijos, sin texto libre: cada botón manda su propio mensaje
-     completo — reemplaza lo que antes se resolvía por chat. -->
+<!-- ══ MODAL ACTUALIZAR LUGAR/HORA O REPORTAR PROBLEMA (cliente → empresa) ═
+     El lugar y la hora se editan de verdad (la empresa ve el dato real,
+     no solo un aviso de que "algo cambió"); los otros dos son alertas
+     fijas sin texto libre, porque no hay un campo concreto que editar. -->
 <div class="modal-overlay" id="modal-reportar-cambio">
   <div class="modal" style="max-width:440px">
-    <h2>⚠ Reportar cambio o problema</h2>
-    <p class="sub">Elige el motivo — se le avisa a la empresa y al superadmin por campana y correo.</p>
+    <h2>✏️ Actualizar viaje / reportar problema</h2>
+    <p class="sub">Si cambió el lugar o la hora, actualízalo aquí — la empresa ve el dato nuevo, no solo un aviso.</p>
     <input type="hidden" id="rc-reserva-id">
-    <div style="display:flex;flex-direction:column;gap:8px;margin:14px 0">
-      <button class="btn-edit" style="text-align:left" onclick="_enviarReporteCambio('punto')">📍 Cambió el punto de recolección o entrega</button>
-      <button class="btn-edit" style="text-align:left" onclick="_enviarReporteCambio('horario')">🕐 Cambió el horario</button>
-      <button class="btn-edit" style="text-align:left" onclick="_enviarReporteCambio('carga')">📦 Hay un problema con la carga o documentos</button>
-      <button class="btn-edit" style="text-align:left" onclick="_enviarReporteCambio('otro')">⚠ Otro problema urgente — contáctenme</button>
+    <input type="hidden" id="rc-pedido-id">
+    <div class="form-group">
+      <label>Lugar de carga/entrega</label>
+      <input type="text" id="rc-lugar" placeholder="Ej. Bodega Industrial Norte, andén 3">
+    </div>
+    <div class="form-group">
+      <label>Hora</label>
+      <input type="text" id="rc-hora" placeholder="Ej. 14:00">
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="cerrarReportarCambio()">Cancelar</button>
+      <button class="btn-confirm" onclick="_guardarCambioLugarHora()">✓ Guardar y avisar</button>
+    </div>
+    <hr style="margin:16px 0;border-color:var(--border)">
+    <p class="sub" style="margin-bottom:8px">¿Es otro tipo de problema?</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn-edit" style="text-align:left" onclick="_enviarReporteCambio('carga')">📦 Hay un problema con la carga o documentos</button>
+      <button class="btn-edit" style="text-align:left" onclick="_enviarReporteCambio('otro')">⚠ Otro problema urgente — contáctenme</button>
     </div>
   </div>
 </div>
@@ -2684,7 +2695,7 @@
 <script src="js/views.js?v=29"></script>
 <script src="js/camiones.js?v=11"></script>
 <script src="js/recursos.js?v=11"></script>
-<script src="js/reservaciones.js?v=41"></script>
+<script src="js/reservaciones.js?v=42"></script>
 <script src="js/modal.js?v=13"></script>
 <script src="js/mapa.js?v=4"></script>
 <script src="js/expedientes.js?v=5"></script>

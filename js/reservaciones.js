@@ -755,21 +755,74 @@ function avisarRetraso(reservaId) {
   });
 }
 
-// ── REPORTAR CAMBIO O PROBLEMA (cliente → empresa + superadmin) ──
-// Motivos fijos: cada botón es su propio mensaje completo, no hay textarea.
+// ── ACTUALIZAR LUGAR/HORA O REPORTAR PROBLEMA (cliente → empresa + superadmin) ──
+// El lugar/hora se editan de verdad (se guardan en el pedido, la empresa ve
+// el dato real); los otros motivos son alertas fijas, sin textarea, porque
+// no hay un campo concreto que editar para "hay un problema con la carga".
 const _RC_MOTIVOS = {
-  punto:   '📍 El cliente avisa que cambió el punto de recolección o entrega.',
-  horario: '🕐 El cliente avisa que cambió el horario.',
-  carga:   '📦 El cliente reporta un problema con la carga o los documentos.',
-  otro:    '⚠ El cliente reporta un problema urgente y pide que lo contacten.',
+  carga: '📦 El cliente reporta un problema con la carga o los documentos.',
+  otro:  '⚠ El cliente reporta un problema urgente y pide que lo contacten.',
 };
 
-function abrirReportarCambio(reservaId) {
+async function abrirReportarCambio(reservaId) {
   document.getElementById('rc-reserva-id').value = reservaId;
+  document.getElementById('rc-pedido-id').value = '';
+  document.getElementById('rc-lugar').value = '';
+  document.getElementById('rc-hora').value = '';
   document.getElementById('modal-reportar-cambio').classList.add('open');
+
+  const { data: r } = await sb.from('reservaciones').select('pedido_id').eq('id', reservaId).single();
+  if (!r?.pedido_id) return;
+  document.getElementById('rc-pedido-id').value = r.pedido_id;
+
+  const { data: p } = await sb.from('pedidos')
+    .select('detalles_lugar, detalles_hora, origen').eq('id', r.pedido_id).maybeSingle();
+  document.getElementById('rc-lugar').value = p?.detalles_lugar || p?.origen || '';
+  document.getElementById('rc-hora').value  = p?.detalles_hora || '';
 }
 function cerrarReportarCambio() {
   document.getElementById('modal-reportar-cambio').classList.remove('open');
+}
+
+// Le avisa a la empresa (dueña de la reservación) y a todo superadmin —
+// mismo destinatario para el cambio de lugar/hora y para los reportes fijos.
+async function _notificarCambioReserva(reservaId, titulo, mensaje) {
+  const { data: r } = await sb.from('reservaciones')
+    .select('propietario_id').eq('id', reservaId).single();
+  if (!r?.propietario_id) { showToast('No se pudo enviar', 'error'); return false; }
+
+  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
+  const destinatarios = [r.propietario_id, ...((supers || []).map(s => s.user_id))];
+
+  const { error } = await sb.from('notificaciones').insert(destinatarios.map(uid => ({
+    user_id: uid, tipo: 'cambio_reportado', titulo, mensaje, leido: false,
+  })));
+  if (error) { showToast('No se pudo enviar: ' + error.message, 'error'); return false; }
+
+  _notificarEmail({ tipo: 'resolucion', destinoIds: destinatarios, titulo, mensaje, aprobado: false });
+  return true;
+}
+
+async function _guardarCambioLugarHora() {
+  const reservaId = document.getElementById('rc-reserva-id').value;
+  const pedidoId  = document.getElementById('rc-pedido-id').value;
+  const lugar = document.getElementById('rc-lugar')?.value?.trim() || '';
+  const hora  = document.getElementById('rc-hora')?.value?.trim() || '';
+  if (!reservaId || !pedidoId) return;
+  if (!lugar && !hora) { showToast('Indica el lugar y/o la hora', 'error'); return; }
+
+  const { error } = await sb.from('pedidos')
+    .update({ detalles_lugar: lugar || null, detalles_hora: hora || null }).eq('id', pedidoId);
+  if (error) { showToast('No se pudo guardar: ' + error.message, 'error'); return; }
+
+  const detalle = [lugar ? `lugar: ${lugar}` : null, hora ? `hora: ${hora}` : null].filter(Boolean).join(', ');
+  const mensaje = `✏️ El cliente actualizó el viaje — ${esc(detalle)}.`;
+  const ok = await _notificarCambioReserva(reservaId, '✏️ El cliente actualizó lugar/hora', mensaje);
+  if (!ok) return;
+
+  cerrarReportarCambio();
+  await renderReserv();
+  showToast('✓ Guardado y avisado a la empresa');
 }
 
 async function _enviarReporteCambio(motivoClave) {
@@ -778,26 +831,10 @@ async function _enviarReporteCambio(motivoClave) {
   if (!reservaId || !texto) return;
 
   const { data: r } = await sb.from('reservaciones')
-    .select('propietario_id, unidad, cliente').eq('id', reservaId).single();
-  if (!r?.propietario_id) { showToast('No se pudo enviar', 'error'); return; }
-
-  const mensaje = `${texto} Servicio "${esc(r.unidad || '')}" — ${esc(r.cliente || 'cliente')}.`;
-  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-  const destinatarios = [r.propietario_id, ...((supers || []).map(s => s.user_id))];
-
-  const { error } = await sb.from('notificaciones').insert(destinatarios.map(uid => ({
-    user_id: uid,
-    tipo:    'cambio_reportado',
-    titulo:  '⚠ Cliente reporta cambio o problema',
-    mensaje,
-    leido:   false,
-  })));
-  if (error) { showToast('No se pudo enviar: ' + error.message, 'error'); return; }
-
-  _notificarEmail({
-    tipo: 'resolucion', destinoIds: destinatarios,
-    titulo: 'Cliente reporta cambio o problema', mensaje, aprobado: false,
-  });
+    .select('unidad, cliente').eq('id', reservaId).single();
+  const mensaje = `${texto} Servicio "${esc(r?.unidad || '')}" — ${esc(r?.cliente || 'cliente')}.`;
+  const ok = await _notificarCambioReserva(reservaId, '⚠ Cliente reporta un problema', mensaje);
+  if (!ok) return;
 
   cerrarReportarCambio();
   showToast('✓ Reporte enviado a la empresa y al superadmin');
