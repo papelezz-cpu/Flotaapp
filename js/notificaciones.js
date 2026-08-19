@@ -154,7 +154,8 @@ async function onNotifClick(id, tipo) {
   if (tipo === 'reserva_pendiente' || tipo === 'reserva_aceptada' || tipo === 'reserva_rechazada' ||
       tipo === 'tracking_actualizado' || tipo === 'reserva_cancelada' || tipo === 'servicio_completado' ||
       tipo === 'finalizacion_solicitada' || tipo === 'finalizacion_rechazada' ||
-      tipo === 'incidente_entrega_vacios') {
+      tipo === 'incidente_entrega_vacios' || tipo === 'documentos_solicitados' ||
+      tipo === 'documentos_carga_solicitados') {
     goTo('reservaciones', 'Reservaciones', 0, null);
     return;
   }

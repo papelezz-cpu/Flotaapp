@@ -677,6 +677,8 @@ async function abrirDocumentosCarga(reservaId) {
   if (subirWrap) subirWrap.style.display = soyCliente ? '' : 'none';
   const btnSubir = document.getElementById('dc-btn-subir');
   if (btnSubir) btnSubir.style.display = soyCliente ? '' : 'none';
+  const btnSolicitar = document.getElementById('dc-btn-solicitar');
+  if (btnSolicitar) btnSolicitar.style.display = soyCliente ? 'none' : '';
   const titulo = document.getElementById('dc-titulo');
   if (titulo) titulo.textContent = soyCliente ? '📄 Carta Porte / documentos de carga' : '📄 Documentos de carga del cliente';
 
@@ -700,6 +702,35 @@ async function abrirDocumentosCarga(reservaId) {
 
 function cerrarDocumentosCarga() {
   document.getElementById('modal-documentos-carga').classList.remove('open');
+}
+
+// La empresa pide la Carta Porte / documentos de carga sin necesidad de
+// chat: un aviso puntual (campana + correo) en vez de un mensaje libre.
+function solicitarDocumentosCarga() {
+  const reservaId = document.getElementById('dc-reserva-id').value;
+  if (!reservaId) return;
+  showConfirm('¿Solicitar al cliente la Carta Porte y documentos de carga? Le llegará aviso por campana y correo.', async () => {
+    const { data: r } = await sb.from('reservaciones')
+      .select('cliente_user_id, unidad').eq('id', reservaId).single();
+    if (!r?.cliente_user_id) { showToast('No se pudo solicitar', 'error'); return; }
+
+    const mensaje = `${esc(currentUser.nombre)} necesita la Carta Porte y/o documentos de carga para el servicio "${esc(r.unidad || '')}". Súbelos desde Reservaciones.`;
+    const { error } = await sb.from('notificaciones').insert({
+      user_id: r.cliente_user_id,
+      tipo:    'documentos_carga_solicitados',
+      titulo:  '📄 Documentos de carga solicitados',
+      mensaje,
+      leido:   false,
+    });
+    if (error) { showToast('No se pudo solicitar: ' + error.message, 'error'); return; }
+
+    _notificarEmail({
+      tipo: 'resolucion', destinoIds: [r.cliente_user_id],
+      titulo: 'Documentos de carga solicitados', mensaje, aprobado: true,
+    });
+
+    showToast('✓ Solicitud enviada al cliente');
+  });
 }
 
 async function subirDocumentosCarga() {
