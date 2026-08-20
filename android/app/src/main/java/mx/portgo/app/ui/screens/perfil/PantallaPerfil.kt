@@ -13,14 +13,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,8 +43,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,9 +56,13 @@ import mx.portgo.app.data.model.Perfil
 import mx.portgo.app.data.model.UsuarioActual
 import mx.portgo.app.di.AppContainer
 import mx.portgo.app.ui.SesionViewModel
+import mx.portgo.app.ui.components.EncabezadoModulo
 import mx.portgo.app.ui.components.FilaDato
+import mx.portgo.app.ui.components.TarjetaFicha
 import mx.portgo.app.ui.theme.ColoresEstado
 import mx.portgo.app.ui.theme.Espacio
+import mx.portgo.app.ui.theme.PortGoColor
+import mx.portgo.app.ui.theme.SpaceGrotesk
 
 @Composable
 fun PantallaPerfil(
@@ -82,68 +90,31 @@ fun PantallaPerfil(
         }
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { relleno ->
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
+        containerColor = PortGoColor.Arena,
+    ) { relleno ->
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(relleno)
-                .verticalScroll(rememberScrollState())
-                .padding(Espacio.m),
+                .background(PortGoColor.Arena)
+                .padding(relleno),
         ) {
-            // ── Identidad ──
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        usuario.nombre.take(1).uppercase(),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
-                Spacer(Modifier.size(Espacio.m))
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            usuario.nombre,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        if (perfil?.verificado == true) {
-                            Spacer(Modifier.size(Espacio.xs))
-                            Icon(
-                                Icons.Default.Verified,
-                                contentDescription = "Cuenta verificada",
-                                tint = ColoresEstado.info,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
-                    Text(
-                        usuario.email,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        if (usuario.esCliente) "Cliente" else "Empresa transportista",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            EncabezadoModulo(titulo = "Perfil", onAtras = null)
 
-            Spacer(Modifier.height(Espacio.l))
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = Espacio.m),
+            ) {
+                Identidad(usuario, perfil)
 
-            // ── Datos fiscales ──
-            perfil?.let { p ->
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(Espacio.m)) {
-                        Text("Datos de la cuenta", style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(Espacio.s))
+                Spacer(Modifier.height(Espacio.m))
+
+                perfil?.let { p ->
+                    TarjetaFicha {
+                        TituloTarjeta("Datos de la cuenta")
                         FilaDato("Razón social", p.razonSocial)
                         FilaDato("RFC", p.rfc)
                         FilaDato("Teléfono", p.telefono)
@@ -156,137 +127,246 @@ fun PantallaPerfil(
                             },
                         )
                     }
+                    Spacer(Modifier.height(Espacio.gapRejilla))
                 }
-                Spacer(Modifier.height(Espacio.m))
-            }
 
-            // ── Preferencias ──
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(Espacio.m)) {
-                    Text("Preferencias", style = MaterialTheme.typography.titleMedium)
+                TarjetaFicha {
+                    TituloTarjeta("Preferencias")
+
+                    FilaInterruptor(
+                        titulo = "Desbloqueo biométrico",
+                        detalle = "Pide huella, rostro o PIN al abrir la app. La sesión se " +
+                            "guarda cifrada en el dispositivo.",
+                        marcado = biometria,
+                        onCambio = {
+                            biometria = it
+                            sesionVm.biometriaActiva = it
+                        },
+                    )
+
+                    Spacer(Modifier.height(Espacio.s))
+                    HorizontalDivider(thickness = 1.dp, color = PortGoColor.Divisor)
                     Spacer(Modifier.height(Espacio.s))
 
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Desbloqueo biométrico", style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                "Pide huella, rostro o PIN al abrir la app. La sesión se guarda " +
-                                    "cifrada en el dispositivo.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Switch(
-                            checked = biometria,
-                            onCheckedChange = {
-                                biometria = it
-                                sesionVm.biometriaActiva = it
-                            },
-                        )
-                    }
-
-                    Spacer(Modifier.height(Espacio.m))
-                    HorizontalDivider()
-                    Spacer(Modifier.height(Espacio.m))
-
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Correos de avisos", style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                if (usuario.esCliente) {
-                                    "Avisos de ofertas nuevas en tus solicitudes."
-                                } else {
-                                    "Avisos de solicitudes nuevas que puedes atender."
-                                } + " Los correos del servicio contratado siempre llegan.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Switch(
-                            checked = notifEmail,
-                            onCheckedChange = { quiere ->
-                                notifEmail = quiere
-                                alcance.launch {
-                                    val r = container.auth
-                                        .actualizarPreferenciaCorreo(usuario.id, quiere)
-                                    if (r is Resultado.Error) {
-                                        notifEmail = !quiere  // revertir: no se guardó
-                                        snackbar.showSnackbar(r.error.mensaje)
-                                    }
+                    FilaInterruptor(
+                        titulo = "Correos de avisos",
+                        detalle = if (usuario.esCliente) {
+                            "Avisos de ofertas nuevas en tus solicitudes."
+                        } else {
+                            "Avisos de solicitudes nuevas que puedes atender."
+                        } + " Los correos del servicio contratado siempre llegan.",
+                        marcado = notifEmail,
+                        onCambio = { quiere ->
+                            notifEmail = quiere
+                            alcance.launch {
+                                val r = container.auth
+                                    .actualizarPreferenciaCorreo(usuario.id, quiere)
+                                if (r is Resultado.Error) {
+                                    notifEmail = !quiere // revertir: no se guardó
+                                    snackbar.showSnackbar(r.error.mensaje)
                                 }
-                            },
-                        )
-                    }
+                            }
+                        },
+                    )
                 }
-            }
 
-            Spacer(Modifier.height(Espacio.m))
+                Spacer(Modifier.height(Espacio.gapRejilla))
 
-            // ── Enlaces ──
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(Espacio.m)) {
-                    Text("Cuenta y documentos", style = MaterialTheme.typography.titleMedium)
+                TarjetaFicha {
+                    TituloTarjeta("Cuenta y documentos")
                     Text(
-                        "El alta de unidades, choferes y documentos fiscales se hace en el " +
-                            "sitio web, donde se adjuntan los archivos y sus vigencias.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        // Las unidades ya se registran desde la app; lo que sigue
+                        // siendo exclusivo de la web son los choferes y los
+                        // documentos fiscales de la empresa.
+                        if (usuario.esCliente) {
+                            "Tus documentos fiscales y los datos de facturación se " +
+                                "gestionan en el sitio web."
+                        } else {
+                            "El alta de choferes y los documentos fiscales de la empresa " +
+                                "se hacen en el sitio web, donde se adjuntan los archivos " +
+                                "y sus vigencias."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = PortGoColor.TextoSecundario,
                     )
                     Spacer(Modifier.height(Espacio.s))
                     OutlinedButton(
                         onClick = {
                             contexto.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse("${BuildConfig.WEB_URL}/app.html")),
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("${BuildConfig.WEB_URL}/app.html"),
+                                ),
                             )
                         },
-                    ) { Text("Abrir PortGo en el navegador") }
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp),
+                        )
+                        Spacer(Modifier.width(Espacio.s))
+                        Text("Abrir PortGo en el navegador")
+                    }
                 }
+
+                Spacer(Modifier.height(Espacio.l))
+
+                OutlinedButton(
+                    onClick = { confirmarSalir = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Logout,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(Espacio.s))
+                    Text("Cerrar sesión")
+                }
+
+                Spacer(Modifier.height(Espacio.m))
+                Text(
+                    "PortGo ${BuildConfig.VERSION_NAME}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PortGoColor.TextoTerciario,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+                Spacer(Modifier.height(Espacio.xl))
             }
-
-            Spacer(Modifier.height(Espacio.l))
-
-            OutlinedButton(
-                onClick = { confirmarSalir = true },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
-                Spacer(Modifier.size(Espacio.s))
-                Text("Cerrar sesión")
-            }
-
-            Spacer(Modifier.height(Espacio.m))
-            Text(
-                "PortGo ${BuildConfig.VERSION_NAME}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            )
-            Spacer(Modifier.height(Espacio.xl))
         }
     }
 
     if (confirmarSalir) {
         AlertDialog(
             onDismissRequest = { confirmarSalir = false },
-            title = { Text("¿Cerrar sesión?") },
-            text = { Text("Tendrás que escribir tu correo y contraseña la próxima vez.") },
+            containerColor = PortGoColor.Superficie,
+            shape = RoundedCornerShape(18.dp),
+            title = { Text("¿Cerrar sesión?", color = PortGoColor.Tinta) },
+            text = {
+                Text(
+                    "Tendrás que escribir tu correo y contraseña la próxima vez.",
+                    color = PortGoColor.TextoSecundario,
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     confirmarSalir = false
                     onCerrarSesion()
-                }) { Text("Cerrar sesión") }
+                }) { Text("Cerrar sesión", color = ColoresEstado.peligro) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmarSalir = false }) { Text("Cancelar") }
+                TextButton(onClick = { confirmarSalir = false }) {
+                    Text("Cancelar", color = PortGoColor.TextoSecundario)
+                }
             },
+        )
+    }
+}
+
+/**
+ * Bloque de identidad.
+ *
+ * La inicial en un círculo teal sustituye a la foto: en esta app nadie sube
+ * avatar, así que un marcador de imagen vacío solo ocuparía espacio.
+ */
+@Composable
+private fun Identidad(usuario: UsuarioActual, perfil: Perfil?) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(PortGoColor.TealTenue),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                usuario.nombre.take(1).uppercase(),
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.headlineSmall,
+                color = PortGoColor.TealOscuro,
+            )
+        }
+        Spacer(Modifier.width(Espacio.m))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    usuario.nombre,
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = PortGoColor.Tinta,
+                )
+                if (perfil?.verificado == true) {
+                    Spacer(Modifier.width(Espacio.xs))
+                    Icon(
+                        Icons.Default.Verified,
+                        contentDescription = "Cuenta verificada",
+                        tint = PortGoColor.Teal,
+                        modifier = Modifier.size(19.dp),
+                    )
+                }
+            }
+            Text(
+                usuario.email,
+                style = MaterialTheme.typography.bodyMedium,
+                color = PortGoColor.TextoSecundario,
+            )
+            Text(
+                if (usuario.esCliente) "Cliente" else "Empresa transportista",
+                style = MaterialTheme.typography.bodySmall,
+                color = PortGoColor.TextoTerciario,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TituloTarjeta(texto: String) {
+    Text(
+        texto,
+        style = MaterialTheme.typography.titleMedium,
+        color = PortGoColor.Tinta,
+    )
+    Spacer(Modifier.height(Espacio.s))
+}
+
+@Composable
+private fun FilaInterruptor(
+    titulo: String,
+    detalle: String,
+    marcado: Boolean,
+    onCambio: (Boolean) -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                titulo,
+                style = MaterialTheme.typography.bodyLarge,
+                color = PortGoColor.Tinta,
+            )
+            Text(
+                detalle,
+                style = MaterialTheme.typography.bodySmall,
+                color = PortGoColor.TextoSecundario,
+            )
+        }
+        Spacer(Modifier.width(Espacio.s))
+        Switch(
+            checked = marcado,
+            onCheckedChange = onCambio,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = PortGoColor.Teal,
+                checkedBorderColor = PortGoColor.Teal,
+            ),
         )
     }
 }

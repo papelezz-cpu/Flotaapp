@@ -21,9 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -49,7 +47,6 @@ import mx.portgo.app.core.Fmt
 import mx.portgo.app.data.model.EstadoOferta
 import mx.portgo.app.data.model.Oferta
 import mx.portgo.app.data.model.Pedido
-import mx.portgo.app.data.model.PedidoConOfertas
 import mx.portgo.app.data.model.UsuarioActual
 import mx.portgo.app.di.AppContainer
 import mx.portgo.app.ui.LocalCatalogos

@@ -92,11 +92,15 @@ fun EncabezadoPortGo(
  * líneas — un vector nuevo para eso solo agregaría un archivo que mantener.
  */
 @Composable
-private fun LogoPortGo(modifier: Modifier = Modifier) {
+fun LogoPortGo(
+    modifier: Modifier = Modifier,
+    tamano: androidx.compose.ui.unit.Dp = 28.dp,
+    radio: androidx.compose.ui.unit.Dp = 8.dp,
+) {
     Box(
         modifier
-            .size(28.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .size(tamano)
+            .clip(RoundedCornerShape(radio))
             .background(PortGoColor.Teal)
             .drawBehind {
                 val centro = Offset(size.width / 2f, size.height / 2f)

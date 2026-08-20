@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import mx.portgo.app.core.Resultado
-import mx.portgo.app.data.model.EstadoOferta
 import mx.portgo.app.data.model.EstadoPedido
 import mx.portgo.app.data.model.EstadoReserva
 import mx.portgo.app.data.model.UsuarioActual

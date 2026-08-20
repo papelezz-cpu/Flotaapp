@@ -1,5 +1,6 @@
 package mx.portgo.app.ui.screens.flota
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -11,23 +12,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
@@ -36,7 +31,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,7 +39,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -53,9 +50,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.portgo.app.data.model.UsuarioActual
 import mx.portgo.app.di.AppContainer
 import mx.portgo.app.ui.LocalCatalogos
+import mx.portgo.app.ui.components.BotonPrincipal
 import mx.portgo.app.ui.components.CampoArchivo
 import mx.portgo.app.ui.components.CampoFecha
+import mx.portgo.app.ui.components.EncabezadoModulo
+import mx.portgo.app.ui.components.RadioCampo
+import mx.portgo.app.ui.components.coloresCampo
 import mx.portgo.app.ui.theme.Espacio
+import mx.portgo.app.ui.theme.PortGoColor
 import mx.portgo.app.ui.viewmodel.AltaCamionViewModel
 import mx.portgo.app.ui.viewmodel.AltaCamionViewModel.Archivo
 import mx.portgo.app.ui.viewmodel.vmFactory
@@ -98,28 +100,26 @@ fun PantallaAltaCamion(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = { Text("Nueva unidad · ${pasos[paso]}") },
-                navigationIcon = {
-                    IconButton(onClick = { if (paso > 0) paso-- else onAtras() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
-                    }
-                },
-            )
-        },
+        containerColor = PortGoColor.Arena,
     ) { relleno ->
-        Column(Modifier.fillMaxSize().padding(relleno)) {
-
-            LinearProgressIndicator(
-                progress = { (paso + 1f) / pasos.size },
-                modifier = Modifier.fillMaxWidth(),
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(PortGoColor.Arena)
+                .padding(relleno),
+        ) {
+            EncabezadoModulo(
+                titulo = "Nueva unidad",
+                onAtras = { if (paso > 0) paso-- else onAtras() },
             )
+
+            PasosAlta(paso, pasos)
+
             if (guardando) {
                 Text(
                     progreso ?: "Guardando…",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = PortGoColor.TextoSecundario,
                     modifier = Modifier.padding(horizontal = Espacio.m, vertical = Espacio.xs),
                 )
             }
@@ -139,35 +139,33 @@ fun PantallaAltaCamion(
                 Spacer(Modifier.height(Espacio.xl))
             }
 
-            HorizontalDivider()
+            HorizontalDivider(thickness = 1.dp, color = PortGoColor.BordeBarra)
             Row(
-                Modifier.fillMaxWidth().padding(Espacio.m),
+                Modifier
+                    .background(PortGoColor.Superficie)
+                    .fillMaxWidth()
+                    .padding(Espacio.m),
                 horizontalArrangement = Arrangement.spacedBy(Espacio.s),
             ) {
                 if (paso > 0) {
                     OutlinedButton(
                         onClick = { paso-- },
                         enabled = !guardando,
-                        modifier = Modifier.weight(1f),
-                    ) { Text("Atrás") }
+                        shape = RadioCampo,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                    ) { Text("Atrás", color = PortGoColor.TextoSecundario) }
                 }
-                Button(
+                BotonPrincipal(
+                    texto = if (paso < pasos.lastIndex) "Continuar" else "Registrar unidad",
                     onClick = {
                         if (paso < pasos.lastIndex) paso++ else vm.guardar(onGuardada)
                     },
-                    enabled = !guardando && (paso > 0 || form.identificacionCompleta),
+                    ocupado = guardando,
+                    habilitado = paso > 0 || form.identificacionCompleta,
                     modifier = Modifier.weight(2f),
-                ) {
-                    if (guardando) {
-                        CircularProgressIndicator(
-                            Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    } else {
-                        Text(if (paso < pasos.lastIndex) "Continuar" else "Registrar unidad")
-                    }
-                }
+                )
             }
         }
     }
@@ -185,6 +183,8 @@ private fun PasoIdentificacion(
     var combAbierto by remember { mutableStateOf(false) }
 
     OutlinedTextField(
+        shape = RadioCampo,
+        colors = coloresCampo(),
         value = form.numEconomico,
         onValueChange = { v -> vm.actualizar { it.copy(numEconomico = v.uppercase()) } },
         label = { Text("Número económico *") },
@@ -199,6 +199,8 @@ private fun PasoIdentificacion(
     // decide qué solicitudes puede atender esta unidad.
     ExposedDropdownMenuBox(expanded = tipoAbierto, onExpandedChange = { tipoAbierto = it }) {
         OutlinedTextField(
+            shape = RadioCampo,
+            colors = coloresCampo(),
             value = form.tipo,
             onValueChange = {},
             readOnly = true,
@@ -221,6 +223,8 @@ private fun PasoIdentificacion(
     Spacer(Modifier.height(Espacio.s))
     Row(horizontalArrangement = Arrangement.spacedBy(Espacio.s)) {
         OutlinedTextField(
+            shape = RadioCampo,
+            colors = coloresCampo(),
             value = form.placas,
             onValueChange = { v -> vm.actualizar { it.copy(placas = v.uppercase()) } },
             label = { Text("Placas") },
@@ -233,6 +237,8 @@ private fun PasoIdentificacion(
             modifier = Modifier.weight(1f),
         ) {
             OutlinedTextField(
+                shape = RadioCampo,
+                colors = coloresCampo(),
                 value = form.tipoPlaca,
                 onValueChange = {},
                 readOnly = true,
@@ -254,6 +260,8 @@ private fun PasoIdentificacion(
     Spacer(Modifier.height(Espacio.s))
     Row(horizontalArrangement = Arrangement.spacedBy(Espacio.s)) {
         OutlinedTextField(
+            shape = RadioCampo,
+            colors = coloresCampo(),
             value = form.marca,
             onValueChange = { v -> vm.actualizar { it.copy(marca = v) } },
             label = { Text("Marca") },
@@ -261,6 +269,8 @@ private fun PasoIdentificacion(
             modifier = Modifier.weight(1f),
         )
         OutlinedTextField(
+            shape = RadioCampo,
+            colors = coloresCampo(),
             value = form.modeloAnio,
             onValueChange = { v -> vm.actualizar { it.copy(modeloAnio = v.filter(Char::isDigit)) } },
             label = { Text("Año") },
@@ -273,6 +283,8 @@ private fun PasoIdentificacion(
     Spacer(Modifier.height(Espacio.s))
     Row(horizontalArrangement = Arrangement.spacedBy(Espacio.s)) {
         OutlinedTextField(
+            shape = RadioCampo,
+            colors = coloresCampo(),
             value = form.version,
             onValueChange = { v -> vm.actualizar { it.copy(version = v) } },
             label = { Text("Versión") },
@@ -280,6 +292,8 @@ private fun PasoIdentificacion(
             modifier = Modifier.weight(1f),
         )
         OutlinedTextField(
+            shape = RadioCampo,
+            colors = coloresCampo(),
             value = form.color,
             onValueChange = { v -> vm.actualizar { it.copy(color = v) } },
             label = { Text("Color") },
@@ -291,6 +305,8 @@ private fun PasoIdentificacion(
     Spacer(Modifier.height(Espacio.s))
     Row(horizontalArrangement = Arrangement.spacedBy(Espacio.s)) {
         OutlinedTextField(
+            shape = RadioCampo,
+            colors = coloresCampo(),
             value = form.capacidad,
             onValueChange = { v -> vm.actualizar { it.copy(capacidad = v) } },
             label = { Text("Capacidad") },
@@ -300,6 +316,8 @@ private fun PasoIdentificacion(
             modifier = Modifier.weight(1f),
         )
         OutlinedTextField(
+            shape = RadioCampo,
+            colors = coloresCampo(),
             value = form.precioDia,
             onValueChange = { v ->
                 vm.actualizar { it.copy(precioDia = v.filter { c -> c.isDigit() || c == '.' }) }
@@ -314,6 +332,8 @@ private fun PasoIdentificacion(
 
     Spacer(Modifier.height(Espacio.s))
     OutlinedTextField(
+        shape = RadioCampo,
+        colors = coloresCampo(),
         value = form.dimensiones,
         onValueChange = { v -> vm.actualizar { it.copy(dimensiones = v) } },
         label = { Text("Dimensiones de la caja") },
@@ -323,7 +343,7 @@ private fun PasoIdentificacion(
     )
 
     Spacer(Modifier.height(Espacio.m))
-    Text("Qué carga puede llevar", style = MaterialTheme.typography.titleMedium)
+    Text("Qué carga puede llevar", style = MaterialTheme.typography.titleMedium, color = PortGoColor.Tinta)
     Spacer(Modifier.height(Espacio.xs))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(Espacio.s)) {
         AltaCamionViewModel.TIPOS_CARGA.forEach { t ->
@@ -331,14 +351,29 @@ private fun PasoIdentificacion(
                 selected = t in form.tiposCarga,
                 onClick = { vm.alternarTipoCarga(t) },
                 label = { Text(t) },
+                shape = RoundedCornerShape(999.dp),
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = PortGoColor.Superficie,
+                    labelColor = PortGoColor.TextoSecundario,
+                    selectedContainerColor = PortGoColor.Teal,
+                    selectedLabelColor = Color.White,
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = t in form.tiposCarga,
+                    borderColor = PortGoColor.BordeTarjeta,
+                    selectedBorderColor = PortGoColor.Teal,
+                ),
             )
         }
     }
 
     Spacer(Modifier.height(Espacio.m))
-    Text("Datos del vehículo", style = MaterialTheme.typography.titleMedium)
+    Text("Datos del vehículo", style = MaterialTheme.typography.titleMedium, color = PortGoColor.Tinta)
     Spacer(Modifier.height(Espacio.xs))
     OutlinedTextField(
+        shape = RadioCampo,
+        colors = coloresCampo(),
         value = form.numSerie,
         onValueChange = { v -> vm.actualizar { it.copy(numSerie = v.uppercase()) } },
         label = { Text("Número de serie (VIN)") },
@@ -348,6 +383,8 @@ private fun PasoIdentificacion(
     Spacer(Modifier.height(Espacio.s))
     Row(horizontalArrangement = Arrangement.spacedBy(Espacio.s)) {
         OutlinedTextField(
+            shape = RadioCampo,
+            colors = coloresCampo(),
             value = form.numMotor,
             onValueChange = { v -> vm.actualizar { it.copy(numMotor = v.uppercase()) } },
             label = { Text("Número de motor") },
@@ -360,6 +397,8 @@ private fun PasoIdentificacion(
             modifier = Modifier.weight(1f),
         ) {
             OutlinedTextField(
+                shape = RadioCampo,
+                colors = coloresCampo(),
                 value = form.combustible,
                 onValueChange = {},
                 readOnly = true,
@@ -389,13 +428,15 @@ private fun PasoDocumentos(
         "Fotografía cada documento y captura su vigencia. Las vigencias son lo " +
             "que decide si la unidad puede salir a carretera.",
         style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = PortGoColor.TextoSecundario,
     )
     Spacer(Modifier.height(Espacio.m))
 
-    Text("Tarjeta de circulación", style = MaterialTheme.typography.titleMedium)
+    Text("Tarjeta de circulación", style = MaterialTheme.typography.titleMedium, color = PortGoColor.Tinta)
     Spacer(Modifier.height(Espacio.xs))
     OutlinedTextField(
+        shape = RadioCampo,
+        colors = coloresCampo(),
         value = form.tarjetaCirculacion,
         onValueChange = { v -> vm.actualizar { it.copy(tarjetaCirculacion = v) } },
         label = { Text("Número de tarjeta") },
@@ -422,7 +463,7 @@ private fun PasoDocumentos(
     ArchivoDe(vm, archivos, Archivo.TARJETA)
 
     Spacer(Modifier.height(Espacio.l))
-    Text("Seguro", style = MaterialTheme.typography.titleMedium)
+    Text("Seguro", style = MaterialTheme.typography.titleMedium, color = PortGoColor.Tinta)
     Spacer(Modifier.height(Espacio.xs))
     CampoFecha(
         etiqueta = "Vence el seguro",
@@ -434,7 +475,7 @@ private fun PasoDocumentos(
     ArchivoDe(vm, archivos, Archivo.SEGURO)
 
     Spacer(Modifier.height(Espacio.l))
-    Text("Permiso SCT", style = MaterialTheme.typography.titleMedium)
+    Text("Permiso SCT", style = MaterialTheme.typography.titleMedium, color = PortGoColor.Tinta)
     Spacer(Modifier.height(Espacio.xs))
     CampoFecha(
         etiqueta = "Vence el permiso",
@@ -446,9 +487,11 @@ private fun PasoDocumentos(
     ArchivoDe(vm, archivos, Archivo.PERMISO_SCT)
 
     Spacer(Modifier.height(Espacio.l))
-    Text("CAAT y verificación", style = MaterialTheme.typography.titleMedium)
+    Text("CAAT y verificación", style = MaterialTheme.typography.titleMedium, color = PortGoColor.Tinta)
     Spacer(Modifier.height(Espacio.xs))
     OutlinedTextField(
+        shape = RadioCampo,
+        colors = coloresCampo(),
         value = form.caat,
         onValueChange = { v -> vm.actualizar { it.copy(caat = v.uppercase()) } },
         label = { Text("CAAT") },
@@ -474,11 +517,11 @@ private fun PasoDocumentos(
     }
 
     Spacer(Modifier.height(Espacio.l))
-    Text("Materiales peligrosos", style = MaterialTheme.typography.titleMedium)
+    Text("Materiales peligrosos", style = MaterialTheme.typography.titleMedium, color = PortGoColor.Tinta)
     Text(
         "Solo si la unidad los transporta.",
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = PortGoColor.TextoSecundario,
     )
     Spacer(Modifier.height(Espacio.xs))
     CampoFecha(
@@ -500,7 +543,7 @@ private fun PasoFotos(
         "Camina alrededor de la unidad y tómale cuatro fotos. Son las que ve el " +
             "cliente al recibir tu oferta.",
         style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = PortGoColor.TextoSecundario,
     )
     Spacer(Modifier.height(Espacio.m))
 
@@ -515,7 +558,7 @@ private fun PasoFotos(
         "Al registrarla queda pendiente de aprobación. Podrás ofertar con ella " +
             "cuando el administrador la revise.",
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = PortGoColor.TextoSecundario,
     )
 }
 
@@ -532,4 +575,45 @@ private fun ArchivoDe(
         onAdjuntar = { vm.adjuntar(archivo, it) },
         onQuitar = { vm.quitar(archivo) },
     )
+}
+
+/**
+ * Indicador de paso del alta.
+ *
+ * Nombra el paso en vez de mostrar solo una barra de relleno: en un formulario
+ * de treinta campos, saber que lo que falta son "Fotos" y no "Documentos"
+ * cambia si lo terminas ahora o lo dejas para cuando tengas los papeles.
+ */
+@Composable
+private fun PasosAlta(paso: Int, pasos: List<String>) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Espacio.m, vertical = Espacio.xs),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        pasos.forEachIndexed { indice, nombre ->
+            val hecho = indice <= paso
+            Column(Modifier.weight(1f)) {
+                Spacer(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .background(
+                            if (hecho) PortGoColor.Teal else PortGoColor.BordeTarjeta,
+                            RoundedCornerShape(2.dp),
+                        ),
+                )
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    nombre,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = if (indice == paso) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (hecho) PortGoColor.TealOscuro else PortGoColor.TextoTerciario,
+                )
+            }
+        }
+    }
+    Spacer(Modifier.height(Espacio.s))
 }

@@ -2,6 +2,7 @@ package mx.portgo.app.ui.screens.auth
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -10,18 +11,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Anchor
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,7 +53,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import mx.portgo.app.BuildConfig
 import mx.portgo.app.ui.SesionViewModel
+import mx.portgo.app.ui.components.BotonPrincipal
+import mx.portgo.app.ui.components.LogoPortGo
+import mx.portgo.app.ui.components.RadioCampo
+import mx.portgo.app.ui.components.coloresCampo
 import mx.portgo.app.ui.theme.Espacio
+import mx.portgo.app.ui.theme.PortGoColor
+import mx.portgo.app.ui.theme.SpaceGrotesk
 
 /**
  * Acceso a la app.
@@ -90,7 +94,11 @@ fun PantallaLogin(
             // Indefinite: los motivos por los que no pudiste entrar (cuenta
             // suspendida, enlace vencido) hay que poder leerlos con calma, no
             // que se vayan solos en tres segundos.
-            snackbar.showSnackbar(it, actionLabel = "Entendido", duration = SnackbarDuration.Indefinite)
+            snackbar.showSnackbar(
+                it,
+                actionLabel = "Entendido",
+                duration = SnackbarDuration.Indefinite,
+            )
             onMensajeVisto()
         }
     }
@@ -106,10 +114,14 @@ fun PantallaLogin(
         }
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { relleno ->
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
+        containerColor = PortGoColor.Arena,
+    ) { relleno ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(PortGoColor.Arena)
                 .padding(relleno)
                 .verticalScroll(rememberScrollState())
                 .imePadding()
@@ -119,22 +131,23 @@ fun PantallaLogin(
         ) {
             Spacer(Modifier.height(Espacio.xl))
 
-            Icon(
-                Icons.Default.Anchor,
-                contentDescription = null,
-                modifier = Modifier.size(56.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.height(Espacio.s))
+            // El mismo logo del encabezado, en grande. Usar aquí un icono
+            // distinto —un ancla genérica— haría que la primera pantalla de la
+            // app no se pareciera a la app.
+            LogoPortGo(tamano = 64.dp, radio = 18.dp)
+
+            Spacer(Modifier.height(Espacio.m))
             Text(
                 "PortGo",
-                style = MaterialTheme.typography.headlineSmall,
+                fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.headlineMedium,
+                color = PortGoColor.Tinta,
             )
             Text(
                 "Transporte portuario",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = PortGoColor.TextoSecundario,
             )
 
             Spacer(Modifier.height(Espacio.xl))
@@ -145,6 +158,8 @@ fun PantallaLogin(
                 label = { Text("Correo") },
                 singleLine = true,
                 enabled = !ocupado,
+                shape = RadioCampo,
+                colors = coloresCampo(),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Next,
@@ -152,7 +167,7 @@ fun PantallaLogin(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Spacer(Modifier.height(Espacio.s))
+            Spacer(Modifier.height(Espacio.gapRejilla))
 
             OutlinedTextField(
                 value = contrasena,
@@ -160,6 +175,8 @@ fun PantallaLogin(
                 label = { Text("Contraseña") },
                 singleLine = true,
                 enabled = !ocupado,
+                shape = RadioCampo,
+                colors = coloresCampo(),
                 visualTransformation = if (verContrasena) VisualTransformation.None
                 else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(
@@ -170,9 +187,11 @@ fun PantallaLogin(
                 trailingIcon = {
                     IconButton(onClick = { verContrasena = !verContrasena }) {
                         Icon(
-                            if (verContrasena) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            if (verContrasena) Icons.Default.VisibilityOff
+                            else Icons.Default.Visibility,
                             contentDescription = if (verContrasena) "Ocultar contraseña"
                             else "Mostrar contraseña",
+                            tint = PortGoColor.TextoSecundario,
                         )
                     }
                 },
@@ -181,32 +200,18 @@ fun PantallaLogin(
 
             Spacer(Modifier.height(Espacio.l))
 
-            Button(
-                onClick = { entrar() },
-                enabled = !ocupado,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) {
-                if (ocupado) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                } else {
-                    Text("Entrar")
-                }
-            }
+            BotonPrincipal("Entrar", onClick = { entrar() }, ocupado = ocupado)
 
             TextButton(onClick = { mostrarRecuperar = true }, enabled = !ocupado) {
-                Text("Olvidé mi contraseña")
+                Text("Olvidé mi contraseña", color = PortGoColor.TealOscuro)
             }
 
             Spacer(Modifier.height(Espacio.l))
 
             Text(
                 "¿Todavía no tienes cuenta?",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+                color = PortGoColor.TextoSecundario,
             )
             TextButton(
                 onClick = {
@@ -215,13 +220,17 @@ fun PantallaLogin(
                     )
                 },
             ) {
-                Text("Registrarme en portgo.mx")
+                Text(
+                    "Registrarme en portgo.mx",
+                    color = PortGoColor.TealOscuro,
+                    fontWeight = FontWeight.Medium,
+                )
             }
             Text(
                 "El alta pide documentos fiscales y la revisa nuestro equipo. " +
                     "Se hace desde el sitio web.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = PortGoColor.TextoTerciario,
                 textAlign = TextAlign.Center,
             )
 
@@ -253,12 +262,15 @@ private fun DialogoRecuperar(
 
     AlertDialog(
         onDismissRequest = onCerrar,
-        title = { Text("Recuperar contraseña") },
+        containerColor = PortGoColor.Superficie,
+        shape = RoundedCornerShape(18.dp),
+        title = { Text("Recuperar contraseña", color = PortGoColor.Tinta) },
         text = {
             Column {
                 Text(
                     "Te mandamos un enlace para elegir una nueva.",
                     style = MaterialTheme.typography.bodyMedium,
+                    color = PortGoColor.TextoSecundario,
                 )
                 Spacer(Modifier.height(Espacio.m))
                 OutlinedTextField(
@@ -266,6 +278,8 @@ private fun DialogoRecuperar(
                     onValueChange = { destino = it },
                     label = { Text("Correo") },
                     singleLine = true,
+                    shape = RadioCampo,
+                    colors = coloresCampo(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -275,8 +289,12 @@ private fun DialogoRecuperar(
             TextButton(
                 onClick = { onEnviar(destino) },
                 enabled = destino.isNotBlank(),
-            ) { Text("Enviar") }
+            ) { Text("Enviar", color = PortGoColor.TealOscuro) }
         },
-        dismissButton = { TextButton(onClick = onCerrar) { Text("Cancelar") } },
+        dismissButton = {
+            TextButton(onClick = onCerrar) {
+                Text("Cancelar", color = PortGoColor.TextoSecundario)
+            }
+        },
     )
 }

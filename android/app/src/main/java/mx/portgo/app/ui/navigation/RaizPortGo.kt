@@ -8,17 +8,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -398,22 +391,22 @@ private fun NavegacionPrincipal(
                 // Modulos que el diseno ya coloca en el inicio pero que todavia
                 // no estan construidos. Muestran a donde van en vez de fingir.
                 composable(Rutas.CATALOGO) {
-                    PantallaPendiente("Catálogo", "Directorio de empresas verificadas con sus unidades y calificaciones.")
+                    PantallaPendiente("Catálogo", "Directorio de empresas verificadas con sus unidades y calificaciones.", onAtras = { nav.popBackStack() })
                 }
                 composable(Rutas.PAGOS) {
-                    PantallaPendiente("Mis pagos", "Consulta de lo que has pagado y lo que está por vencer.")
+                    PantallaPendiente("Mis pagos", "Consulta de lo que has pagado y lo que está por vencer.", onAtras = { nav.popBackStack() })
                 }
                 composable(Rutas.PRIVACIDAD) {
-                    PantallaPendiente("Privacidad", "Tus datos y las solicitudes de derechos ARCO.")
+                    PantallaPendiente("Privacidad", "Tus datos y las solicitudes de derechos ARCO.", onAtras = { nav.popBackStack() })
                 }
                 composable(Rutas.VIGENCIAS) {
-                    PantallaPendiente("Vigencias", "Seguimiento de todos los documentos de tu flota y su vencimiento.")
+                    PantallaPendiente("Vigencias", "Seguimiento de todos los documentos de tu flota y su vencimiento.", onAtras = { nav.popBackStack() })
                 }
                 composable(Rutas.OPERADORES) {
-                    PantallaPendiente("Operadores", "Alta y expediente del personal de conducción.")
+                    PantallaPendiente("Operadores", "Alta y expediente del personal de conducción.", onAtras = { nav.popBackStack() })
                 }
                 composable(Rutas.COBROS) {
-                    PantallaPendiente("Cobros", "Pagos recibidos y vencimientos por cobrar.")
+                    PantallaPendiente("Cobros", "Pagos recibidos y vencimientos por cobrar.", onAtras = { nav.popBackStack() })
                 }
 
                 composable(Rutas.PERFIL) {

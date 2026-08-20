@@ -3,6 +3,7 @@ package mx.portgo.app.ui.screens.expedientes
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -24,7 +26,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -58,6 +59,7 @@ import mx.portgo.app.ui.screens.solicitudes.DialogoNota
 import mx.portgo.app.ui.theme.ColoresEstado
 import mx.portgo.app.ui.theme.Espacio
 import mx.portgo.app.ui.theme.PortGoColor
+import mx.portgo.app.ui.theme.Radio
 import mx.portgo.app.ui.viewmodel.EstadoCarga
 import mx.portgo.app.ui.viewmodel.ExpedienteViewModel
 import mx.portgo.app.ui.viewmodel.abrirEnNavegador
@@ -214,13 +216,17 @@ private fun TarjetaDocumento(
         else -> Icons.Default.RadioButtonUnchecked to ColoresEstado.neutro
     }
 
+    // Blanca con borde, como el resto de las tarjetas. El relleno anterior era
+    // surfaceVariant al 35%, y en este tema surfaceVariant ES el arena del
+    // fondo: la tarjeta quedaba sin contorno sobre la pantalla.
     Card(
         Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        ),
+        shape = RoundedCornerShape(Radio.tarjeta),
+        colors = CardDefaults.cardColors(containerColor = PortGoColor.Superficie),
+        border = BorderStroke(1.dp, PortGoColor.BordeTarjeta),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        Column(Modifier.padding(Espacio.m)) {
+        Column(Modifier.padding(15.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Icon(icono, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.size(Espacio.s))

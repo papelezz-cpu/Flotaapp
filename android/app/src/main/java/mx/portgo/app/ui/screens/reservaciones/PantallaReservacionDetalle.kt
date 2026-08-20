@@ -29,7 +29,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -412,8 +411,11 @@ private fun LineaTiempo(r: Reservacion) {
                         .background(
                             color = when {
                                 hecho -> ColoresEstado.exito
-                                esActual -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.surfaceVariant
+                                esActual -> PortGoColor.Teal
+                                // Un paso pendiente lleva el borde de tarjeta y
+                                // no surfaceVariant: ese token es el arena del
+                                // fondo y el circulo desaparecia.
+                                else -> PortGoColor.BordeTarjeta
                             },
                             shape = CircleShape,
                         ),
@@ -433,8 +435,8 @@ private fun LineaTiempo(r: Reservacion) {
                     paso.etiqueta,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = if (esActual) FontWeight.Bold else FontWeight.Normal,
-                    color = if (hecho || esActual) MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (hecho || esActual) PortGoColor.Tinta
+                    else PortGoColor.TextoTerciario,
                 )
             }
         }

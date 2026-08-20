@@ -1,15 +1,17 @@
 package mx.portgo.app.ui.screens.auth
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,13 +25,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.launch
 import mx.portgo.app.core.BiometricGate
 import mx.portgo.app.data.model.UsuarioActual
+import mx.portgo.app.ui.components.BotonPrincipal
 import mx.portgo.app.ui.theme.Espacio
+import mx.portgo.app.ui.theme.PortGoColor
+import mx.portgo.app.ui.theme.SpaceGrotesk
 
 /**
  * Pantalla de bloqueo.
@@ -83,38 +90,53 @@ fun PantallaBloqueo(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(PortGoColor.Arena)
             .padding(Espacio.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            Icons.Default.Fingerprint,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.primary,
-        )
+        Box(
+            Modifier
+                .size(88.dp)
+                .clip(CircleShape)
+                .background(PortGoColor.TealTenue),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Fingerprint,
+                contentDescription = null,
+                modifier = Modifier.size(44.dp),
+                tint = PortGoColor.TealOscuro,
+            )
+        }
+
         Spacer(Modifier.height(Espacio.l))
         Text(
             "PortGo está bloqueado",
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Bold,
             style = MaterialTheme.typography.titleLarge,
+            color = PortGoColor.Tinta,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(Espacio.s))
         Text(
             "Identifícate para volver a la sesión de ${usuario.nombre}.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = PortGoColor.TextoSecundario,
             textAlign = TextAlign.Center,
         )
 
         Spacer(Modifier.height(Espacio.xl))
 
-        Button(onClick = { pedir() }, enabled = !intentando) {
-            Text(if (falloPrevio) "Intentar de nuevo" else "Desbloquear")
-        }
+        BotonPrincipal(
+            texto = if (falloPrevio) "Intentar de nuevo" else "Desbloquear",
+            onClick = { pedir() },
+            ocupado = intentando,
+        )
 
         TextButton(onClick = onSalir) {
-            Text("Usar otra cuenta")
+            Text("Usar otra cuenta", color = PortGoColor.TextoSecundario)
         }
     }
 }
