@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -178,5 +179,77 @@ private fun BotonCampana(
                     },
             )
         }
+    }
+}
+
+/**
+ * Encabezado de un módulo interior: atrás + título + acción opcional.
+ *
+ * El botón de atrás solo aparece si hay a dónde volver. El handoff lo dibuja
+ * siempre, pero en una pantalla que además es pestaña de la barra inferior un
+ * botón que no hace nada es peor que no tenerlo.
+ */
+@Composable
+fun EncabezadoModulo(
+    titulo: String,
+    onAtras: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    accion: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .background(PortGoColor.Arena)
+            .statusBarsPadding()
+            .padding(start = Espacio.m, end = Espacio.m, top = 6.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (onAtras != null) {
+            BotonHeader(
+                icono = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                descripcion = "Atrás",
+                onClick = onAtras,
+                tamano = 36.dp,
+            )
+            Spacer(Modifier.width(10.dp))
+        }
+
+        Text(titulo, style = MaterialTheme.typography.titleLarge, color = PortGoColor.Tinta)
+
+        Spacer(Modifier.weight(1f))
+
+        accion?.invoke()
+    }
+}
+
+/** Botón cuadrado del encabezado: blanco, borde suave, esquinas redondeadas. */
+@Composable
+fun BotonHeader(
+    icono: androidx.compose.ui.graphics.vector.ImageVector,
+    descripcion: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tamano: androidx.compose.ui.unit.Dp = 38.dp,
+    activo: Boolean = false,
+) {
+    Box(
+        modifier
+            .size(tamano)
+            .clip(RoundedCornerShape(Radio.botonHeader))
+            .background(if (activo) PortGoColor.TealTenue else PortGoColor.Superficie)
+            .border(
+                BorderStroke(1.dp, if (activo) PortGoColor.Teal else PortGoColor.BordeTarjeta),
+                RoundedCornerShape(Radio.botonHeader),
+            )
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = descripcion },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icono,
+            contentDescription = null,
+            tint = if (activo) PortGoColor.Teal else PortGoColor.Tinta,
+            modifier = Modifier.size(19.dp),
+        )
     }
 }

@@ -205,18 +205,6 @@ private fun NavegacionPrincipal(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            AnimatedVisibility(visible = esRaiz) {
-                EncabezadoPortGo(
-                    // El inicio lleva logo + wordmark; el resto, el titulo del
-                    // modulo. Son las dos variantes que define el handoff.
-                    esInicio = rutaActual == Rutas.INICIO,
-                    titulo = destinos.firstOrNull { it.ruta == rutaActual }?.etiqueta.orEmpty(),
-                    noLeidas = noLeidas,
-                    onCampana = { nav.navigate(Rutas.NOTIFICACIONES) },
-                )
-            }
-        },
         bottomBar = {
             AnimatedVisibility(visible = esRaiz) {
                 BarraInferiorPortGo(
@@ -250,11 +238,19 @@ private fun NavegacionPrincipal(
             NavHost(navController = nav, startDestination = Rutas.INICIO) {
 
                 composable(Rutas.INICIO) {
-                    PantallaInicio(
-                        usuario = usuario,
-                        container = container,
-                        onIrA = { ruta -> nav.navigate(ruta) },
-                    )
+                    Column(Modifier.fillMaxSize()) {
+                        EncabezadoPortGo(
+                            esInicio = true,
+                            titulo = "",
+                            noLeidas = noLeidas,
+                            onCampana = { nav.navigate(Rutas.NOTIFICACIONES) },
+                        )
+                        PantallaInicio(
+                            usuario = usuario,
+                            container = container,
+                            onIrA = { ruta -> nav.navigate(ruta) },
+                        )
+                    }
                 }
 
                 composable(Rutas.SOLICITUDES) {
@@ -262,7 +258,13 @@ private fun NavegacionPrincipal(
                         usuario = usuario,
                         container = container,
                         onAbrir = { nav.navigate(Rutas.solicitud(it)) },
-                        onNueva = { nav.navigate(Rutas.NUEVA_SOLICITUD) },
+                        // El boton de atras solo si hay a donde volver: en una
+                        // pestana de la barra inferior seria un boton muerto.
+                        onAtras = if (nav.previousBackStackEntry != null) {
+                            { nav.popBackStack() }
+                        } else null,
+                        noLeidas = noLeidas,
+                        onCampana = { nav.navigate(Rutas.NOTIFICACIONES) },
                     )
                 }
 
