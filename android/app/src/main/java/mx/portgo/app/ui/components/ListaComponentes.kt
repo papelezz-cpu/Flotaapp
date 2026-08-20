@@ -238,3 +238,50 @@ fun BarraProgreso(
         )
     }
 }
+
+/**
+ * Tarjeta blanca estándar, para las fichas de detalle.
+ *
+ * El handoff no especifica las pantallas de detalle, así que se extrapola con
+ * el mismo sistema de las listas: blanco sobre arena, borde suave, radio 16 y
+ * la misma sombra mínima. Mantener una sola forma de tarjeta en toda la app es
+ * lo que hace que las pantallas nuevas se sientan del mismo producto sin tener
+ * que diseñarlas una por una.
+ */
+@Composable
+fun TarjetaFicha(
+    modifier: Modifier = Modifier,
+    contenido: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(Radio.tarjeta),
+        colors = CardDefaults.cardColors(containerColor = PortGoColor.Superficie),
+        border = BorderStroke(1.dp, PortGoColor.BordeTarjeta),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(Modifier.padding(15.dp), content = contenido)
+    }
+}
+
+/**
+ * Separador interno de una ficha, con su título de sección.
+ *
+ * Agrupa los datos en bloques con sentido en vez de dejar treinta filas
+ * seguidas: en una ficha larga —un pedido trae hasta veinte campos— lo que
+ * cansa no es la cantidad sino no poder saltar al bloque que se busca.
+ */
+@Composable
+fun SeccionFicha(titulo: String, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth()) {
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider(thickness = 1.dp, color = PortGoColor.Divisor)
+        Spacer(Modifier.height(10.dp))
+        Text(
+            titulo.uppercase(),
+            style = MaterialTheme.typography.labelLarge,
+            color = PortGoColor.TextoSecundario,
+        )
+        Spacer(Modifier.height(6.dp))
+    }
+}

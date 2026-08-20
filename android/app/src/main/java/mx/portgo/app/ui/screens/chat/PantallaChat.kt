@@ -1,6 +1,8 @@
 package mx.portgo.app.ui.screens.chat
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -29,7 +30,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,8 +49,10 @@ import mx.portgo.app.data.model.UsuarioActual
 import mx.portgo.app.di.AppContainer
 import mx.portgo.app.ui.components.BannerError
 import mx.portgo.app.ui.components.CargandoCentrado
+import mx.portgo.app.ui.components.EncabezadoModulo
 import mx.portgo.app.ui.components.EstadoVacio
 import mx.portgo.app.ui.theme.Espacio
+import mx.portgo.app.ui.theme.PortGoColor
 import mx.portgo.app.ui.viewmodel.ChatViewModel
 import mx.portgo.app.ui.viewmodel.EstadoCarga
 import mx.portgo.app.ui.viewmodel.vmFactory
@@ -90,23 +92,16 @@ fun PantallaChat(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = { Text(titulo) },
-                navigationIcon = {
-                    IconButton(onClick = onAtras) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
-                    }
-                },
-            )
-        },
+        containerColor = PortGoColor.Arena,
     ) { relleno ->
         Column(
             Modifier
                 .fillMaxSize()
+                .background(PortGoColor.Arena)
                 .padding(relleno)
                 .imePadding(),
         ) {
+            EncabezadoModulo(titulo = titulo, onAtras = onAtras)
             Box(Modifier.weight(1f)) {
                 when (val e = estado) {
                     is EstadoCarga.Cargando -> CargandoCentrado()
@@ -186,9 +181,17 @@ private fun Burbuja(msg: Mensaje, esMio: Boolean) {
                         bottomEnd = if (esMio) 4.dp else 16.dp,
                     ),
                 )
-                .background(
-                    if (esMio) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceVariant,
+                .background(if (esMio) PortGoColor.TealTenue else PortGoColor.Superficie)
+                .border(
+                    BorderStroke(
+                        1.dp,
+                        if (esMio) PortGoColor.Teal.copy(alpha = 0.25f) else PortGoColor.BordeTarjeta,
+                    ),
+                    RoundedCornerShape(
+                        topStart = 16.dp, topEnd = 16.dp,
+                        bottomStart = if (esMio) 16.dp else 4.dp,
+                        bottomEnd = if (esMio) 4.dp else 16.dp,
+                    ),
                 )
                 .padding(horizontal = Espacio.m, vertical = Espacio.s),
         ) {

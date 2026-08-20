@@ -19,7 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Check
@@ -45,7 +44,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -71,12 +69,15 @@ import mx.portgo.app.data.model.UsuarioActual
 import mx.portgo.app.di.AppContainer
 import mx.portgo.app.ui.LocalCatalogos
 import mx.portgo.app.ui.components.BannerError
+import mx.portgo.app.ui.components.BotonHeader
+import mx.portgo.app.ui.components.EncabezadoModulo
 import mx.portgo.app.ui.components.ChipEstadoReserva
 import mx.portgo.app.ui.components.EsqueletoLista
 import mx.portgo.app.ui.components.FilaDato
 import mx.portgo.app.ui.screens.solicitudes.DialogoNota
 import mx.portgo.app.ui.theme.ColoresEstado
 import mx.portgo.app.ui.theme.Espacio
+import mx.portgo.app.ui.theme.PortGoColor
 import mx.portgo.app.ui.viewmodel.EstadoCarga
 import mx.portgo.app.ui.viewmodel.ReservacionDetalleViewModel
 import mx.portgo.app.ui.viewmodel.vmFactory
@@ -119,28 +120,25 @@ fun PantallaReservacionDetalle(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = { Text("Servicio") },
-                navigationIcon = {
-                    IconButton(onClick = onAtras) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
-                    }
-                },
-                actions = {
+        containerColor = PortGoColor.Arena,
+    ) { relleno ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(PortGoColor.Arena)
+                .padding(relleno),
+        ) {
+            EncabezadoModulo(titulo = "Servicio", onAtras = onAtras,
+                accion = {
                     vm.contraparteId?.let { otro ->
                         val d = (estado as? EstadoCarga.Listo)?.datos
-                        IconButton(onClick = {
-                            onAbrirChat(otro, d?.nombreContraparte ?: "Conversación", reservaId)
-                        }) {
-                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Mensajes")
-                        }
+                        BotonHeader(
+                            icono = Icons.AutoMirrored.Filled.Chat,
+                            descripcion = "Mensajes",
+                            onClick = { onAbrirChat(otro, d?.nombreContraparte ?: "Conversación", reservaId) },
+                        )
                     }
-                },
-            )
-        },
-    ) { relleno ->
-        Column(Modifier.fillMaxSize().padding(relleno)) {
+                })
             if (ocupado || subiendo) LinearProgressIndicator(Modifier.fillMaxWidth())
 
             when (val e = estado) {
