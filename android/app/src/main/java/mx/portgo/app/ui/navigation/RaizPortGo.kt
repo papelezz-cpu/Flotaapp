@@ -342,6 +342,9 @@ private fun NavegacionPrincipal(
                             usuario = usuario,
                             container = container,
                             onNuevaUnidad = { nav.navigate(Rutas.ALTA_CAMION) },
+                            onAtras = if (nav.previousBackStackEntry != null) {
+                                { nav.popBackStack() }
+                            } else null,
                         )
                     }
                 }
@@ -386,6 +389,9 @@ private fun NavegacionPrincipal(
                         container = container,
                         sesionVm = sesionVm,
                         onCerrarSesion = onCerrarSesion,
+                        onAtras = if (nav.previousBackStackEntry != null) {
+                            { nav.popBackStack() }
+                        } else null,
                     )
                 }
             }

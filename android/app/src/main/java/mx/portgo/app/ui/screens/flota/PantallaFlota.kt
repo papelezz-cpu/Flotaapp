@@ -88,6 +88,7 @@ fun PantallaFlota(
     usuario: UsuarioActual,
     container: AppContainer,
     onNuevaUnidad: () -> Unit = {},
+    onAtras: (() -> Unit)? = null,
 ) {
     val vm: FlotaViewModel = viewModel(
         factory = vmFactory { FlotaViewModel(container.flota, usuario) },
@@ -125,7 +126,7 @@ fun PantallaFlota(
             // competiría con él y además quedaría justo encima de la barra.
             EncabezadoModulo(
                 titulo = "Flota",
-                onAtras = null,
+                onAtras = onAtras,
                 accion = {
                     if (pestana == UNIDADES) {
                         BotonHeader(Icons.Default.Add, "Registrar unidad", onNuevaUnidad)

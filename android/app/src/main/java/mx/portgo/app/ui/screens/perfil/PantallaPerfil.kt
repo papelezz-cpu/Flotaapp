@@ -70,6 +70,7 @@ fun PantallaPerfil(
     container: AppContainer,
     sesionVm: SesionViewModel,
     onCerrarSesion: () -> Unit,
+    onAtras: (() -> Unit)? = null,
 ) {
     val contexto = LocalContext.current
     val alcance = rememberCoroutineScope()
@@ -100,7 +101,7 @@ fun PantallaPerfil(
                 .background(PortGoColor.Arena)
                 .padding(relleno),
         ) {
-            EncabezadoModulo(titulo = "Perfil", onAtras = null)
+            EncabezadoModulo(titulo = "Perfil", onAtras = onAtras)
 
             Column(
                 Modifier
