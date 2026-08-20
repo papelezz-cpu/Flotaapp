@@ -1,6 +1,7 @@
 package mx.portgo.app.ui.navigation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,7 +48,9 @@ import mx.portgo.app.data.model.Rol
 import mx.portgo.app.di.AppContainer
 import mx.portgo.app.ui.LocalCatalogos
 import mx.portgo.app.ui.SesionViewModel
+import mx.portgo.app.ui.components.BarraInferiorPortGo
 import mx.portgo.app.ui.components.CargandoCentrado
+import mx.portgo.app.ui.components.EncabezadoPortGo
 import mx.portgo.app.ui.screens.auth.PantallaActualizar
 import mx.portgo.app.ui.screens.auth.PantallaBloqueo
 import mx.portgo.app.ui.screens.auth.PantallaNuevaContrasena
@@ -58,6 +61,7 @@ import mx.portgo.app.ui.screens.flota.PantallaAltaCamion
 import mx.portgo.app.ui.screens.flota.PantallaFlota
 import mx.portgo.app.ui.screens.inicio.PantallaInicio
 import mx.portgo.app.ui.screens.notificaciones.PantallaNotificaciones
+import mx.portgo.app.ui.screens.PantallaPendiente
 import mx.portgo.app.ui.screens.perfil.PantallaPerfil
 import mx.portgo.app.ui.screens.reservaciones.PantallaReservacionDetalle
 import mx.portgo.app.ui.screens.reservaciones.PantallaReservaciones
@@ -65,6 +69,7 @@ import mx.portgo.app.ui.screens.solicitudes.PantallaNuevaSolicitud
 import mx.portgo.app.ui.screens.solicitudes.PantallaSolicitudDetalle
 import mx.portgo.app.ui.screens.solicitudes.PantallaSolicitudes
 import mx.portgo.app.ui.theme.ColoresEstado
+import mx.portgo.app.ui.theme.PortGoColor
 import mx.portgo.app.ui.viewmodel.NotificacionesViewModel
 import mx.portgo.app.ui.viewmodel.vmFactory
 
@@ -184,7 +189,7 @@ private fun NavegacionPrincipal(
     sesionVm: SesionViewModel,
 ) {
     val nav: NavHostController = rememberNavController()
-    val destinos = remember(usuario.rol) { destinosDe(usuario.rol) }
+    val destinos = remember(usuario.rol) { pestanasDe(usuario.rol) }
     val snackbar = remember { SnackbarHostState() }
 
     // La campana vive en el andamio, no en cada pantalla: es global y así el
@@ -202,56 +207,46 @@ private fun NavegacionPrincipal(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             AnimatedVisibility(visible = esRaiz) {
-                CenterAlignedTopAppBar(
-                    title = { Text(destinos.firstOrNull { it.ruta == rutaActual }?.etiqueta ?: "PortGo") },
-                    actions = {
-                        IconButton(onClick = { nav.navigate(Rutas.NOTIFICACIONES) }) {
-                            BadgedBox(
-                                badge = {
-                                    if (noLeidas > 0) {
-                                        Badge { Text(if (noLeidas > 9) "9+" else "$noLeidas") }
-                                    }
-                                },
-                            ) {
-                                Icon(
-                                    Icons.Default.Notifications,
-                                    contentDescription = if (noLeidas > 0) {
-                                        "Notificaciones, $noLeidas sin leer"
-                                    } else {
-                                        "Notificaciones"
-                                    },
-                                )
-                            }
-                        }
-                    },
+                EncabezadoPortGo(
+                    // El inicio lleva logo + wordmark; el resto, el titulo del
+                    // modulo. Son las dos variantes que define el handoff.
+                    esInicio = rutaActual == Rutas.INICIO,
+                    titulo = destinos.firstOrNull { it.ruta == rutaActual }?.etiqueta.orEmpty(),
+                    noLeidas = noLeidas,
+                    onCampana = { nav.navigate(Rutas.NOTIFICACIONES) },
                 )
             }
         },
         bottomBar = {
             AnimatedVisibility(visible = esRaiz) {
-                NavigationBar {
-                    destinos.forEach { destino ->
-                        NavigationBarItem(
-                            selected = rutaActual == destino.ruta,
-                            onClick = {
-                                nav.navigate(destino.ruta) {
-                                    // Sin esto, cambiar de pestaña apila
-                                    // pantallas y el botón atrás recorre todo
-                                    // el historial de pestañas antes de salir.
-                                    popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = { Icon(destino.icono, contentDescription = null) },
-                            label = { Text(destino.etiqueta) },
-                        )
-                    }
-                }
+                BarraInferiorPortGo(
+                    pestanas = destinos,
+                    rutaActual = rutaActual,
+                    onPestana = { ruta ->
+                        nav.navigate(ruta) {
+                            // Sin esto, cambiar de pestana apila pantallas y el
+                            // boton atras recorre todo el historial de pestanas
+                            // antes de salir.
+                            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    etiquetaAccion = etiquetaAccion(usuario.rol),
+                    // El handoff destaca la etiqueta cuando la pantalla actual
+                    // es el destino natural de la accion.
+                    accionDestacada = rutaActual == Rutas.INICIO,
+                    onAccion = { nav.navigate(rutaAccion(usuario.rol)) },
+                )
             }
         },
     ) { relleno ->
-        Box(Modifier.fillMaxSize().padding(relleno)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(PortGoColor.Arena)
+                .padding(relleno),
+        ) {
             NavHost(navController = nav, startDestination = Rutas.INICIO) {
 
                 composable(Rutas.INICIO) {
@@ -259,8 +254,6 @@ private fun NavegacionPrincipal(
                         usuario = usuario,
                         container = container,
                         onIrA = { ruta -> nav.navigate(ruta) },
-                        onAbrirSolicitud = { nav.navigate(Rutas.solicitud(it)) },
-                        onAbrirReservacion = { nav.navigate(Rutas.reservacion(it)) },
                     )
                 }
 
@@ -392,6 +385,28 @@ private fun NavegacionPrincipal(
                             onGuardada = { nav.popBackStack() },
                         )
                     }
+                }
+
+
+                // Modulos que el diseno ya coloca en el inicio pero que todavia
+                // no estan construidos. Muestran a donde van en vez de fingir.
+                composable(Rutas.CATALOGO) {
+                    PantallaPendiente("Catálogo", "Directorio de empresas verificadas con sus unidades y calificaciones.")
+                }
+                composable(Rutas.PAGOS) {
+                    PantallaPendiente("Mis pagos", "Consulta de lo que has pagado y lo que está por vencer.")
+                }
+                composable(Rutas.PRIVACIDAD) {
+                    PantallaPendiente("Privacidad", "Tus datos y las solicitudes de derechos ARCO.")
+                }
+                composable(Rutas.VIGENCIAS) {
+                    PantallaPendiente("Vigencias", "Seguimiento de todos los documentos de tu flota y su vencimiento.")
+                }
+                composable(Rutas.OPERADORES) {
+                    PantallaPendiente("Operadores", "Alta y expediente del personal de conducción.")
+                }
+                composable(Rutas.COBROS) {
+                    PantallaPendiente("Cobros", "Pagos recibidos y vencimientos por cobrar.")
                 }
 
                 composable(Rutas.PERFIL) {

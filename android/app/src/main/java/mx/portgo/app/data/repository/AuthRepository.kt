@@ -162,6 +162,21 @@ class AuthRepository(
         }
     }
 
+
+    /**
+     * Promedio de calificaciones de una empresa, para el indicador del inicio.
+     *
+     * Devuelve null si todavía no la han calificado: mostrar "0.0" a una
+     * empresa nueva la haría ver mal por no haber trabajado aún, que es lo
+     * contrario de lo que el dato significa.
+     */
+    suspend fun calificacionPromedio(adminId: String): Double? = runCatching {
+        val notas = supabase.from("calificaciones")
+            .select { filter { eq("admin_id", adminId) } }
+            .decodeList<mx.portgo.app.data.model.Calificacion>()
+        if (notas.isEmpty()) null else notas.sumOf { it.rating }.toDouble() / notas.size
+    }.getOrNull()
+
     var correoRecordado: String?
         get() = almacen.ultimoCorreo
         set(value) { almacen.ultimoCorreo = value }

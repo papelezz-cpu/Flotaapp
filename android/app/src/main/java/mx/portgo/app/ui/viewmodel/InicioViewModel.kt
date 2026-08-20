@@ -8,52 +8,60 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import mx.portgo.app.core.Resultado
 import mx.portgo.app.data.model.EstadoOferta
+import mx.portgo.app.data.model.EstadoPedido
 import mx.portgo.app.data.model.EstadoReserva
-import mx.portgo.app.data.model.PedidoConOfertas
-import mx.portgo.app.data.model.Reservacion
 import mx.portgo.app.data.model.UsuarioActual
-import mx.portgo.app.data.repository.ConfiguracionRepository
+import mx.portgo.app.data.repository.AuthRepository
+import mx.portgo.app.data.repository.FlotaRepository
 import mx.portgo.app.data.repository.PedidosRepository
 import mx.portgo.app.data.repository.ReservacionesRepository
 
 /**
- * Resumen de arranque.
+ * Inicio: rejilla de accesos con conteos en vivo.
  *
- * Contesta la única pregunta con la que alguien abre esta app: **qué me toca
- * hacer ahora**. Por eso no es un tablero de métricas — es la lista corta de
- * cosas que están esperando por ti, y el atajo para llegar a cada una.
+ * El diseño convierte la pantalla de entrada en un lanzador de módulos, y los
+ * badges son lo que evita que sea solo un menú: "Mis solicitudes · 2" dice que
+ * hay dos esperando respuesta sin necesidad de entrar a mirar.
+ *
+ * Los conteos se derivan de los mismos datos que ya cargan las listas, así que
+ * no hay una fuente aparte que pueda quedar desfasada.
  */
 class InicioViewModel(
     private val pedidos: PedidosRepository,
     private val reservaciones: ReservacionesRepository,
-    private val configuracion: ConfiguracionRepository,
+    private val flota: FlotaRepository,
+    private val auth: AuthRepository,
     private val usuario: UsuarioActual,
 ) : ViewModel() {
 
     data class Resumen(
-        /** Cosas que requieren acción de esta persona, en orden de urgencia. */
-        val pendientes: List<Pendiente> = emptyList(),
-        val serviciosActivos: List<Reservacion> = emptyList(),
-        val solicitudesAbiertas: Int = 0,
+        // Comunes
+        val solicitudesPendientes: Int = 0,
+        val reservasActivas: Int = 0,
+        // Solo empresa
+        val unidades: Int = 0,
+        val ofertasActivas: Int = 0,
+        val calificacion: Double? = null,
+        val vigenciasPorVencer: Int = 0,
     )
-
-    data class Pendiente(
-        val titulo: String,
-        val detalle: String,
-        val destino: Destino,
-    )
-
-    sealed interface Destino {
-        data class Solicitud(val id: String) : Destino
-        data class Servicio(val id: String) : Destino
-        data class Seccion(val ruta: String) : Destino
-    }
 
     private val _estado = MutableStateFlow<EstadoCarga<Resumen>>(EstadoCarga.Cargando)
     val estado: StateFlow<EstadoCarga<Resumen>> = _estado.asStateFlow()
 
     private val _refrescando = MutableStateFlow(false)
     val refrescando: StateFlow<Boolean> = _refrescando.asStateFlow()
+
+    /** Saludo según la hora, en la zona del negocio. */
+    val saludo: String
+        get() = when (java.time.LocalTime.now(mx.portgo.app.core.Fmt.ZONA).hour) {
+            in 0..11 -> "Buenos días"
+            in 12..18 -> "Buenas tardes"
+            else -> "Buenas noches"
+        }
+
+    /** El cliente se saluda por su nombre de pila; la empresa por su razón social. */
+    val titulo: String
+        get() = if (usuario.esCliente) usuario.nombre.substringBefore(' ') else usuario.nombre
 
     init {
         cargar()
@@ -65,109 +73,52 @@ class InicioViewModel(
     }
 
     fun cargar() = viewModelScope.launch {
-        val resPedidos = pedidos.listar(
-            rol = usuario.rol,
-            pagina = 0,
-            soloMias = usuario.esCliente,
-            miId = usuario.id,
-        )
         val resReservas = reservaciones.mias(usuario)
-
-        // Si las dos fallan no hay nada que enseñar. Si falla una sola, se
-        // muestra lo que sí llegó: media pantalla útil vale más que un error.
-        if (resPedidos is Resultado.Error && resReservas is Resultado.Error) {
-            _estado.value = EstadoCarga.Fallo(resPedidos.error.mensaje)
-            _refrescando.value = false
-            return@launch
-        }
-
-        val listaPedidos = (resPedidos as? Resultado.Ok)?.dato.orEmpty()
         val listaReservas = (resReservas as? Resultado.Ok)?.dato.orEmpty()
 
-        _estado.value = EstadoCarga.Listo(
+        val resumen = if (usuario.esCliente) {
+            val mias = pedidos.listar(
+                rol = usuario.rol, pagina = 0, soloMias = true, miId = usuario.id,
+            )
+            val listaPedidos = (mias as? Resultado.Ok)?.dato.orEmpty()
+
             Resumen(
-                pendientes = construirPendientes(listaPedidos, listaReservas),
-                serviciosActivos = listaReservas.filter {
-                    it.estadoEnum == EstadoReserva.ACTIVA
+                // "Pendiente" para el cliente = algo que espera acción suya o
+                // respuesta ajena: publicada, en negociación o por aprobar.
+                solicitudesPendientes = listaPedidos.count {
+                    it.pedido.estadoEnum in setOf(
+                        EstadoPedido.ABIERTO,
+                        EstadoPedido.EN_NEGOCIACION,
+                        EstadoPedido.PENDIENTE_REVISION,
+                        EstadoPedido.PENDIENTE_ACUERDO,
+                    )
                 },
-                solicitudesAbiertas = listaPedidos.count { it.pedido.estadoEnum.admiteOfertas },
-            ),
-        )
-        _refrescando.value = false
-    }
-
-    private fun construirPendientes(
-        listaPedidos: List<PedidoConOfertas>,
-        listaReservas: List<Reservacion>,
-    ): List<Pendiente> = buildList {
-
-        if (usuario.esCliente) {
-            // Ofertas esperando respuesta: es lo que traba el trato.
-            listaPedidos.forEach { item ->
-                val vivas = item.ofertas.count { it.estadoEnum == EstadoOferta.ENVIADA }
-                if (vivas > 0) {
-                    add(
-                        Pendiente(
-                            titulo = "$vivas oferta${if (vivas == 1) "" else "s"} por responder",
-                            detalle = item.pedido.ruta,
-                            destino = Destino.Solicitud(item.pedido.id),
-                        ),
-                    )
-                }
-            }
-
-            // Servicios completados sin calificar.
-            listaReservas.filter { it.estadoEnum == EstadoReserva.COMPLETADA && !it.calificado }
-                .forEach {
-                    add(
-                        Pendiente(
-                            titulo = "Califica el servicio",
-                            detalle = it.unidad ?: "Servicio completado",
-                            destino = Destino.Servicio(it.id),
-                        ),
-                    )
-                }
+                reservasActivas = listaReservas.count { it.estadoEnum == EstadoReserva.ACTIVA },
+            )
         } else {
-            // Contraofertas esperando respuesta de la empresa.
-            listaPedidos.forEach { item ->
-                item.ofertas.firstOrNull {
-                    it.adminId == usuario.id && it.estadoEnum == EstadoOferta.CONTRA_OFERTA
-                }?.let {
-                    add(
-                        Pendiente(
-                            titulo = "Te contraofertaron",
-                            detalle = item.pedido.ruta,
-                            destino = Destino.Solicitud(item.pedido.id),
-                        ),
-                    )
-                }
-            }
+            val disponibles = pedidos.listar(rol = usuario.rol, pagina = 0, miId = usuario.id)
+            val conOfertas = pedidos.conMisOfertas(usuario.id)
+            val camiones = flota.camiones(usuario.id)
+
+            Resumen(
+                // Para la empresa el badge de Solicitudes es la oportunidad:
+                // cuántas hay ahora mismo para ofertar.
+                solicitudesPendientes = (disponibles as? Resultado.Ok)?.dato
+                    ?.count { it.pedido.estadoEnum.admiteOfertas } ?: 0,
+                reservasActivas = listaReservas.count { it.estadoEnum == EstadoReserva.ACTIVA },
+                unidades = (camiones as? Resultado.Ok)?.dato?.size ?: 0,
+                ofertasActivas = (conOfertas as? Resultado.Ok)?.dato
+                    ?.sumOf { item ->
+                        item.ofertas.count {
+                            it.adminId == usuario.id && it.estadoEnum.esViva
+                        }
+                    } ?: 0,
+                calificacion = auth.calificacionPromedio(usuario.id),
+                vigenciasPorVencer = flota.vigenciasPorVencer(usuario.id).size,
+            )
         }
 
-        // Ambos lados: cierres y cancelaciones en revisión, y viajes en curso
-        // que ya llegaron al último paso y falta cerrar.
-        listaReservas.forEach { r ->
-            when {
-                r.estadoEnum == EstadoReserva.POR_APROBAR &&
-                    r.misEvidencias(usuario.esCliente).isEmpty() ->
-                    add(
-                        Pendiente(
-                            titulo = "Sube tu evidencia del cierre",
-                            detalle = r.unidad ?: "Servicio",
-                            destino = Destino.Servicio(r.id),
-                        ),
-                    )
-
-                r.estadoEnum == EstadoReserva.ACTIVA &&
-                    r.enUltimoPaso(configuracion.catalogos.value) && !usuario.esCliente ->
-                    add(
-                        Pendiente(
-                            titulo = "Marca el servicio como completado",
-                            detalle = r.unidad ?: "Servicio",
-                            destino = Destino.Servicio(r.id),
-                        ),
-                    )
-            }
-        }
+        _estado.value = EstadoCarga.Listo(resumen)
+        _refrescando.value = false
     }
 }
