@@ -10,3 +10,7 @@ Thumbs.db
 .vscode/
 *.suo
 *.user
+
+# Pruebas locales — credenciales reales y salidas de los test (nunca subir)
+pruebas/credenciales.local.json
+pruebas/salida/

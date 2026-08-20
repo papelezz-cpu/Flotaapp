@@ -13,10 +13,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -56,20 +59,20 @@ import mx.portgo.app.ui.viewmodel.FlotaViewModel
 import mx.portgo.app.ui.viewmodel.vmFactory
 
 /**
- * Flota de la empresa.
+ * Flota de la empresa: consulta, disponibilidad y alta.
  *
- * Consulta y disponibilidad, no alta ni edición. Dar de alta una unidad son
- * ~35 campos y cuatro documentos con sus vigencias, y cada cambio vuelve a
- * disparar la aprobación del superadmin: es un trámite de escritorio que ya
- * existe en la web y se hace una vez. Lo que sí se hace desde el patio, todos
- * los días, es ver qué está libre, qué documento está por vencer y sacar una
- * unidad de servicio.
+ * El alta se hacía solo desde la web con el argumento de que es un trámite de
+ * escritorio. Era un mal argumento: quien recibe una unidad nueva está en el
+ * patio, junto al camión, sin computadora. Ahora se registra desde aquí, y con
+ * la cámara del teléfono resulta más cómodo que en la web — la tarjeta de
+ * circulación se fotografía en el momento en vez de buscar un escaneo.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaFlota(
     usuario: UsuarioActual,
     container: AppContainer,
+    onNuevaUnidad: () -> Unit = {},
 ) {
     val vm: FlotaViewModel = viewModel(
         factory = vmFactory { FlotaViewModel(container.flota, usuario) },
@@ -91,7 +94,20 @@ fun PantallaFlota(
     // aprobada no aparecía hasta deslizar para actualizar.
     RecargarAlVolver(vm::cargar)
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { relleno ->
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
+        floatingActionButton = {
+            // Solo en la pestana de unidades: el alta de choferes es otro
+            // formulario y mezclar los dos botones confunde.
+            if (pestana == 0) {
+                ExtendedFloatingActionButton(
+                    onClick = onNuevaUnidad,
+                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                    text = { Text("Nueva unidad") },
+                )
+            }
+        },
+    ) { relleno ->
         Column(Modifier.fillMaxSize().padding(relleno)) {
             TabRow(selectedTabIndex = pestana) {
                 Tab(pestana == 0, { pestana = 0 }, text = { Text("Unidades") })
@@ -107,8 +123,8 @@ fun PantallaFlota(
                     ListaRecursos(
                         estado = camiones,
                         vacioTitulo = "No tienes unidades registradas",
-                        vacioDetalle = "Las unidades se dan de alta desde el sitio web, " +
-                            "donde se adjuntan los documentos y sus vigencias.",
+                        vacioDetalle = "Registra tu primera unidad desde aquí. Puedes " +
+                            "fotografiar los documentos con la cámara.",
                         onReintentar = vm::cargar,
                         encabezado = {
                             if (vigencias.isNotEmpty()) {
@@ -127,7 +143,7 @@ fun PantallaFlota(
                     ListaRecursos(
                         estado = operadores,
                         vacioTitulo = "No tienes choferes registrados",
-                        vacioDetalle = "Los choferes se dan de alta desde el sitio web.",
+                        vacioDetalle = "Los choferes se dan de alta desde el sitio web.",  // TODO: alta de operador
                         onReintentar = vm::cargar,
                     ) { operador ->
                         TarjetaOperador(operador)

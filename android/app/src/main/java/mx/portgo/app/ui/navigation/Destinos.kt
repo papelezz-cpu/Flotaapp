@@ -25,6 +25,8 @@ object Rutas {
 
     const val NOTIFICACIONES = "notificaciones"
     const val NUEVA_SOLICITUD = "nueva_solicitud"
+    const val ALTA_CAMION = "alta_camion"
+    const val ALTA_OPERADOR = "alta_operador"
 
     fun solicitud(id: String) = "solicitud/$id"
     const val SOLICITUD_PATRON = "solicitud/{pedidoId}"

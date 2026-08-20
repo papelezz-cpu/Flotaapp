@@ -54,6 +54,7 @@ import mx.portgo.app.ui.screens.auth.PantallaNuevaContrasena
 import mx.portgo.app.ui.screens.auth.PantallaLogin
 import mx.portgo.app.ui.screens.chat.PantallaChat
 import mx.portgo.app.ui.screens.expedientes.PantallaExpediente
+import mx.portgo.app.ui.screens.flota.PantallaAltaCamion
 import mx.portgo.app.ui.screens.flota.PantallaFlota
 import mx.portgo.app.ui.screens.inicio.PantallaInicio
 import mx.portgo.app.ui.screens.notificaciones.PantallaNotificaciones
@@ -373,7 +374,23 @@ private fun NavegacionPrincipal(
 
                 if (usuario.rol == Rol.EMPRESA) {
                     composable(Rutas.FLOTA) {
-                        PantallaFlota(usuario = usuario, container = container)
+                        PantallaFlota(
+                            usuario = usuario,
+                            container = container,
+                            onNuevaUnidad = { nav.navigate(Rutas.ALTA_CAMION) },
+                        )
+                    }
+                }
+
+
+                if (usuario.rol == Rol.EMPRESA) {
+                    composable(Rutas.ALTA_CAMION) {
+                        PantallaAltaCamion(
+                            usuario = usuario,
+                            container = container,
+                            onAtras = { nav.popBackStack() },
+                            onGuardada = { nav.popBackStack() },
+                        )
                     }
                 }
 
