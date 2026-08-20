@@ -116,27 +116,9 @@ fun PantallaNotificaciones(
 }
 
 /**
- * A dónde lleva tocar una notificación.
- *
- * Para un mensaje nuevo se abre el hilo exacto usando `meta`; para el resto,
- * la sección que corresponde. Si falta el contexto se cae a la sección, que es
- * mejor que no hacer nada.
+ * A dónde lleva tocar una notificación: la sección que le corresponde.
  */
 private fun rutaDe(n: Notificacion): String? = when (n.destino) {
-    DestinoNotificacion.Chat -> {
-        val ctxId = n.ctxId
-        val de = n.deUserId
-        if (ctxId != null && de != null) {
-            Rutas.chat(
-                contexto = if (n.ctxTipo == "reserva") "reserva" else "pedido",
-                ctxId = ctxId,
-                otroId = de,
-                titulo = n.deNombre ?: "Conversación",
-            )
-        } else {
-            Rutas.RESERVACIONES
-        }
-    }
     DestinoNotificacion.Solicitudes -> Rutas.SOLICITUDES
     DestinoNotificacion.Reservaciones -> Rutas.RESERVACIONES
     DestinoNotificacion.Flota -> Rutas.FLOTA

@@ -12,8 +12,8 @@ import mx.portgo.app.ui.components.PestanaBarra
  * Rutas de navegación.
  *
  * Las que llevan argumentos los codifican en la ruta porque son identificadores
- * cortos. El título del chat viaja codificado en URL: los nombres de empresa
- * traen espacios, acentos y a veces "/" y "&", que romperían la ruta.
+ * cortos: uuid o clave de etapa, nada con espacios ni acentos que hubiera que
+ * escapar.
  */
 object Rutas {
     const val INICIO = "inicio"
@@ -47,10 +47,7 @@ object Rutas {
      * @param contexto "reserva" o "pedido"
      * @param otroId con quién se conversa
      */
-    fun chat(contexto: String, ctxId: String, otroId: String, titulo: String) =
-        "chat/$contexto/$ctxId/$otroId/${java.net.URLEncoder.encode(titulo, "UTF-8")}"
 
-    const val CHAT_PATRON = "chat/{contexto}/{ctxId}/{otroId}/{titulo}"
 
     fun expediente(reservaId: String, etapa: String) = "expediente/$reservaId/$etapa"
     const val EXPEDIENTE_PATRON = "expediente/{reservaId}/{etapa}"

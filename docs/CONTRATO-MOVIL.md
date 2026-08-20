@@ -5,6 +5,35 @@ Fecha: 2026-08-10 · Base analizada: `main` @ 79d7f0a
 
 ---
 
+## ⚠️ Actualización 2026-08-20 — el chat ya no es parte del contrato
+
+Todo lo que este documento dice sobre el **chat** quedó obsoleto. La web lo dio de baja
+en `6b8beee` y la app Android lo quitó después. Ningún cliente lo usa ya.
+
+Lo sustituyen **avisos fijos**, sin texto libre en ninguna dirección, que escriben en
+`notificaciones` y disparan el correo (`enviar-notificacion`, tipo `resolucion`):
+
+| Aviso | De → a | `tipo` de la notificación |
+|---|---|---|
+| Solicitar documentos de carga | empresa → cliente | `documentos_carga_solicitados` |
+| Confirmar lugar y hora | empresa → cliente | `confirmar_lugar_hora` |
+| Avisar retraso | empresa → cliente | `aviso_retraso` |
+| Actualizar lugar/hora | cliente → empresa + superadmins | `cambio_reportado` |
+| Reportar problema (carga ❘ urgente) | cliente → empresa + superadmins | `cambio_reportado` |
+
+"Actualizar lugar/hora" además **escribe** `pedidos.detalles_lugar` / `detalles_hora`: esa
+es la diferencia de fondo con el chat, donde lo pactado no cambiaba ningún dato y no había
+forma de reconstruirlo después.
+
+La tabla `mensajes`, sus políticas RLS y la RPC `enviar_mensaje` **siguen en la base de
+datos**, sin uso desde ningún cliente. No se han borrado.
+
+Pendiente: los cinco avisos están implementados en el cliente (web y Android por separado),
+no en una RPC. El conjunto de destinatarios —la empresa **y todos** los superadmins— es
+regla de negocio y debería bajar a Postgres, igual que `enviar_oferta`.
+
+---
+
 ## 0. Corrección de premisa: no hay Next.js
 
 El encargo asume un backend Next.js con API routes. **No existe.** Verificado:

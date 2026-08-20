@@ -5,7 +5,7 @@ import io.github.jan.supabase.SupabaseClient
 import mx.portgo.app.core.SecureSessionStorage
 import mx.portgo.app.core.SupabaseFactory
 import mx.portgo.app.data.repository.AuthRepository
-import mx.portgo.app.data.repository.ChatRepository
+import mx.portgo.app.data.repository.AvisosRepository
 import mx.portgo.app.data.repository.ConfiguracionRepository
 import mx.portgo.app.data.repository.FlotaRepository
 import mx.portgo.app.data.repository.NotificacionesRepository
@@ -37,7 +37,7 @@ class AppContainer(context: Context) {
     }
     val pedidos: PedidosRepository by lazy { PedidosRepository(supabase) }
     val reservaciones: ReservacionesRepository by lazy { ReservacionesRepository(supabase) }
-    val chat: ChatRepository by lazy { ChatRepository(supabase) }
+    val avisos: AvisosRepository by lazy { AvisosRepository(supabase) }
     val notificaciones: NotificacionesRepository by lazy { NotificacionesRepository(supabase) }
     val flota: FlotaRepository by lazy { FlotaRepository(supabase) }
     val storage: StorageRepository by lazy {

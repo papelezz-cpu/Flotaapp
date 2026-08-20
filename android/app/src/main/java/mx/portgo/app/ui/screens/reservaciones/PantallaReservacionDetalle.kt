@@ -19,7 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Description
@@ -65,10 +64,10 @@ import mx.portgo.app.data.model.EstadoReserva
 import mx.portgo.app.data.model.EtapaExpediente
 import mx.portgo.app.data.model.Reservacion
 import mx.portgo.app.data.model.UsuarioActual
+import mx.portgo.app.data.repository.AvisosRepository.MotivoReporte
 import mx.portgo.app.di.AppContainer
 import mx.portgo.app.ui.LocalCatalogos
 import mx.portgo.app.ui.components.BannerError
-import mx.portgo.app.ui.components.BotonHeader
 import mx.portgo.app.ui.components.EncabezadoModulo
 import mx.portgo.app.ui.components.ChipEstadoReserva
 import mx.portgo.app.ui.components.EsqueletoLista
@@ -88,14 +87,14 @@ fun PantallaReservacionDetalle(
     usuario: UsuarioActual,
     container: AppContainer,
     onAtras: () -> Unit,
-    onAbrirChat: (otroId: String, titulo: String, reservaId: String) -> Unit,
     onAbrirExpediente: (reservaId: String, etapa: String) -> Unit,
 ) {
     val vm: ReservacionDetalleViewModel = viewModel(
         key = reservaId,
         factory = vmFactory {
             ReservacionDetalleViewModel(
-                container.reservaciones, container.storage, container.auth, usuario, reservaId,
+                container.reservaciones, container.storage, container.auth,
+                container.avisos, usuario, reservaId,
             )
         },
     )
@@ -110,6 +109,10 @@ fun PantallaReservacionDetalle(
     var confirmarCancelar by rememberSaveable { mutableStateOf(false) }
     var pedirCancelacion by rememberSaveable { mutableStateOf(false) }
     var calificando by rememberSaveable { mutableStateOf(false) }
+    var avisandoRetraso by rememberSaveable { mutableStateOf(false) }
+    var eligiendoMotivo by rememberSaveable { mutableStateOf(false) }
+    var reportando by rememberSaveable { mutableStateOf<MotivoReporte?>(null) }
+    val viajeEnEdicion by vm.viajeEnEdicion.collectAsStateWithLifecycle()
 
     // Se aceptan varios archivos de una vez: nadie sube una sola foto de una
     // maniobra, y hacerlo de uno en uno con la red del puerto es desesperante.
@@ -127,17 +130,7 @@ fun PantallaReservacionDetalle(
                 .background(PortGoColor.Arena)
                 .padding(relleno),
         ) {
-            EncabezadoModulo(titulo = "Servicio", onAtras = onAtras,
-                accion = {
-                    vm.contraparteId?.let { otro ->
-                        val d = (estado as? EstadoCarga.Listo)?.datos
-                        BotonHeader(
-                            icono = Icons.AutoMirrored.Filled.Chat,
-                            descripcion = "Mensajes",
-                            onClick = { onAbrirChat(otro, d?.nombreContraparte ?: "Conversación", reservaId) },
-                        )
-                    }
-                })
+            EncabezadoModulo(titulo = "Servicio", onAtras = onAtras)
             if (ocupado || subiendo) LinearProgressIndicator(Modifier.fillMaxWidth())
 
             when (val e = estado) {
@@ -186,6 +179,25 @@ fun PantallaReservacionDetalle(
                             onAbrir = { etapa -> onAbrirExpediente(reservaId, etapa) },
                             onSolicitar = { etapa -> vm.abrirExpediente(etapa) },
                         )
+
+                        // ── Avisos a la otra parte ──
+                        // Solo mientras el viaje corre: en una reserva cerrada
+                        // no hay nada que confirmar ni retraso que avisar, y un
+                        // botón que no sirve es peor que ninguno.
+                        if (r.estadoEnum == EstadoReserva.ACTIVA ||
+                            r.estadoEnum == EstadoReserva.PENDIENTE
+                        ) {
+                            Spacer(Modifier.height(Espacio.l))
+                            SeccionAvisos(
+                                soyCliente = vm.soyCliente,
+                                habilitado = !ocupado,
+                                onSolicitarDocumentos = { vm.solicitarDocumentosCarga() },
+                                onConfirmarLugarHora = { vm.confirmarLugarHora() },
+                                onAvisarRetraso = { avisandoRetraso = true },
+                                onActualizarViaje = { vm.abrirActualizarViaje() },
+                                onReportarProblema = { eligiendoMotivo = true },
+                            )
+                        }
 
                         // ── Evidencias / cierre ──
                         Spacer(Modifier.height(Espacio.l))
@@ -308,6 +320,52 @@ fun PantallaReservacionDetalle(
             onConfirmar = { motivo ->
                 pedirCancelacion = false
                 vm.solicitarCancelacion(motivo.orEmpty(), null)
+            },
+        )
+    }
+
+    if (avisandoRetraso) {
+        DialogoNota(
+            titulo = "Avisar retraso",
+            descripcion = "Detalle (opcional) — cuánto tiempo o el motivo.",
+            etiquetaBoton = "Enviar aviso",
+            onCerrar = { avisandoRetraso = false },
+            onConfirmar = { nota ->
+                avisandoRetraso = false
+                vm.avisarRetraso(nota)
+            },
+        )
+    }
+
+    viajeEnEdicion?.let { detalles ->
+        DialogoActualizarViaje(
+            lugarInicial = detalles.lugar,
+            horaInicial = detalles.hora,
+            onCerrar = { vm.cerrarActualizarViaje() },
+            onConfirmar = { lugar, hora -> vm.actualizarLugarHora(lugar, hora) },
+        )
+    }
+
+    if (eligiendoMotivo) {
+        DialogoMotivoReporte(
+            onCerrar = { eligiendoMotivo = false },
+            onElegir = { motivo ->
+                eligiendoMotivo = false
+                reportando = motivo
+            },
+        )
+    }
+
+    // El motivo ya está elegido; esto solo recoge el detalle, que es opcional.
+    reportando?.let { motivo ->
+        DialogoNota(
+            titulo = "Reportar problema",
+            descripcion = "Detalle (opcional) — qué pasó exactamente.",
+            etiquetaBoton = "Enviar reporte",
+            onCerrar = { reportando = null },
+            onConfirmar = { nota ->
+                reportando = null
+                vm.reportarProblema(motivo, nota)
             },
         )
     }

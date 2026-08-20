@@ -48,7 +48,6 @@ import mx.portgo.app.ui.screens.auth.PantallaActualizar
 import mx.portgo.app.ui.screens.auth.PantallaBloqueo
 import mx.portgo.app.ui.screens.auth.PantallaNuevaContrasena
 import mx.portgo.app.ui.screens.auth.PantallaLogin
-import mx.portgo.app.ui.screens.chat.PantallaChat
 import mx.portgo.app.ui.screens.expedientes.PantallaExpediente
 import mx.portgo.app.ui.screens.flota.PantallaAltaCamion
 import mx.portgo.app.ui.screens.flota.PantallaFlota
@@ -270,9 +269,6 @@ private fun NavegacionPrincipal(
                         usuario = usuario,
                         container = container,
                         onAtras = { nav.popBackStack() },
-                        onAbrirChat = { otroId, titulo, pedidoId ->
-                            nav.navigate(Rutas.chat("pedido", pedidoId, otroId, titulo))
-                        },
                     )
                 }
 
@@ -309,9 +305,6 @@ private fun NavegacionPrincipal(
                         usuario = usuario,
                         container = container,
                         onAtras = { nav.popBackStack() },
-                        onAbrirChat = { otroId, titulo, reservaId ->
-                            nav.navigate(Rutas.chat("reserva", reservaId, otroId, titulo))
-                        },
                         onAbrirExpediente = { reservaId, etapa ->
                             nav.navigate(Rutas.expediente(reservaId, etapa))
                         },
@@ -334,28 +327,6 @@ private fun NavegacionPrincipal(
                     )
                 }
 
-                composable(
-                    Rutas.CHAT_PATRON,
-                    arguments = listOf(
-                        navArgument("contexto") { type = NavType.StringType },
-                        navArgument("ctxId") { type = NavType.StringType },
-                        navArgument("otroId") { type = NavType.StringType },
-                        navArgument("titulo") { type = NavType.StringType },
-                    ),
-                ) { entrada ->
-                    val args = entrada.arguments
-                    PantallaChat(
-                        esReserva = args?.getString("contexto") == "reserva",
-                        contextoId = args?.getString("ctxId").orEmpty(),
-                        otroUsuarioId = args?.getString("otroId").orEmpty(),
-                        titulo = java.net.URLDecoder.decode(
-                            args?.getString("titulo").orEmpty(), "UTF-8",
-                        ),
-                        usuario = usuario,
-                        container = container,
-                        onAtras = { nav.popBackStack() },
-                    )
-                }
 
                 composable(Rutas.NOTIFICACIONES) {
                     PantallaNotificaciones(

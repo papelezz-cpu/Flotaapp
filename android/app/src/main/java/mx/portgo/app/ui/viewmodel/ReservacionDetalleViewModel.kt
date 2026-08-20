@@ -16,6 +16,7 @@ import mx.portgo.app.data.model.Expediente
 import mx.portgo.app.data.model.Reservacion
 import mx.portgo.app.data.model.UsuarioActual
 import mx.portgo.app.data.repository.AuthRepository
+import mx.portgo.app.data.repository.AvisosRepository
 import mx.portgo.app.data.repository.ReservacionesRepository
 import mx.portgo.app.data.repository.StorageRepository
 
@@ -23,6 +24,7 @@ class ReservacionDetalleViewModel(
     private val repo: ReservacionesRepository,
     private val storage: StorageRepository,
     private val auth: AuthRepository,
+    private val avisosRepo: AvisosRepository,
     private val usuario: UsuarioActual,
     private val reservaId: String,
 ) : ViewModel() {
@@ -159,6 +161,53 @@ class ReservacionDetalleViewModel(
     fun abrirExpediente(etapa: EtapaExpediente) =
         ejecutar("Documentación solicitada al cliente.") {
             repo.abrirExpediente(reservaId, etapa)
+        }
+
+    // ── Avisos fijos, los que sustituyen al chat ─────────────────────────
+
+    /** No nulo mientras el formulario de lugar/hora está abierto. */
+    private val _viajeEnEdicion = MutableStateFlow<AvisosRepository.DetallesViaje?>(null)
+    val viajeEnEdicion: StateFlow<AvisosRepository.DetallesViaje?> = _viajeEnEdicion.asStateFlow()
+
+    // Se consultan los detalles ANTES de abrir: el formulario tiene que nacer
+    // con lo que ya está guardado, o al escribir solo la hora se perdería el
+    // lugar.
+    fun abrirActualizarViaje() = viewModelScope.launch {
+        when (val r = avisosRepo.detallesViaje(reservaId)) {
+            is Resultado.Ok -> _viajeEnEdicion.value = r.dato
+            is Resultado.Error -> _avisos.emit(r.error.mensaje)
+        }
+    }
+
+    fun cerrarActualizarViaje() {
+        _viajeEnEdicion.value = null
+    }
+
+    fun solicitarDocumentosCarga() =
+        ejecutar("Solicitud enviada al cliente.") {
+            avisosRepo.solicitarDocumentosCarga(reservaId, usuario.nombre)
+        }
+
+    fun confirmarLugarHora() =
+        ejecutar("Aviso enviado al cliente.") {
+            avisosRepo.confirmarLugarHora(reservaId, usuario.nombre)
+        }
+
+    fun avisarRetraso(nota: String?) =
+        ejecutar("Aviso de retraso enviado.") {
+            avisosRepo.avisarRetraso(reservaId, nota)
+        }
+
+    fun actualizarLugarHora(lugar: String?, hora: String?) {
+        _viajeEnEdicion.value = null
+        ejecutar("Guardado. La empresa ya fue avisada.") {
+            avisosRepo.actualizarLugarHora(reservaId, lugar, hora)
+        }
+    }
+
+    fun reportarProblema(motivo: AvisosRepository.MotivoReporte, nota: String?) =
+        ejecutar("Reporte enviado a la empresa y al administrador.") {
+            avisosRepo.reportarProblema(reservaId, motivo, nota)
         }
 
     private fun ejecutar(mensajeExito: String? = null, bloque: suspend () -> Resultado<*>) =

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Star
@@ -66,9 +65,7 @@ fun PantallaReservaciones(
 ) {
     val vm: ReservacionesViewModel = viewModel(
         factory = vmFactory {
-            ReservacionesViewModel(
-                container.reservaciones, container.chat, container.auth, usuario,
-            )
+            ReservacionesViewModel(container.reservaciones, container.auth, usuario)
         },
     )
     val estado by vm.estado.collectAsStateWithLifecycle()
@@ -221,36 +218,26 @@ private fun TarjetaReservacion(
 }
 
 /**
- * Avisos de la fila: mensajes sin leer y expedientes pendientes.
+ * Aviso de la fila: expedientes pendientes.
  *
- * Van juntos y pequeños porque son secundarios al estado del viaje, pero el de
- * expediente importa: es lo que traba el ingreso a puerto o dispara las
+ * Va pequeño porque es secundario al estado del viaje, pero importa: un
+ * expediente incompleto es lo que traba el ingreso a puerto o dispara las
  * demoras del contenedor.
  */
 @Composable
 private fun IndicadoresFila(fila: FilaReservacion) {
     val pendientes = fila.expedientes.count { !it.completo }
+    if (pendientes == 0) return
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        if (pendientes > 0) {
-            Icon(
-                Icons.Default.Description,
-                contentDescription = "$pendientes expediente(s) pendiente(s)",
-                tint = ColoresEstado.alerta,
-                modifier = Modifier.size(17.dp),
-            )
-            Spacer(Modifier.width(6.dp))
-        }
-        if (fila.mensajesSinLeer > 0) {
-            Icon(
-                Icons.AutoMirrored.Filled.Chat,
-                contentDescription = null,
-                tint = PortGoColor.TextoSecundario,
-                modifier = Modifier.size(17.dp),
-            )
-            Spacer(Modifier.width(3.dp))
-            BadgeConteo(fila.mensajesSinLeer)
-        }
+        Icon(
+            Icons.Default.Description,
+            contentDescription = "$pendientes expediente(s) pendiente(s)",
+            tint = ColoresEstado.alerta,
+            modifier = Modifier.size(17.dp),
+        )
+        Spacer(Modifier.width(6.dp))
+        BadgeConteo(pendientes)
     }
 }
 

@@ -10,18 +10,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -74,7 +70,6 @@ fun PantallaSolicitudDetalle(
     usuario: UsuarioActual,
     container: AppContainer,
     onAtras: () -> Unit,
-    onAbrirChat: (otroId: String, titulo: String, pedidoId: String) -> Unit,
 ) {
     val vm: SolicitudDetalleViewModel = viewModel(
         key = pedidoId,
@@ -186,11 +181,6 @@ fun PantallaSolicitudDetalle(
                                     onAceptar = { vm.aceptarOferta(oferta.id) },
                                     onContraofertar = { contraofertarA = oferta.id },
                                     onRechazar = { rechazarA = oferta.id },
-                                    onChat = {
-                                        oferta.adminId?.let {
-                                            onAbrirChat(it, oferta.adminNombre ?: "Empresa", pedidoId)
-                                        }
-                                    },
                                 )
                                 Spacer(Modifier.height(Espacio.s))
                             }
@@ -389,7 +379,6 @@ private fun TarjetaOferta(
     onAceptar: () -> Unit,
     onContraofertar: () -> Unit,
     onRechazar: () -> Unit,
-    onChat: () -> Unit,
 ) {
     Card(
         Modifier.fillMaxWidth(),
@@ -472,21 +461,7 @@ private fun TarjetaOferta(
                         modifier = Modifier.weight(1f),
                     ) { Text("Contraofertar") }
                 }
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    TextButton(onClick = onRechazar, enabled = habilitado) { Text("Rechazar") }
-                    TextButton(onClick = onChat) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Chat,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.size(Espacio.xs))
-                        Text("Mensaje")
-                    }
-                }
+                TextButton(onClick = onRechazar, enabled = habilitado) { Text("Rechazar") }
             }
         }
     }

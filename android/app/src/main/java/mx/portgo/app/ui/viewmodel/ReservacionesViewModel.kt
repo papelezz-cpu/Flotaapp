@@ -13,13 +13,11 @@ import mx.portgo.app.data.model.Expediente
 import mx.portgo.app.data.model.Reservacion
 import mx.portgo.app.data.model.UsuarioActual
 import mx.portgo.app.data.repository.AuthRepository
-import mx.portgo.app.data.repository.ChatRepository
 import mx.portgo.app.data.repository.ReservacionesRepository
 
 /** Fila de la lista, con lo que hace falta para pintarla sin más consultas. */
 data class FilaReservacion(
     val reservacion: Reservacion,
-    val mensajesSinLeer: Int = 0,
     val expedientes: List<Expediente> = emptyList(),
     /** Nombre de la contraparte: la empresa si soy cliente, el cliente si soy empresa. */
     val contraparte: String? = null,
@@ -27,7 +25,6 @@ data class FilaReservacion(
 
 class ReservacionesViewModel(
     private val repo: ReservacionesRepository,
-    private val chat: ChatRepository,
     private val auth: AuthRepository,
     private val usuario: UsuarioActual,
 ) : ViewModel() {
@@ -65,10 +62,9 @@ class ReservacionesViewModel(
                 val reservas = r.dato
                 val ids = reservas.map { it.id }
 
-                // Las tres consultas de apoyo se toleran fallando: son adornos
-                // de la fila —el globito de chat, las pastillas de expediente,
-                // el nombre de la contraparte— no la información principal.
-                val sinLeer = chat.noLeidosPorReserva(usuario.id, ids)
+                // Las dos consultas de apoyo se toleran fallando: son adornos
+                // de la fila —las pastillas de expediente, el nombre de la
+                // contraparte— no la información principal.
                 val expedientes = repo.expedientesDe(ids)
                 val nombres = if (usuario.esCliente) {
                     auth.nombresDe(reservas.mapNotNull { it.propietarioId })
@@ -80,7 +76,6 @@ class ReservacionesViewModel(
                     reservas.map { res ->
                         FilaReservacion(
                             reservacion = res,
-                            mensajesSinLeer = sinLeer[res.id] ?: 0,
                             expedientes = expedientes[res.id].orEmpty(),
                             contraparte = if (usuario.esCliente) {
                                 nombres[res.propietarioId]
