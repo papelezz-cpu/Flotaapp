@@ -299,6 +299,11 @@ private fun NavegacionPrincipal(
                         usuario = usuario,
                         container = container,
                         onAbrir = { nav.navigate(Rutas.reservacion(it)) },
+                        onAtras = if (nav.previousBackStackEntry != null) {
+                            { nav.popBackStack() }
+                        } else null,
+                        noLeidas = noLeidas,
+                        onCampana = { nav.navigate(Rutas.NOTIFICACIONES) },
                     )
                 }
 
