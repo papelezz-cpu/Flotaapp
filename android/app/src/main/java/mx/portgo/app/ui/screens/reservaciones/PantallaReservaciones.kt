@@ -81,7 +81,12 @@ fun PantallaReservaciones(
             .fillMaxSize()
             .background(PortGoColor.Arena),
     ) {
-        EncabezadoModulo(titulo = "Reservas", onAtras = onAtras)
+        EncabezadoModulo(
+            titulo = "Reservas",
+            onAtras = onAtras,
+            noLeidas = noLeidas,
+            onCampana = onCampana,
+        )
 
         FilaFiltros(
             opciones = vm.filtrosDisponibles,

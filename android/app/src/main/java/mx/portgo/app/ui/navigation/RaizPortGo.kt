@@ -44,6 +44,7 @@ import mx.portgo.app.ui.SesionViewModel
 import mx.portgo.app.ui.components.BarraInferiorPortGo
 import mx.portgo.app.ui.components.CargandoCentrado
 import mx.portgo.app.ui.components.EncabezadoPortGo
+import mx.portgo.app.ui.components.RecargarAlVolver
 import mx.portgo.app.ui.screens.auth.PantallaActualizar
 import mx.portgo.app.ui.screens.auth.PantallaBloqueo
 import mx.portgo.app.ui.screens.auth.PantallaNuevaContrasena
@@ -190,6 +191,12 @@ private fun NavegacionPrincipal(
         factory = vmFactory { NotificacionesViewModel(container.notificaciones, usuario) },
     )
     val noLeidas by notifVm.noLeidas.collectAsStateWithLifecycle()
+
+    // El contador se cargaba al arrancar y se mantenia por Realtime. Pero
+    // mientras la app esta en segundo plano —que es justo cuando el otro lado
+    // hace su parte desde la web— el canal se cae y los avisos que llegan
+    // entretanto no se cuentan. Al volver, se relee.
+    RecargarAlVolver(notifVm::cargar)
 
     val entradaActual by nav.currentBackStackEntryAsState()
     val rutaActual = entradaActual?.destination?.route

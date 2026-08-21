@@ -12,6 +12,7 @@ import mx.portgo.app.core.intentar
 import mx.portgo.app.data.model.EstadoPedido
 import mx.portgo.app.data.model.Oferta
 import mx.portgo.app.data.model.Pedido
+import mx.portgo.app.data.model.Perfil
 import mx.portgo.app.data.model.PedidoConOfertas
 import mx.portgo.app.data.model.PlantillaPedido
 import mx.portgo.app.data.model.Rol
@@ -197,36 +198,45 @@ class PedidosRepository(private val supabase: SupabaseClient) {
     }
 
     /**
-     * Publica una solicitud.
+     * Publica una solicitud y avisa a los superadmins.
      *
      * Es el único flujo de escritura que no pasa por RPC: es un solo INSERT que
      * RLS cubre, y envolverlo obligaría a versionar las ~60 columnas de
      * `pedidos` dentro de una función de Postgres cada vez que la web agrega un
-     * campo. El aviso a los superadmins sí se inserta aparte — si fallara, la
-     * solicitud ya quedó publicada, que es lo que importa.
+     * campo.
+     *
+     * El aviso NO se traga si falla. Antes iba en un `runCatching` mudo, así
+     * que si el insert de `notificaciones` era rechazado nadie se enteraba: la
+     * solicitud quedaba esperando revisión y el superadmin sin saberlo. El
+     * pedido ya está creado a esas alturas, así que no se deshace nada — pero
+     * se dice, que es la diferencia entre un aviso perdido y un aviso perdido
+     * en silencio.
      */
     suspend fun crear(payload: JsonObject): Resultado<Unit> = intentar {
         supabase.from("pedidos").insert(payload)
 
-        runCatching {
-            val supers = supabase.from("perfiles")
-                .select { filter { eq("rol", Rol.SUPERADMIN.db) } }
-                .decodeList<mx.portgo.app.data.model.Perfil>()
+        avisarSuperadmins()
+    }
 
-            if (supers.isNotEmpty()) {
-                supabase.from("notificaciones").insert(
-                    supers.map { s ->
-                        buildJsonObject {
-                            put("user_id", s.userId)
-                            put("tipo", "revision_solicitud")
-                            put("titulo", "Nueva solicitud para revisar")
-                            put("mensaje", "Una solicitud nueva requiere tu revisión antes de publicarse.")
-                            put("leido", false)
-                        }
-                    },
-                )
-            }
-        }
+    /** Deja que el fallo suba, en vez de esconderlo. */
+    private suspend fun avisarSuperadmins() {
+        val supers = supabase.from("perfiles")
+            .select { filter { eq("rol", Rol.SUPERADMIN.db) } }
+            .decodeList<Perfil>()
+
+        if (supers.isEmpty()) return
+
+        supabase.from("notificaciones").insert(
+            supers.map { s ->
+                buildJsonObject {
+                    put("user_id", s.userId)
+                    put("tipo", "revision_solicitud")
+                    put("titulo", "Nueva solicitud para revisar")
+                    put("mensaje", "Una solicitud nueva requiere tu revisión antes de publicarse.")
+                    put("leido", false)
+                }
+            },
+        )
     }
 
     enum class AccionOferta(val db: String) {

@@ -83,6 +83,8 @@ fun PantallaSolicitudes(
         EncabezadoModulo(
             titulo = "Solicitudes",
             onAtras = onAtras,
+            noLeidas = noLeidas,
+            onCampana = onCampana,
             accion = {
                 BotonHeader(
                     icono = Icons.Default.Tune,

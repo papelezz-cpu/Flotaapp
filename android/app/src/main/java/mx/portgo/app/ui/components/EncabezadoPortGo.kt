@@ -136,7 +136,7 @@ fun LogoPortGo(
  * además dice de qué. Un número aquí competiría con esos sin aportar.
  */
 @Composable
-private fun BotonCampana(
+fun BotonCampana(
     noLeidas: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -199,6 +199,8 @@ fun EncabezadoModulo(
     onAtras: (() -> Unit)?,
     modifier: Modifier = Modifier,
     accion: (@Composable () -> Unit)? = null,
+    noLeidas: Int? = null,
+    onCampana: (() -> Unit)? = null,
 ) {
     Row(
         modifier
@@ -223,6 +225,15 @@ fun EncabezadoModulo(
         Spacer(Modifier.weight(1f))
 
         accion?.invoke()
+
+        // La campana va en TODAS las pantallas, como el handoff pide. Al pasar
+        // de TopAppBar a este encabezado se quedo fuera: las pantallas seguian
+        // recibiendo `noLeidas` y `onCampana` sin usarlos, y Kotlin no avisa de
+        // un parametro sin usar, asi que compilaba limpio con la campana muerta.
+        if (onCampana != null) {
+            if (accion != null) Spacer(Modifier.width(Espacio.s))
+            BotonCampana(noLeidas = noLeidas ?: 0, onClick = onCampana)
+        }
     }
 }
 
