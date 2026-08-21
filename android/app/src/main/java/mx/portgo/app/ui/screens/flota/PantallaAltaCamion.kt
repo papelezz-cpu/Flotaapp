@@ -84,6 +84,7 @@ fun PantallaAltaCamion(
     onGuardada: () -> Unit,
 ) {
     val vm: AltaCamionViewModel = viewModel(
+        key = usuario.id,
         factory = vmFactory {
             AltaCamionViewModel(container.flota, container.storage, usuario)
         },

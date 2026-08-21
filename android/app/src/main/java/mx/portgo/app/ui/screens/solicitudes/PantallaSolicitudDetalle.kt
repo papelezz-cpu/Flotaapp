@@ -72,7 +72,7 @@ fun PantallaSolicitudDetalle(
     onAtras: () -> Unit,
 ) {
     val vm: SolicitudDetalleViewModel = viewModel(
-        key = pedidoId,
+        key = "${usuario.id}-$pedidoId",
         factory = vmFactory {
             SolicitudDetalleViewModel(container.pedidos, container.flota, usuario, pedidoId)
         },

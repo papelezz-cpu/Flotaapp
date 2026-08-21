@@ -64,6 +64,7 @@ fun PantallaReservaciones(
     onCampana: () -> Unit,
 ) {
     val vm: ReservacionesViewModel = viewModel(
+        key = usuario.id,
         factory = vmFactory {
             ReservacionesViewModel(container.reservaciones, container.auth, usuario)
         },

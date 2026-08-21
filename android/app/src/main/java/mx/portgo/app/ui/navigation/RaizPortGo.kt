@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -116,13 +117,23 @@ fun RaizPortGo(
         when (estado) {
             is SesionViewModel.Estado.Cargando -> CargandoCentrado()
 
-            is SesionViewModel.Estado.SinSesion -> PantallaLogin(
-                vm = sesionVm,
-                // Si el enlace del correo falló, el motivo tiene prioridad: es
-                // lo que el usuario está intentando entender en ese momento.
-                mensajeInicial = errorEnlace ?: estado.mensaje,
-                onMensajeVisto = onErrorEnlaceVisto,
-            )
+            is SesionViewModel.Estado.SinSesion -> {
+                // Los ViewModels viven en el store de la Activity, que sobrevive
+                // al cierre de sesión. Las claves por usuario ya impiden que el
+                // siguiente reciba instancias ajenas; esto vacía además lo que
+                // el anterior dejó cargado en memoria, en vez de esperar a que
+                // muera la Activity.
+                val duenoStore = LocalViewModelStoreOwner.current
+                LaunchedEffect(Unit) { duenoStore?.viewModelStore?.clear() }
+
+                PantallaLogin(
+                    vm = sesionVm,
+                    // Si el enlace del correo falló, el motivo tiene prioridad:
+                    // es lo que el usuario intenta entender en ese momento.
+                    mensajeInicial = errorEnlace ?: estado.mensaje,
+                    onMensajeVisto = onErrorEnlaceVisto,
+                )
+            }
 
             is SesionViewModel.Estado.Bloqueada -> PantallaBloqueo(
                 usuario = estado.usuario,
@@ -187,7 +198,15 @@ private fun NavegacionPrincipal(
 
     // La campana vive en el andamio, no en cada pantalla: es global y así el
     // contador es uno solo, alimentado por un único canal de Realtime.
+    //
+    // La clave lleva el id del usuario a propósito, y lo mismo hacen todas las
+    // demás pantallas. Sin ella, `viewModel()` devuelve SIEMPRE la misma
+    // instancia mientras viva la Activity: al cambiar de cuenta sin cerrar la
+    // app, el ViewModel del usuario anterior seguía en pie con sus datos en
+    // pantalla. RLS impide leer lo ajeno del servidor, pero lo que ya estaba
+    // cargado en memoria quedaba a la vista de quien entrara después.
     val notifVm: NotificacionesViewModel = viewModel(
+        key = usuario.id,
         factory = vmFactory { NotificacionesViewModel(container.notificaciones, usuario) },
     )
     val noLeidas by notifVm.noLeidas.collectAsStateWithLifecycle()

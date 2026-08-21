@@ -88,6 +88,7 @@ fun PantallaNuevaSolicitud(
     onPublicada: () -> Unit,
 ) {
     val vm: NuevaSolicitudViewModel = viewModel(
+        key = usuario.id,
         factory = vmFactory {
             NuevaSolicitudViewModel(container.pedidos, container.supabase, usuario)
         },

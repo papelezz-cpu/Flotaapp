@@ -56,6 +56,7 @@ fun PantallaSolicitudes(
     onCampana: () -> Unit,
 ) {
     val vm: SolicitudesViewModel = viewModel(
+        key = usuario.id,
         factory = vmFactory { SolicitudesViewModel(container.pedidos, usuario) },
     )
     val estado by vm.estado.collectAsStateWithLifecycle()

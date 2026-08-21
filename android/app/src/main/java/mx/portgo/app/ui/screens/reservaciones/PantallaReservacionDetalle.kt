@@ -90,7 +90,7 @@ fun PantallaReservacionDetalle(
     onAbrirExpediente: (reservaId: String, etapa: String) -> Unit,
 ) {
     val vm: ReservacionDetalleViewModel = viewModel(
-        key = reservaId,
+        key = "${usuario.id}-$reservaId",
         factory = vmFactory {
             ReservacionDetalleViewModel(
                 container.reservaciones, container.storage, container.auth,

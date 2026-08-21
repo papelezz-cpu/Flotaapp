@@ -89,7 +89,7 @@ fun PantallaExpediente(
     val etapa = EtapaExpediente.de(etapaClave)
 
     val vm: ExpedienteViewModel = viewModel(
-        key = "$reservaId-$etapaClave",
+        key = "${usuario.id}-$reservaId-$etapaClave",
         factory = vmFactory {
             ExpedienteViewModel(
                 container.reservaciones, container.storage, usuario, reservaId, etapaClave,

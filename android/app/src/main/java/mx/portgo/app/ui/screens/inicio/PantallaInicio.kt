@@ -78,6 +78,7 @@ fun PantallaInicio(
     onIrA: (String) -> Unit,
 ) {
     val vm: InicioViewModel = viewModel(
+        key = usuario.id,
         factory = vmFactory {
             InicioViewModel(
                 container.pedidos, container.reservaciones,

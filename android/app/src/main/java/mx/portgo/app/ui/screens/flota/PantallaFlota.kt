@@ -91,6 +91,7 @@ fun PantallaFlota(
     onAtras: (() -> Unit)? = null,
 ) {
     val vm: FlotaViewModel = viewModel(
+        key = usuario.id,
         factory = vmFactory { FlotaViewModel(container.flota, usuario) },
     )
     val camiones by vm.camiones.collectAsStateWithLifecycle()
