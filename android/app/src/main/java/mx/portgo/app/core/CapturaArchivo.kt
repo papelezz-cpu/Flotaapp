@@ -1,7 +1,9 @@
 package mx.portgo.app.core
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import java.io.File
 import java.text.SimpleDateFormat
@@ -26,6 +28,19 @@ import java.util.Locale
  * se vuelve el más natural.
  */
 object CapturaArchivo {
+
+    /**
+     * Si el dispositivo tiene una app de camara que la nuestra pueda ver.
+     *
+     * Lo segundo importa tanto como lo primero: desde Android 11 la
+     * visibilidad de paquetes esta restringida y sin el bloque <queries> del
+     * manifiesto esto devuelve false aunque haya camara. Tambien devuelve
+     * false, con razon, en un emulador configurado sin camara.
+     */
+    fun hayCamara(contexto: Context): Boolean = runCatching {
+        contexto.packageManager
+            .resolveActivity(Intent(MediaStore.ACTION_IMAGE_CAPTURE), 0) != null
+    }.getOrDefault(false)
 
     fun nuevoDestino(contexto: Context, prefijo: String): Pair<File, Uri> {
         val carpeta = File(contexto.cacheDir, "capturas").apply { mkdirs() }

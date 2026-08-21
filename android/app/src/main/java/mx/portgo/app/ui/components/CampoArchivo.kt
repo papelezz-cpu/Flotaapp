@@ -1,6 +1,8 @@
 package mx.portgo.app.ui.components
 
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import mx.portgo.app.core.CapturaArchivo
 import mx.portgo.app.ui.theme.ColoresEstado
 import mx.portgo.app.ui.theme.Espacio
+import mx.portgo.app.ui.theme.PortGoColor
+import mx.portgo.app.ui.theme.Radio
 
 /**
  * Campo para adjuntar un documento o foto, con cámara y galería.
@@ -60,6 +64,8 @@ fun CampoArchivo(
 ) {
     val contexto = LocalContext.current
     var uriPendiente by remember { mutableStateOf<Uri?>(null) }
+    val hayCamara = remember { CapturaArchivo.hayCamara(contexto) }
+    var fallo by remember { mutableStateOf<String?>(null) }
 
     val camara = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture(),
@@ -74,13 +80,15 @@ fun CampoArchivo(
         ActivityResultContracts.OpenDocument(),
     ) { uri -> uri?.let(onAdjuntar) }
 
+    // Blanca con borde. El relleno anterior era surfaceVariant al 30%, y en este
+    // tema surfaceVariant ES el arena del fondo: la tarjeta no se veia.
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-        ),
+        shape = RoundedCornerShape(Radio.tarjeta),
+        colors = CardDefaults.cardColors(containerColor = PortGoColor.Superficie),
+        border = BorderStroke(1.dp, PortGoColor.BordeTarjeta),
     ) {
-        Column(Modifier.padding(Espacio.m)) {
+        Column(Modifier.padding(15.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Icon(
                     if (adjunto != null) Icons.Default.CheckCircle
@@ -108,20 +116,33 @@ fun CampoArchivo(
             if (adjunto == null) {
                 Spacer(Modifier.height(Espacio.s))
                 Row(horizontalArrangement = Arrangement.spacedBy(Espacio.s)) {
-                    OutlinedButton(
-                        onClick = {
-                            val (_, uri) = CapturaArchivo.nuevoDestino(
-                                contexto,
-                                etiqueta.replace(Regex("[^A-Za-z0-9]"), "_"),
-                            )
-                            uriPendiente = uri
-                            camara.launch(uri)
-                        },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Icon(Icons.Default.PhotoCamera, contentDescription = null)
-                        Spacer(Modifier.size(Espacio.xs))
-                        Text("Cámara")
+                    // Si no hay camara visible no se enseña el boton: un boton
+                    // que no puede funcionar es peor que su ausencia, y aqui
+                    // siempre queda la alternativa de adjuntar un archivo.
+                    if (hayCamara) {
+                        OutlinedButton(
+                            onClick = {
+                                fallo = null
+                                // Aunque resolveActivity diga que si, lanzar
+                                // puede fallar. Se avisa en vez de reventar.
+                                runCatching {
+                                    val (_, uri) = CapturaArchivo.nuevoDestino(
+                                        contexto,
+                                        etiqueta.replace(Regex("[^A-Za-z0-9]"), "_"),
+                                    )
+                                    uriPendiente = uri
+                                    camara.launch(uri)
+                                }.onFailure {
+                                    uriPendiente = null
+                                    fallo = "No se pudo abrir la cámara. Usa \"Archivo\"."
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(Icons.Default.PhotoCamera, contentDescription = null)
+                            Spacer(Modifier.size(Espacio.xs))
+                            Text("Cámara")
+                        }
                     }
                     OutlinedButton(
                         onClick = { galeria.launch(arrayOf("image/*", "application/pdf")) },
@@ -129,8 +150,17 @@ fun CampoArchivo(
                     ) {
                         Icon(Icons.Default.PhotoLibrary, contentDescription = null)
                         Spacer(Modifier.size(Espacio.xs))
-                        Text("Archivo")
+                        Text(if (hayCamara) "Archivo" else "Elegir archivo")
                     }
+                }
+
+                fallo?.let {
+                    Spacer(Modifier.height(Espacio.xs))
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ColoresEstado.peligro,
+                    )
                 }
             }
         }

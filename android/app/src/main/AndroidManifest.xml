@@ -9,6 +9,19 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!--
+      Obligatorio desde Android 11 (API 30). Con la visibilidad de paquetes
+      restringida, sin declarar esta intencion la app NO VE ninguna aplicacion
+      de camara: resolveActivity devuelve null y lanzar ACTION_IMAGE_CAPTURE
+      revienta con ActivityNotFoundException. No es cosa del emulador — pasa
+      igual en cualquier telefono con Android 11 o superior.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+    </queries>
+
     <application
         android:name=".PortGoApplication"
         android:allowBackup="false"
