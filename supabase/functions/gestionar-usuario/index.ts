@@ -1,4 +1,9 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+// Versiones fijas a proposito. Sin fijarlas, el import resuelve a "la ultima"
+// por redireccion, asi que dos despliegues del MISMO commit pueden compilar
+// modulos distintos — y una funcion que se rompe sin que nadie toque nada, sin
+// commit al que culpar, es de las cosas mas caras de diagnosticar. Estas son
+// las versiones que corrian el 2026-08-21, verificadas en produccion.
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
