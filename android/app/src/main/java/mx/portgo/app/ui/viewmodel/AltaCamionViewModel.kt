@@ -76,9 +76,16 @@ class AltaCamionViewModel(
         val venceVerificacion: String? = null,
         val vencePeligrosa: String? = null,
     ) {
-        /** Lo mínimo sin lo cual la unidad no sirve para ofertar. */
+        /**
+         * Lo mínimo sin lo cual la unidad no sirve para ofertar.
+         *
+         * Los tres son NOT NULL en `camiones`. Dejar que el botón se habilite
+         * sin ellos solo cambia el sitio donde falla: en vez de un campo en
+         * rojo, un error de Postgres al final de un formulario de tres pasos.
+         */
         val identificacionCompleta: Boolean
-            get() = numEconomico.isNotBlank() && tipo.isNotBlank()
+            get() = numEconomico.isNotBlank() && tipo.isNotBlank() &&
+                capacidad.isNotBlank()
     }
 
     private val _form = MutableStateFlow(Formulario())

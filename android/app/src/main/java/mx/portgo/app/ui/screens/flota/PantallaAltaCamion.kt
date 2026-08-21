@@ -182,6 +182,13 @@ private fun PasoIdentificacion(
     var placaAbierta by remember { mutableStateOf(false) }
     var combAbierto by remember { mutableStateOf(false) }
 
+    Text(
+        "Los campos con * son obligatorios. El resto lo puedes completar despues.",
+        style = MaterialTheme.typography.bodySmall,
+        color = PortGoColor.TextoSecundario,
+    )
+    Spacer(Modifier.height(Espacio.m))
+
     OutlinedTextField(
         shape = RadioCampo,
         colors = coloresCampo(),
@@ -308,11 +315,15 @@ private fun PasoIdentificacion(
             shape = RadioCampo,
             colors = coloresCampo(),
             value = form.capacidad,
-            onValueChange = { v -> vm.actualizar { it.copy(capacidad = v) } },
-            label = { Text("Capacidad") },
+            // Solo digitos: la columna es integer. Con decimales el cast en
+            // `guardar_camion` daba NULL y el alta moria en una NOT NULL.
+            onValueChange = { v ->
+                vm.actualizar { it.copy(capacidad = v.filter(Char::isDigit)) }
+            },
+            label = { Text("Capacidad *") },
             suffix = { Text("ton") },
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.weight(1f),
         )
         OutlinedTextField(
