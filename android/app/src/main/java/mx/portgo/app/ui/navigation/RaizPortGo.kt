@@ -28,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -117,23 +116,23 @@ fun RaizPortGo(
         when (estado) {
             is SesionViewModel.Estado.Cargando -> CargandoCentrado()
 
-            is SesionViewModel.Estado.SinSesion -> {
-                // Los ViewModels viven en el store de la Activity, que sobrevive
-                // al cierre de sesión. Las claves por usuario ya impiden que el
-                // siguiente reciba instancias ajenas; esto vacía además lo que
-                // el anterior dejó cargado en memoria, en vez de esperar a que
-                // muera la Activity.
-                val duenoStore = LocalViewModelStoreOwner.current
-                LaunchedEffect(Unit) { duenoStore?.viewModelStore?.clear() }
-
-                PantallaLogin(
-                    vm = sesionVm,
-                    // Si el enlace del correo falló, el motivo tiene prioridad:
-                    // es lo que el usuario intenta entender en ese momento.
-                    mensajeInicial = errorEnlace ?: estado.mensaje,
-                    onMensajeVisto = onErrorEnlaceVisto,
-                )
-            }
+            // NO se vacía aquí el ViewModelStore. Se intentó, para soltar de
+            // memoria lo que cargó el usuario anterior, y rompía el inicio de
+            // sesión: SesionViewModel vive en ese mismo store (MainActivity lo
+            // crea con `viewModel()`), así que vaciarlo lo destruía también
+            // —`onCleared()` cancela su viewModelScope— y a partir de ahí
+            // `iniciarSesion()` lanzaba corrutinas en un scope muerto.
+            //
+            // El aislamiento entre cuentas ya lo garantizan las claves por
+            // usuario de cada `viewModel()`. Lo que quedara en memoria muere
+            // con la Activity.
+            is SesionViewModel.Estado.SinSesion -> PantallaLogin(
+                vm = sesionVm,
+                // Si el enlace del correo falló, el motivo tiene prioridad: es
+                // lo que el usuario está intentando entender en ese momento.
+                mensajeInicial = errorEnlace ?: estado.mensaje,
+                onMensajeVisto = onErrorEnlaceVisto,
+            )
 
             is SesionViewModel.Estado.Bloqueada -> PantallaBloqueo(
                 usuario = estado.usuario,
