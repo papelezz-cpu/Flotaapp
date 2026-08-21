@@ -6,7 +6,19 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <!-- La cámara es opcional: subir evidencias también funciona eligiendo de
          la galería, y en patio/puerto hay teléfonos sin cámara utilizable. -->
-    <uses-permission android:name="android.permission.CAMERA" />
+    <!--
+      NO se declara android.permission.CAMERA a proposito.
+
+      La app nunca abre la camara: delega en la del sistema con un intent
+      IMAGE_CAPTURE y recibe la foto. Para eso no hace falta el permiso... pero
+      si se DECLARA, Android exige tenerlo concedido para poder lanzar ese
+      intent, y lanzarlo sin el muere con
+      "SecurityException: ... with revoked permission android.permission.CAMERA".
+
+      Declararlo y no pedirlo en tiempo de ejecucion es el peor de los dos
+      mundos, que es justo donde estaba. Sin declararlo, delegar funciona y
+      ademas no se le pide al usuario un permiso que no usamos.
+    -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <!--

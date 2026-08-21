@@ -132,9 +132,17 @@ fun CampoArchivo(
                                     )
                                     uriPendiente = uri
                                     camara.launch(uri)
-                                }.onFailure {
+                                }.onFailure { e ->
                                     uriPendiente = null
-                                    fallo = "No se pudo abrir la cámara. Usa \"Archivo\"."
+                                    // Se enseña la causa real, no un mensaje
+                                    // generico: aqui pueden fallar dos cosas
+                                    // muy distintas —el FileProvider al crear
+                                    // el destino, o el sistema al no encontrar
+                                    // camara— y sin distinguirlas no hay forma
+                                    // de arreglarlo desde fuera.
+                                    fallo = "No se pudo abrir la cámara. " +
+                                        "Usa \"Archivo\". " +
+                                        "(${e::class.java.simpleName}: ${e.message})"
                                 }
                             },
                             modifier = Modifier.weight(1f),
