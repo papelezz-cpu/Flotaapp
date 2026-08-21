@@ -136,13 +136,44 @@ class AltaCamionViewModel(
      * Si una subida falla, no se guarda nada. Es preferible dejar un archivo
      * huérfano en Storage a registrar una unidad con la mitad de sus papeles.
      */
-    fun guardar(onListo: () -> Unit) = viewModelScope.launch {
+    /**
+     * Lo que falta para poder registrar la unidad.
+     *
+     * Es el espejo de `agregarCamion()` en js/admin.js. Sin esto la app dejaba
+     * pasar unidades sin seguro ni permiso SCT —papeles sin los cuales el
+     * camion no puede circular— y el superadmin tenia que rechazarlas a mano
+     * despues de que alguien lleno tres pasos de formulario.
+     */
+    fun faltantes(): List<String> {
         val f = _form.value
-        if (!f.identificacionCompleta) {
-            _avisos.emit("Falta el número económico y el tipo de unidad.")
+        val hay = _archivos.value.keys
+        val falta = mutableListOf<String>()
+
+        if (f.numEconomico.isBlank()) falta += "Número económico"
+        if (f.tipo.isBlank()) falta += "Tipo de unidad"
+        if (f.capacidad.isBlank()) falta += "Capacidad"
+
+        if (Archivo.FOTO_FRENTE !in hay) falta += "Foto de frente"
+        if (Archivo.FOTO_PLACA !in hay) falta += "Foto de la placa"
+        if (Archivo.TARJETA !in hay) falta += "Tarjeta de circulación"
+        if (Archivo.PERMISO_SCT !in hay) falta += "Permiso SCT"
+        if (Archivo.SEGURO !in hay) falta += "Póliza de seguro"
+
+        if (f.tiposCarga.any { it in CARGA_PELIGROSA }) {
+            if (Archivo.PELIGROSA !in hay) falta += "Permiso de materiales peligrosos"
+            if (f.vencePeligrosa.isNullOrBlank()) falta += "Vigencia del permiso de peligrosos"
+        }
+        return falta
+    }
+
+    fun guardar(onListo: () -> Unit) = viewModelScope.launch {
+        val falta = faltantes()
+        if (falta.isNotEmpty()) {
+            _avisos.emit("Falta: " + falta.joinToString(", "))
             return@launch
         }
         if (_guardando.value) return@launch
+        val f = _form.value
         _guardando.value = true
 
         val subidos = mutableMapOf<String, String>()
@@ -233,10 +264,26 @@ class AltaCamionViewModel(
 
     companion object {
         /** Se ofrecen los mismos tipos que el catálogo de unidades. */
+        /**
+         * Los mismos valores exactos que `CARGO_TIPOS` en js/admin.js.
+         *
+         * No es una lista de etiquetas bonitas: se guarda tal cual en
+         * `camiones.tipo_carga` y la web filtra por ella. La app decia
+         * "Peligrosa" donde la web busca "Peligroso", asi que una unidad dada
+         * de alta desde el telefono no se reconocia como HAZMAT y no aparecia
+         * en los filtros de carga peligrosa.
+         *
+         * Deberia venir del catalogo remoto, como `tipo_unidad`, pero hoy no
+         * existe la clave `tipo_carga` en `catalogos` — la web tambien lo tiene
+         * a fuego. Mientras siga asi, el unico modo de no divergir es copiarla.
+         */
         val TIPOS_CARGA = listOf(
-            "General", "Refrigerada", "Peligrosa", "Contenedor",
-            "Granel", "Sobredimensionada",
+            "General", "Refrigerado", "Peligroso", "Frágil", "Granel",
+            "Maquinaria", "Automóviles", "Contenedor", "HAZMAT",
         )
+
+        /** Igual que en la web: estas dos marcan la unidad como peligrosa. */
+        val CARGA_PELIGROSA = setOf("Peligroso", "HAZMAT")
         val TIPOS_PLACA = listOf("Federal", "Estatal", "Particular")
         val COMBUSTIBLES = listOf("Diésel", "Gasolina", "Gas LP", "Eléctrico")
     }

@@ -55,7 +55,9 @@ import mx.portgo.app.ui.components.CampoArchivo
 import mx.portgo.app.ui.components.CampoFecha
 import mx.portgo.app.ui.components.EncabezadoModulo
 import mx.portgo.app.ui.components.RadioCampo
+import mx.portgo.app.ui.components.TarjetaFicha
 import mx.portgo.app.ui.components.coloresCampo
+import mx.portgo.app.ui.theme.ColoresEstado
 import mx.portgo.app.ui.theme.Espacio
 import mx.portgo.app.ui.theme.PortGoColor
 import mx.portgo.app.ui.viewmodel.AltaCamionViewModel
@@ -134,7 +136,7 @@ fun PantallaAltaCamion(
                 when (paso) {
                     0 -> PasoIdentificacion(vm, form, catalogos.tiposUnidad.map { it.valor })
                     1 -> PasoDocumentos(vm, form, archivos)
-                    else -> PasoFotos(vm, archivos)
+                    else -> PasoFotos(vm, archivos, vm.faltantes())
                 }
                 Spacer(Modifier.height(Espacio.xl))
             }
@@ -549,6 +551,7 @@ private fun PasoDocumentos(
 private fun PasoFotos(
     vm: AltaCamionViewModel,
     archivos: Map<Archivo, android.net.Uri>,
+    faltantes: List<String>,
 ) {
     Text(
         "Camina alrededor de la unidad y tómale cuatro fotos. Son las que ve el " +
@@ -565,6 +568,29 @@ private fun PasoFotos(
         }
 
     Spacer(Modifier.height(Espacio.m))
+
+    // Se enseña aqui, en el ultimo paso, y no solo al pulsar: llegar al final y
+    // que te digan que falta algo de dos pasos atras es la peor forma de
+    // enterarse.
+    if (faltantes.isNotEmpty()) {
+        TarjetaFicha {
+            Text(
+                "Falta antes de registrar",
+                style = MaterialTheme.typography.titleMedium,
+                color = ColoresEstado.alerta,
+            )
+            Spacer(Modifier.height(Espacio.xs))
+            faltantes.forEach {
+                Text(
+                    "· $it",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = PortGoColor.Tinta,
+                )
+            }
+        }
+        Spacer(Modifier.height(Espacio.m))
+    }
+
     Text(
         "Al registrarla queda pendiente de aprobación. Podrás ofertar con ella " +
             "cuando el administrador la revise.",
