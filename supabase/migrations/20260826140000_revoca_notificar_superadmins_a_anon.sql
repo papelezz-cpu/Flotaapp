@@ -1,0 +1,51 @@
+-- ============================================================================
+-- notificar_superadmins() deja de ser invocable sin sesión
+-- ============================================================================
+-- Postgres concede EXECUTE a PUBLIC en cada función nueva salvo que se revoque
+-- a mano. Nadie lo hizo, así que las 30 funciones de public son ejecutables por
+-- el rol `anon`, es decir por cualquiera con la clave anon — que va en el
+-- código del cliente y es pública por diseño.
+--
+-- Para casi todas da igual:
+--
+--   · Las 11 RPC de negocio (enviar_oferta, responder_oferta,
+--     cancelar_reservacion, calificar_servicio, registrar_evidencias,
+--     avanzar_tracking, abrir_expediente, solicitar_cancelacion,
+--     responder_contraoferta, enviar_mensaje, cerrar_acuerdo) verifican
+--     auth.uid() por dentro. Sin sesión es NULL y la llamada falla sola.
+--   · Los ayudantes (is_superadmin, mi_nombre, puede_notificar,
+--     participa_en_expediente) responden a partir de auth.uid(): anon obtiene
+--     false o NULL.
+--   · Las puras (tracking_pasos, tabla_recurso, version_al_menos...) no leen
+--     ni escriben nada.
+--   · arranque_app es pública A PROPOSITO: es el arranque del cliente movil y
+--     tiene que responder ANTES del login. No se toca.
+--
+-- La excepción es notificar_superadmins(): es SECURITY DEFINER, escribe en
+-- notificaciones, y es la unica que no comprueba en absoluto quien la llama.
+-- Tal como está, cualquiera sin sesión puede insertar filas con titulo y
+-- mensaje arbitrarios en la campana de todos los superadmins. Eso es spam, y
+-- peor: es texto que un superadmin lee dentro de un panel en el que confia.
+--
+-- Solo la llaman usuarios con sesión iniciada (21 sitios en js/, todos tras
+-- una acción de empresa o cliente autenticado), así que revocar a anon no
+-- quita nada que se esté usando.
+-- ============================================================================
+
+REVOKE EXECUTE ON FUNCTION public.notificar_superadmins(text, text, text) FROM anon;
+
+-- Se deja explícito lo que sí debe poder llamarla, para que no dependa del
+-- valor por omisión de PUBLIC.
+GRANT EXECUTE ON FUNCTION public.notificar_superadmins(text, text, text) TO authenticated;
+
+-- ── PENDIENTE DE DECISION, NO SE TOCA AQUI ─────────────────────────────────
+-- expire_stale_offers() tampoco comprueba al llamante y tambien es
+-- SECURITY DEFINER, asi que anon puede ejecutarla. El riesgo es bajo: su
+-- UPDATE solo alcanza ofertas con expira_en < NOW(), es decir las que ya
+-- estaban vencidas de todos modos. No puede caducar una oferta viva. Lo unico
+-- que abre es la posibilidad de provocar escrituras repetidas sin sesion.
+-- Ningun cliente la llama hoy (grep sb.rpc en js/ solo devuelve
+-- cerrar_acuerdo); la usaria el pg_cron de la migracion opcional.
+--
+--   REVOKE EXECUTE ON FUNCTION public.expire_stale_offers() FROM anon;
+-- ============================================================================
