@@ -1654,14 +1654,22 @@ function aprobarTodasSolicitudes() {
 
 function aprobarTodosAcuerdos() {
   showConfirm('¿Aprobar todos los acuerdos pendientes? Se crearán reservaciones para cada uno.', async () => {
-    const { data: acuerdos } = await sb.from('pedidos').select('id, oferta_pendiente_id').eq('estado', 'pendiente_acuerdo');
+    // Dos consultas en total, no dos por acuerdo: antes esto pedía el pedido
+    // completo y su oferta dentro del bucle, con 2N+1 viajes de red.
+    const { data: acuerdos } = await sb.from('pedidos').select('*').eq('estado', 'pendiente_acuerdo');
     if (!acuerdos?.length) { showToast('No hay acuerdos pendientes'); return; }
+
+    const ofertaIds = acuerdos.map(p => p.oferta_pendiente_id).filter(Boolean);
+    const ofertasPorId = {};
+    if (ofertaIds.length) {
+      const { data: ofs } = await sb.from('ofertas').select('*').in('id', ofertaIds);
+      (ofs || []).forEach(o => { ofertasPorId[o.id] = o; });
+    }
+
     let ok = 0, err = 0;
-    for (const a of acuerdos) {
+    for (const ped of acuerdos) {
       try {
-        const { data: ped } = await sb.from('pedidos').select('*').eq('id', a.id).single();
-        if (!ped?.oferta_pendiente_id) { err++; continue; }
-        const { data: oferta } = await sb.from('ofertas').select('*').eq('id', ped.oferta_pendiente_id).single();
+        const oferta = ped.oferta_pendiente_id && ofertasPorId[ped.oferta_pendiente_id];
         if (!oferta) { err++; continue; }
         await _ejecutarAprobarAcuerdo(ped, oferta);
         ok++;

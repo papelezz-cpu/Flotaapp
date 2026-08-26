@@ -172,16 +172,11 @@ async function enviarSolicitudArco() {
   if (error) { showToast('Error al enviar: ' + error.message, 'error'); return; }
 
   // Avisar a superadmin: estas solicitudes suelen tener plazo legal de respuesta.
-  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-  if (supers?.length) {
-    await sb.from('notificaciones').insert(supers.map(s => ({
-      user_id: s.user_id,
-      tipo:    'solicitud_arco',
-      titulo:  'Nueva solicitud de derechos ARCO',
-      mensaje: `${esc(currentUser.nombre || 'Un usuario')} envió una solicitud de ${ARCO_TIPOS[tipo]?.label || tipo}. Tiene plazo de respuesta.`,
-      leido:   false,
-    })));
-  }
+  await sb.rpc('notificar_superadmins', {
+    p_tipo:    'solicitud_arco',
+    p_titulo:  'Nueva solicitud de derechos ARCO',
+    p_mensaje: `${esc(currentUser.nombre || 'Un usuario')} envió una solicitud de ${ARCO_TIPOS[tipo]?.label || tipo}. Tiene plazo de respuesta.`,
+  });
 
   showToast('✓ Solicitud enviada — te responderemos por correo');
   renderPrivacidad();

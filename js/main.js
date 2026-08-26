@@ -24,17 +24,29 @@ function init() {
 // nuevo (ver checkExistingSession/doLogin en auth.js), y logout() limpia
 // los canales antes de mostrar el login de nuevo.
 function iniciarSuscripcionesRealtime() {
-  sb.channel('notif-' + currentUser.id)
-    .on('postgres_changes', {
-      event: 'INSERT', schema: 'public', table: 'notificaciones',
-      filter: `user_id=eq.${currentUser.id}`
-    }, () => loadNotificaciones())
-    .subscribe();
-
   const clienteActivo       = () => document.getElementById('view-cliente').classList.contains('active');
   const adminActivo         = () => document.getElementById('view-admin').classList.contains('active');
   const pendientesActivo    = () => document.getElementById('view-pendientes')?.classList.contains('active');
   const pedidosActivo       = () => document.getElementById('view-pedidos').classList.contains('active');
+
+  // Un solo canal para las notificaciones propias, y filtrado en el servidor.
+  // Antes había dos escuchadores del mismo evento — este, y otro sin filtro
+  // dentro de 'portgo-changes' — así que cada notificación propia disparaba
+  // loadNotificaciones() dos veces, con su consulta cada una.
+  sb.channel('notif-' + currentUser.id)
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'notificaciones',
+      filter: `user_id=eq.${currentUser.id}`
+    }, () => {
+      loadNotificaciones();
+      // El superadmin además refresca el badge de Pendientes: esa parte vivía
+      // en el escuchador duplicado y se conserva aquí.
+      if (currentUser.rol === 'superadmin') {
+        _loadAprBadge();
+        if (pendientesActivo()) renderAprobaciones();
+      }
+    })
+    .subscribe();
 
   sb.channel('portgo-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'camiones' }, () => {
@@ -64,17 +76,6 @@ function iniciarSuscripcionesRealtime() {
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ofertas' }, () => {
       if (pedidosActivo()) renderPedidos();
-    })
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificaciones' }, payload => {
-      // Refrescar campanita cuando llega una notificación para mí
-      if (currentUser.id && payload.new?.user_id === currentUser.id) {
-        loadNotificaciones();
-        // Si soy superadmin: refrescar badge del recuadro en home y pendientes si está activo
-        if (currentUser.rol === 'superadmin') {
-          _loadAprBadge();
-          if (pendientesActivo()) renderAprobaciones();
-        }
-      }
     })
     .subscribe();
 }

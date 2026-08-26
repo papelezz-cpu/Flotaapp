@@ -425,16 +425,11 @@ async function _guardarIncidenteVacios(expedienteId, nota) {
     });
   }
   // También al superadmin: ahí corren las demoras (costo por día de retraso).
-  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-  if (supers?.length) {
-    await sb.from('notificaciones').insert(supers.map(s => ({
-      user_id: s.user_id,
-      tipo:    'incidente_entrega_vacios',
-      titulo:  '⚠ Incidente: entrega de vacíos',
-      mensaje: `${esc(currentUser.nombre || 'Una empresa')} reportó que no puede entregar el vacío del servicio de ${esc(reserva?.cliente || 'un cliente')}. Motivo: ${nota}`,
-      leido:   false,
-    })));
-  }
+  await sb.rpc('notificar_superadmins', {
+    p_tipo:    'incidente_entrega_vacios',
+    p_titulo:  '⚠ Incidente: entrega de vacíos',
+    p_mensaje: `${esc(currentUser.nombre || 'Una empresa')} reportó que no puede entregar el vacío del servicio de ${esc(reserva?.cliente || 'un cliente')}. Motivo: ${nota}`,
+  });
 
   await _refrescarExpediente();
   showToast('✓ Cliente notificado');
