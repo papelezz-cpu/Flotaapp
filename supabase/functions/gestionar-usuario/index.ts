@@ -45,7 +45,21 @@ Deno.serve(async (req: Request) => {
         user_metadata: { nombre }
       })
       if (createErr) return new Response(JSON.stringify({ error: createErr.message }), { status: 400, headers: corsHeaders })
-      await sbAdmin.from('perfiles').insert({ user_id: newUser.user.id, nombre, rol })
+
+      // upsert y no insert: si un trigger de alta ya creó el perfil, el insert
+      // fallaba con clave duplicada y el usuario se quedaba con el rol por
+      // defecto — mientras el panel decía que todo salió bien.
+      const { error: perfilErr } = await sbAdmin.from('perfiles')
+        .upsert({ user_id: newUser.user.id, nombre, rol }, { onConflict: 'user_id' })
+
+      if (perfilErr) {
+        // Sin perfil el usuario no puede entrar a nada: se deshace el alta en
+        // vez de dejar una cuenta huérfana en auth.
+        await sbAdmin.auth.admin.deleteUser(newUser.user.id)
+        return new Response(
+          JSON.stringify({ error: `No se pudo asignar el perfil (${perfilErr.message}). No se creó el usuario.` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
       return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
@@ -65,7 +79,21 @@ Deno.serve(async (req: Request) => {
       if (rol)    perfilUpdate.rol    = rol
 
       if (Object.keys(perfilUpdate).length) {
-        await sbAdmin.from('perfiles').update(perfilUpdate).eq('user_id', user_id)
+        // Se confirma con .select(): un UPDATE frenado por el trigger
+        // guard_perfil_self_update, o que no encuentra la fila, devolvía 0
+        // filas y la función respondía ok igual. Ese era el motivo de
+        // "dice que se guardó pero el rol sigue igual".
+        const { data: filas, error: perfilErr } = await sbAdmin.from('perfiles')
+          .update(perfilUpdate).eq('user_id', user_id).select('user_id')
+
+        if (perfilErr) {
+          return new Response(JSON.stringify({ error: `No se pudo actualizar el perfil: ${perfilErr.message}` }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+        if (!filas?.length) {
+          return new Response(JSON.stringify({ error: 'No se modificó ningún perfil: el usuario ya no existe o una regla de la base bloqueó el cambio.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
       }
 
       return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
