@@ -132,7 +132,8 @@ async function actualizarBadgeCobros() {
     .eq('estado', 'Completada')
     .eq('pagado', false)
     .lt('fecha_vencimiento_pago', hoy);
-  if (currentUser.rol === 'cliente')      q = q.eq('cliente_email', currentUser.email);
+  // Por cliente_user_id, no por correo: ver el comentario en renderReserv().
+  if (currentUser.rol === 'cliente')      q = q.eq('cliente_user_id', currentUser.id);
   else if (currentUser.rol === 'admin')   q = q.eq('propietario_id', currentUser.id);
   const { count } = await q;
   if (count > 0) {

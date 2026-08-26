@@ -1453,16 +1453,11 @@ async function crearPedido() {
   await guardarPlantillaDesdeFormulario();
 
   // Notificar solo a superadmins para revisión
-  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-  if (supers?.length) {
-    await sb.from('notificaciones').insert(supers.map(a => ({
-      user_id: a.user_id,
-      tipo:    'revision_solicitud',
-      titulo:  'Nueva solicitud para revisar',
-      mensaje: `${currentUser.nombre || 'Un cliente'} publicó una solicitud de ${tipo} que requiere tu revisión antes de publicarse.`,
-      leido:   false,
-    })));
-  }
+  await sb.rpc('notificar_superadmins', {
+    p_tipo:    'revision_solicitud',
+    p_titulo:  'Nueva solicitud para revisar',
+    p_mensaje: `${currentUser.nombre || 'Un cliente'} publicó una solicitud de ${tipo} que requiere tu revisión antes de publicarse.`,
+  });
 
   // Correo SOLO a superadmins: son los que tienen que revisarla.
   // Antes esta misma línea caía en la plantilla 'nueva_solicitud' (sin campo
@@ -1739,16 +1734,11 @@ async function confirmarDetallesServicio() {
   } else if (errCierre.message?.includes('DOCUMENTOS_VENCIDOS')) {
     // Único caso que sigue necesitando al superadmin: la empresa tiene
     // documentos vencidos y no se puede cerrar el trato automáticamente.
-    const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-    if (supers?.length) {
-      await sb.from('notificaciones').insert(supers.map(a => ({
-        user_id: a.user_id,
-        tipo:    'revision_acuerdo',
-        titulo:  '⚠ Acuerdo pendiente — documentos vencidos',
-        mensaje: `${esc(pedido.cliente_nombre || 'Un cliente')} aceptó una oferta de ${esc(oferta.admin_nombre || 'un proveedor')}, pero la empresa tiene documentos vencidos. Revísalo en Pendientes.`,
-        leido:   false,
-      })));
-    }
+    await sb.rpc('notificar_superadmins', {
+      p_tipo:    'revision_acuerdo',
+      p_titulo:  '⚠ Acuerdo pendiente — documentos vencidos',
+      p_mensaje: `${esc(pedido.cliente_nombre || 'Un cliente')} aceptó una oferta de ${esc(oferta.admin_nombre || 'un proveedor')}, pero la empresa tiene documentos vencidos. Revísalo en Pendientes.`,
+    });
     mensajeFinal = '✓ Acuerdo aceptado — la empresa tiene documentos vencidos, un administrador lo revisará antes de confirmar.';
   } else {
     console.error('Error al cerrar el acuerdo:', errCierre);
@@ -2215,16 +2205,11 @@ async function responderContra(accion) {
           if (pedido.patio_externo)  await _crearExpedienteAuto(reservaId, 'entrega_vacios');
         }
       } else if (errCierre.message?.includes('DOCUMENTOS_VENCIDOS')) {
-        const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-        if (supers?.length) {
-          await sb.from('notificaciones').insert(supers.map(a => ({
-            user_id: a.user_id,
-            tipo:    'revision_acuerdo',
-            titulo:  '⚠ Acuerdo pendiente — documentos vencidos',
-            mensaje: `${esc(currentUser.nombre)} aceptó una contraoferta de ${esc(pedido.cliente_nombre || 'cliente')}, pero tiene documentos vencidos. Revísalo en Pendientes.`,
-            leido:   false,
-          })));
-        }
+        await sb.rpc('notificar_superadmins', {
+          p_tipo:    'revision_acuerdo',
+          p_titulo:  '⚠ Acuerdo pendiente — documentos vencidos',
+          p_mensaje: `${esc(currentUser.nombre)} aceptó una contraoferta de ${esc(pedido.cliente_nombre || 'cliente')}, pero tiene documentos vencidos. Revísalo en Pendientes.`,
+        });
         mensajeFinal = '✓ Acuerdo aceptado — tienes documentos vencidos, un administrador lo revisará antes de confirmar.';
       } else {
         console.error('Error al cerrar el acuerdo:', errCierre);

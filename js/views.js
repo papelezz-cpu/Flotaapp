@@ -164,7 +164,8 @@ async function actualizarBadgeReservas() {
   const badge = document.getElementById('home-res-badge');
   if (!badge || !currentUser.id) return;
   let q = sb.from('reservaciones').select('id', { count: 'exact', head: true }).eq('estado', 'Activa');
-  if (currentUser.rol === 'cliente')   q = q.eq('cliente_email', currentUser.email);
+  // Por cliente_user_id, no por correo: ver el comentario en renderReserv().
+  if (currentUser.rol === 'cliente')   q = q.eq('cliente_user_id', currentUser.id);
   else if (currentUser.rol === 'admin') q = q.eq('propietario_id', currentUser.id);
   const { count } = await q;
   if (count > 0) {

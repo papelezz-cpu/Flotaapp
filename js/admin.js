@@ -310,13 +310,11 @@ async function solicitarActualizacionDocs() {
   const { error } = await sb.from('perfiles').update(payload).eq('user_id', uid);
   if (error) { _done(); showToast('Error al enviar: ' + error.message, 'error'); return; }
 
-  const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-  if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
-    user_id: sa.user_id, tipo: 'docs_empresa_pendientes',
-    titulo:  '📋 Documentos de empresa para revisar',
-    mensaje: `${esc(currentUser.nombre || '')} envió documentos de empresa para actualización.`,
-    leido:   false,
-  })));
+  await sb.rpc('notificar_superadmins', {
+    p_tipo: 'docs_empresa_pendientes',
+    p_titulo:  '📋 Documentos de empresa para revisar',
+    p_mensaje: `${esc(currentUser.nombre || '')} envió documentos de empresa para actualización.`,
+  });
 
   _done();
   showToast('✓ Documentos enviados — pendientes de aprobación');
@@ -530,13 +528,11 @@ async function guardarEdicion() {
   const { error } = await sb.from('camiones').update(updatePayload).eq('id', id);
   if (error) { showToast('No se pudo actualizar: ' + _dbError(error), 'error'); return; }
   if (!esSuperAdmin) {
-    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
-      user_id: sa.user_id, tipo: 'nueva_unidad_pendiente',
-      titulo:  'Unidad editada — revisión pendiente',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} editó la unidad ${id}. Revisa los cambios en Pendientes.`,
-      leido:   false,
-    })));
+    await sb.rpc('notificar_superadmins', {
+      p_tipo: 'nueva_unidad_pendiente',
+      p_titulo:  'Unidad editada — revisión pendiente',
+      p_mensaje: `La empresa ${esc(currentUser.nombre || '')} editó la unidad ${id}. Revisa los cambios en Pendientes.`,
+    });
   }
   closeEditarCamion();
   await renderAdmin();
@@ -995,13 +991,11 @@ async function agregarCamion() {
   if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
   if (!esSuperAdmin) {
-    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
-      user_id: sa.user_id, tipo: 'nueva_unidad_pendiente',
-      titulo:  'Nueva unidad pendiente de revisión',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta la unidad ${targetId} (${tipo}). Revísala en Pendientes.`,
-      leido:   false,
-    })));
+    await sb.rpc('notificar_superadmins', {
+      p_tipo: 'nueva_unidad_pendiente',
+      p_titulo:  'Nueva unidad pendiente de revisión',
+      p_mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta la unidad ${targetId} (${tipo}). Revísala en Pendientes.`,
+    });
   }
 
   // Limpiar formulario
@@ -1126,13 +1120,11 @@ async function agregarCustodio() {
   if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
   if (!esSuperAdmin) {
-    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
-      user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
-      titulo:  'Nuevo custodio pendiente de revisión',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta el custodio ${id} (${nombre}). Revísalo en Pendientes.`,
-      leido:   false,
-    })));
+    await sb.rpc('notificar_superadmins', {
+      p_tipo: 'nuevo_recurso_pendiente',
+      p_titulo:  'Nuevo custodio pendiente de revisión',
+      p_mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta el custodio ${id} (${nombre}). Revísalo en Pendientes.`,
+    });
   }
 
   ['ac-nombre','ac-desc','ac-precio','ac-certs','ac-vence-cert','ac-num-sedena','ac-vence-sedena'].forEach(i => {
@@ -1219,13 +1211,11 @@ async function guardarEdicionCustodio() {
   const { error } = await sb.from('custodios').update(upd).eq('id', id);
   if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
   if (!esSA) {
-    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
-      user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
-      titulo:  'Custodio editado — revisión pendiente',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} editó el custodio ${id}. Revisa los cambios en Pendientes.`,
-      leido:   false,
-    })));
+    await sb.rpc('notificar_superadmins', {
+      p_tipo: 'nuevo_recurso_pendiente',
+      p_titulo:  'Custodio editado — revisión pendiente',
+      p_mensaje: `La empresa ${esc(currentUser.nombre || '')} editó el custodio ${id}. Revisa los cambios en Pendientes.`,
+    });
   }
   closeEditarCustodio();
   await renderAdminCustodios();
@@ -1312,13 +1302,11 @@ async function agregarPatio() {
   if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
   if (!esSuperAdmin) {
-    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
-      user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
-      titulo:  'Nuevo patio pendiente de revisión',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta el patio ${id} (${nombre}). Revísalo en Pendientes.`,
-      leido:   false,
-    })));
+    await sb.rpc('notificar_superadmins', {
+      p_tipo: 'nuevo_recurso_pendiente',
+      p_titulo:  'Nuevo patio pendiente de revisión',
+      p_mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta el patio ${id} (${nombre}). Revísalo en Pendientes.`,
+    });
   }
 
   ['ap-nombre','ap-ubic','ap-area','ap-cap','ap-precio','ap-svcs','ap-vence-permiso','ap-doc-permiso'].forEach(i => {
@@ -1374,13 +1362,11 @@ async function guardarEdicionPatio() {
   const { error } = await sb.from('patios').update(upd).eq('id', id);
   if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
   if (!esSA) {
-    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
-      user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
-      titulo:  'Patio editado — revisión pendiente',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} editó el patio ${id}. Revisa los cambios en Pendientes.`,
-      leido:   false,
-    })));
+    await sb.rpc('notificar_superadmins', {
+      p_tipo: 'nuevo_recurso_pendiente',
+      p_titulo:  'Patio editado — revisión pendiente',
+      p_mensaje: `La empresa ${esc(currentUser.nombre || '')} editó el patio ${id}. Revisa los cambios en Pendientes.`,
+    });
   }
   closeEditarPatio();
   await renderAdminPatios();
@@ -1459,13 +1445,11 @@ async function agregarLavado() {
   if (error) { _done(); showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
 
   if (currentUser.rol !== 'superadmin') {
-    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
-      user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
-      titulo:  'Nuevo servicio de lavado pendiente de revisión',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta el servicio ${id} (${nombre}). Revísalo en Pendientes.`,
-      leido:   false,
-    })));
+    await sb.rpc('notificar_superadmins', {
+      p_tipo: 'nuevo_recurso_pendiente',
+      p_titulo:  'Nuevo servicio de lavado pendiente de revisión',
+      p_mensaje: `La empresa ${esc(currentUser.nombre || '')} dio de alta el servicio ${id} (${nombre}). Revísalo en Pendientes.`,
+    });
   }
 
   ['al-nombre','al-tipos-vehiculo','al-tipos-lavado','al-capacidad','al-ubic','al-horario','al-precio','al-desc']
@@ -1519,13 +1503,11 @@ async function guardarEdicionLavado() {
   const { error } = await sb.from('lavados').update(upd).eq('id', id);
   if (error) { showToast('No se pudo guardar: ' + _dbError(error), 'error'); return; }
   if (!esSA) {
-    const { data: sas } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-    if (sas?.length) await sb.from('notificaciones').insert(sas.map(sa => ({
-      user_id: sa.user_id, tipo: 'nuevo_recurso_pendiente',
-      titulo:  'Servicio de lavado editado — revisión pendiente',
-      mensaje: `La empresa ${esc(currentUser.nombre || '')} editó el servicio de lavado ${id}. Revisa los cambios en Pendientes.`,
-      leido:   false,
-    })));
+    await sb.rpc('notificar_superadmins', {
+      p_tipo: 'nuevo_recurso_pendiente',
+      p_titulo:  'Servicio de lavado editado — revisión pendiente',
+      p_mensaje: `La empresa ${esc(currentUser.nombre || '')} editó el servicio de lavado ${id}. Revisa los cambios en Pendientes.`,
+    });
   }
   closeEditarLavado();
   await renderAdminLavados();

@@ -391,18 +391,13 @@ async function agregarOperador() {
   if (errConsent) console.error('No se pudo registrar la declaración:', errConsent);
 
   // Notificar a superadmins
-  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-  if (supers?.length) {
-    await sb.from('notificaciones').insert(supers.map(s => ({
-      user_id: s.user_id,
-      tipo:    'nuevo_recurso_pendiente',
-      titulo:  esEdicionAprobado ? '✏️ Operador editado — revisión pendiente' : '👷 Nuevo operador por aprobar',
-      mensaje: esEdicionAprobado
-        ? `La empresa ${currentUser.nombre} editó al operador ${nombre} (${id}). Revisa los cambios en Pendientes.`
-        : `${currentUser.nombre} registró al operador ${nombre} (${id}). Revísalo en el panel de aprobaciones.`,
-      leido:   false,
-    })));
-  }
+  await sb.rpc('notificar_superadmins', {
+    p_tipo:    'nuevo_recurso_pendiente',
+    p_titulo:  esEdicionAprobado ? '✏️ Operador editado — revisión pendiente' : '👷 Nuevo operador por aprobar',
+    p_mensaje: esEdicionAprobado
+      ? `La empresa ${currentUser.nombre} editó al operador ${nombre} (${id}). Revisa los cambios en Pendientes.`
+      : `${currentUser.nombre} registró al operador ${nombre} (${id}). Revísalo en el panel de aprobaciones.`,
+  });
 
   restore();
   showToast(isEdit ? `✓ Correcciones enviadas — ${id} en revisión nuevamente` : `✓ Operador ${id} enviado — pendiente de aprobación`);

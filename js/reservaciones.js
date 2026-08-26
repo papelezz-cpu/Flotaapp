@@ -67,9 +67,13 @@ async function renderReserv() {
     header.innerHTML = `<div>Unidad</div><div>Empresa</div><div>Inicio</div><div>Fin</div><div>Estado</div>`;
     header.classList.add('cli');
 
+    // Se filtra por cliente_user_id, NO por cliente_email: el correo es texto
+    // que el usuario puede cambiar, y al cambiarlo su historial entero
+    // desaparecía de esta vista aunque RLS se lo siguiera permitiendo.
+    // cliente_user_id es además la columna sobre la que decide RLS.
     const { data: _allCli, error } = await sb.from('reservaciones')
       .select('*')
-      .eq('cliente_email', currentUser.email)
+      .eq('cliente_user_id', currentUser.id)
       .order('created_at', { ascending: false });
 
     if (error) { body.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar.</div>`; return; }
@@ -84,6 +88,7 @@ async function renderReserv() {
     const camionIds   = data.filter(r => !r.recurso_tipo || r.recurso_tipo === 'camion').map(r => r.unidad).filter(Boolean);
     const custodioIds = data.filter(r => r.recurso_tipo === 'custodio').map(r => r.unidad).filter(Boolean);
     const patioIds    = data.filter(r => r.recurso_tipo === 'patio').map(r => r.unidad).filter(Boolean);
+    const lavadoIds   = data.filter(r => r.recurso_tipo === 'lavado').map(r => r.unidad).filter(Boolean);
 
     const empresaMap = {};
     const recursoNombreMap = {};
@@ -109,6 +114,15 @@ async function renderReserv() {
         .then(({ data: d }) => (d || []).forEach(p => {
           propIdMap[p.id] = p.propietario_id;
           recursoNombreMap[p.id] = `🏭 ${p.nombre}`;
+        }))
+    );
+    // Los lavados faltaban aquí: sus reservaciones nunca resolvían nombre ni
+    // empresa y salían siempre como «—».
+    if (lavadoIds.length) fetches.push(
+      sb.from('lavados').select('id, nombre, propietario_id').in('id', lavadoIds)
+        .then(({ data: d }) => (d || []).forEach(l => {
+          propIdMap[l.id] = l.propietario_id;
+          recursoNombreMap[l.id] = `🧼 ${l.nombre}`;
         }))
     );
     await Promise.all(fetches);
@@ -237,6 +251,7 @@ async function renderReserv() {
   const camionIds   = [...new Set(data.filter(r => !r.recurso_tipo || r.recurso_tipo === 'camion').map(r => r.unidad).filter(Boolean))];
   const custodioIds = [...new Set(data.filter(r => r.recurso_tipo === 'custodio').map(r => r.unidad).filter(Boolean))];
   const patioIds    = [...new Set(data.filter(r => r.recurso_tipo === 'patio').map(r => r.unidad).filter(Boolean))];
+  const lavadoIds   = [...new Set(data.filter(r => r.recurso_tipo === 'lavado').map(r => r.unidad).filter(Boolean))];
 
   const empresaMap      = {};
   const ownerMap        = {};
@@ -265,6 +280,15 @@ async function renderReserv() {
         propIdMap2[p.id]      = p.propietario_id;
         ownerMap[p.id]        = p.propietario_id;
         recursoLabelMap[p.id] = `🏭 ${p.nombre}`;
+      }))
+  );
+  // Los lavados faltaban aquí igual que en la rama de cliente.
+  if (lavadoIds.length) fetches.push(
+    sb.from('lavados').select('id, nombre, propietario_id').in('id', lavadoIds)
+      .then(({ data: d }) => (d || []).forEach(l => {
+        propIdMap2[l.id]      = l.propietario_id;
+        ownerMap[l.id]        = l.propietario_id;
+        recursoLabelMap[l.id] = `🧼 ${l.nombre}`;
       }))
   );
   await Promise.all(fetches);
@@ -540,16 +564,11 @@ function cancelarReserva(reservaId, unidad) {
     }
 
     // Notificar a superadmin — un acuerdo ya aprobado se cayó, debe saberlo
-    const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-    if (supers?.length) {
-      await sb.from('notificaciones').insert(supers.map(a => ({
-        user_id: a.user_id,
-        tipo:    'reserva_cancelada_admin',
-        titulo:  'Un acuerdo aprobado se canceló',
-        mensaje: `${esc(currentUser.nombre)} canceló la reserva con ${esc(rv?.cliente || 'un cliente')} después de que el acuerdo ya había sido aprobado. La solicitud volvió a estar abierta.`,
-        leido:   false,
-      })));
-    }
+    await sb.rpc('notificar_superadmins', {
+      p_tipo:    'reserva_cancelada_admin',
+      p_titulo:  'Un acuerdo aprobado se canceló',
+      p_mensaje: `${esc(currentUser.nombre)} canceló la reserva con ${esc(rv?.cliente || 'un cliente')} después de que el acuerdo ya había sido aprobado. La solicitud volvió a estar abierta.`,
+    });
 
     _reservaActiva = false;
     await renderReserv();
@@ -808,6 +827,10 @@ async function _notificarCambioReserva(reservaId, titulo, mensaje) {
     .select('propietario_id').eq('id', reservaId).single();
   if (!r?.propietario_id) { showToast('No se pudo enviar', 'error'); return false; }
 
+  // Este es el único sitio que sigue leyendo los superadmins a mano en vez de
+  // usar notificar_superadmins(): _notificarEmail necesita la lista de ids
+  // para el correo, así que la consulta hace falta igual. Cambiarlo a la RPC
+  // daría tres viajes en vez de dos.
   const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
   const destinatarios = [r.propietario_id, ...((supers || []).map(s => s.user_id))];
 
@@ -1020,13 +1043,13 @@ async function confirmarCambiarUnidad() {
     user_id: r.cliente_user_id, tipo: 'unidad_cambiada', titulo: '🔧 Se cambió la unidad de tu servicio',
     mensaje: `La empresa cambió la unidad asignada de "${unidadVieja}" a "${unidadNueva}". Motivo: ${motivo}`, leido: false,
   });
-  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-  (supers || []).forEach(s => notifs.push({
-    user_id: s.user_id, tipo: 'unidad_cambiada', titulo: '🔧 Cambio de unidad en un servicio activo',
-    mensaje: `${esc(currentUser.nombre || 'Una empresa')} cambió la unidad de "${unidadVieja}" a "${unidadNueva}" en el servicio de ${esc(r?.cliente || 'un cliente')}. Motivo: ${motivo}`,
-    leido: false,
-  }));
   if (notifs.length) await sb.from('notificaciones').insert(notifs);
+
+  await sb.rpc('notificar_superadmins', {
+    p_tipo:    'unidad_cambiada',
+    p_titulo:  '🔧 Cambio de unidad en un servicio activo',
+    p_mensaje: `${esc(currentUser.nombre || 'Una empresa')} cambió la unidad de "${unidadVieja}" a "${unidadNueva}" en el servicio de ${esc(r?.cliente || 'un cliente')}. Motivo: ${motivo}`,
+  });
 
   cerrarCambiarUnidad();
   await renderReserv();
@@ -1177,29 +1200,19 @@ async function subirEvidencias() {
       });
     }
     // Notificar a superadmins para que lo revisen
-    const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-    if (supers?.length) {
-      await sb.from('notificaciones').insert(supers.map(a => ({
-        user_id: a.user_id,
-        tipo:    'revision_finalizacion',
-        titulo:  '🏁 Finalización de servicio por revisar',
-        mensaje: `${esc(r.cliente || 'Un cliente')} tiene un servicio marcado como completado, pendiente de tu aprobación.`,
-        leido:   false,
-      })));
-    }
+    await sb.rpc('notificar_superadmins', {
+      p_tipo:    'revision_finalizacion',
+      p_titulo:  '🏁 Finalización de servicio por revisar',
+      p_mensaje: `${esc(r.cliente || 'Un cliente')} tiene un servicio marcado como completado, pendiente de tu aprobación.`,
+    });
   } else if (!existentes.length) {
     // La otra parte ya había solicitado el cierre; esta es la primera vez que
     // ESTE lado sube su evidencia — avisar a superadmins que ya están ambas.
-    const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-    if (supers?.length) {
-      await sb.from('notificaciones').insert(supers.map(a => ({
-        user_id: a.user_id,
-        tipo:    'revision_finalizacion',
-        titulo:  '🏁 Ya están ambas evidencias',
-        mensaje: `${esc(r.cliente || 'Un cliente')} y la empresa ya subieron su evidencia de cierre. Puedes revisarla y aprobarla.`,
-        leido:   false,
-      })));
-    }
+    await sb.rpc('notificar_superadmins', {
+      p_tipo:    'revision_finalizacion',
+      p_titulo:  '🏁 Ya están ambas evidencias',
+      p_mensaje: `${esc(r.cliente || 'Un cliente')} y la empresa ya subieron su evidencia de cierre. Puedes revisarla y aprobarla.`,
+    });
   }
 
   cerrarEvidencias();
@@ -1325,15 +1338,13 @@ async function confirmarSolicitudCancelacion() {
     mensaje: `${esc(currentUser.nombre || 'El cliente')} solicitó cancelar el servicio de ${esc(r.unidad || 'la unidad')}. Motivo: ${esc(motivo)}. Está en revisión — no continúes hasta que se resuelva.`,
     leido:   false,
   });
-  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-  (supers || []).forEach(s => notifs.push({
-    user_id: s.user_id,
-    tipo:    'cancelacion_solicitada',
-    titulo:  'Cancelación por revisar',
-    mensaje: `${esc(currentUser.nombre || 'Un cliente')} solicitó cancelar un servicio activo (${esc(r?.tracking_estado || 'Confirmado')}). Motivo: ${esc(motivo)}.`,
-    leido:   false,
-  }));
   if (notifs.length) await sb.from('notificaciones').insert(notifs);
+
+  await sb.rpc('notificar_superadmins', {
+    p_tipo:    'cancelacion_solicitada',
+    p_titulo:  'Cancelación por revisar',
+    p_mensaje: `${esc(currentUser.nombre || 'Un cliente')} solicitó cancelar un servicio activo (${esc(r?.tracking_estado || 'Confirmado')}). Motivo: ${esc(motivo)}.`,
+  });
 
   showToast('✓ Solicitud enviada — te avisaremos cuando se resuelva');
   await renderReserv();

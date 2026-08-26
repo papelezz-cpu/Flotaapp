@@ -802,16 +802,11 @@ async function doRegistro() {
   // re-registro: puede haber cambiado la versión del aviso desde la vez pasada.
   await _registrarConsentimientos(userId, 'registro');
 
-  const { data: superadmins } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-  if (superadmins?.length) {
-    await sb.from('notificaciones').insert(superadmins.map(s => ({
-      user_id: s.user_id,
-      tipo:    'nueva_cuenta_pendiente',
-      titulo:  'Nueva solicitud de cuenta',
-      mensaje: `${nombre} quiere registrarse como ${_regRol === 'cliente' ? 'cliente' : 'empresa'}. Revisa en "Por aprobar".`,
-      leido:   false,
-    })));
-  }
+  await sb.rpc('notificar_superadmins', {
+    p_tipo:    'nueva_cuenta_pendiente',
+    p_titulo:  'Nueva solicitud de cuenta',
+    p_mensaje: `${nombre} quiere registrarse como ${_regRol === 'cliente' ? 'cliente' : 'empresa'}. Revisa en "Por aprobar".`,
+  });
 
   await sb.auth.signOut();
 
