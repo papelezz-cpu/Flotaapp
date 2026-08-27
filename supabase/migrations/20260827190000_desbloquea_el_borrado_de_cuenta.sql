@@ -141,7 +141,62 @@ $fn$;
 
 
 -- ─────────────────────────────────────────────────────────────────────────
--- 5. Comprobacion
+-- 5. Lo mismo para los guards de pedidos y ofertas
+-- ─────────────────────────────────────────────────────────────────────────
+-- guard_pedido_update termina en un RAISE EXCEPTION 'No autorizado' sin
+-- condicion: rechaza cualquier UPDATE que no venga del cliente del pedido o
+-- de un admin. En una cascada auth.uid() es NULL, asi que no encaja en
+-- ninguna rama y la excepcion salta.
+--
+--   ERROR: No autorizado
+--   CONTEXTO: guard_pedido_update() line 54
+--             UPDATE ONLY "pedidos" SET "cliente_id" = NULL
+--
+-- Esto NO aparecio al probar en pruebas, porque alli la cuenta de prueba era
+-- una empresa sin pedidos. Los clientes de produccion tienen hasta 16. Mismo
+-- cambio, distinto dato, distinto camino de codigo.
+--
+-- La excepcion se inyecta en vez de reescribir la funcion entera: asi el resto
+-- del cuerpo queda intacto, byte a byte, y no hay riesgo de perder una rama al
+-- transcribirla. Es la misma condicion acotada que en guard_fleet_resource_
+-- update: solo cuando la columna pasa a NULL y el perfil anterior ya no existe.
+DO $$
+DECLARE
+  g      record;
+  def    text;
+  clausu text;
+BEGIN
+  FOR g IN
+    SELECT * FROM (VALUES
+      ('guard_pedido_update', 'cliente_id'),
+      ('guard_oferta_update', 'admin_id')
+    ) AS t(fn, col)
+  LOOP
+    SELECT pg_get_functiondef(p.oid) INTO def
+      FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = g.fn;
+
+    CONTINUE WHEN def IS NULL;
+    -- Ya inyectada: no hacer nada (esta migracion tiene que poder reejecutarse)
+    CONTINUE WHEN def LIKE '%orfandad por borrado de cuenta%';
+
+    clausu := format($c$
+  -- orfandad por borrado de cuenta: el titular anterior ya no existe
+  IF NEW.%1$I IS NULL AND OLD.%1$I IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM public.perfiles WHERE user_id = OLD.%1$I) THEN
+    RETURN NEW;
+  END IF;
+$c$, g.col);
+
+    -- Se inserta justo despues del BEGIN del bloque principal.
+    def := regexp_replace(def, E'\\mBEGIN\\M', 'BEGIN' || clausu, '');
+    EXECUTE def;
+    RAISE NOTICE 'Excepcion de orfandad inyectada en %', g.fn;
+  END LOOP;
+END $$;
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- 6. Comprobacion
 -- ─────────────────────────────────────────────────────────────────────────
 DO $$
 DECLARE bloqueantes integer; detalle text;
