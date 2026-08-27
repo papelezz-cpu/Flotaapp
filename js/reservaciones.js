@@ -31,26 +31,78 @@ const _RESERV_FILTRO_LABEL = {
 const _ESTADO_LABEL = { PorAprobar: 'Por aprobar', CancelacionSolicitada: 'Cancelación en revisión' };
 const _estadoLabel = estado => _ESTADO_LABEL[estado] || estado;
 
-function _aplicaFiltroReserva(rows) {
-  if (_reservFiltro === 'todas') return rows;
-  if (_reservFiltro === 'Cancelada') return rows.filter(r => r.estado === 'Cancelada' || r.estado === 'Rechazada');
-  // Filtros de cobro: se apoyan en el estado derivado (ver js/cobros.js)
-  if (_reservFiltro === 'PorCobrar') return rows.filter(r => estadoCobro(r)?.clave === 'por_cobrar');
-  if (_reservFiltro === 'Vencido')   return rows.filter(r => estadoCobro(r)?.clave === 'vencido');
-  return rows.filter(r => r.estado === _reservFiltro);
+// ── PAGINACIÓN ────────────────────────────────────────
+// Mismo patrón que renderPedidos: un bloque inicial y un botón que añade el
+// siguiente. Antes esta vista se traía la tabla ENTERA —para el superadmin,
+// sin un solo filtro— y descartaba en el navegador lo que acababa de
+// transferir. Con realtime re-renderizando en cada cambio de cualquier
+// reservación, eso se repetía constantemente.
+const RESERV_PAGE = 30;
+let _reservOffset = 0;
+let _reservAccum  = [];
+
+// El filtro de las pills, traducido a SQL. Es la contraparte servidor de lo
+// que hacía _aplicaFiltroReserva en memoria.
+//
+// 'PorCobrar' y 'Vencido' no son estados guardados: los deriva estadoCobro()
+// en js/cobros.js a partir de pagado + fecha_vencimiento_pago. La derivación
+// es determinista, así que se puede expresar en SQL — y el índice parcial
+// idx_reservaciones_cobro (pagado, fecha_vencimiento_pago) WHERE
+// estado='Completada' la cubre exactamente.
+function _filtroReservaSQL(q) {
+  const hoy = today();
+  switch (_reservFiltro) {
+    case 'todas':
+      return q;
+    case 'Cancelada':
+      return q.in('estado', ['Cancelada', 'Rechazada']);
+    case 'PorCobrar':
+      // Sin vencer: o no tiene fecha límite, o aún no ha llegado.
+      return q.eq('estado', 'Completada').eq('pagado', false)
+              .or(`fecha_vencimiento_pago.is.null,fecha_vencimiento_pago.gte.${hoy}`);
+    case 'Vencido':
+      return q.eq('estado', 'Completada').eq('pagado', false)
+              .lt('fecha_vencimiento_pago', hoy);
+    default:
+      return q.eq('estado', _reservFiltro);
+  }
 }
 
 function filtrarReservas(est) {
   _reservFiltro = est;
   document.querySelectorAll('#reserv-filtros-bar .ped-filtro-pill').forEach(el =>
     el.classList.toggle('active', el.dataset.rest === est));
-  renderReserv();
+  renderReserv();   // sin append: reinicia offset y acumulado
 }
 
-async function renderReserv() {
+let _cargandoMasReservas = false;
+
+async function cargarMasReservas() {
+  if (_cargandoMasReservas) return;
+  _cargandoMasReservas = true;
+  _reservOffset += RESERV_PAGE;
+  await renderReserv(true);
+  _cargandoMasReservas = false;
+}
+
+// Botón "Cargar más": solo si la última página vino llena. Que venga llena no
+// garantiza que haya más, pero pedir un count exacto en cada render cuesta más
+// que un viaje de vacío al final.
+function _btnMasReservas(nRecibidas) {
+  return nRecibidas === RESERV_PAGE
+    ? `<div style="text-align:center;padding:16px 0"><button class="btn-cargar-mas" onclick="cargarMasReservas()">Cargar más reservaciones</button></div>`
+    : '';
+}
+
+async function renderReserv(append = false) {
   const body   = document.getElementById('reserv-body');
   const header = document.getElementById('reserv-header');
-  body.innerHTML = skeletonRows(4);
+
+  if (!append) {
+    _reservOffset = 0;
+    _reservAccum  = [];
+    body.innerHTML = skeletonRows(4);
+  }
 
   // Sincronizar las pills con el filtro activo (p. ej. al llegar desde el home)
   document.querySelectorAll('#reserv-filtros-bar .ped-filtro-pill').forEach(el =>
@@ -71,13 +123,20 @@ async function renderReserv() {
     // que el usuario puede cambiar, y al cambiarlo su historial entero
     // desaparecía de esta vista aunque RLS se lo siguiera permitiendo.
     // cliente_user_id es además la columna sobre la que decide RLS.
-    const { data: _allCli, error } = await sb.from('reservaciones')
+    let qCli = sb.from('reservaciones')
       .select('*')
       .eq('cliente_user_id', currentUser.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(_reservOffset, _reservOffset + RESERV_PAGE - 1);
+    qCli = _filtroReservaSQL(qCli);
 
+    const { data: _pagCli, error } = await qCli;
     if (error) { body.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar.</div>`; return; }
-    const data = _aplicaFiltroReserva(_allCli || []);
+
+    const _vistosCli = new Set(_reservAccum.map(r => r.id));
+    (_pagCli || []).forEach(r => { if (!_vistosCli.has(r.id)) { _reservAccum.push(r); _vistosCli.add(r.id); } });
+    const data = _reservAccum;
+
     if (!data.length) {
       const lbl = _RESERV_FILTRO_LABEL[_reservFiltro] || '';
       body.innerHTML = `<div class="empty-state"><div class="icon">📋</div>No tienes reservaciones${lbl ? ' ' + lbl : ''}.</div>`;
@@ -222,7 +281,7 @@ async function renderReserv() {
         ${grupo('Cierre', completarBtn + calBtn + cancelBtn)}
       </div>
       </div>`;
-    }).join('');
+    }).join('') + _btnMasReservas((_pagCli || []).length);
     return;
   }
 
@@ -232,15 +291,21 @@ async function renderReserv() {
 
   let reservQuery = sb.from('reservaciones')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(_reservOffset, _reservOffset + RESERV_PAGE - 1);
 
   if (currentUser.rol !== 'superadmin') {
     reservQuery = reservQuery.eq('propietario_id', currentUser.id);
   }
+  reservQuery = _filtroReservaSQL(reservQuery);
 
-  const { data: _allAdm, error } = await reservQuery;
+  const { data: _pagAdm, error } = await reservQuery;
   if (error) { body.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar.</div>`; return; }
-  const data = _aplicaFiltroReserva(_allAdm || []);
+
+  const _vistosAdm = new Set(_reservAccum.map(r => r.id));
+  (_pagAdm || []).forEach(r => { if (!_vistosAdm.has(r.id)) { _reservAccum.push(r); _vistosAdm.add(r.id); } });
+  const data = _reservAccum;
+
   if (!data.length) {
     const lbl = _RESERV_FILTRO_LABEL[_reservFiltro] || '';
     body.innerHTML = `<div class="empty-state"><div class="icon">📋</div>No hay reservaciones${lbl ? ' ' + lbl : ''}.</div>`;
@@ -427,7 +492,7 @@ async function renderReserv() {
     </div>
     ${detalleHTML ? `<div id="reserv-detalle-${r.id}" class="reserv-detail${abierta ? ' open' : ''}">${detalleHTML}</div>` : ''}
     </div>`;
-  }).join('');
+  }).join('') + _btnMasReservas((_pagAdm || []).length);
 }
 
 // ── ACCIONES ───────────────────────────────────────────
