@@ -1,9 +1,37 @@
 -- ============================================================================
--- notificar_superadmins() deja de ser invocable sin sesión
+-- notificar_superadmins(): permisos explícitos en las dos bases
 -- ============================================================================
+-- OJO: esta migración hace cosas DISTINTAS en cada proyecto, porque partían de
+-- estados distintos. Comprobado el 2026-08-26:
+--
+--   · portgo-pruebas: anon podía ejecutar las 30 funciones de public. El
+--     REVOKE de abajo es el que cuenta; el GRANT es un no-op.
+--   · PRODUCCION: ya estaba cerrado — anon solo alcanza 17 de 40 funciones y
+--     ninguna peligrosa. Pero notificar_superadmins estaba revocada TAMBIEN
+--     para `authenticated`, asi que ahi el REVOKE es el no-op y **el GRANT es
+--     imprescindible**: sin el, los 21 sitios de js/ que llaman a la RPC
+--     fallan con "permission denied" y los superadmins dejan de recibir
+--     avisos de altas, cuentas nuevas, solicitudes e incidentes.
+--
+-- Por eso esta migracion tiene que aplicarse ANTES de desplegar el codigo.
+--
+-- La diferencia entre las dos bases no es que produccion se relajara: es que
+-- preparar-pruebas.sh sembro el proyecto de pruebas sin replicar los REVOKE.
+-- Conviene tenerlo presente — pruebas NO es un espejo fiel para nada que
+-- dependa de permisos.
+--
+-- ── ¿El GRANT a authenticated debilita algo? No ────────────────────────────
+-- La politica insertar_notificaciones ya permite a cualquier autenticado
+-- escribir en notificaciones cuando puede_notificar(user_id) es cierto, y esa
+-- funcion devuelve true si el destinatario es superadmin. O sea: un usuario
+-- con sesion YA podia insertar notificaciones arbitrarias a los superadmins
+-- directamente por la tabla — asi funcionaba el codigo anterior, por diseño.
+-- El GRANT da la misma capacidad por un camino mas barato y transaccional.
+--
+-- ── Por que anon sigue fuera ───────────────────────────────────────────────
 -- Postgres concede EXECUTE a PUBLIC en cada función nueva salvo que se revoque
--- a mano. Nadie lo hizo, así que las 30 funciones de public son ejecutables por
--- el rol `anon`, es decir por cualquiera con la clave anon — que va en el
+-- a mano. Donde eso no se corrigió, las funciones de public quedan al alcance
+-- del rol `anon`, es decir de cualquiera con la clave anon — que va en el
 -- código del cliente y es pública por diseño.
 --
 -- Para casi todas da igual:
