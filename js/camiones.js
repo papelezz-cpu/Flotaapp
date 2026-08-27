@@ -56,7 +56,7 @@ async function renderCamiones(filtroTipo = '', fechaIni = '', fechaFin = '') {
 
   grid.innerHTML = skeletonGrid(6);
 
-  let query = sb.from('camiones').select('*').eq('aprobacion', 'aprobada').order('id');
+  let query = sb.from('camiones').select('*').eq('aprobacion', 'aprobada').not('propietario_id','is',null).order('id');
   if (filtroTipo) query = query.eq('tipo', filtroTipo);
   const { data, error } = await query;
   if (error) {

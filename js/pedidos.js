@@ -528,8 +528,16 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
   const _ahora         = new Date().toISOString();
   const ofertasVivaz   = ofertas.filter(o => o.estado !== 'rechazada' && (!o.expira_en || o.expira_en >= _ahora));
   const hayAceptada    = ofertas.some(o => o.estado === 'aceptada');
+  // La empresa ya no puede contar las ofertas ajenas: desde que of_select se
+  // cerró a las partes implicadas, `ofertas` solo trae las suyas. En la vista
+  // de solicitudes disponibles eso siempre daría cero, y decir "Sin ofertas
+  // aún" en una solicitud que tiene cinco no es ocultar, es mentir. Ahí se
+  // muestra el estado a secas; el conteo sigue igual para cliente y superadmin,
+  // que sí ven todas.
+  const puedeContarOfertas = vista !== 'admin' && vista !== 'publico';
   const estadoLabel = (p.estado === 'abierto' || (p.estado === 'en_negociacion' && !ofertasVivaz.length))
-    ? (ofertasVivaz.length ? `${ofertasVivaz.length} oferta${ofertasVivaz.length > 1 ? 's' : ''}` : 'Sin ofertas aún')
+    ? (!puedeContarOfertas ? 'Abierta'
+       : ofertasVivaz.length ? `${ofertasVivaz.length} oferta${ofertasVivaz.length > 1 ? 's' : ''}` : 'Sin ofertas aún')
     : (p.estado === 'en_negociacion' && hayAceptada) ? '⏳ Acuerdo en revisión'
     : p.estado === 'en_negociacion'     ? 'En negociación'
     : p.estado === 'acordado'           ? '✓ Acordado'
