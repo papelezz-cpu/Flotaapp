@@ -28,7 +28,7 @@ async function renderCustodios(filtroTipo = '') {
 
   grid.innerHTML = skeletonGrid(4);
 
-  let query = sb.from('custodios').select('*').eq('aprobacion', 'aprobada').order('id');
+  let query = sb.from('custodios').select('*').eq('aprobacion', 'aprobada').not('propietario_id','is',null).order('id');
   if (filtroTipo) query = query.eq('tipo', filtroTipo);
   const { data, error } = await query;
   if (error) {
@@ -104,7 +104,7 @@ async function renderPatios(filtroTipo = '') {
 
   grid.innerHTML = skeletonGrid(4);
 
-  let query = sb.from('patios').select('*').eq('aprobacion', 'aprobada').order('id');
+  let query = sb.from('patios').select('*').eq('aprobacion', 'aprobada').not('propietario_id','is',null).order('id');
   if (filtroTipo) query = query.eq('tipo', filtroTipo);
   const { data, error } = await query;
   if (error) {
