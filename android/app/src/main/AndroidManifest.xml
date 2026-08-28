@@ -4,8 +4,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
-    <!-- Desde Android 13 el usuario debe conceder los avisos explicitamente. -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- La cámara es opcional: subir evidencias también funciona eligiendo de
          la galería, y en patio/puerto hay teléfonos sin cámara utilizable. -->
     <!--
@@ -46,14 +44,6 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.PortGo">
-
-        <service
-            android:name=".PortGoMessagingService"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.google.firebase.MESSAGING_EVENT" />
-            </intent-filter>
-        </service>
 
         <activity
             android:name=".MainActivity"

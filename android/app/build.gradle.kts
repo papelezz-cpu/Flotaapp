@@ -94,13 +94,6 @@ android {
 dependencies {
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    // Push. El plugin com.google.gms.google-services NO se aplica todavia:
-    // requiere google-services.json, que se anade al crear el proyecto de
-    // Firebase. Sin el la app compila y funciona; solo no entrega push.
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.messaging)
-    implementation(libs.kotlinx.coroutines.play.services)
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)

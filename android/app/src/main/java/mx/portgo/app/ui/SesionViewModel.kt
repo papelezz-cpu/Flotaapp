@@ -11,7 +11,6 @@ import kotlinx.coroutines.launch
 import mx.portgo.app.core.Resultado
 import mx.portgo.app.data.model.UsuarioActual
 import mx.portgo.app.data.repository.AuthRepository
-import mx.portgo.app.data.repository.PushRepository
 import mx.portgo.app.di.AppContainer
 
 /**
@@ -23,10 +22,7 @@ import mx.portgo.app.di.AppContainer
  * el dueño del teléfono se identifique con huella, rostro o PIN. Ese es el
  * trato que sustituye al `sessionStorage` de la web.
  */
-class SesionViewModel(
-    private val auth: AuthRepository,
-    private val push: PushRepository,
-) : ViewModel() {
+class SesionViewModel(private val auth: AuthRepository) : ViewModel() {
 
     sealed interface Estado {
         /** Restaurando la sesión guardada. Dura lo que tarde el Keystore. */
@@ -87,10 +83,7 @@ class SesionViewModel(
                         // Sigue siendo mejor que la web: la sesión está cifrada
                         // en el Keystore, no en un almacén del navegador.
                         if (auth.biometriaActiva) Estado.Bloqueada(acceso.usuario)
-                        else {
-                            registrarParaPush(acceso.usuario.id)
-                            Estado.Dentro(acceso.usuario)
-                        }
+                        else Estado.Dentro(acceso.usuario)
                 }
             }
             // Sin red al arrancar no debe expulsar a nadie: se pide login, que
@@ -105,10 +98,7 @@ class SesionViewModel(
             _ocupado.value = true
             when (val r = auth.iniciarSesion(correo, contrasena)) {
                 is Resultado.Ok -> when (val acceso = r.dato) {
-                    is AuthRepository.Acceso.Concedido -> {
-                        registrarParaPush(acceso.usuario.id)
-                        _estado.value = Estado.Dentro(acceso.usuario)
-                    }
+                    is AuthRepository.Acceso.Concedido -> _estado.value = Estado.Dentro(acceso.usuario)
                     is AuthRepository.Acceso.Bloqueado -> onError(acceso.motivo)
                 }
                 is Resultado.Error -> onError(
@@ -127,10 +117,7 @@ class SesionViewModel(
     /** El gate biométrico salió bien. */
     fun desbloquear() {
         _estado.update { actual ->
-            if (actual is Estado.Bloqueada) {
-                registrarParaPush(actual.usuario.id)
-                Estado.Dentro(actual.usuario)
-            } else actual
+            if (actual is Estado.Bloqueada) Estado.Dentro(actual.usuario) else actual
         }
     }
 
@@ -138,11 +125,6 @@ class SesionViewModel(
     fun cancelarDesbloqueo() = cerrarSesion()
 
     fun cerrarSesion() = viewModelScope.launch {
-        // Antes del signOut: borrar la fila de dispositivos_push necesita
-        // sesion, porque su politica RLS filtra por auth.uid(). Al reves
-        // fallaria en silencio y el siguiente usuario de este telefono
-        // heredaria los avisos del anterior.
-        push.retirar()
         auth.cerrarSesion()
         _estado.value = Estado.SinSesion()
     }
@@ -168,23 +150,11 @@ class SesionViewModel(
         }
     }
 
-    /**
-     * Registra el token de este aparato. Se llama en cada entrada —login,
-     * sesion restaurada y desbloqueo biometrico— porque FCM rota el token por
-     * su cuenta y hacerlo solo al instalar dejaria de funcionar en silencio.
-     *
-     * Deliberadamente no bloquea ni avisa si falla: sin push la app funciona
-     * igual, y la campana en tiempo real sigue llegando por Realtime.
-     */
-    private fun registrarParaPush(userId: String) = viewModelScope.launch {
-        push.registrar(userId)
-    }
-
     companion object {
         fun factory(container: AppContainer) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                SesionViewModel(container.auth, container.push) as T
+                SesionViewModel(container.auth) as T
         }
     }
 }

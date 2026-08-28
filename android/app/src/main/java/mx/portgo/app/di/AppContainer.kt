@@ -10,7 +10,6 @@ import mx.portgo.app.data.repository.ConfiguracionRepository
 import mx.portgo.app.data.repository.FlotaRepository
 import mx.portgo.app.data.repository.NotificacionesRepository
 import mx.portgo.app.data.repository.PedidosRepository
-import mx.portgo.app.data.repository.PushRepository
 import mx.portgo.app.data.repository.ReservacionesRepository
 import mx.portgo.app.data.repository.StorageRepository
 
@@ -41,7 +40,6 @@ class AppContainer(context: Context) {
     val avisos: AvisosRepository by lazy { AvisosRepository(supabase) }
     val notificaciones: NotificacionesRepository by lazy { NotificacionesRepository(supabase) }
     val flota: FlotaRepository by lazy { FlotaRepository(supabase) }
-    val push: PushRepository by lazy { PushRepository(supabase) }
     val storage: StorageRepository by lazy {
         StorageRepository(supabase, appContext.contentResolver)
     }
