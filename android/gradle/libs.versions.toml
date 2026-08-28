@@ -18,6 +18,11 @@ datetime = "0.6.1"
 securityCrypto = "1.1.0-alpha06"
 biometric = "1.2.0-alpha05"
 coil = "2.7.0"
+
+# Push. firebase-messaging compila sin el plugin google-services;
+# ese plugin solo hace falta para procesar google-services.json en tiempo de build.
+firebaseBom = "33.7.0"
+coroutinesPlayServices = "1.9.0"
 desugar = "2.1.3"
 
 [libraries]
@@ -52,6 +57,10 @@ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.
 
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar" }
+
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
+kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutinesPlayServices" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

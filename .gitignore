@@ -14,3 +14,7 @@ Thumbs.db
 # Pruebas locales — credenciales reales y salidas de los test (nunca subir)
 pruebas/credenciales.local.json
 pruebas/salida/
+
+# Firebase: configuracion del proyecto para el push de Android.
+# Identifica el proyecto de Firebase y no debe viajar en el repositorio.
+android/app/google-services.json
