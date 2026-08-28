@@ -48,35 +48,54 @@ function iniciarSuscripcionesRealtime() {
     })
     .subscribe();
 
+  // Agrupa las ráfagas de eventos en un solo re-render. Aprobar diez unidades
+  // seguidas, o cerrar un acuerdo —que toca pedido, oferta y reservación en
+  // cadena—, disparaba antes un render completo por cada evento, y cada render
+  // vuelve a consultar. Con esto, una ráfaga cuesta una consulta.
+  const _agrupado = (fn, ms = 400) => {
+    let t = null;
+    return () => { clearTimeout(t); t = setTimeout(fn, ms); };
+  };
+
+  const _flota = (renderPropio) => _agrupado(() => {
+    if (clienteActivo()) renderCatalogo();
+    if (adminActivo())   renderPropio();
+  });
+
+  const esSA = currentUser.rol === 'superadmin';
+
+  // Filtro de flota: a la empresa solo le interesan sus propios recursos, que
+  // es lo que dibuja renderAdmin. El cliente y el superadmin no lo llevan
+  // porque el catálogo y el panel de aprobaciones necesitan verlo todo.
+  const filtroFlota = currentUser.rol === 'admin'
+    ? { filter: `propietario_id=eq.${currentUser.id}` } : {};
+
+  // Filtro de reservaciones: duplica lo que RLS ya impone, pero así el evento
+  // ni siquiera viaja. El superadmin las necesita todas para Pendientes.
+  const filtroReservas = esSA ? {}
+    : currentUser.rol === 'admin' ? { filter: `propietario_id=eq.${currentUser.id}` }
+    : { filter: `cliente_user_id=eq.${currentUser.id}` };
+
+  // pedidos y ofertas van sin filtro a propósito:
+  //   · ped_select deja ver a cualquiera los pedidos abiertos, y la empresa
+  //     necesita enterarse de los nuevos — no hay columna por la que filtrar.
+  //   · of_select ya quedó acotado a las partes en la Fase 4, así que RLS hace
+  //     el trabajo: nadie recibe eventos de ofertas ajenas.
+  const _renderPedidos = _agrupado(() => { if (pedidosActivo()) renderPedidos(); });
+
   sb.channel('portgo-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'camiones' }, () => {
-      if (clienteActivo()) renderCatalogo();
-      if (adminActivo())   renderAdmin();
-    })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'custodios' }, () => {
-      if (clienteActivo()) renderCatalogo();
-      if (adminActivo())   renderAdminCustodios();
-    })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'patios' }, () => {
-      if (clienteActivo()) renderCatalogo();
-      if (adminActivo())   renderAdminPatios();
-    })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'lavados' }, () => {
-      if (clienteActivo()) renderCatalogo();
-      if (adminActivo())   renderAdminLavados();
-    })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'reservaciones' }, () => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'camiones',  ...filtroFlota }, _flota(renderAdmin))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'custodios', ...filtroFlota }, _flota(renderAdminCustodios))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'patios',    ...filtroFlota }, _flota(renderAdminPatios))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'lavados',   ...filtroFlota }, _flota(renderAdminLavados))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'reservaciones', ...filtroReservas }, _agrupado(() => {
       if (document.getElementById('view-reservaciones').classList.contains('active')) renderReserv();
       // El superadmin necesita ver en vivo cuando cliente/empresa suben su
       // evidencia de cierre (no siempre dispara una notificación nueva).
       if (pendientesActivo()) renderAprobaciones();
-    })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
-      if (pedidosActivo()) renderPedidos();
-    })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'ofertas' }, () => {
-      if (pedidosActivo()) renderPedidos();
-    })
+    }))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, _renderPedidos)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ofertas' }, _renderPedidos)
     .subscribe();
 }
 

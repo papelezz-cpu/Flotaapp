@@ -11,7 +11,15 @@ let _filtroEstadoCli   = 'todos';
 let _pedidosMode       = 'lista'; // 'solicitar' | 'lista'
 
 const PEDIDOS_PAGE = 30;
-let _pedidosOffset = 0;
+// Paginación por cursor, no por OFFSET. Con OFFSET, la página N obliga a
+// Postgres a recorrer y descartar N x 30 filas antes de devolver nada: el
+// coste crece con la profundidad. Con cursor es constante — se salta
+// directamente por el índice idx_pedidos_fecha.
+//
+// El cursor lleva created_at Y el id. Solo con la fecha, dos pedidos creados
+// en el mismo microsegundo harían que uno se perdiera al pasar de página.
+// Hoy no hay ni un empate en producción, pero eso no es una garantía.
+let _pedidosCursor = null;   // { created_at, id } de la última fila traída
 let _pedidosAccum  = [];
 let _ofertasAccum  = {};
 
@@ -176,7 +184,7 @@ async function renderPedidos(append = false) {
   const container = document.getElementById('pedidos-list');
 
   if (!append) {
-    _pedidosOffset = 0;
+    _pedidosCursor = null;
     _pedidosAccum  = [];
     _ofertasAccum  = {};
     container.innerHTML = skeletonList(3);
@@ -201,8 +209,18 @@ async function renderPedidos(append = false) {
   if (plantBox)   plantBox.style.display   = 'none';
   if (filtrosBar) filtrosBar.style.display = currentUser.id ? '' : 'none';
 
-  let pedidosQ = sb.from('pedidos').select('*').order('created_at', { ascending: false })
-    .range(_pedidosOffset, _pedidosOffset + PEDIDOS_PAGE - 1);
+  let pedidosQ = sb.from('pedidos').select('*')
+    .order('created_at', { ascending: false })
+    .order('id',         { ascending: false })
+    .limit(PEDIDOS_PAGE);
+  if (_pedidosCursor) {
+    // "más antiguo que el cursor": o la fecha es menor, o es la misma y el id
+    // es menor. Ese segundo término es el desempate.
+    pedidosQ = pedidosQ.or(
+      `created_at.lt.${_pedidosCursor.created_at},` +
+      `and(created_at.eq.${_pedidosCursor.created_at},id.lt.${_pedidosCursor.id})`
+    );
+  }
   if (esCliente) pedidosQ = pedidosQ.in('estado', ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado', 'acordado', 'cancelado', 'finalizado', 'expirado']);
 
   // Superadmin: query paralela para acordados (no están en la paginación por ser más viejos)
@@ -216,6 +234,13 @@ async function renderPedidos(append = false) {
   if (error) {
     container.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar solicitudes.</div>`;
     return;
+  }
+
+  // El cursor avanza a la última fila devuelta, que por el orden es la más
+  // antigua de la página.
+  if (pedidosPage?.length) {
+    const ultimo = pedidosPage[pedidosPage.length - 1];
+    _pedidosCursor = { created_at: ultimo.created_at, id: ultimo.id };
   }
 
   // Accumulate new pedidos (skip duplicates); merge acordados SA
@@ -505,7 +530,6 @@ let _cargandoMas = false;
 async function cargarMasPedidos() {
   if (_cargandoMas) return;
   _cargandoMas = true;
-  _pedidosOffset += PEDIDOS_PAGE;
   await renderPedidos(true);
   _cargandoMas = false;
 }
@@ -2509,7 +2533,7 @@ async function confirmarReenviar() {
   if (error) { showToast('Error al reenviar: ' + error.message, 'error'); return; }
 
   cerrarReenviarPedido();
-  _pedidosOffset = 0;
+  _pedidosCursor = null;
   _pedidosAccum  = [];
   _ofertasAccum  = {};
   await renderPedidos();
@@ -2556,7 +2580,7 @@ async function confirmarEditarPedido() {
   if (error) { showToast('Error al guardar: ' + error.message, 'error'); return; }
 
   cerrarEditarPedido();
-  _pedidosOffset = 0;
+  _pedidosCursor = null;
   _pedidosAccum  = [];
   _ofertasAccum  = {};
   await renderPedidos();
