@@ -32,6 +32,42 @@ When in doubt, do not delete — ask.
 
 ---
 
+## 🛑 RULE #2 — PRODUCTION IS THE USER'S DECISION, NEVER YOURS
+
+**Nothing reaches production until the tests are finished AND the user says so, in those words, for that specific change.** This rule overrides every permission setting and every judgment call about how safe a change looks.
+
+"Production" means all of it, not just the visible part:
+
+- `git push` to `main`, or merging `dev` → `main`
+- Applying **any** migration, SQL statement, `ALTER`, `GRANT`/`REVOKE`, index, trigger or extension to the production project (`xnyqsewaluezkkrlyhxg`)
+- Deploying an Edge Function there
+- Changing anything from the Supabase dashboard of that project
+- Any write at all, even inside a transaction you intend to roll back
+
+### What is NOT authorization
+
+- **"It's inert / zero-risk / it doesn't do anything yet."** Not an exemption. An inert object in production is still an object in production, and "it can't break anything" is a prediction, not a fact. This exact reasoning is what put a push-notification table, a trigger, a cron job and an extension into production on 2026-08-28 without anyone asking for them.
+- **Having verified it in `portgo-pruebas`.** That is the *precondition*, not the permission. Passing in the test project earns the right to *ask*.
+- **The user approving the same change for `dev`.** Approval is per environment. "Apply it" means the test project unless production is named.
+- **An earlier promotion.** Authorization never carries over from one change to the next, however similar.
+- **A general "go ahead" about a different topic**, silence, or an unrelated reply.
+
+### What the user must be told before deciding
+
+State it plainly, then wait:
+
+1. **What** exactly gets applied — the migration file, the branch, the objects created or dropped.
+2. **What was verified in `portgo-pruebas`**, and what could *not* be verified there. Say this explicitly: the two databases differ in ways that have already bitten (permissions, Realtime publication, data volume). A clean run in `dev` does not prove a clean run in production.
+3. **What breaks if it goes wrong**, and whether it is reversible.
+
+Then apply **only** what they approved, and nothing adjacent.
+
+### Order, when promotion is approved
+
+Migrations first, code after — the deployed code may depend on schema or grants that must already exist. Pushing code first breaks production for the length of that gap.
+
+---
+
 ## Project Overview
 
 **PortGo** is a PWA logistics platform for port transport services built as a fully client-side app with Supabase as the backend (PostgreSQL + Auth + Realtime + Storage).
@@ -54,11 +90,13 @@ When in doubt, do not delete — ask.
 
 **`js/config.js` is the one file that is deliberately different per branch, forever.** It must never travel from one branch to the other during a merge — that's the only thing standing between "tests happen safely" and "a test run corrupts production data". Everything else in the repo (all other JS/CSS/`app.html`/migrations) is meant to be identical between branches once promoted.
 
-**Workflow:**
+**Workflow — and see [Rule #2](#-rule-2--production-is-the-users-decision-never-yours): step 3 needs the user's explicit yes, every time.**
 1. Do the work on `dev`: same deployment-checklist steps below, committed and pushed to `dev`. It deploys to the `dev` preview URL automatically and talks to `portgo-pruebas`, not production.
-2. The user tests on the `dev` URL with the same real accounts/passwords (the test project's data is a full clone of production — see below).
+2. The user tests on the `dev` URL with the same real accounts/passwords. **The user decides when testing is finished — not you, and not the fact that your own checks passed.**
 3. **Only when the user says to promote** ("pasa esto a producción" or equivalent): merge `dev` → `main`, then **immediately restore `main`'s own `js/config.js`** (`git checkout main -- js/config.js` after the merge, before committing) so production's credentials are never overwritten. Push `main` — that's what actually deploys to production.
-4. Database/Edge Function changes follow the same order: apply to `portgo-pruebas` first via the Management API, verify, then apply the identical SQL/function to production when promoting.
+4. Database/Edge Function changes follow the same order and need the same explicit yes: apply to `portgo-pruebas` first, verify, and wait. Applying SQL to production is a promotion like any other, even when it creates nothing visible.
+
+> ⚠️ **`portgo-pruebas` is not a faithful mirror, and assuming it is has already caused problems.** Verified divergences found on 2026-08-27/28: `anon` held privileges there that production had revoked (82 function grants); the Realtime publication was **empty** while production replicated six tables; and the data volume differs enough that a query plan seen in `dev` says little about production. Use `supabase/alinear-permisos-pruebas.sh` after every seeding, and when a check depends on permissions, replication or volume, **re-run it against production before drawing a conclusion** — read-only.
 
 **`portgo-pruebas` data:** was seeded as a full clone of production (same schema, same triggers/RLS, same rows in every table, same 12 users with the same passwords) as of 2026-08-19. It will drift from production over time as both databases get used — re-sync manually if a fresh mirror is ever needed. Storage buckets were **not** cloned — file paths in `portgo-pruebas` rows point to files that only exist in production's storage, so documents/photos opened from `dev` will 404 unless the buckets get copied too.
 
@@ -71,7 +109,7 @@ The app is served from **Vercel**, same project for both branches (repo `papelez
 1. **Bump the `?v=` param in `app.html`** for every JS/CSS file you changed (e.g. `js/pedidos.js?v=36` → `?v=37`). `app.html` is the application; `index.html` is the static marketing landing. If you skip this, browsers serve the old cached file and the user reports "it's not fixed".
 2. **Bump the cache version in `sw.js`**: `const CACHE = 'portgo-vXX'` → `vXX+1`. On Vercel the Service Worker actually registers (the site is at the domain root), so the cache bump genuinely matters now — unlike on the old GitHub Pages subpath where `/sw.js` 404'd.
 3. **Commit AND `git push`** — Vercel deploys on push; a local commit alone deploys nothing.
-4. Schema changes: apply to `portgo-pruebas` first (Management API or the Supabase dashboard), verify, then apply the same migration to production when the user asks to promote. Edge Functions follow the same order. Never skip straight to production unless the user says to.
+4. Schema changes: apply to `portgo-pruebas` first, verify, and **stop there**. Applying the same migration to production requires the user's explicit yes for that specific change — see [Rule #2](#-rule-2--production-is-the-users-decision-never-yours). Edge Functions follow the same order. "It's inert" and "it passed in pruebas" are not permission.
 5. Tell the user to hard-refresh (**Ctrl+Shift+R**) if they're testing right away.
 
 `vercel.json` sets the static config: `cleanUrls:false` (keeps the `.html` URLs), no-cache for `sw.js`, revalidate for HTML/manifest.
