@@ -24,7 +24,10 @@ async function openDetail(id) {
   // Cargar perfil de la empresa y reservas en paralelo
   const hoy = today();
   const [{ data: perfil }, { data: reservas }] = await Promise.all([
-    sb.from('perfiles').select('*').eq('user_id', c.propietario_id).single(),
+    // Ficha publica: la vista trae solo lo que esta pantalla pinta. Antes era
+    // select('*') sobre perfiles, que entregaba las 37 columnas —documentos,
+    // estado de moderacion, fotos de verificacion— para mostrar un nombre.
+    sb.from('empresas_publico').select('*').eq('user_id', c.propietario_id).maybeSingle(),
     sb.from('reservaciones')
       .select('fecha_ini, fecha_fin, estado')
       .eq('unidad', id)
@@ -93,7 +96,7 @@ async function renderDetalleTab() {
 
   } else if (detalleTab === 'empresa') {
     if (!detallePerfil) {
-      const { data: p } = await sb.from('perfiles').select('*').eq('user_id', c.propietario_id).single();
+      const { data: p } = await sb.from('empresas_publico').select('*').eq('user_id', c.propietario_id).maybeSingle();
       detallePerfil = p;
     }
     const p = detallePerfil || {};

@@ -174,9 +174,9 @@ function cambiarAdminTab(tab) {
 // ── DROPDOWN EMPRESA (solo superadmin) ───────────────
 
 async function _cargarEmpresasDropdowns() {
-  const { data: empresas } = await sb.from('perfiles')
+  // empresas_publico ya filtra rol = 'admin' dentro de la vista.
+  const { data: empresas } = await sb.from('empresas_publico')
     .select('user_id, nombre')
-    .eq('rol', 'admin')
     .order('nombre');
 
   const opts = (empresas || []).map(e =>

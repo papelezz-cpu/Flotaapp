@@ -19,9 +19,9 @@ async function renderCatalogo() {
   if (!grid) return;
   grid.innerHTML = skeletonGrid(3);
 
-  const { data: perfiles } = await sb.from('perfiles')
+  // empresas_publico ya filtra rol = 'admin' dentro de la vista.
+  const { data: perfiles } = await sb.from('empresas_publico')
     .select('user_id, nombre, rfc, razon_social, anos_operacion, num_unidades, seguro_rc, seguro_carga, permiso_sct, descripcion, telefono, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga, verificado')
-    .eq('rol', 'admin')
     .order('nombre');
 
   if (!perfiles?.length) {
@@ -278,9 +278,9 @@ async function abrirPerfilEmpresaCat(adminId, adminNombre) {
   document.getElementById('modal-emp-cat').classList.add('open');
 
   const [{ data: p }, { data: cals }] = await Promise.all([
-    sb.from('perfiles')
+    sb.from('empresas_publico')
       .select('rfc, razon_social, anos_operacion, num_unidades, seguro_rc, seguro_carga, permiso_sct, descripcion, telefono, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga')
-      .eq('user_id', adminId).single(),
+      .eq('user_id', adminId).maybeSingle(),
     sb.from('calificaciones').select('rating, comentario, created_at').eq('admin_id', adminId).order('created_at', { ascending: false }).limit(5),
   ]);
 

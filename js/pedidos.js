@@ -2451,7 +2451,7 @@ async function openEmpresaPerfil(adminId, adminNombre) {
     { data: lavados },
     { data: cals }
   ] = await Promise.all([
-    sb.from('perfiles').select('descripcion, nombre').eq('user_id', adminId).single(),
+    sb.from('empresas_publico').select('descripcion, nombre').eq('user_id', adminId).maybeSingle(),
     sb.from('camiones').select('id, estado').eq('propietario_id', adminId),
     sb.from('custodios').select('id, estado').eq('propietario_id', adminId),
     sb.from('patios').select('id, estado').eq('propietario_id', adminId),

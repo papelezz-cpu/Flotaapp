@@ -186,10 +186,10 @@ async function renderReserv(append = false) {
     );
     await Promise.all(fetches);
 
-    // Query directa a perfiles por user_id (evita problemas de RLS con joins)
+    // Query directa a la ficha publica por user_id (evita problemas de RLS con joins)
     const uniquePropIds = [...new Set(Object.values(propIdMap).filter(Boolean))];
     if (uniquePropIds.length) {
-      const { data: perfs } = await sb.from('perfiles').select('user_id, nombre').in('user_id', uniquePropIds);
+      const { data: perfs } = await sb.from('empresas_publico').select('user_id, nombre').in('user_id', uniquePropIds);
       const perfMap = {};
       (perfs || []).forEach(p => { perfMap[p.user_id] = p.nombre; });
       Object.entries(propIdMap).forEach(([recursoId, propId]) => {
@@ -358,10 +358,10 @@ async function renderReserv(append = false) {
   );
   await Promise.all(fetches);
 
-  // Query directa a perfiles
+  // Query directa a la ficha publica
   const uniquePropIds2 = [...new Set(Object.values(propIdMap2).filter(Boolean))];
   if (uniquePropIds2.length) {
-    const { data: perfs } = await sb.from('perfiles').select('user_id, nombre').in('user_id', uniquePropIds2);
+    const { data: perfs } = await sb.from('empresas_publico').select('user_id, nombre').in('user_id', uniquePropIds2);
     const perfMap2 = {};
     (perfs || []).forEach(p => { perfMap2[p.user_id] = p.nombre; });
     Object.entries(propIdMap2).forEach(([recursoId, propId]) => {
@@ -892,12 +892,18 @@ async function _notificarCambioReserva(reservaId, titulo, mensaje) {
     .select('propietario_id').eq('id', reservaId).single();
   if (!r?.propietario_id) { showToast('No se pudo enviar', 'error'); return false; }
 
-  // Este es el único sitio que sigue leyendo los superadmins a mano en vez de
-  // usar notificar_superadmins(): _notificarEmail necesita la lista de ids
-  // para el correo, así que la consulta hace falta igual. Cambiarlo a la RPC
-  // daría tres viajes en vez de dos.
-  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-  const destinatarios = [r.propietario_id, ...((supers || []).map(s => s.user_id))];
+  // Este es el único sitio que necesita la LISTA de superadmins en vez de
+  // usar notificar_superadmins(): _notificarEmail necesita los ids para el
+  // correo, así que hace falta traerlos. Cambiarlo a la RPC daría tres
+  // viajes en vez de dos.
+  //
+  // Va por ids_superadmins() y no por un select a perfiles porque quien
+  // llama aquí es un admin o un cliente: con la tabla cerrada (H-01) el
+  // select devolvería vacío SIN error y los superadmins dejarían de recibir
+  // el aviso en silencio. La función solo devuelve ids, ninguna columna
+  // de datos personales.
+  const { data: supers } = await sb.rpc('ids_superadmins');
+  const destinatarios = [r.propietario_id, ...((supers || []).map(s => s.user_id ?? s))];
 
   const { error } = await sb.from('notificaciones').insert(destinatarios.map(uid => ({
     user_id: uid, tipo: 'cambio_reportado', titulo, mensaje, leido: false,
