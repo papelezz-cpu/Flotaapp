@@ -42,7 +42,7 @@ const MARCA = `PRUEBA-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, 
 // Se replica en vez de inventar el cálculo: así la prueba mide lo que la app
 // hace de verdad, incluidos sus huecos.
 const PLAZO_PAGO_DIAS = {
-  'Anticipado': 0, '3 días': 3, '7 días': 7,
+  'Anticipado': 0, 'Contra entrega': 0, '3 días': 3, '7 días': 7,
   '15 días': 15, '30 días': 30, '45 días': 45, '60 días': 60,
 };
 function plazoADias(plazo) {
@@ -100,6 +100,14 @@ function verificar(desc, condicion, detalle) {
 // rechazado. Para los casos que no se pueden juzgar así, se pasa `comprobar`,
 // que consulta la fila de verdad y manda sobre todo lo demás.
 async function debeFallar(desc, fn, consecuencia, comprobar) {
+  // Con la corrida cortada, el estado de la base ya no es el que esta prueba
+  // supone: la reservación que debería existir no existe, el acuerdo no se
+  // cerró. Evaluarla igual da resultados inventados en las dos direcciones —
+  // un "SE PERMITIÓ el doble booking" que en realidad era la primera reserva,
+  // y peor, un "Rechazado correctamente" que solo falló porque el id era nulo.
+  // El falso aprobado es el más dañino: da confianza donde no la hay.
+  if (cortado) { R.aviso(`No evaluado (la corrida se cortó antes): ${desc}`); return; }
+
   let tuvoEfecto;
   try {
     const r = await fn();
