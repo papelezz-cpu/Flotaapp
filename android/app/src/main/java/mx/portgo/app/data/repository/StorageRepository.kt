@@ -93,6 +93,44 @@ class StorageRepository(
         if (ruta.startsWith("http")) ruta
         else supabase.storage.from(bucket).publicUrl(ruta)
 
+
+    /**
+     * Sube una foto o documento de una unidad al bucket privado `unidades`.
+     *
+     * La ruta empieza con el auth.uid() porque la politica de Storage exige que
+     * el primer segmento sea el del usuario. Devuelve la RUTA, que es lo que se
+     * guarda en la base; se firma al mostrarla.
+     */
+    suspend fun subirArchivoUnidad(
+        miId: String,
+        unidadId: String,
+        etiqueta: String,
+        uri: Uri,
+    ): Resultado<String> = intentar {
+        val bytes = leer(uri)
+        val ruta = "$miId/unidades/$unidadId/${etiqueta}_${System.currentTimeMillis()}.${extensionDe(uri)}"
+        supabase.storage.from(BUCKET_UNIDADES).upload(ruta, bytes) { upsert = true }
+        ruta
+    }
+
+    /**
+     * Sube una foto o documento de un operador.
+     *
+     * `operadores` es un bucket PUBLICO (asi esta en la web), asi que aqui se
+     * devuelve la URL y no la ruta: es lo que la tabla guarda. Ojo con la
+     * diferencia respecto a `unidades`, que es privado y guarda rutas.
+     */
+    suspend fun subirArchivoOperador(
+        miId: String,
+        etiqueta: String,
+        uri: Uri,
+    ): Resultado<String> = intentar {
+        val bytes = leer(uri)
+        val ruta = "$miId/${etiqueta}_${System.currentTimeMillis()}.${extensionDe(uri)}"
+        supabase.storage.from(BUCKET_OPERADORES).upload(ruta, bytes) { upsert = true }
+        supabase.storage.from(BUCKET_OPERADORES).publicUrl(ruta)
+    }
+
     // ── Utilidades ────────────────────────────────────────────────────────
 
     private suspend fun leer(uri: Uri): ByteArray = withContext(Dispatchers.IO) {

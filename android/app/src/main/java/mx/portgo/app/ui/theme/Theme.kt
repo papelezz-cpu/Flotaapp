@@ -1,154 +1,232 @@
 package mx.portgo.app.ui.theme
 
 import android.app.Activity
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import mx.portgo.app.R
 
-// ── Paleta ────────────────────────────────────────────────────────────────
-// El azul es el de la marca (#1a4fd6 en la web y en los correos). El resto se
-// derivó alrededor de él siguiendo los roles de Material 3, para que la app se
-// vea PortGo sin romper el contraste que M3 garantiza.
+// ══════════════════════════════════════════════════════════════════════════
+// TIPOGRAFÍA
+// ══════════════════════════════════════════════════════════════════════════
+//
+// Se empaquetan TTF estáticos, uno por peso, en vez de la fuente variable:
+// las fuentes variables solo funcionan desde API 26 y el minSdk es 24. Con
+// estáticas los pesos se ven correctos también en Android 7, que es donde
+// están los teléfonos de patio.
+//
+// Tampoco se usan Downloadable Fonts: dependerían de Google Play Services y de
+// tener red la primera vez. En el puerto eso significa abrir la app con la
+// tipografía equivocada.
 
-private val AzulPortGo = Color(0xFF1A4FD6)
-private val AzulClaro = Color(0xFFAFC6FF)
-private val AzulProfundo = Color(0xFF002A78)
-
-private val EsquemaClaro = lightColorScheme(
-    primary = AzulPortGo,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFDCE1FF),
-    onPrimaryContainer = AzulProfundo,
-    secondary = Color(0xFF00668B),
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFFC3E8FF),
-    onSecondaryContainer = Color(0xFF001E2C),
-    tertiary = Color(0xFF6B5E00),
-    tertiaryContainer = Color(0xFFF8E36B),
-    onTertiaryContainer = Color(0xFF211C00),
-    error = Color(0xFFBA1A1A),
-    errorContainer = Color(0xFFFFDAD6),
-    onErrorContainer = Color(0xFF410002),
-    background = Color(0xFFFDFBFF),
-    onBackground = Color(0xFF1B1B1F),
-    surface = Color(0xFFFDFBFF),
-    onSurface = Color(0xFF1B1B1F),
-    surfaceVariant = Color(0xFFE2E1EC),
-    onSurfaceVariant = Color(0xFF45464F),
-    outline = Color(0xFF767680),
+/** Títulos, nombres, cifras y precios. */
+val SpaceGrotesk = FontFamily(
+    Font(R.font.space_grotesk_400, FontWeight.Normal),
+    Font(R.font.space_grotesk_500, FontWeight.Medium),
+    Font(R.font.space_grotesk_600, FontWeight.SemiBold),
+    Font(R.font.space_grotesk_700, FontWeight.Bold),
 )
 
-private val EsquemaOscuro = darkColorScheme(
-    primary = AzulClaro,
-    onPrimary = Color(0xFF002C71),
-    primaryContainer = Color(0xFF0040A0),
-    onPrimaryContainer = Color(0xFFDCE1FF),
-    secondary = Color(0xFF77D1FF),
-    onSecondary = Color(0xFF003549),
-    secondaryContainer = Color(0xFF004C69),
-    onSecondaryContainer = Color(0xFFC3E8FF),
-    tertiary = Color(0xFFDBC750),
-    tertiaryContainer = Color(0xFF514700),
-    onTertiaryContainer = Color(0xFFF8E36B),
-    error = Color(0xFFFFB4AB),
-    errorContainer = Color(0xFF93000A),
-    onErrorContainer = Color(0xFFFFDAD6),
-    background = Color(0xFF1B1B1F),
-    onBackground = Color(0xFFE4E1E6),
-    surface = Color(0xFF1B1B1F),
-    onSurface = Color(0xFFE4E1E6),
-    surfaceVariant = Color(0xFF45464F),
-    onSurfaceVariant = Color(0xFFC6C5D0),
-    outline = Color(0xFF90909A),
+/** Texto de cuerpo, subtítulos, descripciones y etiquetas. */
+val DMSans = FontFamily(
+    Font(R.font.dm_sans_300, FontWeight.Light),
+    Font(R.font.dm_sans_400, FontWeight.Normal),
+    Font(R.font.dm_sans_500, FontWeight.Medium),
+    Font(R.font.dm_sans_600, FontWeight.SemiBold),
+)
+
+// ══════════════════════════════════════════════════════════════════════════
+// COLOR
+// ══════════════════════════════════════════════════════════════════════════
+//
+// Valores exactos del handoff. Es una identidad de marca fija, así que
+// **Material You queda fuera**: en Android 12+ el color dinámico toma la
+// paleta del fondo de pantalla del usuario y sustituiría el teal por lo que
+// el teléfono decida. Con una marca definida eso no es personalización, es
+// perder la marca.
+
+object PortGoColor {
+    val Arena = Color(0xFFFAF8F3)          // fondo de pantalla
+    val Teal = Color(0xFF0D9488)           // primario: acciones, activos, FAB
+    val TealOscuro = Color(0xFF0F766E)     // precios, énfasis
+    val TealTenue = Color(0xFFE3F1EE)      // fondo de iconos de tarjeta
+    val Tinta = Color(0xFF102A26)          // texto principal
+    val TextoSecundario = Color(0xFF7C8A85)
+    val TextoTerciario = Color(0xFF9AA6A1) // inactivo
+    val Superficie = Color(0xFFFFFFFF)     // tarjetas, barra inferior
+    val BordeTarjeta = Color(0xFFE6E1D6)
+    val BordeBarra = Color(0xFFECE7DA)
+    val Divisor = Color(0xFFF0ECE2)        // línea interna de tarjeta
+}
+
+/**
+ * Colores de estado. Van fuera del esquema de Material a propósito: los
+ * estados del negocio (en revisión, activa, en tránsito) son un vocabulario
+ * propio, no "primary" ni "error", y tienen que leerse igual sin importar qué
+ * pase con el tema.
+ */
+object ColoresEstado {
+    val exito = Color(0xFF15924E)          // "Activa"
+    val exitoSuave = Color(0xFFE4F2EA)
+    val alerta = Color(0xFFC77C11)         // "En revisión" / "Pendiente"
+    val alertaSuave = Color(0xFFFAF1DF)
+    val info = PortGoColor.Teal
+    val infoSuave = PortGoColor.TealTenue
+    val peligro = Color(0xFFC0573A)        // badges de conteo, "En tránsito"
+    val peligroSuave = Color(0xFFFBEEE8)
+    val neutro = PortGoColor.TextoSecundario
+    val neutroSuave = Color(0xFFF0ECE2)
+}
+
+private val EsquemaPortGo = lightColorScheme(
+    primary = PortGoColor.Teal,
+    onPrimary = Color.White,
+    primaryContainer = PortGoColor.TealTenue,
+    onPrimaryContainer = PortGoColor.TealOscuro,
+    secondary = PortGoColor.TealOscuro,
+    onSecondary = Color.White,
+    secondaryContainer = PortGoColor.TealTenue,
+    onSecondaryContainer = PortGoColor.Tinta,
+    tertiary = ColoresEstado.alerta,
+    tertiaryContainer = ColoresEstado.alertaSuave,
+    onTertiaryContainer = PortGoColor.Tinta,
+    error = ColoresEstado.peligro,
+    onError = Color.White,
+    errorContainer = ColoresEstado.peligroSuave,
+    onErrorContainer = Color(0xFF7A2E1C),
+    background = PortGoColor.Arena,
+    onBackground = PortGoColor.Tinta,
+    surface = PortGoColor.Superficie,
+    onSurface = PortGoColor.Tinta,
+    // surfaceVariant se usa como fondo suave en varias pantallas; se ata al
+    // arena para que no aparezca el gris azulado que trae Material por defecto.
+    surfaceVariant = PortGoColor.Arena,
+    onSurfaceVariant = PortGoColor.TextoSecundario,
+    outline = PortGoColor.BordeTarjeta,
+    outlineVariant = PortGoColor.Divisor,
+    scrim = Color(0x66102A26),
 )
 
 /**
- * Colores de estado, fuera del esquema de M3.
+ * Escala tipográfica del handoff, mapeada a los roles de Material 3.
  *
- * Los estados de una solicitud o una reserva no son "primary" ni "error": son
- * un vocabulario propio (abierta, en negociación, acordada, cancelada) que
- * tiene que leerse igual en claro y en oscuro. Van aparte para que ningún
- * cambio de tema los altere sin querer.
+ * Space Grotesk para lo que se lee de un vistazo —saludo, títulos, cifras,
+ * precios— y DM Sans para lo que se lee con calma. La mezcla no es decorativa:
+ * hace que el precio de una oferta y el nombre de una ruta salten sobre la
+ * descripción sin necesidad de más color.
  */
-object ColoresEstado {
-    val exito = Color(0xFF16A34A)
-    val exitoSuave = Color(0x2216A34A)
-    val alerta = Color(0xFFB45309)
-    val alertaSuave = Color(0x22B45309)
-    val info = Color(0xFF1A4FD6)
-    val infoSuave = Color(0x221A4FD6)
-    val peligro = Color(0xFFDC2626)
-    val peligroSuave = Color(0x22DC2626)
-    val neutro = Color(0xFF64748B)
-    val neutroSuave = Color(0x2264748B)
-}
-
 private val TipografiaPortGo = Typography(
-    headlineSmall = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, lineHeight = 32.sp),
-    titleLarge = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold, lineHeight = 28.sp),
-    titleMedium = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.SemiBold, lineHeight = 24.sp),
-    bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 24.sp),
-    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
-    bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 16.sp),
-    labelLarge = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
-    labelSmall = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium),
+    // Saludo del inicio: 22px
+    headlineMedium = TextStyle(
+        fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold,
+        fontSize = 22.sp, lineHeight = 25.sp,
+    ),
+    // Nombre de empresa en el inicio: 20px
+    headlineSmall = TextStyle(
+        fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold,
+        fontSize = 20.sp, lineHeight = 24.sp,
+    ),
+    // Título de pantalla y wordmark: 17-18px
+    titleLarge = TextStyle(
+        fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold,
+        fontSize = 17.sp, lineHeight = 22.sp,
+    ),
+    // Título de tarjeta de lista: 14px
+    titleMedium = TextStyle(
+        fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp, lineHeight = 19.sp,
+    ),
+    // Nombre de tarjeta de acceso rápido: 13.5px
+    titleSmall = TextStyle(
+        fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold,
+        fontSize = 13.5.sp, lineHeight = 18.sp,
+    ),
+    bodyLarge = TextStyle(
+        fontFamily = DMSans, fontWeight = FontWeight.Normal,
+        fontSize = 13.sp, lineHeight = 19.sp,
+    ),
+    // Meta de tarjeta, subtítulos: 12-12.5px
+    bodyMedium = TextStyle(
+        fontFamily = DMSans, fontWeight = FontWeight.Normal,
+        fontSize = 12.5.sp, lineHeight = 18.sp,
+    ),
+    // Descripción de acceso rápido: 11px
+    bodySmall = TextStyle(
+        fontFamily = DMSans, fontWeight = FontWeight.Normal,
+        fontSize = 11.sp, lineHeight = 15.sp,
+    ),
+    // Label de sección en mayúsculas: 11px + letter-spacing .06em
+    labelLarge = TextStyle(
+        fontFamily = DMSans, fontWeight = FontWeight.Medium,
+        fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 0.66.sp,
+    ),
+    // Badge: 11px
+    labelMedium = TextStyle(
+        fontFamily = DMSans, fontWeight = FontWeight.SemiBold,
+        fontSize = 11.sp, lineHeight = 13.sp,
+    ),
+    // Etiqueta de pestaña: 10px
+    labelSmall = TextStyle(
+        fontFamily = DMSans, fontWeight = FontWeight.Medium,
+        fontSize = 10.sp, lineHeight = 12.sp,
+    ),
 )
 
-/** Separación estándar entre bloques. Evita números mágicos regados por la UI. */
+/** Separaciones del handoff. */
 object Espacio {
     val xs = 4.dp
     val s = 8.dp
-    val m = 16.dp
+    val m = 16.dp     // padding lateral de contenido
     val l = 24.dp
     val xl = 32.dp
+    val gapRejilla = 12.dp
+}
+
+/** Radios del handoff. */
+object Radio {
+    val tarjeta = 16.dp
+    val stat = 14.dp
+    val iconoTarjeta = 12.dp
+    val botonHeader = 11.dp
+    val pill = 999.dp
 }
 
 @Composable
 fun PortGoTheme(
-    oscuro: Boolean = isSystemInDarkTheme(),
-    /**
-     * Material You. Se respeta el color del sistema en Android 12+, que es lo
-     * que la guía de Material recomienda, pero se puede apagar: hay clientes
-     * que prefieren ver el azul de la marca.
-     */
-    colorDinamico: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val contexto = LocalContext.current
-    val esquema = when {
-        colorDinamico && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            if (oscuro) dynamicDarkColorScheme(contexto) else dynamicLightColorScheme(contexto)
-        oscuro -> EsquemaOscuro
-        else -> EsquemaClaro
-    }
-
     val vista = LocalView.current
     if (!vista.isInEditMode) {
         SideEffect {
             val ventana = (vista.context as Activity).window
+            // La paleta es clara en toda la app, así que los iconos de la barra
+            // de estado van oscuros siempre.
             WindowCompat.getInsetsController(ventana, vista)
-                .isAppearanceLightStatusBars = !oscuro
+                .isAppearanceLightStatusBars = true
         }
     }
 
     MaterialTheme(
-        colorScheme = esquema,
+        colorScheme = EsquemaPortGo,
         typography = TipografiaPortGo,
         content = content,
     )
 }
+
+// Modo oscuro: PENDIENTE a propósito.
+//
+// El handoff define una sola paleta clara. Inventar un oscuro a partir de
+// estos tokens daría contrastes que nadie revisó — el arena y el teal tenue no
+// tienen equivalente evidente sobre fondo negro. Mejor dejarlo explícito que
+// entregar un oscuro improvisado.

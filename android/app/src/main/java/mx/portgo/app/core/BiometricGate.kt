@@ -14,7 +14,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
  * del trato: el refresh token sobrevive al cierre de la app, pero para volver
  * a usarlo hace falta la huella o el rostro del dueño. Sin esto, un teléfono
  * perdido desbloqueado da acceso completo a las reservaciones, los precios
- * acordados y el chat con los clientes.
+ * acordados y los datos de los clientes.
  *
  * `DEVICE_CREDENTIAL` va incluido a propósito: en muchos equipos de flota el
  * sensor de huella está desgastado o el operador trae guantes. Sin la

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solo la carpeta de capturas de la caché: lo mínimo que el FileProvider
+     necesita exponer para que la cámara escriba la foto. No se comparte el
+     resto del almacenamiento de la app. -->
+<paths>
+    <cache-path name="capturas" path="capturas/" />
+</paths>

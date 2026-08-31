@@ -19,8 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Description
@@ -30,7 +28,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -45,7 +42,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,15 +64,18 @@ import mx.portgo.app.data.model.EstadoReserva
 import mx.portgo.app.data.model.EtapaExpediente
 import mx.portgo.app.data.model.Reservacion
 import mx.portgo.app.data.model.UsuarioActual
+import mx.portgo.app.data.repository.AvisosRepository.MotivoReporte
 import mx.portgo.app.di.AppContainer
 import mx.portgo.app.ui.LocalCatalogos
 import mx.portgo.app.ui.components.BannerError
+import mx.portgo.app.ui.components.EncabezadoModulo
 import mx.portgo.app.ui.components.ChipEstadoReserva
 import mx.portgo.app.ui.components.EsqueletoLista
 import mx.portgo.app.ui.components.FilaDato
 import mx.portgo.app.ui.screens.solicitudes.DialogoNota
 import mx.portgo.app.ui.theme.ColoresEstado
 import mx.portgo.app.ui.theme.Espacio
+import mx.portgo.app.ui.theme.PortGoColor
 import mx.portgo.app.ui.viewmodel.EstadoCarga
 import mx.portgo.app.ui.viewmodel.ReservacionDetalleViewModel
 import mx.portgo.app.ui.viewmodel.vmFactory
@@ -88,14 +87,14 @@ fun PantallaReservacionDetalle(
     usuario: UsuarioActual,
     container: AppContainer,
     onAtras: () -> Unit,
-    onAbrirChat: (otroId: String, titulo: String, reservaId: String) -> Unit,
     onAbrirExpediente: (reservaId: String, etapa: String) -> Unit,
 ) {
     val vm: ReservacionDetalleViewModel = viewModel(
-        key = reservaId,
+        key = "${usuario.id}-$reservaId",
         factory = vmFactory {
             ReservacionDetalleViewModel(
-                container.reservaciones, container.storage, container.auth, usuario, reservaId,
+                container.reservaciones, container.storage, container.auth,
+                container.avisos, usuario, reservaId,
             )
         },
     )
@@ -110,6 +109,10 @@ fun PantallaReservacionDetalle(
     var confirmarCancelar by rememberSaveable { mutableStateOf(false) }
     var pedirCancelacion by rememberSaveable { mutableStateOf(false) }
     var calificando by rememberSaveable { mutableStateOf(false) }
+    var avisandoRetraso by rememberSaveable { mutableStateOf(false) }
+    var eligiendoMotivo by rememberSaveable { mutableStateOf(false) }
+    var reportando by rememberSaveable { mutableStateOf<MotivoReporte?>(null) }
+    val viajeEnEdicion by vm.viajeEnEdicion.collectAsStateWithLifecycle()
 
     // Se aceptan varios archivos de una vez: nadie sube una sola foto de una
     // maniobra, y hacerlo de uno en uno con la red del puerto es desesperante.
@@ -119,28 +122,15 @@ fun PantallaReservacionDetalle(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = { Text("Servicio") },
-                navigationIcon = {
-                    IconButton(onClick = onAtras) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
-                    }
-                },
-                actions = {
-                    vm.contraparteId?.let { otro ->
-                        val d = (estado as? EstadoCarga.Listo)?.datos
-                        IconButton(onClick = {
-                            onAbrirChat(otro, d?.nombreContraparte ?: "Conversación", reservaId)
-                        }) {
-                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Mensajes")
-                        }
-                    }
-                },
-            )
-        },
+        containerColor = PortGoColor.Arena,
     ) { relleno ->
-        Column(Modifier.fillMaxSize().padding(relleno)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(PortGoColor.Arena)
+                .padding(relleno),
+        ) {
+            EncabezadoModulo(titulo = "Servicio", onAtras = onAtras)
             if (ocupado || subiendo) LinearProgressIndicator(Modifier.fillMaxWidth())
 
             when (val e = estado) {
@@ -189,6 +179,25 @@ fun PantallaReservacionDetalle(
                             onAbrir = { etapa -> onAbrirExpediente(reservaId, etapa) },
                             onSolicitar = { etapa -> vm.abrirExpediente(etapa) },
                         )
+
+                        // ── Avisos a la otra parte ──
+                        // Solo mientras el viaje corre: en una reserva cerrada
+                        // no hay nada que confirmar ni retraso que avisar, y un
+                        // botón que no sirve es peor que ninguno.
+                        if (r.estadoEnum == EstadoReserva.ACTIVA ||
+                            r.estadoEnum == EstadoReserva.PENDIENTE
+                        ) {
+                            Spacer(Modifier.height(Espacio.l))
+                            SeccionAvisos(
+                                soyCliente = vm.soyCliente,
+                                habilitado = !ocupado,
+                                onSolicitarDocumentos = { vm.solicitarDocumentosCarga() },
+                                onConfirmarLugarHora = { vm.confirmarLugarHora() },
+                                onAvisarRetraso = { avisandoRetraso = true },
+                                onActualizarViaje = { vm.abrirActualizarViaje() },
+                                onReportarProblema = { eligiendoMotivo = true },
+                            )
+                        }
 
                         // ── Evidencias / cierre ──
                         Spacer(Modifier.height(Espacio.l))
@@ -315,6 +324,52 @@ fun PantallaReservacionDetalle(
         )
     }
 
+    if (avisandoRetraso) {
+        DialogoNota(
+            titulo = "Avisar retraso",
+            descripcion = "Detalle (opcional) — cuánto tiempo o el motivo.",
+            etiquetaBoton = "Enviar aviso",
+            onCerrar = { avisandoRetraso = false },
+            onConfirmar = { nota ->
+                avisandoRetraso = false
+                vm.avisarRetraso(nota)
+            },
+        )
+    }
+
+    viajeEnEdicion?.let { detalles ->
+        DialogoActualizarViaje(
+            lugarInicial = detalles.lugar,
+            horaInicial = detalles.hora,
+            onCerrar = { vm.cerrarActualizarViaje() },
+            onConfirmar = { lugar, hora -> vm.actualizarLugarHora(lugar, hora) },
+        )
+    }
+
+    if (eligiendoMotivo) {
+        DialogoMotivoReporte(
+            onCerrar = { eligiendoMotivo = false },
+            onElegir = { motivo ->
+                eligiendoMotivo = false
+                reportando = motivo
+            },
+        )
+    }
+
+    // El motivo ya está elegido; esto solo recoge el detalle, que es opcional.
+    reportando?.let { motivo ->
+        DialogoNota(
+            titulo = "Reportar problema",
+            descripcion = "Detalle (opcional) — qué pasó exactamente.",
+            etiquetaBoton = "Enviar reporte",
+            onCerrar = { reportando = null },
+            onConfirmar = { nota ->
+                reportando = null
+                vm.reportarProblema(motivo, nota)
+            },
+        )
+    }
+
     if (calificando) {
         DialogoCalificar(
             onCerrar = { calificando = false },
@@ -414,8 +469,11 @@ private fun LineaTiempo(r: Reservacion) {
                         .background(
                             color = when {
                                 hecho -> ColoresEstado.exito
-                                esActual -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.surfaceVariant
+                                esActual -> PortGoColor.Teal
+                                // Un paso pendiente lleva el borde de tarjeta y
+                                // no surfaceVariant: ese token es el arena del
+                                // fondo y el circulo desaparecia.
+                                else -> PortGoColor.BordeTarjeta
                             },
                             shape = CircleShape,
                         ),
@@ -435,8 +493,8 @@ private fun LineaTiempo(r: Reservacion) {
                     paso.etiqueta,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = if (esActual) FontWeight.Bold else FontWeight.Normal,
-                    color = if (hecho || esActual) MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (hecho || esActual) PortGoColor.Tinta
+                    else PortGoColor.TextoTerciario,
                 )
             }
         }

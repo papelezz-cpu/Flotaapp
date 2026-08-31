@@ -1,6 +1,8 @@
 package mx.portgo.app.ui.screens.auth
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,14 +12,13 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +37,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -45,7 +48,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import mx.portgo.app.data.repository.AuthRepository
 import mx.portgo.app.ui.SesionViewModel
+import mx.portgo.app.ui.components.BotonPrincipal
+import mx.portgo.app.ui.components.RadioCampo
+import mx.portgo.app.ui.components.coloresCampo
+import mx.portgo.app.ui.theme.ColoresEstado
 import mx.portgo.app.ui.theme.Espacio
+import mx.portgo.app.ui.theme.PortGoColor
+import mx.portgo.app.ui.theme.SpaceGrotesk
 
 /**
  * Elegir una contraseña nueva, tras llegar por el enlace del correo.
@@ -76,10 +85,14 @@ fun PantallaNuevaContrasena(
     val puedeGuardar = !muyCorta && !noCoinciden &&
         contrasena.length >= AuthRepository.MIN_CONTRASENA && contrasena == confirmacion
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { relleno ->
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
+        containerColor = PortGoColor.Arena,
+    ) { relleno ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(PortGoColor.Arena)
                 .padding(relleno)
                 .verticalScroll(rememberScrollState())
                 .imePadding()
@@ -87,21 +100,36 @@ fun PantallaNuevaContrasena(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Icon(
-                Icons.Default.LockReset,
-                contentDescription = null,
-                modifier = Modifier.size(56.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
+            Box(
+                Modifier
+                    .size(76.dp)
+                    .clip(CircleShape)
+                    .background(PortGoColor.TealTenue),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.LockReset,
+                    contentDescription = null,
+                    modifier = Modifier.size(38.dp),
+                    tint = PortGoColor.TealOscuro,
+                )
+            }
 
             Spacer(Modifier.height(Espacio.m))
 
-            Text("Elige una contraseña nueva", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "Elige una contraseña nueva",
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLarge,
+                color = PortGoColor.Tinta,
+                textAlign = TextAlign.Center,
+            )
             Spacer(Modifier.height(Espacio.s))
             Text(
                 "Debe tener al menos ${AuthRepository.MIN_CONTRASENA} caracteres.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = PortGoColor.TextoSecundario,
                 textAlign = TextAlign.Center,
             )
 
@@ -113,8 +141,15 @@ fun PantallaNuevaContrasena(
                 label = { Text("Contraseña nueva") },
                 singleLine = true,
                 isError = muyCorta,
+                shape = RadioCampo,
+                colors = coloresCampo(),
                 supportingText = if (muyCorta) {
-                    { Text("Mínimo ${AuthRepository.MIN_CONTRASENA} caracteres") }
+                    {
+                        Text(
+                            "Mínimo ${AuthRepository.MIN_CONTRASENA} caracteres",
+                            color = ColoresEstado.peligro,
+                        )
+                    }
                 } else null,
                 visualTransformation = if (visible) VisualTransformation.None
                 else PasswordVisualTransformation(),
@@ -124,13 +159,14 @@ fun PantallaNuevaContrasena(
                         Icon(
                             if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                             contentDescription = if (visible) "Ocultar" else "Mostrar",
+                            tint = PortGoColor.TextoSecundario,
                         )
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Spacer(Modifier.height(Espacio.s))
+            Spacer(Modifier.height(Espacio.gapRejilla))
 
             OutlinedTextField(
                 value = confirmacion,
@@ -138,8 +174,10 @@ fun PantallaNuevaContrasena(
                 label = { Text("Repite la contraseña") },
                 singleLine = true,
                 isError = noCoinciden,
+                shape = RadioCampo,
+                colors = coloresCampo(),
                 supportingText = if (noCoinciden) {
-                    { Text("Las contraseñas no coinciden") }
+                    { Text("Las contraseñas no coinciden", color = ColoresEstado.peligro) }
                 } else null,
                 visualTransformation = if (visible) VisualTransformation.None
                 else PasswordVisualTransformation(),
@@ -149,29 +187,20 @@ fun PantallaNuevaContrasena(
 
             Spacer(Modifier.height(Espacio.l))
 
-            Button(
+            BotonPrincipal(
+                texto = "Guardar y entrar",
                 onClick = {
                     vm.cambiarContrasena(contrasena) { ok, mensaje ->
                         alcance.launch { snackbar.showSnackbar(mensaje) }
                         if (ok) onListo()
                     }
                 },
-                enabled = puedeGuardar && !ocupado,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) {
-                if (ocupado) {
-                    CircularProgressIndicator(
-                        Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                } else {
-                    Text("Guardar y entrar")
-                }
-            }
+                ocupado = ocupado,
+                habilitado = puedeGuardar,
+            )
 
             TextButton(onClick = onListo, enabled = !ocupado) {
-                Text("Cancelar")
+                Text("Cancelar", color = PortGoColor.TextoSecundario)
             }
         }
     }

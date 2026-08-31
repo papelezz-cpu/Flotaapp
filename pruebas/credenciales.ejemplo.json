@@ -1,0 +1,26 @@
+{
+  "_lee_esto": "Copia este archivo como credenciales.local.json y llena los datos. El .local.json esta en .gitignore: git no lo ve nunca. Este ejemplo si se sube, asi que NO pongas datos reales aqui.",
+  "pruebas": {
+    "_nota": "Proyecto portgo-pruebas. Supabase -> Settings -> API. La service_role NO va nunca en codigo del cliente, solo aqui.",
+    "url": "https://PENDIENTE.supabase.co",
+    "anon": "PENDIENTE",
+    "service_role": "PENDIENTE",
+    "clave_siembra": "PON-AQUI-UNA-CADENA-LARGA-QUE-NO-USES-EN-OTRO-SITIO"
+  },
+  "produccion": {
+    "_nota": "Solo la service_role de PRODUCCION, y solo para BAJAR los archivos de Storage al replicar (pruebas/04-copiar-archivos.mjs). Con ella nunca se escribe en produccion. Si no vas a copiar archivos, dejala en PENDIENTE: lo demas funciona igual.",
+    "service_role": "PENDIENTE"
+  },
+  "superadmin": {
+    "email": "PON-AQUI-EL-EMAIL-DEL-SUPERADMIN",
+    "password": "PON-AQUI-LA-CONTRASENA"
+  },
+  "empresa": {
+    "email": "PON-AQUI-EL-EMAIL-DE-LA-EMPRESA",
+    "password": "PON-AQUI-LA-CONTRASENA"
+  },
+  "cliente": {
+    "email": "",
+    "password": ""
+  }
+}

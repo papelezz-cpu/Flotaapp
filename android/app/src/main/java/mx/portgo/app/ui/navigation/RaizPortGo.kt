@@ -1,23 +1,17 @@
 package mx.portgo.app.ui.navigation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -47,16 +41,20 @@ import mx.portgo.app.data.model.Rol
 import mx.portgo.app.di.AppContainer
 import mx.portgo.app.ui.LocalCatalogos
 import mx.portgo.app.ui.SesionViewModel
+import mx.portgo.app.ui.components.BarraInferiorPortGo
 import mx.portgo.app.ui.components.CargandoCentrado
+import mx.portgo.app.ui.components.EncabezadoPortGo
+import mx.portgo.app.ui.components.RecargarAlVolver
 import mx.portgo.app.ui.screens.auth.PantallaActualizar
 import mx.portgo.app.ui.screens.auth.PantallaBloqueo
 import mx.portgo.app.ui.screens.auth.PantallaNuevaContrasena
 import mx.portgo.app.ui.screens.auth.PantallaLogin
-import mx.portgo.app.ui.screens.chat.PantallaChat
 import mx.portgo.app.ui.screens.expedientes.PantallaExpediente
+import mx.portgo.app.ui.screens.flota.PantallaAltaCamion
 import mx.portgo.app.ui.screens.flota.PantallaFlota
 import mx.portgo.app.ui.screens.inicio.PantallaInicio
 import mx.portgo.app.ui.screens.notificaciones.PantallaNotificaciones
+import mx.portgo.app.ui.screens.PantallaPendiente
 import mx.portgo.app.ui.screens.perfil.PantallaPerfil
 import mx.portgo.app.ui.screens.reservaciones.PantallaReservacionDetalle
 import mx.portgo.app.ui.screens.reservaciones.PantallaReservaciones
@@ -64,6 +62,7 @@ import mx.portgo.app.ui.screens.solicitudes.PantallaNuevaSolicitud
 import mx.portgo.app.ui.screens.solicitudes.PantallaSolicitudDetalle
 import mx.portgo.app.ui.screens.solicitudes.PantallaSolicitudes
 import mx.portgo.app.ui.theme.ColoresEstado
+import mx.portgo.app.ui.theme.PortGoColor
 import mx.portgo.app.ui.viewmodel.NotificacionesViewModel
 import mx.portgo.app.ui.viewmodel.vmFactory
 
@@ -117,6 +116,16 @@ fun RaizPortGo(
         when (estado) {
             is SesionViewModel.Estado.Cargando -> CargandoCentrado()
 
+            // NO se vacía aquí el ViewModelStore. Se intentó, para soltar de
+            // memoria lo que cargó el usuario anterior, y rompía el inicio de
+            // sesión: SesionViewModel vive en ese mismo store (MainActivity lo
+            // crea con `viewModel()`), así que vaciarlo lo destruía también
+            // —`onCleared()` cancela su viewModelScope— y a partir de ahí
+            // `iniciarSesion()` lanzaba corrutinas en un scope muerto.
+            //
+            // El aislamiento entre cuentas ya lo garantizan las claves por
+            // usuario de cada `viewModel()`. Lo que quedara en memoria muere
+            // con la Activity.
             is SesionViewModel.Estado.SinSesion -> PantallaLogin(
                 vm = sesionVm,
                 // Si el enlace del correo falló, el motivo tiene prioridad: es
@@ -183,15 +192,29 @@ private fun NavegacionPrincipal(
     sesionVm: SesionViewModel,
 ) {
     val nav: NavHostController = rememberNavController()
-    val destinos = remember(usuario.rol) { destinosDe(usuario.rol) }
+    val destinos = remember(usuario.rol) { pestanasDe(usuario.rol) }
     val snackbar = remember { SnackbarHostState() }
 
     // La campana vive en el andamio, no en cada pantalla: es global y así el
     // contador es uno solo, alimentado por un único canal de Realtime.
+    //
+    // La clave lleva el id del usuario a propósito, y lo mismo hacen todas las
+    // demás pantallas. Sin ella, `viewModel()` devuelve SIEMPRE la misma
+    // instancia mientras viva la Activity: al cambiar de cuenta sin cerrar la
+    // app, el ViewModel del usuario anterior seguía en pie con sus datos en
+    // pantalla. RLS impide leer lo ajeno del servidor, pero lo que ya estaba
+    // cargado en memoria quedaba a la vista de quien entrara después.
     val notifVm: NotificacionesViewModel = viewModel(
+        key = usuario.id,
         factory = vmFactory { NotificacionesViewModel(container.notificaciones, usuario) },
     )
     val noLeidas by notifVm.noLeidas.collectAsStateWithLifecycle()
+
+    // El contador se cargaba al arrancar y se mantenia por Realtime. Pero
+    // mientras la app esta en segundo plano —que es justo cuando el otro lado
+    // hace su parte desde la web— el canal se cae y los avisos que llegan
+    // entretanto no se cuentan. Al volver, se relee.
+    RecargarAlVolver(notifVm::cargar)
 
     val entradaActual by nav.currentBackStackEntryAsState()
     val rutaActual = entradaActual?.destination?.route
@@ -199,68 +222,52 @@ private fun NavegacionPrincipal(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
+        bottomBar = {
             AnimatedVisibility(visible = esRaiz) {
-                CenterAlignedTopAppBar(
-                    title = { Text(destinos.firstOrNull { it.ruta == rutaActual }?.etiqueta ?: "PortGo") },
-                    actions = {
-                        IconButton(onClick = { nav.navigate(Rutas.NOTIFICACIONES) }) {
-                            BadgedBox(
-                                badge = {
-                                    if (noLeidas > 0) {
-                                        Badge { Text(if (noLeidas > 9) "9+" else "$noLeidas") }
-                                    }
-                                },
-                            ) {
-                                Icon(
-                                    Icons.Default.Notifications,
-                                    contentDescription = if (noLeidas > 0) {
-                                        "Notificaciones, $noLeidas sin leer"
-                                    } else {
-                                        "Notificaciones"
-                                    },
-                                )
-                            }
+                BarraInferiorPortGo(
+                    pestanas = destinos,
+                    rutaActual = rutaActual,
+                    onPestana = { ruta ->
+                        nav.navigate(ruta) {
+                            // Sin esto, cambiar de pestana apila pantallas y el
+                            // boton atras recorre todo el historial de pestanas
+                            // antes de salir.
+                            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
                         }
                     },
+                    etiquetaAccion = etiquetaAccion(usuario.rol),
+                    // El handoff destaca la etiqueta cuando la pantalla actual
+                    // es el destino natural de la accion.
+                    accionDestacada = rutaActual == Rutas.INICIO,
+                    onAccion = { nav.navigate(rutaAccion(usuario.rol)) },
                 )
             }
         },
-        bottomBar = {
-            AnimatedVisibility(visible = esRaiz) {
-                NavigationBar {
-                    destinos.forEach { destino ->
-                        NavigationBarItem(
-                            selected = rutaActual == destino.ruta,
-                            onClick = {
-                                nav.navigate(destino.ruta) {
-                                    // Sin esto, cambiar de pestaña apila
-                                    // pantallas y el botón atrás recorre todo
-                                    // el historial de pestañas antes de salir.
-                                    popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = { Icon(destino.icono, contentDescription = null) },
-                            label = { Text(destino.etiqueta) },
-                        )
-                    }
-                }
-            }
-        },
     ) { relleno ->
-        Box(Modifier.fillMaxSize().padding(relleno)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(PortGoColor.Arena)
+                .padding(relleno),
+        ) {
             NavHost(navController = nav, startDestination = Rutas.INICIO) {
 
                 composable(Rutas.INICIO) {
-                    PantallaInicio(
-                        usuario = usuario,
-                        container = container,
-                        onIrA = { ruta -> nav.navigate(ruta) },
-                        onAbrirSolicitud = { nav.navigate(Rutas.solicitud(it)) },
-                        onAbrirReservacion = { nav.navigate(Rutas.reservacion(it)) },
-                    )
+                    Column(Modifier.fillMaxSize()) {
+                        EncabezadoPortGo(
+                            esInicio = true,
+                            titulo = "",
+                            noLeidas = noLeidas,
+                            onCampana = { nav.navigate(Rutas.NOTIFICACIONES) },
+                        )
+                        PantallaInicio(
+                            usuario = usuario,
+                            container = container,
+                            onIrA = { ruta -> nav.navigate(ruta) },
+                        )
+                    }
                 }
 
                 composable(Rutas.SOLICITUDES) {
@@ -268,7 +275,13 @@ private fun NavegacionPrincipal(
                         usuario = usuario,
                         container = container,
                         onAbrir = { nav.navigate(Rutas.solicitud(it)) },
-                        onNueva = { nav.navigate(Rutas.NUEVA_SOLICITUD) },
+                        // El boton de atras solo si hay a donde volver: en una
+                        // pestana de la barra inferior seria un boton muerto.
+                        onAtras = if (nav.previousBackStackEntry != null) {
+                            { nav.popBackStack() }
+                        } else null,
+                        noLeidas = noLeidas,
+                        onCampana = { nav.navigate(Rutas.NOTIFICACIONES) },
                     )
                 }
 
@@ -281,9 +294,6 @@ private fun NavegacionPrincipal(
                         usuario = usuario,
                         container = container,
                         onAtras = { nav.popBackStack() },
-                        onAbrirChat = { otroId, titulo, pedidoId ->
-                            nav.navigate(Rutas.chat("pedido", pedidoId, otroId, titulo))
-                        },
                     )
                 }
 
@@ -303,6 +313,11 @@ private fun NavegacionPrincipal(
                         usuario = usuario,
                         container = container,
                         onAbrir = { nav.navigate(Rutas.reservacion(it)) },
+                        onAtras = if (nav.previousBackStackEntry != null) {
+                            { nav.popBackStack() }
+                        } else null,
+                        noLeidas = noLeidas,
+                        onCampana = { nav.navigate(Rutas.NOTIFICACIONES) },
                     )
                 }
 
@@ -315,9 +330,6 @@ private fun NavegacionPrincipal(
                         usuario = usuario,
                         container = container,
                         onAtras = { nav.popBackStack() },
-                        onAbrirChat = { otroId, titulo, reservaId ->
-                            nav.navigate(Rutas.chat("reserva", reservaId, otroId, titulo))
-                        },
                         onAbrirExpediente = { reservaId, etapa ->
                             nav.navigate(Rutas.expediente(reservaId, etapa))
                         },
@@ -340,28 +352,6 @@ private fun NavegacionPrincipal(
                     )
                 }
 
-                composable(
-                    Rutas.CHAT_PATRON,
-                    arguments = listOf(
-                        navArgument("contexto") { type = NavType.StringType },
-                        navArgument("ctxId") { type = NavType.StringType },
-                        navArgument("otroId") { type = NavType.StringType },
-                        navArgument("titulo") { type = NavType.StringType },
-                    ),
-                ) { entrada ->
-                    val args = entrada.arguments
-                    PantallaChat(
-                        esReserva = args?.getString("contexto") == "reserva",
-                        contextoId = args?.getString("ctxId").orEmpty(),
-                        otroUsuarioId = args?.getString("otroId").orEmpty(),
-                        titulo = java.net.URLDecoder.decode(
-                            args?.getString("titulo").orEmpty(), "UTF-8",
-                        ),
-                        usuario = usuario,
-                        container = container,
-                        onAtras = { nav.popBackStack() },
-                    )
-                }
 
                 composable(Rutas.NOTIFICACIONES) {
                     PantallaNotificaciones(
@@ -373,8 +363,49 @@ private fun NavegacionPrincipal(
 
                 if (usuario.rol == Rol.EMPRESA) {
                     composable(Rutas.FLOTA) {
-                        PantallaFlota(usuario = usuario, container = container)
+                        PantallaFlota(
+                            usuario = usuario,
+                            container = container,
+                            onNuevaUnidad = { nav.navigate(Rutas.ALTA_CAMION) },
+                            onAtras = if (nav.previousBackStackEntry != null) {
+                                { nav.popBackStack() }
+                            } else null,
+                        )
                     }
+                }
+
+
+                if (usuario.rol == Rol.EMPRESA) {
+                    composable(Rutas.ALTA_CAMION) {
+                        PantallaAltaCamion(
+                            usuario = usuario,
+                            container = container,
+                            onAtras = { nav.popBackStack() },
+                            onGuardada = { nav.popBackStack() },
+                        )
+                    }
+                }
+
+
+                // Modulos que el diseno ya coloca en el inicio pero que todavia
+                // no estan construidos. Muestran a donde van en vez de fingir.
+                composable(Rutas.CATALOGO) {
+                    PantallaPendiente("Catálogo", "Directorio de empresas verificadas con sus unidades y calificaciones.", onAtras = { nav.popBackStack() })
+                }
+                composable(Rutas.PAGOS) {
+                    PantallaPendiente("Mis pagos", "Consulta de lo que has pagado y lo que está por vencer.", onAtras = { nav.popBackStack() })
+                }
+                composable(Rutas.PRIVACIDAD) {
+                    PantallaPendiente("Privacidad", "Tus datos y las solicitudes de derechos ARCO.", onAtras = { nav.popBackStack() })
+                }
+                composable(Rutas.VIGENCIAS) {
+                    PantallaPendiente("Vigencias", "Seguimiento de todos los documentos de tu flota y su vencimiento.", onAtras = { nav.popBackStack() })
+                }
+                composable(Rutas.OPERADORES) {
+                    PantallaPendiente("Operadores", "Alta y expediente del personal de conducción.", onAtras = { nav.popBackStack() })
+                }
+                composable(Rutas.COBROS) {
+                    PantallaPendiente("Cobros", "Pagos recibidos y vencimientos por cobrar.", onAtras = { nav.popBackStack() })
                 }
 
                 composable(Rutas.PERFIL) {
@@ -383,6 +414,9 @@ private fun NavegacionPrincipal(
                         container = container,
                         sesionVm = sesionVm,
                         onCerrarSesion = onCerrarSesion,
+                        onAtras = if (nav.previousBackStackEntry != null) {
+                            { nav.popBackStack() }
+                        } else null,
                     )
                 }
             }

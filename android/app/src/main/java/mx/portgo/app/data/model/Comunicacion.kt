@@ -6,33 +6,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Mensaje de un hilo de chat. Tabla `mensajes`.
- *
- * El hilo se identifica por el par (contexto, participantes): un mismo pedido
- * puede tener varias conversaciones 1-a-1, una por cada empresa que ofertó.
- * Por eso las consultas filtran por `participantes @> [yo, elOtro]` y no solo
- * por `pedido_id`.
- */
-@Serializable
-data class Mensaje(
-    val id: String,
-    @SerialName("de_user_id") val deUserId: String,
-    @SerialName("de_nombre") val deNombre: String? = null,
-    val texto: String,
-    @SerialName("reserva_id") val reservaId: String? = null,
-    @SerialName("pedido_id") val pedidoId: String? = null,
-    val participantes: List<String> = emptyList(),
-    val leido: Boolean = false,
-    @SerialName("created_at") val creadoEn: String? = null,
-) {
-    fun esMio(miId: String?): Boolean = deUserId == miId
-}
-
-/**
  * Aviso de la campana. Tabla `notificaciones`.
  *
- * `meta` es jsonb libre. Hoy solo lo usa el tipo `nuevo_mensaje`, que trae
- * `ctx_tipo` / `ctx_id` / `de_user_id` para poder abrir el hilo correcto.
+ * `meta` es jsonb libre. Lo escribía el chat, que ya no existe en ningún
+ * cliente; se conserva la lectura porque las filas viejas siguen ahí y romper
+ * al deserializarlas dejaría la campana en blanco.
  */
 @Serializable
 data class Notificacion(
@@ -60,7 +38,12 @@ data class Notificacion(
      */
     val destino: DestinoNotificacion
         get() = when (tipo) {
-            "nuevo_mensaje" -> DestinoNotificacion.Chat
+            // El chat se dio de baja. Los avisos que lo sustituyen y los
+            // `nuevo_mensaje` que quedaron de antes llevan a Reservaciones, que
+            // es donde está el servicio del que hablan.
+            "nuevo_mensaje", "documentos_carga_solicitados", "confirmar_lugar_hora",
+            "aviso_retraso", "cambio_reportado",
+            -> DestinoNotificacion.Reservaciones
 
             "nueva_oferta", "respuesta_oferta", "respuesta_contra_oferta",
             "oferta_no_seleccionada", "pedido_cancelado", "negociacion_cerrada",
@@ -80,5 +63,5 @@ data class Notificacion(
 }
 
 enum class DestinoNotificacion {
-    Solicitudes, Reservaciones, Chat, Flota, Ninguno
+    Solicitudes, Reservaciones, Flota, Ninguno
 }

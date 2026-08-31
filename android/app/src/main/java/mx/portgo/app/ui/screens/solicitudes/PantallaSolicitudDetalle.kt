@@ -1,5 +1,7 @@
 package mx.portgo.app.ui.screens.solicitudes
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,20 +10,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -30,7 +26,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,17 +43,22 @@ import mx.portgo.app.core.Fmt
 import mx.portgo.app.data.model.EstadoOferta
 import mx.portgo.app.data.model.Oferta
 import mx.portgo.app.data.model.Pedido
-import mx.portgo.app.data.model.PedidoConOfertas
 import mx.portgo.app.data.model.UsuarioActual
 import mx.portgo.app.di.AppContainer
 import mx.portgo.app.ui.LocalCatalogos
 import mx.portgo.app.ui.components.BannerError
 import mx.portgo.app.ui.components.ChipEstadoOferta
+import mx.portgo.app.ui.components.EncabezadoModulo
+import mx.portgo.app.ui.components.SeccionFicha
+import mx.portgo.app.ui.components.TarjetaFicha
 import mx.portgo.app.ui.components.ChipEstadoPedido
 import mx.portgo.app.ui.components.EsqueletoLista
 import mx.portgo.app.ui.components.FilaDato
 import mx.portgo.app.ui.theme.ColoresEstado
 import mx.portgo.app.ui.theme.Espacio
+import mx.portgo.app.ui.theme.PortGoColor
+import mx.portgo.app.ui.theme.Radio
+import mx.portgo.app.ui.theme.SpaceGrotesk
 import mx.portgo.app.ui.viewmodel.EstadoCarga
 import mx.portgo.app.ui.viewmodel.SolicitudDetalleViewModel
 import mx.portgo.app.ui.viewmodel.vmFactory
@@ -70,10 +70,9 @@ fun PantallaSolicitudDetalle(
     usuario: UsuarioActual,
     container: AppContainer,
     onAtras: () -> Unit,
-    onAbrirChat: (otroId: String, titulo: String, pedidoId: String) -> Unit,
 ) {
     val vm: SolicitudDetalleViewModel = viewModel(
-        key = pedidoId,
+        key = "${usuario.id}-$pedidoId",
         factory = vmFactory {
             SolicitudDetalleViewModel(container.pedidos, container.flota, usuario, pedidoId)
         },
@@ -93,18 +92,15 @@ fun PantallaSolicitudDetalle(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = { Text("Solicitud") },
-                navigationIcon = {
-                    IconButton(onClick = onAtras) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
-                    }
-                },
-            )
-        },
+        containerColor = PortGoColor.Arena,
     ) { relleno ->
-        Column(Modifier.fillMaxSize().padding(relleno)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(PortGoColor.Arena)
+                .padding(relleno),
+        ) {
+            EncabezadoModulo(titulo = "Solicitud", onAtras = onAtras)
             if (ocupado) LinearProgressIndicator(Modifier.fillMaxWidth())
 
             when (val e = estado) {
@@ -185,11 +181,6 @@ fun PantallaSolicitudDetalle(
                                     onAceptar = { vm.aceptarOferta(oferta.id) },
                                     onContraofertar = { contraofertarA = oferta.id },
                                     onRechazar = { rechazarA = oferta.id },
-                                    onChat = {
-                                        oferta.adminId?.let {
-                                            onAbrirChat(it, oferta.adminNombre ?: "Empresa", pedidoId)
-                                        }
-                                    },
                                 )
                                 Spacer(Modifier.height(Espacio.s))
                             }
@@ -276,8 +267,8 @@ fun PantallaSolicitudDetalle(
 
 @Composable
 private fun FichaSolicitud(p: Pedido) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Espacio.m)) {
+    TarjetaFicha {
+        run {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -299,9 +290,7 @@ private fun FichaSolicitud(p: Pedido) {
                 )
             }
 
-            Spacer(Modifier.height(Espacio.m))
-            HorizontalDivider()
-            Spacer(Modifier.height(Espacio.s))
+            SeccionFicha("Ruta y fechas")
 
             FilaDato("Ruta", p.ruta)
             FilaDato("Arribo a puerto", p.fechaArriboPuerto?.let { Fmt.fecha(it) })
@@ -364,10 +353,7 @@ private fun FichaSolicitud(p: Pedido) {
             FilaDato("Plazo de pago", p.plazoPago)
 
             if (!p.descripcion.isNullOrBlank()) {
-                Spacer(Modifier.height(Espacio.s))
-                HorizontalDivider()
-                Spacer(Modifier.height(Espacio.s))
-                Text("Notas", style = MaterialTheme.typography.labelLarge)
+                SeccionFicha("Notas")
                 Text(p.descripcion, style = MaterialTheme.typography.bodyMedium)
             }
 
@@ -393,16 +379,20 @@ private fun TarjetaOferta(
     onAceptar: () -> Unit,
     onContraofertar: () -> Unit,
     onRechazar: () -> Unit,
-    onChat: () -> Unit,
 ) {
     Card(
         Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(Radio.tarjeta),
         colors = CardDefaults.cardColors(
-            containerColor = if (esMia) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            // La propia oferta se distingue con un teñido teal muy suave, no
+            // con un borde grueso: en una lista de cinco ofertas lo que hay que
+            // comparar son los precios, no encontrar la propia.
+            containerColor = if (esMia) PortGoColor.TealTenue else PortGoColor.Superficie,
         ),
+        border = BorderStroke(1.dp, if (esMia) PortGoColor.Teal else PortGoColor.BordeTarjeta),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        Column(Modifier.padding(Espacio.m)) {
+        Column(Modifier.padding(15.dp)) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -432,9 +422,10 @@ private fun TarjetaOferta(
 
             Text(
                 Fmt.precioMxn(oferta.precioOferta),
-                style = MaterialTheme.typography.titleLarge,
+                fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.headlineSmall,
+                color = PortGoColor.TealOscuro,
             )
 
             if (oferta.contraPrecio != null) {
@@ -470,21 +461,7 @@ private fun TarjetaOferta(
                         modifier = Modifier.weight(1f),
                     ) { Text("Contraofertar") }
                 }
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    TextButton(onClick = onRechazar, enabled = habilitado) { Text("Rechazar") }
-                    TextButton(onClick = onChat) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Chat,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.size(Espacio.xs))
-                        Text("Mensaje")
-                    }
-                }
+                TextButton(onClick = onRechazar, enabled = habilitado) { Text("Rechazar") }
             }
         }
     }
@@ -499,11 +476,12 @@ private fun TarjetaContraofertaRecibida(
 ) {
     Card(
         Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
-        ),
+        shape = RoundedCornerShape(Radio.tarjeta),
+        colors = CardDefaults.cardColors(containerColor = ColoresEstado.alertaSuave),
+        border = BorderStroke(1.dp, ColoresEstado.alerta),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        Column(Modifier.padding(Espacio.m)) {
+        Column(Modifier.padding(15.dp)) {
             Text("El cliente te contraofertó", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Espacio.s))
             Row(

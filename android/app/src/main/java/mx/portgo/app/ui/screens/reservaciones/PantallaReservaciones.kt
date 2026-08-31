@@ -1,31 +1,22 @@
 package mx.portgo.app.ui.screens.reservaciones
 
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -38,17 +29,25 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.portgo.app.core.Fmt
+import mx.portgo.app.data.model.EstadoCobro
 import mx.portgo.app.data.model.EstadoReserva
 import mx.portgo.app.data.model.UsuarioActual
 import mx.portgo.app.di.AppContainer
 import mx.portgo.app.ui.LocalCatalogos
+import mx.portgo.app.ui.components.BadgeConteo
 import mx.portgo.app.ui.components.BannerError
-import mx.portgo.app.ui.components.ChipEstadoReserva
+import mx.portgo.app.ui.components.BarraProgreso
+import mx.portgo.app.ui.components.ChipEstado
+import mx.portgo.app.ui.components.EncabezadoModulo
 import mx.portgo.app.ui.components.EsqueletoLista
 import mx.portgo.app.ui.components.EstadoVacio
+import mx.portgo.app.ui.components.FilaFiltros
 import mx.portgo.app.ui.components.RecargarAlVolver
+import mx.portgo.app.ui.components.TarjetaLista
 import mx.portgo.app.ui.theme.ColoresEstado
 import mx.portgo.app.ui.theme.Espacio
+import mx.portgo.app.ui.theme.PortGoColor
+import mx.portgo.app.ui.theme.SpaceGrotesk
 import mx.portgo.app.ui.viewmodel.EstadoCarga
 import mx.portgo.app.ui.viewmodel.FilaReservacion
 import mx.portgo.app.ui.viewmodel.ReservacionesViewModel
@@ -60,36 +59,41 @@ fun PantallaReservaciones(
     usuario: UsuarioActual,
     container: AppContainer,
     onAbrir: (String) -> Unit,
+    onAtras: (() -> Unit)?,
+    noLeidas: Int,
+    onCampana: () -> Unit,
 ) {
     val vm: ReservacionesViewModel = viewModel(
+        key = usuario.id,
         factory = vmFactory {
-            ReservacionesViewModel(container.reservaciones, container.chat, usuario)
+            ReservacionesViewModel(container.reservaciones, container.auth, usuario)
         },
     )
     val estado by vm.estado.collectAsStateWithLifecycle()
-    val filtro by vm.filtro.collectAsStateWithLifecycle()
+    val filtro by vm.filtroTexto.collectAsStateWithLifecycle()
     val refrescando by vm.refrescando.collectAsStateWithLifecycle()
 
     // El superadmin aprueba acuerdos y cierres desde la web: un servicio puede
     // aparecer o cambiar de estado con la app abierta.
     RecargarAlVolver(vm::cargar)
 
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = Espacio.m, vertical = Espacio.s),
-            horizontalArrangement = Arrangement.spacedBy(Espacio.s),
-        ) {
-            vm.filtros.forEach { est ->
-                FilterChip(
-                    selected = filtro == est,
-                    onClick = { vm.cambiarFiltro(est) },
-                    label = { Text(est.etiqueta) },
-                )
-            }
-        }
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(PortGoColor.Arena),
+    ) {
+        EncabezadoModulo(
+            titulo = "Reservas",
+            onAtras = onAtras,
+            noLeidas = noLeidas,
+            onCampana = onCampana,
+        )
+
+        FilaFiltros(
+            opciones = vm.filtrosDisponibles,
+            seleccionado = filtro,
+            onSeleccionar = vm::cambiarFiltro,
+        )
 
         PullToRefreshBox(
             isRefreshing = refrescando,
@@ -111,22 +115,20 @@ fun PantallaReservaciones(
                             } else {
                                 "Cuando se apruebe un acuerdo de una de tus ofertas, aparecerá aquí."
                             },
-                            icono = Icons.AutoMirrored.Filled.EventNote,
+                            icono = Icons.Default.EventAvailable,
                         )
                     } else {
                         LazyColumn(
                             contentPadding = PaddingValues(
                                 start = Espacio.m, end = Espacio.m,
-                                top = Espacio.s, bottom = Espacio.l,
+                                top = 2.dp, bottom = Espacio.l,
                             ),
-                            verticalArrangement = Arrangement.spacedBy(Espacio.s),
+                            verticalArrangement = Arrangement.spacedBy(Espacio.gapRejilla),
                         ) {
                             items(visibles, key = { it.reservacion.id }) { fila ->
-                                TarjetaReservacion(
-                                    fila = fila,
-                                    esCliente = usuario.esCliente,
-                                    onClick = { onAbrir(fila.reservacion.id) },
-                                )
+                                TarjetaReservacion(fila, usuario.esCliente) {
+                                    onAbrir(fila.reservacion.id)
+                                }
                             }
                         }
                     }
@@ -136,6 +138,13 @@ fun PantallaReservaciones(
     }
 }
 
+/**
+ * Tarjeta de servicio.
+ *
+ * El bloque de progreso solo aparece mientras el viaje corre. En una reserva
+ * completada la barra al 100% no informa de nada —ya se sabe que terminó— y en
+ * su lugar va lo que sí queda pendiente de saber: si ya se calificó.
+ */
 @Composable
 private fun TarjetaReservacion(
     fila: FilaReservacion,
@@ -146,116 +155,112 @@ private fun TarjetaReservacion(
     val catalogos = LocalCatalogos.current
     val pasos = catalogos.pasos(r.recurso)
     val idx = r.pasoActual(catalogos)
+    val enCurso = r.estadoEnum == EstadoReserva.ACTIVA || r.estadoEnum == EstadoReserva.PENDIENTE
 
-    Card(
+    TarjetaLista(
+        titulo = listOfNotNull(r.recurso.etiqueta, r.unidad).joinToString(" · "),
+        subtitulo = null,
+        meta = listOfNotNull(fila.contraparte, r.descripcion?.takeIf { it.isNotBlank() })
+            .joinToString(" · ").takeIf { it.isNotBlank() },
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        ),
-    ) {
-        Column(Modifier.padding(Espacio.m)) {
-
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(r.unidad ?: "Servicio", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        if (esCliente) r.recurso.etiqueta else (r.cliente ?: "Cliente"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        chip = { ChipEstadoReservaDiseno(r.estadoEnum) },
+        extra = if (enCurso) {
+            {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ChipEstado(
+                        pasos.getOrNull(idx)?.etiqueta ?: "—",
+                        if (r.estadoEnum == EstadoReserva.ACTIVA) PortGoColor.TealOscuro
+                        else ColoresEstado.alerta,
+                        if (r.estadoEnum == EstadoReserva.ACTIVA) PortGoColor.TealTenue
+                        else ColoresEstado.alertaSuave,
+                    )
+                    Spacer(Modifier.width(Espacio.s))
+                    BarraProgreso(
+                        paso = idx + 1,
+                        total = pasos.size,
+                        color = if (r.estadoEnum == EstadoReserva.ACTIVA) PortGoColor.Teal
+                        else ColoresEstado.alerta,
                     )
                 }
-                ChipEstadoReserva(r.estadoEnum)
             }
-
-            Spacer(Modifier.height(Espacio.s))
-
-            Text(
-                Fmt.rangoFechas(r.fechaIni, r.fechaFin),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-
-            // Barra de avance del viaje. Solo tiene sentido mientras el
-            // servicio corre; en una reserva cancelada sobra.
-            if (r.estadoEnum == EstadoReserva.ACTIVA) {
-                Spacer(Modifier.height(Espacio.s))
-                LinearProgressIndicator(
-                    progress = { (idx + 1f) / pasos.size },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    pasos.getOrNull(idx)?.etiqueta ?: "",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = Espacio.xs),
-                )
+        } else if (r.estadoEnum == EstadoReserva.COMPLETADA) {
+            {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Star,
+                        contentDescription = null,
+                        tint = if (r.calificado) ColoresEstado.alerta else PortGoColor.TextoTerciario,
+                        modifier = Modifier.size(15.dp),
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        if (r.calificado) "Calificado" else "Sin calificar",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = PortGoColor.TextoSecundario,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    IndicadoresFila(fila)
+                }
             }
-
-            Spacer(Modifier.height(Espacio.s))
-
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+        } else null,
+        etiquetaPie = Fmt.rangoFechas(r.fechaIni, r.fechaFin),
+        pie = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (enCurso) {
+                    IndicadoresFila(fila)
+                    Spacer(Modifier.width(Espacio.s))
+                }
                 Text(
                     Fmt.precioMxn(r.precioAcordado),
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    color = if (r.estadoCobro == EstadoCobro.VENCIDO) ColoresEstado.peligro
+                    else PortGoColor.TealOscuro,
                 )
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Espacio.m),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    // Expediente pendiente: al cliente le urge saberlo, es lo
-                    // que traba el ingreso a puerto o dispara las demoras.
-                    val pendientes = fila.expedientes.count { !it.completo }
-                    if (pendientes > 0) {
-                        Icon(
-                            Icons.Default.Description,
-                            contentDescription = "$pendientes expediente(s) pendiente(s)",
-                            tint = ColoresEstado.alerta,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-
-                    if (fila.mensajesSinLeer > 0) {
-                        BadgedBox(badge = { Badge { Text("${fila.mensajesSinLeer}") } }) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.Chat,
-                                contentDescription = "${fila.mensajesSinLeer} mensajes sin leer",
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
-                }
             }
+        },
+    )
+}
 
-            // Aviso de vacíos: las demoras se cobran por día, así que la fecha
-            // límite se enseña desde la lista, no escondida en el detalle.
-            fila.expedientes
-                .firstOrNull { it.etapa == "entrega_vacios" && it.fechaLimiteVacios != null }
-                ?.let { exp ->
-                    val dias = exp.diasParaVacios
-                    if (dias != null && dias <= 3) {
-                        Spacer(Modifier.height(Espacio.xs))
-                        Text(
-                            when {
-                                dias < 0 -> "⚠ Vacíos vencidos hace ${-dias} día(s): corren demoras"
-                                dias == 0L -> "⚠ Hoy vence la devolución del contenedor"
-                                else -> "Faltan $dias día(s) para devolver el contenedor"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (dias <= 0) ColoresEstado.peligro else ColoresEstado.alerta,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                }
-        }
+/**
+ * Aviso de la fila: expedientes pendientes.
+ *
+ * Va pequeño porque es secundario al estado del viaje, pero importa: un
+ * expediente incompleto es lo que traba el ingreso a puerto o dispara las
+ * demoras del contenedor.
+ */
+@Composable
+private fun IndicadoresFila(fila: FilaReservacion) {
+    val pendientes = fila.expedientes.count { !it.completo }
+    if (pendientes == 0) return
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            Icons.Default.Description,
+            contentDescription = "$pendientes expediente(s) pendiente(s)",
+            tint = ColoresEstado.alerta,
+            modifier = Modifier.size(17.dp),
+        )
+        Spacer(Modifier.width(6.dp))
+        BadgeConteo(pendientes)
     }
+}
+
+/** Chip de estado con la paleta del diseño. */
+@Composable
+private fun ChipEstadoReservaDiseno(estado: EstadoReserva) {
+    val (color, fondo) = when (estado) {
+        EstadoReserva.ACTIVA -> ColoresEstado.exito to ColoresEstado.exitoSuave
+        EstadoReserva.PENDIENTE,
+        EstadoReserva.POR_APROBAR,
+        EstadoReserva.CANCELACION_SOLICITADA,
+        -> ColoresEstado.alerta to ColoresEstado.alertaSuave
+        EstadoReserva.COMPLETADA -> PortGoColor.TealOscuro to PortGoColor.TealTenue
+        EstadoReserva.CANCELADA,
+        EstadoReserva.RECHAZADA,
+        -> ColoresEstado.peligro to ColoresEstado.peligroSuave
+        EstadoReserva.DESCONOCIDO -> ColoresEstado.neutro to ColoresEstado.neutroSuave
+    }
+    ChipEstado(estado.etiqueta, color, fondo)
 }

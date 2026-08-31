@@ -10,3 +10,10 @@ Thumbs.db
 .vscode/
 *.suo
 *.user
+
+# Pruebas locales — credenciales reales y salidas de los test (nunca subir)
+pruebas/credenciales.local.json
+pruebas/salida/
+
+# Espejo de produccion — volcado con datos personales reales (nunca subir)
+supabase/espejo/

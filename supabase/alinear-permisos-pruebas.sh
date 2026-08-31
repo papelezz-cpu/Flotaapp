@@ -71,6 +71,12 @@ trap 'rm -f "$TMP"' EXIT
 # PUBLIC primero: anon y authenticated son miembros de PUBLIC, asi que
 # revocarles a ellos sin revocar a PUBLIC puede no quitar nada.
 {
+  # btree_gist vive en public y trae ~300 funciones de soporte (gbt_*) que no
+  # son nuestras: no las poseemos, asi que cada REVOKE sobre ellas es un no-op
+  # que Postgres anuncia con un WARNING. Son cientos de lineas de ruido que
+  # parecen un fallo y no lo son. Se generan igual —si algun dia difirieran de
+  # verdad, queremos poder alinearlas— pero sin el aviso.
+  echo "set client_min_messages = error;"
   psql "$PROD" -Atc "
     select 'REVOKE EXECUTE ON FUNCTION public.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||') FROM PUBLIC;'
       from pg_proc p where p.pronamespace='public'::regnamespace order by p.proname"
@@ -92,7 +98,8 @@ fi
 # Solo se aplican las que afectan a funciones que existan en el destino.
 # Pruebas puede ir por delante (migraciones aun sin promover): esas funciones
 # conservan los permisos que les puso su propia migracion.
-if psql "$PRUE" -v ON_ERROR_STOP=1 -q -f "$TMP"; then
+echo "   aplicando a pruebas (puede tardar; no imprime nada mientras corre)…"
+if psql "$PRUE" -v ON_ERROR_STOP=1 -q -o /dev/null -f "$TMP"; then
   echo "   ✓ aplicadas a pruebas"
 else
   echo "   ✗ Fallo al aplicar. Lo mas probable: una funcion que existe en" >&2

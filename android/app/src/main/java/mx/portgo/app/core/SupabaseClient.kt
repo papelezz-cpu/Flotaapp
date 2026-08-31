@@ -4,6 +4,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.FlowType
 import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.serializer.KotlinXSerializer
@@ -58,5 +59,9 @@ object SupabaseFactory {
             install(Postgrest)
             install(Realtime)
             install(Storage)
+            // Para `enviar-notificacion`, la Edge Function del correo. La app
+            // solo escribia la campana, asi que un aviso mandado desde el
+            // telefono no llegaba a quien no tuviera la app abierta.
+            install(Functions)
         }
 }

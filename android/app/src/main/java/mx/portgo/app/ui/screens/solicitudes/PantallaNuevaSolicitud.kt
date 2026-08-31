@@ -1,5 +1,7 @@
 package mx.portgo.app.ui.screens.solicitudes
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -12,15 +14,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
@@ -28,9 +26,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
@@ -38,9 +35,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,19 +48,26 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneOffset
 import mx.portgo.app.core.Fmt
 import mx.portgo.app.data.model.UsuarioActual
 import mx.portgo.app.di.AppContainer
 import mx.portgo.app.ui.LocalCatalogos
+import mx.portgo.app.ui.components.BotonPrincipal
+import mx.portgo.app.ui.components.EncabezadoModulo
+import mx.portgo.app.ui.components.RadioCampo
+import mx.portgo.app.ui.components.TarjetaFicha
+import mx.portgo.app.ui.components.coloresCampo
 import mx.portgo.app.ui.theme.Espacio
+import mx.portgo.app.ui.theme.PortGoColor
+import mx.portgo.app.ui.theme.SpaceGrotesk
 import mx.portgo.app.ui.viewmodel.NuevaSolicitudViewModel
 import mx.portgo.app.ui.viewmodel.vmFactory
 
@@ -84,6 +88,7 @@ fun PantallaNuevaSolicitud(
     onPublicada: () -> Unit,
 ) {
     val vm: NuevaSolicitudViewModel = viewModel(
+        key = usuario.id,
         factory = vmFactory {
             NuevaSolicitudViewModel(container.pedidos, container.supabase, usuario)
         },
@@ -106,24 +111,21 @@ fun PantallaNuevaSolicitud(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = { Text("Nueva solicitud") },
-                navigationIcon = {
-                    IconButton(onClick = onAtras) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
-                    }
-                },
-            )
-        },
+        containerColor = PortGoColor.Arena,
     ) { relleno ->
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(relleno)
+                .background(PortGoColor.Arena)
+                .padding(relleno),
+        ) {
+        EncabezadoModulo(titulo = "Nueva solicitud", onAtras = onAtras)
+        Column(
+            Modifier
+                .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .imePadding()
-                .padding(Espacio.m),
+                .padding(horizontal = Espacio.m),
         ) {
             // ── 1. Qué se mueve ──
             Titulo("¿Qué vas a mover?")
@@ -133,6 +135,19 @@ fun PantallaNuevaSolicitud(
                         selected = form.categoria == cat.valor,
                         onClick = { vm.elegirCategoria(cat) },
                         label = { Text(cat.etiqueta) },
+                        shape = RoundedCornerShape(999.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = PortGoColor.Superficie,
+                            labelColor = PortGoColor.TextoSecundario,
+                            selectedContainerColor = PortGoColor.Teal,
+                            selectedLabelColor = Color.White,
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = form.categoria == cat.valor,
+                            borderColor = PortGoColor.BordeTarjeta,
+                            selectedBorderColor = PortGoColor.Teal,
+                        ),
                     )
                 }
             }
@@ -140,7 +155,7 @@ fun PantallaNuevaSolicitud(
                 Text(
                     ayuda,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = PortGoColor.TextoSecundario,
                     modifier = Modifier.padding(top = Espacio.xs),
                 )
             }
@@ -171,7 +186,7 @@ fun PantallaNuevaSolicitud(
                 Text(
                     "Un camión se llena por peso o por espacio, lo que ocurra primero.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = PortGoColor.TextoSecundario,
                 )
             }
 
@@ -199,6 +214,8 @@ fun PantallaNuevaSolicitud(
                     onExpandedChange = { contAbierto = it },
                 ) {
                     OutlinedTextField(
+                        shape = RadioCampo,
+                        colors = coloresCampo(),
                         value = form.contenedor1Tipo,
                         onValueChange = {},
                         readOnly = true,
@@ -250,6 +267,8 @@ fun PantallaNuevaSolicitud(
                 Spacer(Modifier.height(Espacio.s))
                 Row(horizontalArrangement = Arrangement.spacedBy(Espacio.s)) {
                     OutlinedTextField(
+                        shape = RadioCampo,
+                        colors = coloresCampo(),
                         value = form.hazmatClase,
                         onValueChange = { v -> vm.actualizar { it.copy(hazmatClase = v) } },
                         label = { Text("Clase") },
@@ -257,6 +276,8 @@ fun PantallaNuevaSolicitud(
                         modifier = Modifier.weight(1f),
                     )
                     OutlinedTextField(
+                        shape = RadioCampo,
+                        colors = coloresCampo(),
                         value = form.hazmatUn,
                         onValueChange = { v -> vm.actualizar { it.copy(hazmatUn = v) } },
                         label = { Text("Número UN") },
@@ -277,6 +298,11 @@ fun PantallaNuevaSolicitud(
                     Switch(
                         checked = form.refrigerado,
                         onCheckedChange = { v -> vm.actualizar { it.copy(refrigerado = v) } },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = PortGoColor.Teal,
+                            checkedBorderColor = PortGoColor.Teal,
+                        ),
                     )
                 }
                 if (form.refrigerado) {
@@ -301,29 +327,35 @@ fun PantallaNuevaSolicitud(
 
             // ── 3. Unidad recomendada ──
             Spacer(Modifier.height(Espacio.l))
-            Card(
-                Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                ),
-            ) {
-                Column(Modifier.padding(Espacio.m)) {
-                    Text("Unidad recomendada", style = MaterialTheme.typography.labelLarge)
+            TarjetaFicha {
+                Column {
+                    Text(
+                        "UNIDAD RECOMENDADA",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = PortGoColor.TextoSecundario,
+                    )
                     Spacer(Modifier.height(Espacio.xs))
                     Text(
                         vm.tipoFinal ?: "Captura los datos de la carga",
+                        fontFamily = SpaceGrotesk,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
+                        color = PortGoColor.TealOscuro,
                     )
                     if (!razon.isNullOrBlank() && form.unidadManual == null) {
                         Spacer(Modifier.height(Espacio.xs))
-                        Text(razon, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            razon,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = PortGoColor.TextoSecundario,
+                        )
                     }
                     if (form.unidadManual != null) {
                         Spacer(Modifier.height(Espacio.xs))
                         Text(
                             "La elegiste tú. Sugerida: ${unidadSugerida ?: "—"}",
                             style = MaterialTheme.typography.bodySmall,
+                            color = PortGoColor.TextoSecundario,
                         )
                     }
 
@@ -359,6 +391,8 @@ fun PantallaNuevaSolicitud(
             Spacer(Modifier.height(Espacio.l))
             Titulo("Ruta")
             OutlinedTextField(
+                shape = RadioCampo,
+                colors = coloresCampo(),
                 value = form.origen,
                 onValueChange = { v -> vm.actualizar { it.copy(origen = v) } },
                 label = { Text("Origen *") },
@@ -366,6 +400,8 @@ fun PantallaNuevaSolicitud(
             )
             Spacer(Modifier.height(Espacio.s))
             OutlinedTextField(
+                shape = RadioCampo,
+                colors = coloresCampo(),
                 value = form.destino,
                 onValueChange = { v -> vm.actualizar { it.copy(destino = v) } },
                 label = { Text("Destino *") },
@@ -383,12 +419,17 @@ fun PantallaNuevaSolicitud(
                     Text(
                         "Implica maniobras, esperas y expediente documental.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = PortGoColor.TextoSecundario,
                     )
                 }
                 Switch(
                     checked = form.entraAPuerto,
                     onCheckedChange = { v -> vm.actualizar { it.copy(entraAPuerto = v) } },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = PortGoColor.Teal,
+                        checkedBorderColor = PortGoColor.Teal,
+                    ),
                 )
             }
 
@@ -426,6 +467,8 @@ fun PantallaNuevaSolicitud(
             Spacer(Modifier.height(Espacio.s))
             ExposedDropdownMenuBox(expanded = plazoAbierto, onExpandedChange = { plazoAbierto = it }) {
                 OutlinedTextField(
+                    shape = RadioCampo,
+                    colors = coloresCampo(),
                     value = form.plazoPago,
                     onValueChange = {},
                     readOnly = true,
@@ -450,6 +493,8 @@ fun PantallaNuevaSolicitud(
 
             Spacer(Modifier.height(Espacio.m))
             OutlinedTextField(
+                shape = RadioCampo,
+                colors = coloresCampo(),
                 value = form.descripcion,
                 onValueChange = { v -> vm.actualizar { it.copy(descripcion = v) } },
                 label = { Text("Notas para el transportista") },
@@ -458,32 +503,24 @@ fun PantallaNuevaSolicitud(
             )
 
             Spacer(Modifier.height(Espacio.l))
-            HorizontalDivider()
+            HorizontalDivider(thickness = 1.dp, color = PortGoColor.Divisor)
             Spacer(Modifier.height(Espacio.m))
 
-            Button(
+            BotonPrincipal(
+                texto = "Publicar solicitud",
                 onClick = { vm.publicar(onPublicada) },
-                enabled = vm.puedePublicar(),
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) {
-                if (publicando) {
-                    CircularProgressIndicator(
-                        Modifier.height(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                } else {
-                    Text("Publicar solicitud")
-                }
-            }
+                ocupado = publicando,
+                habilitado = vm.puedePublicar(),
+            )
             Text(
                 "Un administrador la revisa antes de publicarla a las empresas.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = PortGoColor.TextoSecundario,
                 modifier = Modifier.padding(top = Espacio.xs),
             )
 
             Spacer(Modifier.height(Espacio.xl))
+        }
         }
     }
 
@@ -523,7 +560,10 @@ fun PantallaNuevaSolicitud(
 private fun Titulo(texto: String) {
     Text(
         texto,
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Bold,
         style = MaterialTheme.typography.titleMedium,
+        color = PortGoColor.Tinta,
         modifier = Modifier.padding(bottom = Espacio.s),
     )
 }
@@ -540,16 +580,20 @@ private fun BotonFecha(etiqueta: String, valor: String?, onClick: () -> Unit) {
     OutlinedCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
+        shape = RadioCampo,
+        colors = CardDefaults.outlinedCardColors(containerColor = PortGoColor.Superficie),
+        border = BorderStroke(1.dp, PortGoColor.BordeTarjeta),
     ) {
         Column(Modifier.padding(horizontal = Espacio.m, vertical = 12.dp)) {
             Text(
                 etiqueta,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = PortGoColor.TextoSecundario,
             )
             Text(
                 valor?.let { Fmt.fecha(it) } ?: "Elegir fecha",
                 style = MaterialTheme.typography.bodyLarge,
+                color = if (valor == null) PortGoColor.TextoTerciario else PortGoColor.Tinta,
             )
         }
     }
@@ -567,6 +611,8 @@ private fun CampoNumero(
     permiteNegativo: Boolean = false,
 ) {
     OutlinedTextField(
+        shape = RadioCampo,
+        colors = coloresCampo(),
         value = valor,
         onValueChange = { entrada ->
             val limpio = entrada.filter { c ->
