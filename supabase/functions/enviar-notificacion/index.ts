@@ -11,6 +11,22 @@ const GMAIL_PASS = Deno.env.get('GMAIL_PASS')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+// ── La UNICA diferencia permitida entre produccion y pruebas ──────────────
+//
+// portgo-pruebas es una copia fiel de produccion: mismos usuarios, mismos
+// correos REALES de clientes y empresas. Con esos datos dentro, cualquier
+// prueba que dispare una notificacion le escribiria a gente de verdad.
+//
+// El bloqueo vive aqui, en el codigo, y no en "esperemos que falten los
+// secretos": si faltara GMAIL_PASS la funcion reventaria al conectar y la
+// prueba veria un error donde deberia ver un envio correcto — una diferencia
+// de comportamiento, no solo de salida. Asi el codigo es identico en los dos
+// proyectos y lo unico que cambia es un secreto.
+//
+// Ausente o 'activa' = comportamiento de produccion. En pruebas:
+//   npx supabase secrets set CORREO_SALIDA=bloqueada --project-ref <ref-pruebas>
+const CORREO_BLOQUEADO = (Deno.env.get('CORREO_SALIDA') ?? 'activa').toLowerCase() === 'bloqueada';
+
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, content-type',
@@ -270,6 +286,15 @@ const TEMPLATES: Record<string, (p: Record<string, unknown>) => { subject: strin
 // Para varios destinatarios se usa BCC: nadie ve el correo de los demás.
 async function sendEmailBulk(to: string[], subject: string, html: string) {
   if (!to.length) return;
+  if (CORREO_BLOQUEADO) {
+    // Se hace TODO lo demas igual que en produccion (plantilla, destinatarios,
+    // fila en notificaciones) y solo se omite la conexion SMTP. En la bitacora
+    // queda cuantos habrian recibido y con que asunto, que es lo que una
+    // prueba necesita comprobar. Las direcciones no se registran: son datos
+    // personales reales copiados de produccion.
+    console.log(JSON.stringify({ correo: 'bloqueado', destinatarios: to.length, asunto: subject }));
+    return;
+  }
   const client = new SMTPClient({
     connection: { hostname: 'smtp.gmail.com', port: 465, tls: true,
       auth: { username: GMAIL_USER, password: GMAIL_PASS } },
@@ -412,6 +437,15 @@ Deno.serve(async (req) => {
 
     const payload = await req.json();
 
+    // Sonda: responde en qué modo está la salida de correo y no manda nada ni
+    // toca ninguna tabla. Existe para poder COMPROBAR que en pruebas el correo
+    // está bloqueado sin tener que provocar un envío real para averiguarlo —
+    // que, con los datos de producción copiados, le escribiría a un cliente de
+    // verdad. Va después de validar la sesión: no es un endpoint abierto.
+    if (payload.tipo === 'sonda_correo') {
+      return json({ ok: true, sonda: true, correo: CORREO_BLOQUEADO ? 'bloqueado' : 'enviado' });
+    }
+
     // Determine event type — support both legacy shape and new `tipo` field
     const tipo: string = payload.tipo || (payload.tipo_evento === 'acuerdo' ? 'acuerdo' : 'nueva_solicitud');
     const tplFn = TEMPLATES[tipo];
@@ -472,7 +506,14 @@ Deno.serve(async (req) => {
     await sendEmailBulk(emails, subject, html);
     // Solo el conteo: devolver la lista de correos permitía a cualquier
     // usuario con sesión enumerar las direcciones de todas las empresas.
-    return json({ ok: true, sent: emails.length });
+    // `correo` es lo que deja comprobar desde fuera que pruebas no manda nada
+    // (node pruebas/05-sonda-correo.mjs); en producción siempre dice 'enviado'.
+    return json({
+      ok: true,
+      sent: CORREO_BLOQUEADO ? 0 : emails.length,
+      correo: CORREO_BLOQUEADO ? 'bloqueado' : 'enviado',
+      destinatarios: emails.length,
+    });
   } catch (err) {
     console.error(err);
     return json({ ok: false, error: String(err) }, 500);

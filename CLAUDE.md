@@ -68,6 +68,46 @@ Migrations first, code after — the deployed code may depend on schema or grant
 
 ---
 
+## 🛑 RULE #3 — `portgo-pruebas` IS A COPY OF PRODUCTION, OR IT IS NOTHING
+
+**Before seeding a single row or running a single test against `portgo-pruebas`, replicate production into it and verify the two databases are identical.** Not once, not "when it looks stale" — *before every seeding and every test run*. A green test on a database that is not production is not evidence; it is an anecdote, and reporting it as evidence is what makes an audit untrustworthy.
+
+The only permitted difference is **outgoing email, which is blocked in pruebas**. Everything else — schema, permissions, RLS, triggers, functions, Realtime publication, buckets, auth users with their password hashes, the rows in every table and the files in Storage — must match.
+
+### The procedure, every time
+
+```bash
+PORTGO_DB_URL_PROD="postgresql://…xnyqsewaluezkkrlyhxg…" \
+PORTGO_DB_URL_PRUEBAS="postgresql://…xskgnudiznryhgagxadu…" \
+bash supabase/replicar-produccion-a-pruebas.sh   # production is READ-ONLY throughout
+
+node pruebas/04-copiar-archivos.mjs   # Storage bytes: without them every document 404s
+node pruebas/05-sonda-correo.mjs      # proves email is still blocked, without sending one
+```
+
+`supabase/verificar-paridad.sh` (also run automatically at the end of the replication) compares **18 dimensions**: columns, constraints, indexes, RLS flags, policies, triggers, function bodies and `search_path`, EXECUTE and table grants per role, extensions, the Realtime publication, pg_cron jobs, buckets, storage policies, exact row counts, auth users (id, email, password hash), Storage objects, and a **content hash of every table**. It writes the verdict to `supabase/espejo/paridad.json`.
+
+`pruebas/lib/paridad.mjs` reads that stamp: `02-sembrar.mjs`, `03-flujo-completo.mjs` and `01-diagnostico.mjs --pruebas` **refuse to start** if it is missing, older than 6 hours, from a different project, or says the databases diverge. Do not route around that check. `PORTGO_SIN_PARIDAD=1` exists for debugging the scripts themselves and stamps the report as worthless — it is never the answer to a failing verification.
+
+### What is NOT parity
+
+- **"I seeded it recently."** Seeding creates *test* data. It does not make pruebas resemble production; it makes it resemble the seeding script.
+- **"It was a clone of production once."** Both databases keep being used. The 2026-08-19 clone had already drifted by 2026-08-27: 82 function grants more open in pruebas, the Realtime publication **empty** while production replicated six tables, and different data volume. Everything "worked" in both. They were not the same database.
+- **"The tests passed."** Tests passing on a divergent base is the failure mode, not the refutation of it.
+- **A dimension that could not be read.** `verificar-paridad.sh` reports those as `no_verificable` and refuses the "identical" verdict. Treat an unread dimension as a difference, never as a match.
+
+### The email exception, stated exactly
+
+Blocking lives in the code of `enviar-notificacion`, not in a missing secret: `CORREO_SALIDA=bloqueada` makes the function do everything it normally does (resolve recipients, render the template, write the `notificaciones` row) and skip only the SMTP send. Identical code in both projects; one secret differs. This matters because a faithful copy puts **real customer email addresses** in pruebas — any test that fires a notification would write to actual clients.
+
+Supabase's own auth emails do not pass through that function, so `node pruebas/05-sonda-correo.mjs` also compares `/auth/v1/settings` between the two projects and fails if they differ. Production runs with `mailer_autoconfirm = true` (signup confirmation **off**), and pruebas must match — on 2026-08-31 it did not, so every seeded account was mailing a real address *and* pruebas was gating logins behind a confirmation that production never asks for. That knob is Authentication → Sign In / Providers → Email → "Confirm email", and it is not visible from SQL, which is why the probe exists. The password-recovery email cannot be disabled in either project; it only fires on an explicit `resetPasswordForEmail`, and nothing in `pruebas/` calls it.
+
+### What to tell the user
+
+When reporting anything measured in `portgo-pruebas`, state the parity stamp (date, verdict) alongside the result. If parity failed or could not be verified, **say that instead of the result** — do not present the finding and mention the caveat afterwards.
+
+---
+
 ## Project Overview
 
 **PortGo** is a PWA logistics platform for port transport services built as a fully client-side app with Supabase as the backend (PostgreSQL + Auth + Realtime + Storage).
@@ -96,9 +136,11 @@ Migrations first, code after — the deployed code may depend on schema or grant
 3. **Only when the user says to promote** ("pasa esto a producción" or equivalent): merge `dev` → `main`, then **immediately restore `main`'s own `js/config.js`** (`git checkout main -- js/config.js` after the merge, before committing) so production's credentials are never overwritten. Push `main` — that's what actually deploys to production.
 4. Database/Edge Function changes follow the same order and need the same explicit yes: apply to `portgo-pruebas` first, verify, and wait. Applying SQL to production is a promotion like any other, even when it creates nothing visible.
 
-> ⚠️ **`portgo-pruebas` is not a faithful mirror, and assuming it is has already caused problems.** Verified divergences found on 2026-08-27/28: `anon` held privileges there that production had revoked (82 function grants); the Realtime publication was **empty** while production replicated six tables; and the data volume differs enough that a query plan seen in `dev` says little about production. Use `supabase/alinear-permisos-pruebas.sh` after every seeding, and when a check depends on permissions, replication or volume, **re-run it against production before drawing a conclusion** — read-only.
+> ⚠️ **`portgo-pruebas` drifts from production the moment either database is used, and assuming otherwise has already caused problems.** Verified divergences on 2026-08-27/28, eight days after a full clone: `anon` held privileges there that production had revoked (82 function grants); the Realtime publication was **empty** while production replicated six tables; and the data volume differed enough that a query plan seen in `dev` said little about production. Everything "worked" in both.
+>
+> **This is why [Rule #3](#-rule-3--portgo-pruebas-is-a-copy-of-production-or-it-is-nothing) exists:** re-replicate and verify before every seeding and every test run (`supabase/replicar-produccion-a-pruebas.sh`, which ends by running `supabase/verificar-paridad.sh`). The old advice — align permissions after seeding and re-check doubtful findings against production — is now the *floor*, not the procedure.
 
-**`portgo-pruebas` data:** was seeded as a full clone of production (same schema, same triggers/RLS, same rows in every table, same 12 users with the same passwords) as of 2026-08-19. It will drift from production over time as both databases get used — re-sync manually if a fresh mirror is ever needed. Storage buckets were **not** cloned — file paths in `portgo-pruebas` rows point to files that only exist in production's storage, so documents/photos opened from `dev` will 404 unless the buckets get copied too.
+**`portgo-pruebas` data:** a full clone of production (same schema, same triggers/RLS, same rows, same users with the same passwords) is re-established by `supabase/replicar-produccion-a-pruebas.sh` on demand; the first one was done by hand on 2026-08-19. Storage bytes live in S3, not Postgres, so the DB replication copies **paths, not files** — `node pruebas/04-copiar-archivos.mjs` copies the actual objects, and until it runs, every document/photo opened from `dev` 404s.
 
 ---
 
@@ -141,6 +183,14 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
     │   └── enviar-notificacion/ # Email notifications
     ├── migrations/         # 25 SQL migrations — the source of truth for schema, RLS,
     │                       #   guard triggers and the business RPCs
+    ├── espejo/             # (gitignored) production dump + paridad.json stamp. Real
+    │                       #   personal data — never commit, never share
+    ├── replicar-produccion-a-pruebas.sh  # Rule #3: rebuilds portgo-pruebas as an exact
+    │                       #   copy of production. Reads prod, writes only pruebas,
+    │                       #   asks before destroying anything
+    ├── verificar-paridad.sh     # Compares the two databases across 18 dimensions and
+    │                       #   writes the stamp the test scripts require. Read-only
+    ├── alinear-permisos-pruebas.sh  # Function grants only — a subset of the above
     └── aplicar-migraciones.sh   # Applies migrations via psql against PRODUCTION (asks for
                             #   the password interactively; there is no staging)
 ```
@@ -338,4 +388,5 @@ Deploy with `mcp__supabase__deploy_edge_function` (or `supabase functions deploy
 - **Don't use `alert()`/`confirm()`** — `showToast()` / `showConfirm()`.
 - **Don't ship without bumping `?v=` + sw.js cache + pushing** — see the deployment checklist.
 - **Don't put the service role key anywhere near client code.**
+- **Don't seed or test on `portgo-pruebas` without a fresh parity stamp** — and don't present a result measured there without saying which stamp backs it. See [Rule #3](#-rule-3--portgo-pruebas-is-a-copy-of-production-or-it-is-nothing).
 - **Don't delete anything without explicit authorization** — even under `bypassPermissions`. See [Rule #1](#-rule-1--ask-before-deleting-anything) at the top of this file.
