@@ -4,11 +4,26 @@
 // vencimiento, para no depender de un proceso que actualice estados a diario.
 
 // Plazos ofrecidos en el formulario de solicitud → días.
-// "Anticipado" vence el mismo día; "" (a convenir) no genera vencimiento.
+// "Anticipado" y "Contra entrega" vencen el mismo día que cierra el servicio;
+// "" (a convenir) no genera vencimiento, y eso sí es a propósito.
+//
+// ⚠ Este mapa es una COPIA del catálogo `plazo_pago` de la base, y se desfasa
+// solo. El 2026-08-31 el catálogo tenía "Contra entrega" y este mapa no: ese
+// plazo caía al respaldo por expresión regular, que no encuentra dígitos, y
+// fecha_vencimiento_pago quedaba en null. Consecuencia: ese cobro no vencía
+// nunca, no salía en el aviso de la portada, y se cobraba solo si alguien se
+// acordaba. Al revés también pasaba: "3 días" y "7 días" seguían aquí después
+// de desaparecer del catálogo.
+//
+// Si añades un plazo al catálogo, añádelo aquí y en la copia de
+// pruebas/03-flujo-completo.mjs. La prueba "Todo plazo de pago del catálogo
+// produce una fecha de vencimiento" lee el catálogo real y avisa cuando se
+// vuelven a separar.
 const PLAZO_PAGO_DIAS = {
-  'Anticipado': 0,
-  '3 días':  3,
-  '7 días':  7,
+  'Anticipado':     0,
+  'Contra entrega': 0,
+  '3 días':  3,   // ya no está en el catálogo; se conserva por las
+  '7 días':  7,   // reservaciones antiguas que guardaron ese texto
   '15 días': 15,
   '30 días': 30,
   '45 días': 45,
