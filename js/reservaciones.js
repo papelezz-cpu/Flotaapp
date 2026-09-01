@@ -38,7 +38,7 @@ const _estadoLabel = estado => _ESTADO_LABEL[estado] || estado;
 // transferir. Con realtime re-renderizando en cada cambio de cualquier
 // reservación, eso se repetía constantemente.
 const RESERV_PAGE = 30;
-let _reservOffset = 0;
+let _reservCursor = null;   // { created_at, id } de la última fila traída
 let _reservAccum  = [];
 
 // El filtro de las pills, traducido a SQL. Es la contraparte servidor de lo
@@ -72,7 +72,7 @@ function filtrarReservas(est) {
   _reservFiltro = est;
   document.querySelectorAll('#reserv-filtros-bar .ped-filtro-pill').forEach(el =>
     el.classList.toggle('active', el.dataset.rest === est));
-  renderReserv();   // sin append: reinicia offset y acumulado
+  renderReserv();   // sin append: reinicia cursor y acumulado
 }
 
 let _cargandoMasReservas = false;
@@ -80,7 +80,6 @@ let _cargandoMasReservas = false;
 async function cargarMasReservas() {
   if (_cargandoMasReservas) return;
   _cargandoMasReservas = true;
-  _reservOffset += RESERV_PAGE;
   await renderReserv(true);
   _cargandoMasReservas = false;
 }
@@ -99,7 +98,7 @@ async function renderReserv(append = false) {
   const header = document.getElementById('reserv-header');
 
   if (!append) {
-    _reservOffset = 0;
+    _reservCursor = null;
     _reservAccum  = [];
     body.innerHTML = skeletonRows(4);
   }
@@ -127,11 +126,23 @@ async function renderReserv(append = false) {
       .select('*')
       .eq('cliente_user_id', currentUser.id)
       .order('created_at', { ascending: false })
-      .range(_reservOffset, _reservOffset + RESERV_PAGE - 1);
+      .order('id',          { ascending: false })
+      .limit(RESERV_PAGE);
+    if (_reservCursor) {
+      qCli = qCli.or(
+        `created_at.lt.${_reservCursor.created_at},` +
+        `and(created_at.eq.${_reservCursor.created_at},id.lt.${_reservCursor.id})`
+      );
+    }
     qCli = _filtroReservaSQL(qCli);
 
     const { data: _pagCli, error } = await qCli;
     if (error) { body.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar.</div>`; return; }
+
+    if (_pagCli?.length) {
+      const ultimo = _pagCli[_pagCli.length - 1];
+      _reservCursor = { created_at: ultimo.created_at, id: ultimo.id };
+    }
 
     const _vistosCli = new Set(_reservAccum.map(r => r.id));
     (_pagCli || []).forEach(r => { if (!_vistosCli.has(r.id)) { _reservAccum.push(r); _vistosCli.add(r.id); } });
@@ -292,7 +303,14 @@ async function renderReserv(append = false) {
   let reservQuery = sb.from('reservaciones')
     .select('*')
     .order('created_at', { ascending: false })
-    .range(_reservOffset, _reservOffset + RESERV_PAGE - 1);
+    .order('id',          { ascending: false })
+    .limit(RESERV_PAGE);
+  if (_reservCursor) {
+    reservQuery = reservQuery.or(
+      `created_at.lt.${_reservCursor.created_at},` +
+      `and(created_at.eq.${_reservCursor.created_at},id.lt.${_reservCursor.id})`
+    );
+  }
 
   if (currentUser.rol !== 'superadmin') {
     reservQuery = reservQuery.eq('propietario_id', currentUser.id);
@@ -301,6 +319,11 @@ async function renderReserv(append = false) {
 
   const { data: _pagAdm, error } = await reservQuery;
   if (error) { body.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar.</div>`; return; }
+
+  if (_pagAdm?.length) {
+    const ultimo = _pagAdm[_pagAdm.length - 1];
+    _reservCursor = { created_at: ultimo.created_at, id: ultimo.id };
+  }
 
   const _vistosAdm = new Set(_reservAccum.map(r => r.id));
   (_pagAdm || []).forEach(r => { if (!_vistosAdm.has(r.id)) { _reservAccum.push(r); _vistosAdm.add(r.id); } });
