@@ -68,7 +68,33 @@ obtener() { # obtener <etiqueta> <ref> <var_env>
 PROD="$(obtener "PRODUCCIÓN (solo lectura)" "$REF_PRODUCCION" PORTGO_DB_URL_PROD)" || exit 1
 PRUE="$(obtener "el proyecto DE PRUEBAS (se sobrescribe)" "<ref-de-pruebas>" PORTGO_DB_URL_PRUEBAS)" || exit 1
 
-_host() { local s="${1#*://}"; s="${s#*@}"; echo "${s%%/*}"; }
+# Identifica un extremo como "usuario@host:puerto", NUNCA con la contraseña:
+# esto se imprime en pantalla y se compara en el candado de más abajo.
+#
+# POR QUÉ LLEVA EL USUARIO Y NO SOLO EL HOST: con la conexión directa el
+# proyecto va en el host (db.<ref>.supabase.co), pero esa vía es solo IPv6
+# desde que Supabase la dejó atrás, y en una red IPv4 ni siquiera resuelve.
+# Por el pooler, que es la que funciona, el host es COMPARTIDO por todos los
+# proyectos de la región (aws-0-….pooler.supabase.com) y el ref viaja en el
+# usuario (postgres.<ref>). Comparando solo el host, dos proyectos distintos
+# parecían el mismo y el guion se cancelaba solo.
+#
+# La protección de identidad no vive aquí: la hacen los dos candados que
+# buscan el ref de producción en cada cadena. Este solo comprueba que no se
+# esté copiando un extremo sobre sí mismo.
+#
+# Se corta por la ÚLTIMA arroba a propósito: una contraseña con "@" sin
+# escapar partiría la cadena por el sitio equivocado.
+_host() {
+  local s="${1#*://}" usuario="" destino=""
+  case "$s" in
+    *@*) usuario="${s%@*}"; destino="${s##*@}" ;;
+    *)   destino="$s" ;;
+  esac
+  usuario="${usuario%%:*}"      # fuera la contraseña
+  destino="${destino%%/*}"      # fuera la base y los parámetros
+  if [ -n "$usuario" ]; then echo "$usuario@$destino"; else echo "$destino"; fi
+}
 
 # psql.exe es un binario nativo de Windows y escribe la salida en modo texto:
 # cada línea termina en CRLF. Al leerla desde bash, un nombre de tabla sale
@@ -83,7 +109,9 @@ if [[ "$PRUE" == *"$REF_PRODUCCION"* ]]; then
   echo "❌ ALTO: el DESTINO es producción ($REF_PRODUCCION). Cancelado." >&2; exit 2
 fi
 if [ "$(_host "$PROD")" = "$(_host "$PRUE")" ]; then
-  echo "❌ ALTO: origen y destino son el mismo host. Cancelado." >&2; exit 2
+  echo "❌ ALTO: origen y destino son el mismo extremo. Cancelado." >&2
+  echo "   ($(_host "$PROD"))" >&2
+  exit 2
 fi
 if [[ "$PROD" != *"$REF_PRODUCCION"* ]]; then
   echo "❌ El ORIGEN no es producción ($REF_PRODUCCION)." >&2
