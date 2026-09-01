@@ -575,67 +575,14 @@ function cancelarReserva(reservaId, unidad) {
   if (_reservaActiva) return;
   showConfirm('¿Cancelar esta reserva? El recurso volverá a estar disponible y la solicitud se reabrirá para nuevas ofertas.', async () => {
     _reservaActiva = true;
-    const { data: rv } = await sb.from('reservaciones').select('*').eq('id', reservaId).single();
-    const tipoFinal = rv?.recurso_tipo || 'camion';
-
-    // Cancelar la reserva
-    await sb.from('reservaciones').update({ estado: 'Cancelada' }).eq('id', reservaId);
-
-    // Liberar el recurso
-    if (unidad) {
-      const tabla = tipoFinal === 'custodio' ? 'custodios' : tipoFinal === 'patio' ? 'patios' : 'camiones';
-      await sb.from(tabla).update({ estado: 'disponible' }).eq('id', unidad);
-    }
-
-    // Regresar el pedido a abierto para que puedan ofertar de nuevo
-    if (rv?.pedido_id) {
-      const { error: errPedido } = await sb.from('pedidos').update({
-        estado:              'abierto',
-        oferta_pendiente_id: null,
-      }).eq('id', rv.pedido_id);
-      if (errPedido) {
-        _reservaActiva = false;
-        showToast('La reserva se canceló, pero la solicitud no se pudo reabrir: ' + errPedido.message, 'error');
-        await renderReserv();
-        return;
-      }
-
-      // La oferta que ya estaba aceptada (la de quien canceló el viaje) queda
-      // bloqueada para volver a ofertar en esta misma solicitud — canceló un
-      // acuerdo ya cerrado, no es lo mismo que una oferta simplemente rechazada.
-      await sb.from('ofertas')
-        .update({ estado: 'rechazada', permite_reoferta: false })
-        .eq('pedido_id', rv.pedido_id)
-        .eq('estado', 'aceptada');
-
-      // Las demás ofertas que seguían activas (de otras empresas) también se
-      // invalidan para el ciclo de negociación anterior, pero sí podrán
-      // volver a ofertar en la solicitud reabierta.
-      await sb.from('ofertas')
-        .update({ estado: 'rechazada' })
-        .eq('pedido_id', rv.pedido_id)
-        .in('estado', ['enviada', 'contra_oferta']);
-    }
-
-    // Notificar al cliente
-    if (rv?.cliente_user_id) {
-      await sb.from('notificaciones').insert({
-        user_id: rv.cliente_user_id,
-        tipo:    'reserva_cancelada',
-        titulo:  'Reserva cancelada',
-        mensaje: `Tu reserva fue cancelada por el proveedor. Tu solicitud está abierta de nuevo para recibir ofertas.`,
-        leido:   false,
-      });
-    }
-
-    // Notificar a superadmin — un acuerdo ya aprobado se cayó, debe saberlo
-    await sb.rpc('notificar_superadmins', {
-      p_tipo:    'reserva_cancelada_admin',
-      p_titulo:  'Un acuerdo aprobado se canceló',
-      p_mensaje: `${esc(currentUser.nombre)} canceló la reserva con ${esc(rv?.cliente || 'un cliente')} después de que el acuerdo ya había sido aprobado. La solicitud volvió a estar abierta.`,
-    });
-
+    // cancelar_reservacion (RPC, ver supabase/migrations/20260810120000 +
+    // 20260901140000) hace las 7 escrituras de antes en una sola transacción:
+    // cancela la reserva, libera el recurso (incluido lavado, que este
+    // código antes omitía), reabre el pedido, invalida las ofertas y
+    // notifica al cliente y a los superadmins. Ver H-10 en la auditoría.
+    const { error } = await sb.rpc('cancelar_reservacion', { p_reserva_id: reservaId });
     _reservaActiva = false;
+    if (error) { showToast(error.message || 'No se pudo cancelar la reserva', 'error'); return; }
     await renderReserv();
     showToast('Reserva cancelada — solicitud reabierta para nuevas ofertas');
   }, { danger: true, confirmLabel: 'Sí, cancelar' });
