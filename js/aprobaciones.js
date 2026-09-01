@@ -1607,9 +1607,15 @@ function aprobarTodasSolicitudes() {
   showConfirm('¿Aprobar y publicar todas las solicitudes pendientes de revisión?', async () => {
     const { data: solic } = await sb.from('pedidos').select('id, cliente_id, tipo_camion, origen, destino').eq('estado', 'pendiente_revision');
     if (!solic?.length) { showToast('No hay solicitudes pendientes'); return; }
-    for (const p of solic) {
-      await sb.from('pedidos').update({ estado: 'abierto', rechazo_nota: null }).eq('id', p.id);
-    }
+    // Un solo UPDATE en vez de uno por fila (H-13): además de ahorrar N viajes
+    // de red, hace del lote una sola sentencia — si algo falla, no aprueba
+    // solo las primeras y deja el resto a medias, que es lo deseable en una
+    // acción llamada "aprobar todas". Los triggers guardianes se siguen
+    // ejecutando fila a fila dentro del motor, que es donde deben ejecutarse.
+    const { error: errLote } = await sb.from('pedidos')
+      .update({ estado: 'abierto', rechazo_nota: null })
+      .in('id', solic.map(p => p.id));
+    if (errLote) { showToast('No se pudo aprobar el lote: ' + errLote.message, 'error'); return; }
 
     // Notificar a cada cliente cuya solicitud fue aprobada
     const notifClientes = solic.filter(p => p.cliente_id).map(p => {
