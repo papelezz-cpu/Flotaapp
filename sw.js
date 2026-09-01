@@ -1,5 +1,5 @@
 // ── SERVICE WORKER — PortGo ────────────────────────────
-const CACHE      = 'portgo-v175';
+const CACHE      = 'portgo-v176';
 const DATA_CACHE = 'portgo-data-v1';
 
 const SHELL = [
