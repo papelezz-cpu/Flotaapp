@@ -666,7 +666,7 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
     if (p.peso_carga)       chips.push(`⚖️ ${p.peso_carga} ton`);
     if (p.capacidad_min)    chips.push(`🚛 Mín ${p.capacidad_min} ton`);
     if (p.carga_peligrosa)  chips.push('⚠️ Peligrosa');
-    if (p.temp_controlada)  chips.push('❄️ Temp. controlada');
+    if (p.refrigerado)      chips.push('❄️ Temp. controlada');
     if (p.requiere_seguro)  chips.push('🛡️ Seguro');
     if (p.requiere_factura) chips.push('🧾 Factura');
   } else if (esCustodioCard) {

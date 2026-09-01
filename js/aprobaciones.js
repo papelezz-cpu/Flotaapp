@@ -997,7 +997,7 @@ function _buildChipsSol(p) {
   if (p.num_vehiculos)     chips.push(`🚗 x${p.num_vehiculos} veh.`);
   if (p.tipo_vehiculos)    chips.push(esc(p.tipo_vehiculos));
   if (p.carga_peligrosa)   chips.push('⚠️ Peligrosa');
-  if (p.temp_controlada)   chips.push('❄️ Temp. controlada');
+  if (p.refrigerado)       chips.push('❄️ Temp. controlada');
   if (p.requiere_seguro)   chips.push('🛡️ Seguro');
   if (p.requiere_factura)  chips.push('🧾 Factura');
   if (!chips.length) return '';
