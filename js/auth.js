@@ -939,6 +939,12 @@ async function logout() {
   // que los viejos se limpiaran nunca.
   await sb.removeAllChannels();
   await sb.auth.signOut();
+
+  // El Service Worker guarda respuestas del REST en Cache Storage (disco), y
+  // eso sobrevive al signOut: la sesión vive en sessionStorage, el caché no.
+  // Sin esto, la siguiente persona que abriera la app en la misma computadora
+  // tendría ahí los datos de la anterior.
+  navigator.serviceWorker?.controller?.postMessage({ type: 'PURGE_DATA_CACHE' });
   currentUser = { id: null, nombre: null, rol: null };
   document.body.classList.remove('role-admin', 'role-superadmin', 'logged-in');
   document.getElementById('login-user').value = '';

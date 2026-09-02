@@ -1,5 +1,5 @@
 // ── SERVICE WORKER — PortGo ────────────────────────────
-const CACHE      = 'portgo-v147';
+const CACHE      = 'portgo-v148';
 const DATA_CACHE = 'portgo-data-v1';
 
 const SHELL = [
@@ -61,6 +61,22 @@ self.addEventListener('activate', e => {
   );
 });
 
+// Cerrar sesión debe llevarse también los datos guardados.
+//
+// DATA_CACHE guarda respuestas del REST de Supabase — entre ellas filas de
+// `perfiles` con RFC y razón social. Vive en Cache Storage, o sea en disco, y
+// no lo tocaba nadie: la sesión se guarda en sessionStorage justamente para
+// que cerrar el navegador desconecte, pero el caché seguía ahí para la
+// siguiente persona que abriera la app en esa computadora.
+//
+// Hasta ahora esto no se notaba porque el bug del clone impedía que el caché
+// se llenara. Al arreglarlo sí se llena, así que hay que vaciarlo al salir.
+self.addEventListener('message', e => {
+  if (e.data?.type === 'PURGE_DATA_CACHE') {
+    e.waitUntil(caches.delete(DATA_CACHE));
+  }
+});
+
 // Fetch handler
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
@@ -83,9 +99,15 @@ self.addEventListener('fetch', e => {
   // si de verdad no hay conexión.
   if (isSupabaseRest) {
     e.respondWith(
-      fetch(e.request.clone()).then(res => {
+      fetch(e.request).then(res => {
+        // El clon se saca AQUÍ, en el mismo tick. caches.open() es asíncrono:
+        // cuando su callback corría, `return res` ya había entregado la
+        // respuesta y supabase-js le había hecho .json(), así que res.clone()
+        // reventaba con "Response body is already used" — y de paso el caché
+        // de datos no se llenaba nunca.
         if (res.ok) {
-          caches.open(DATA_CACHE).then(cache => cache.put(e.request.clone(), res.clone()));
+          const copia = res.clone();
+          caches.open(DATA_CACHE).then(cache => cache.put(e.request, copia));
         }
         return res;
       }).catch(async () => {
@@ -108,7 +130,8 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       fetch(e.request).then(res => {
         if (res.ok) {
-          caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+          const copia = res.clone();   // mismo motivo que arriba
+          caches.open(CACHE).then(c => c.put(e.request, copia));
         }
         return res;
       }).catch(() => caches.match(e.request))
@@ -120,7 +143,10 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     caches.match(e.request).then(cached =>
       cached || fetch(e.request).then(res => {
-        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        if (res.ok) {
+          const copia = res.clone();   // mismo motivo que arriba
+          caches.open(CACHE).then(c => c.put(e.request, copia));
+        }
         return res;
       })
     )
