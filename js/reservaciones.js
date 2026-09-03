@@ -1186,8 +1186,11 @@ async function subirEvidencias() {
   const files     = Array.from(document.getElementById('ev-files')?.files || []);
   if (!files.length) { showToast('Selecciona al menos un archivo', 'error'); return; }
 
+  // Lectura ligera solo para no subir archivos a Storage que la RPC vaya a
+  // rechazar (plazo/tope) y para el texto del toast. registrar_evidencias
+  // revalida todo esto de forma autoritativa.
   const { data: r } = await sb.from('reservaciones')
-    .select('estado, completado_en, evidencias, evidencias_cliente, cliente_user_id, propietario_id, cliente, unidad, recurso_tipo, pedido_id')
+    .select('estado, completado_en, evidencias, evidencias_cliente')
     .eq('id', reservaId).single();
   if (!r) { showToast('No se encontró la reserva', 'error'); return; }
 
@@ -1217,44 +1220,18 @@ async function subirEvidencias() {
     nuevosPaths.push(path);
   }
 
-  const payload = { [campo]: [...existentes, ...nuevosPaths] };
-  const actor = campo === 'evidencias_cliente' ? 'cliente' : 'empresa';
-  if (solicitando) {
-    payload.estado = 'PorAprobar';
-    payload.finalizacion_solicitada_por = actor;
-    if (!r.completado_en) payload.completado_en = new Date().toISOString();
-  }
-
-  const { error } = await sb.from('reservaciones').update(payload).eq('id', reservaId);
-  if (error) { showToast('Error al guardar: ' + error.message, 'error'); return; }
-
-  if (solicitando) {
-    // Notificar a la otra parte para que suba su propia evidencia
-    const otroId = actor === 'cliente' ? r.propietario_id : r.cliente_user_id;
-    if (otroId) {
-      await sb.from('notificaciones').insert({
-        user_id: otroId,
-        tipo:    'finalizacion_solicitada',
-        titulo:  '📎 Confirma la finalización del servicio',
-        mensaje: `${actor === 'cliente' ? 'El cliente' : 'La empresa'} marcó el servicio como completado. Sube tu propia evidencia para enviarlo a revisión del superadmin.`,
-        leido:   false,
-      });
-    }
-    // Notificar a superadmins para que lo revisen
-    await sb.rpc('notificar_superadmins', {
-      p_tipo:    'revision_finalizacion',
-      p_titulo:  '🏁 Finalización de servicio por revisar',
-      p_mensaje: `${esc(r.cliente || 'Un cliente')} tiene un servicio marcado como completado, pendiente de tu aprobación.`,
-    });
-  } else if (!existentes.length) {
-    // La otra parte ya había solicitado el cierre; esta es la primera vez que
-    // ESTE lado sube su evidencia — avisar a superadmins que ya están ambas.
-    await sb.rpc('notificar_superadmins', {
-      p_tipo:    'revision_finalizacion',
-      p_titulo:  '🏁 Ya están ambas evidencias',
-      p_mensaje: `${esc(r.cliente || 'Un cliente')} y la empresa ya subieron su evidencia de cierre. Puedes revisarla y aprobarla.`,
-    });
-  }
+  // registrar_evidencias (RPC, ver supabase/migrations/20260810120000): los
+  // archivos ya están en Storage; la función agrega las rutas a la columna del
+  // lado que corresponde (cliente o empresa, según auth.uid()), y si es la
+  // solicitud de cierre mueve el estado a PorAprobar, fija completado_en y
+  // avisa a la otra parte y a los superadmins — todo en una transacción. Antes
+  // eran hasta 4 escrituras sueltas. Revalida plazo, tope y paso del tracking.
+  // Ver H-10 en la auditoría.
+  const { error } = await sb.rpc('registrar_evidencias', {
+    p_reserva_id: reservaId,
+    p_paths:      nuevosPaths,
+  });
+  if (error) { showToast(error.message || 'Error al guardar', 'error'); return; }
 
   cerrarEvidencias();
   await renderReserv();
@@ -1300,24 +1277,17 @@ function seleccionarEstrella(val) {
 async function enviarCalificacion() {
   if (!_calReservaId || !_calAdminId) return;
   const comentario = document.getElementById('cal-comentario')?.value?.trim() || null;
-  const { error } = await sb.from('calificaciones').insert({
-    reservacion_id: _calReservaId,
-    admin_id:       _calAdminId,
-    cliente_id:     currentUser.id,
-    rating:         _calRating,
-    comentario,
-  });
-  if (error) { showToast('Error al enviar calificación'); return; }
-  await sb.from('reservaciones').update({ calificado: true }).eq('id', _calReservaId);
 
-  // Notificar al proveedor de la nueva calificación
-  await sb.from('notificaciones').insert({
-    user_id: _calAdminId,
-    tipo:    'nueva_calificacion',
-    titulo:  '⭐ Nueva calificación recibida',
-    mensaje: `${currentUser.nombre || 'Un cliente'} te calificó con ${_calRating} estrella${_calRating !== 1 ? 's' : ''}${comentario ? ': "' + comentario.slice(0, 80) + (comentario.length > 80 ? '…' : '') + '"' : ''}.`,
-    leido:   false,
+  // calificar_servicio (RPC, ver supabase/migrations/20260810120000): inserta
+  // la calificación, marca la reserva como calificada y avisa al proveedor en
+  // una sola transacción. Antes eran 3 escrituras sueltas sin atomicidad — el
+  // admin_id lo deriva la función del propietario de la reserva. Ver H-10.
+  const { error } = await sb.rpc('calificar_servicio', {
+    p_reserva_id: _calReservaId,
+    p_rating:     _calRating,
+    p_comentario: comentario,
   });
+  if (error) { showToast(error.message || 'Error al enviar calificación', 'error'); return; }
 
   closeCalificar();
   await renderReserv();
