@@ -1733,7 +1733,9 @@ async function confirmarDetallesServicio() {
   const oferta = _pendingOferta;
   const pedido = _pendingPedido;
 
-  // Guardar detalles en el pedido (solo los que se hayan ingresado)
+  // Guardar detalles en el pedido (solo los que se hayan ingresado). Es
+  // informativo y va antes de la RPC porque cerrar_acuerdo copia fecha_ini a
+  // la reservación; si esto falla, no rompe el acuerdo.
   const update = {
     detalles_completados: true,
     detalles_lugar: lugar || null,
@@ -1742,47 +1744,42 @@ async function confirmarDetallesServicio() {
   if (fecha) update.fecha_ini = fecha;
   await sb.from('pedidos').update(update).eq('id', pedido.id);
 
-  // Marcar oferta como aceptada
-  await sb.from('ofertas').update({ estado: 'aceptada' }).eq('id', oferta.id);
+  // aceptar_y_cerrar_acuerdo (RPC, ver supabase/migrations/20260903120000):
+  // acepta la oferta, marca el pedido y cierra el acuerdo (rechaza las demás
+  // ofertas, crea la reservación, ocupa el recurso) en UNA transacción. Antes
+  // eran 3 llamadas sueltas — un corte a la mitad dejaba la oferta 'aceptada'
+  // y el pedido 'pendiente_acuerdo' sin reservación. Ver H-10.
+  const { data: res, error: errCierre } = await sb.rpc('aceptar_y_cerrar_acuerdo', {
+    p_oferta_id: oferta.id,
+    p_via:       'cliente_acepta_oferta',
+  });
 
-  // Pendiente_acuerdo es el paso intermedio; se cierra solo abajo salvo que
-  // haya un impedimento real (documentos vencidos de la empresa).
-  await sb.from('pedidos').update({
-    estado:              'pendiente_acuerdo',
-    oferta_pendiente_id: oferta.id,
-  }).eq('id', pedido.id);
-
-  // El acuerdo se cierra solo (rechaza las demás ofertas, marca el pedido y
-  // crea la reservación) — ya no requiere que el superadmin le dé clic.
-  const { data: reservaId, error: errCierre } = await sb.rpc('cerrar_acuerdo', { p_oferta_id: oferta.id });
-
-  let mensajeFinal;
-  if (!errCierre) {
-    mensajeFinal = '✓ Acuerdo cerrado — ya tienes una reservación activa';
-    if (reservaId && typeof _crearExpedienteAuto === 'function') {
-      if (pedido.entra_a_puerto) await _crearExpedienteAuto(reservaId, 'ingreso_puerto');
-      if (pedido.patio_externo)  await _crearExpedienteAuto(reservaId, 'entrega_vacios');
-    }
-  } else if (errCierre.message?.includes('DOCUMENTOS_VENCIDOS')) {
-    // Único caso que sigue necesitando al superadmin: la empresa tiene
-    // documentos vencidos y no se puede cerrar el trato automáticamente.
-    await sb.rpc('notificar_superadmins', {
-      p_tipo:    'revision_acuerdo',
-      p_titulo:  '⚠ Acuerdo pendiente — documentos vencidos',
-      p_mensaje: `${esc(pedido.cliente_nombre || 'Un cliente')} aceptó una oferta de ${esc(oferta.admin_nombre || 'un proveedor')}, pero la empresa tiene documentos vencidos. Revísalo en Pendientes.`,
-    });
-    mensajeFinal = '✓ Acuerdo aceptado — la empresa tiene documentos vencidos, un administrador lo revisará antes de confirmar.';
-  } else {
+  if (errCierre) {
     console.error('Error al cerrar el acuerdo:', errCierre);
-    mensajeFinal = '✓ Acuerdo aceptado — quedó pendiente de revisión.';
+    if (btnConfirmar) { btnConfirmar.disabled = false; btnConfirmar.textContent = '✓ Guardar y confirmar'; }
+    showToast(errCierre.message?.includes('RECURSO_NO_DISPONIBLE')
+      ? '❌ Ese recurso ya tiene una reserva en esas fechas. La oferta sigue vigente — elige otra o pide una nueva.'
+      : 'No se pudo cerrar el acuerdo: ' + (errCierre.message || 'error desconocido'), 'error');
+    return;
   }
 
-  // Correo: acuerdo cerrado (o pendiente, según el caso). El acuerdo ya se
-  // cierra solo en el caso normal — el superadmin solo tiene algo que hacer
-  // cuando quedó bloqueado por documentos vencidos.
+  let mensajeFinal;
+  if (res?.resultado === 'pendiente_docs') {
+    // La empresa tiene documentos vencidos: la RPC dejó el pedido esperando y
+    // ya avisó a los superadmins. El único caso que sigue pasando por ellos.
+    mensajeFinal = '✓ Acuerdo aceptado — la empresa tiene documentos vencidos, un administrador lo revisará antes de confirmar.';
+  } else {
+    mensajeFinal = '✓ Acuerdo cerrado — ya tienes una reservación activa';
+    if (res?.reserva_id && typeof _crearExpedienteAuto === 'function') {
+      if (pedido.entra_a_puerto) await _crearExpedienteAuto(res.reserva_id, 'ingreso_puerto');
+      if (pedido.patio_externo)  await _crearExpedienteAuto(res.reserva_id, 'entrega_vacios');
+    }
+  }
+
+  // Correo: acuerdo cerrado (o pendiente por documentos vencidos).
   _notificarEmail({
     tipo_evento:    'acuerdo',
-    cerrado:        !errCierre,
+    cerrado:        res?.resultado === 'cerrado',
     tipo_camion:    pedido.tipo_camion,
     cliente_nombre: pedido.cliente_nombre,
     admin_nombre:   oferta.admin_nombre,
@@ -2210,51 +2207,42 @@ async function responderContra(accion) {
   const { data: oferta } = await sb.from('ofertas').select('*').eq('id', ofertaDetalleId).single();
 
   if (accion === 'aceptar' && oferta) {
-    // Fijar el precio acordado (contraoferta del cliente) en la oferta
-    await sb.from('ofertas').update({
-      estado:        'aceptada',
-      precio_oferta: oferta.contra_precio,
-    }).eq('id', ofertaDetalleId);
-
     const { data: pedido } = await sb.from('pedidos').select('*').eq('id', oferta.pedido_id).single();
-    let mensajeFinal = '✓ Acuerdo aceptado';
-    let errCierre = null;
-    if (pedido) {
-      await sb.from('pedidos').update({
-        estado:              'pendiente_acuerdo',
-        oferta_pendiente_id: oferta.id,
-      }).eq('id', pedido.id);
 
-      // El acuerdo se cierra solo — ya no requiere que el superadmin le dé
-      // clic (los documentos vencidos son un bloqueo duro desde ofertas).
-      let reservaId;
-      ({ data: reservaId, error: errCierre } = await sb.rpc('cerrar_acuerdo', { p_oferta_id: oferta.id }));
+    // aceptar_y_cerrar_acuerdo (RPC, ver supabase/migrations/20260903120000):
+    // fija el precio en la contraoferta del cliente, acepta, marca el pedido y
+    // cierra el acuerdo en UNA transacción. Antes eran 3 llamadas sueltas.
+    // Ver H-10.
+    const { data: res, error: errCierre } = await sb.rpc('aceptar_y_cerrar_acuerdo', {
+      p_oferta_id: oferta.id,
+      p_via:       'empresa_acepta_contra',
+    });
 
-      if (!errCierre) {
-        mensajeFinal = '✓ Acuerdo cerrado — ya tienes una reservación activa';
-        if (reservaId && typeof _crearExpedienteAuto === 'function') {
-          if (pedido.entra_a_puerto) await _crearExpedienteAuto(reservaId, 'ingreso_puerto');
-          if (pedido.patio_externo)  await _crearExpedienteAuto(reservaId, 'entrega_vacios');
-        }
-      } else if (errCierre.message?.includes('DOCUMENTOS_VENCIDOS')) {
-        await sb.rpc('notificar_superadmins', {
-          p_tipo:    'revision_acuerdo',
-          p_titulo:  '⚠ Acuerdo pendiente — documentos vencidos',
-          p_mensaje: `${esc(currentUser.nombre)} aceptó una contraoferta de ${esc(pedido.cliente_nombre || 'cliente')}, pero tiene documentos vencidos. Revísalo en Pendientes.`,
-        });
-        mensajeFinal = '✓ Acuerdo aceptado — tienes documentos vencidos, un administrador lo revisará antes de confirmar.';
-      } else {
-        console.error('Error al cerrar el acuerdo:', errCierre);
-        mensajeFinal = '✓ Acuerdo aceptado — quedó pendiente de revisión.';
+    if (errCierre) {
+      console.error('Error al cerrar el acuerdo:', errCierre);
+      showToast(errCierre.message?.includes('RECURSO_NO_DISPONIBLE')
+        ? '❌ Ese recurso ya tiene una reserva en esas fechas. La contraoferta sigue vigente.'
+        : 'No se pudo cerrar el acuerdo: ' + (errCierre.message || 'error desconocido'), 'error');
+      return;
+    }
+
+    let mensajeFinal;
+    if (res?.resultado === 'pendiente_docs') {
+      mensajeFinal = '✓ Acuerdo aceptado — tienes documentos vencidos, un administrador lo revisará antes de confirmar.';
+    } else {
+      mensajeFinal = '✓ Acuerdo cerrado — ya tienes una reservación activa';
+      if (res?.reserva_id && typeof _crearExpedienteAuto === 'function' && pedido) {
+        if (pedido.entra_a_puerto) await _crearExpedienteAuto(res.reserva_id, 'ingreso_puerto');
+        if (pedido.patio_externo)  await _crearExpedienteAuto(res.reserva_id, 'entrega_vacios');
       }
     }
 
-    // Correo: acuerdo cerrado (o pendiente, según el caso)
+    // Correo: acuerdo cerrado (o pendiente por documentos vencidos)
     _notificarEmail({
       tipo_evento:    'acuerdo',
-      cerrado:        !errCierre,
-      tipo_camion:    pedido.tipo_camion,
-      cliente_nombre: pedido.cliente_nombre,
+      cerrado:        res?.resultado === 'cerrado',
+      tipo_camion:    pedido?.tipo_camion,
+      cliente_nombre: pedido?.cliente_nombre,
       admin_nombre:   currentUser.nombre,
       precio:         oferta.contra_precio,
     });
