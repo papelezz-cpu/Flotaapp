@@ -1322,40 +1322,19 @@ async function confirmarSolicitudCancelacion() {
   const detalle = document.getElementById('sc-detalle').value.trim();
   if (!motivo) { showToast('Selecciona el motivo de la cancelación.', 'error'); return; }
 
-  const { data: r } = await sb.from('reservaciones')
-    .select('tracking_estado, propietario_id, unidad, cliente')
-    .eq('id', _cancelReservaId).single();
-
-  const { error } = await sb.from('reservaciones').update({
-    estado:                      'CancelacionSolicitada',
-    cancelacion_solicitada_en:   new Date().toISOString(),
-    cancelacion_solicitada_por:  currentUser.id,
-    cancelacion_motivo:          motivo,
-    cancelacion_detalle:         detalle || null,
-    // Se congela el punto del viaje: no es lo mismo cancelar antes de salir
-    // que con la carga en tránsito.
-    cancelacion_tracking_estado: r?.tracking_estado || 'Confirmado',
-  }).eq('id', _cancelReservaId);
+  // solicitar_cancelacion (RPC, ver supabase/migrations/20260810120000): pone
+  // la reserva en CancelacionSolicitada, congela el punto del viaje en
+  // cancelacion_tracking_estado y avisa a la empresa (puede detener la unidad)
+  // y a los superadmins, que resuelven — todo en una transacción. Antes eran 3
+  // escrituras sueltas. Ver H-10 en la auditoría.
+  const { error } = await sb.rpc('solicitar_cancelacion', {
+    p_reserva_id: _cancelReservaId,
+    p_motivo:     motivo,
+    p_detalle:    detalle || null,
+  });
 
   cerrarSolicitarCancelacion();
-  if (error) { showToast('No se pudo enviar la solicitud: ' + error.message, 'error'); return; }
-
-  // Avisar a la empresa YA (puede detener la unidad) y al superadmin, que decide.
-  const notifs = [];
-  if (r?.propietario_id) notifs.push({
-    user_id: r.propietario_id,
-    tipo:    'cancelacion_solicitada',
-    titulo:  '⚠ El cliente pidió cancelar un servicio',
-    mensaje: `${esc(currentUser.nombre || 'El cliente')} solicitó cancelar el servicio de ${esc(r.unidad || 'la unidad')}. Motivo: ${esc(motivo)}. Está en revisión — no continúes hasta que se resuelva.`,
-    leido:   false,
-  });
-  if (notifs.length) await sb.from('notificaciones').insert(notifs);
-
-  await sb.rpc('notificar_superadmins', {
-    p_tipo:    'cancelacion_solicitada',
-    p_titulo:  'Cancelación por revisar',
-    p_mensaje: `${esc(currentUser.nombre || 'Un cliente')} solicitó cancelar un servicio activo (${esc(r?.tracking_estado || 'Confirmado')}). Motivo: ${esc(motivo)}.`,
-  });
+  if (error) { showToast(error.message || 'No se pudo enviar la solicitud', 'error'); return; }
 
   showToast('✓ Solicitud enviada — te avisaremos cuando se resuelva');
   await renderReserv();
