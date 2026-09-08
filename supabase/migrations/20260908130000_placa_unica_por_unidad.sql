@@ -45,6 +45,13 @@
 -- El WHERE es defensivo y hace la migracion idempotente: solo toca la fila si
 -- SIGUE compartiendo placa con T-001. Si alguien ya le puso la placa buena
 -- entre que esto se escribio y se aplica, no se la pisa.
+--
+-- Este UPDATE SI pasa el guard de flota, comprobado a proposito porque el de
+-- pedidos no lo hace (ver 20260901130000). trg_guard_camiones_update solo
+-- vigila dos cosas —que no cambie `aprobacion` y que no cambie
+-- `propietario_id`— y aqui solo se toca `placas`, asi que devuelve NEW sin
+-- protestar aunque auth.uid() sea NULL al aplicarlo desde psql. No hace
+-- falta desactivar nada.
 
 update public.camiones
    set placas = 'PRUEBA-001'
