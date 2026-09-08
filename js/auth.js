@@ -781,21 +781,38 @@ async function doRegistro() {
     }),
   };
 
+  // El perfil va PRIMERO y su error aborta el alta. Si falla y seguimos, se
+  // crea la solicitud sin perfil: el panel del superadmin la muestra, el globo
+  // de "por aprobar" no la cuenta —cuenta perfiles.aprobacion_cuenta— y al
+  // aprobarla el UPDATE no encuentra fila que tocar. La cuenta queda aprobada
+  // y sin perfil, que es como se manifestó la recursión de RLS del 2026-09-08.
+  const _fallo = (e, paso) => {
+    console.error(`registro: falló ${paso}`, e);
+    showErr(`No se pudo completar el registro (${paso}): ${e.message || e}`);
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud de registro'; }
+  };
+
   if (esReregistro) {
-    // Actualizar registros existentes
-    await Promise.all([
-      sb.from('perfiles').update({ nombre, aprobacion_cuenta: 'pendiente', nota_rechazo_cuenta: null })
-        .eq('user_id', userId),
-      sb.from('solicitudes_cuenta').update(solicitudPayload).eq('user_id', userId),
-    ]);
+    const { error: ePerf } = await sb.from('perfiles')
+      .update({ nombre, aprobacion_cuenta: 'pendiente', nota_rechazo_cuenta: null })
+      .eq('user_id', userId);
+    if (ePerf) { _fallo(ePerf, 'perfil'); return; }
+
+    const { error: eSol } = await sb.from('solicitudes_cuenta')
+      .update(solicitudPayload).eq('user_id', userId);
+    if (eSol) { _fallo(eSol, 'solicitud'); return; }
   } else {
-    await sb.from('perfiles').upsert({
+    const { error: ePerf } = await sb.from('perfiles').upsert({
       user_id:           userId,
       nombre,
       rol:               _regRol === 'cliente' ? 'cliente' : 'admin',
       aprobacion_cuenta: 'pendiente',
     });
-    await sb.from('solicitudes_cuenta').insert({ user_id: userId, rol: _regRol, ...solicitudPayload });
+    if (ePerf) { _fallo(ePerf, 'perfil'); return; }
+
+    const { error: eSol } = await sb.from('solicitudes_cuenta')
+      .insert({ user_id: userId, rol: _regRol, ...solicitudPayload });
+    if (eSol) { _fallo(eSol, 'solicitud'); return; }
   }
 
   // Constancia de la aceptación (versión + fecha). Se guarda también en el
