@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PortGo">
+  <title>PortGo</title>
+  <!-- Hub de tres nodos: la marca que la app ya usa en icon.svg y en
+       index.html. Anillo abierto con flecha: la idea de movimiento del
+       logo dorado, en plano y en la paleta Marea de css/theme.css. -->
+  <g stroke="#0d9488" stroke-width="30" stroke-linecap="round">
+    <line x1="256" y1="256" x2="256" y2="120.0"/>
+    <line x1="256" y1="256" x2="378.0" y2="338.0"/>
+    <line x1="256" y1="256" x2="134.0" y2="338.0"/>
+  </g>
+  <circle cx="256" cy="116.0" r="46" fill="#0d9488"/>
+  <circle cx="382.0" cy="340.0" r="46" fill="#0d9488"/>
+  <circle cx="130.0" cy="340.0" r="46" fill="#0d9488"/>
+  <circle cx="256" cy="256" r="43.0" fill="none" stroke="#0d9488" stroke-width="38.0"/>
+</svg>
