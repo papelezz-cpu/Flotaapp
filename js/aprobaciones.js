@@ -997,7 +997,7 @@ function _buildChipsSol(p) {
   if (p.num_vehiculos)     chips.push(`🚗 x${p.num_vehiculos} veh.`);
   if (p.tipo_vehiculos)    chips.push(esc(p.tipo_vehiculos));
   if (p.carga_peligrosa)   chips.push('⚠️ Peligrosa');
-  if (p.temp_controlada)   chips.push('❄️ Temp. controlada');
+  if (p.refrigerado)       chips.push('❄️ Temp. controlada');
   if (p.requiere_seguro)   chips.push('🛡️ Seguro');
   if (p.requiere_factura)  chips.push('🧾 Factura');
   if (!chips.length) return '';
@@ -1607,9 +1607,15 @@ function aprobarTodasSolicitudes() {
   showConfirm('¿Aprobar y publicar todas las solicitudes pendientes de revisión?', async () => {
     const { data: solic } = await sb.from('pedidos').select('id, cliente_id, tipo_camion, origen, destino').eq('estado', 'pendiente_revision');
     if (!solic?.length) { showToast('No hay solicitudes pendientes'); return; }
-    for (const p of solic) {
-      await sb.from('pedidos').update({ estado: 'abierto', rechazo_nota: null }).eq('id', p.id);
-    }
+    // Un solo UPDATE en vez de uno por fila (H-13): además de ahorrar N viajes
+    // de red, hace del lote una sola sentencia — si algo falla, no aprueba
+    // solo las primeras y deja el resto a medias, que es lo deseable en una
+    // acción llamada "aprobar todas". Los triggers guardianes se siguen
+    // ejecutando fila a fila dentro del motor, que es donde deben ejecutarse.
+    const { error: errLote } = await sb.from('pedidos')
+      .update({ estado: 'abierto', rechazo_nota: null })
+      .in('id', solic.map(p => p.id));
+    if (errLote) { showToast('No se pudo aprobar el lote: ' + errLote.message, 'error'); return; }
 
     // Notificar a cada cliente cuya solicitud fue aprobada
     const notifClientes = solic.filter(p => p.cliente_id).map(p => {

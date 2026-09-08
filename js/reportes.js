@@ -32,7 +32,7 @@ async function renderReportes() {
       .gte('created_at', desde).lte('created_at', hasta + 'T23:59:59'),
     sb.from('reservaciones').select('id, precio_acordado, propietario_id, created_at, estado')
       .gte('created_at', desde).lte('created_at', hasta + 'T23:59:59'),
-    sb.from('perfiles').select('user_id, nombre, rol').eq('rol', 'admin'),
+    sb.from('empresas_publico').select('user_id, nombre'),
   ]);
 
   if (!pedidos || !reservas) {

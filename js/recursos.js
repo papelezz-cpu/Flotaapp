@@ -39,7 +39,7 @@ async function renderCustodios(filtroTipo = '') {
   const ownerIds = [...new Set((data || []).map(c => c.propietario_id).filter(Boolean))];
   let ownerMap = {};
   if (ownerIds.length) {
-    const { data: perfiles } = await sb.from('perfiles').select('user_id, nombre').in('user_id', ownerIds);
+    const { data: perfiles } = await sb.from('empresas_publico').select('user_id, nombre').in('user_id', ownerIds);
     (perfiles || []).forEach(p => { ownerMap[p.user_id] = p.nombre; });
   }
   const custodios = (data || []).map(c => ({ ...c, empresaNombre: ownerMap[c.propietario_id] || '—' }));
@@ -115,7 +115,7 @@ async function renderPatios(filtroTipo = '') {
   const ownerIds = [...new Set((data || []).map(p => p.propietario_id).filter(Boolean))];
   let ownerMap = {};
   if (ownerIds.length) {
-    const { data: perfiles } = await sb.from('perfiles').select('user_id, nombre').in('user_id', ownerIds);
+    const { data: perfiles } = await sb.from('empresas_publico').select('user_id, nombre').in('user_id', ownerIds);
     (perfiles || []).forEach(p => { ownerMap[p.user_id] = p.nombre; });
   }
   const patios = (data || []).map(p => ({ ...p, empresaNombre: ownerMap[p.propietario_id] || '—' }));

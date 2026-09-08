@@ -67,7 +67,7 @@ async function renderCamiones(filtroTipo = '', fechaIni = '', fechaFin = '') {
   const ownerIds = [...new Set(data.map(c => c.propietario_id).filter(Boolean))];
   let ownerMap = {};
   if (ownerIds.length) {
-    const { data: perfiles } = await sb.from('perfiles').select('user_id, nombre').in('user_id', ownerIds);
+    const { data: perfiles } = await sb.from('empresas_publico').select('user_id, nombre').in('user_id', ownerIds);
     (perfiles || []).forEach(p => { ownerMap[p.user_id] = p.nombre; });
   }
 

@@ -55,7 +55,7 @@ async function _marcarNotifsVistas() {
   notifPanel = (notifPanel || []).map(n => ({ ...n, leido: true }));
 
   await sb.from('notificaciones').update({ leido: true })
-    .eq('user_id', currentUser.id).eq('leido', false);
+    .eq('user_id', currentUser.id).eq('leido', false).in('id', idsNoLeidos);
 }
 
 function renderNotifPanel() {

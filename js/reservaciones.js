@@ -38,7 +38,7 @@ const _estadoLabel = estado => _ESTADO_LABEL[estado] || estado;
 // transferir. Con realtime re-renderizando en cada cambio de cualquier
 // reservación, eso se repetía constantemente.
 const RESERV_PAGE = 30;
-let _reservOffset = 0;
+let _reservCursor = null;   // { created_at, id } de la última fila traída
 let _reservAccum  = [];
 
 // El filtro de las pills, traducido a SQL. Es la contraparte servidor de lo
@@ -72,7 +72,7 @@ function filtrarReservas(est) {
   _reservFiltro = est;
   document.querySelectorAll('#reserv-filtros-bar .ped-filtro-pill').forEach(el =>
     el.classList.toggle('active', el.dataset.rest === est));
-  renderReserv();   // sin append: reinicia offset y acumulado
+  renderReserv();   // sin append: reinicia cursor y acumulado
 }
 
 let _cargandoMasReservas = false;
@@ -80,7 +80,6 @@ let _cargandoMasReservas = false;
 async function cargarMasReservas() {
   if (_cargandoMasReservas) return;
   _cargandoMasReservas = true;
-  _reservOffset += RESERV_PAGE;
   await renderReserv(true);
   _cargandoMasReservas = false;
 }
@@ -99,7 +98,7 @@ async function renderReserv(append = false) {
   const header = document.getElementById('reserv-header');
 
   if (!append) {
-    _reservOffset = 0;
+    _reservCursor = null;
     _reservAccum  = [];
     body.innerHTML = skeletonRows(4);
   }
@@ -127,11 +126,23 @@ async function renderReserv(append = false) {
       .select('*')
       .eq('cliente_user_id', currentUser.id)
       .order('created_at', { ascending: false })
-      .range(_reservOffset, _reservOffset + RESERV_PAGE - 1);
+      .order('id',          { ascending: false })
+      .limit(RESERV_PAGE);
+    if (_reservCursor) {
+      qCli = qCli.or(
+        `created_at.lt.${_reservCursor.created_at},` +
+        `and(created_at.eq.${_reservCursor.created_at},id.lt.${_reservCursor.id})`
+      );
+    }
     qCli = _filtroReservaSQL(qCli);
 
     const { data: _pagCli, error } = await qCli;
     if (error) { body.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar.</div>`; return; }
+
+    if (_pagCli?.length) {
+      const ultimo = _pagCli[_pagCli.length - 1];
+      _reservCursor = { created_at: ultimo.created_at, id: ultimo.id };
+    }
 
     const _vistosCli = new Set(_reservAccum.map(r => r.id));
     (_pagCli || []).forEach(r => { if (!_vistosCli.has(r.id)) { _reservAccum.push(r); _vistosCli.add(r.id); } });
@@ -186,10 +197,10 @@ async function renderReserv(append = false) {
     );
     await Promise.all(fetches);
 
-    // Query directa a perfiles por user_id (evita problemas de RLS con joins)
+    // Query directa a la ficha publica por user_id (evita problemas de RLS con joins)
     const uniquePropIds = [...new Set(Object.values(propIdMap).filter(Boolean))];
     if (uniquePropIds.length) {
-      const { data: perfs } = await sb.from('perfiles').select('user_id, nombre').in('user_id', uniquePropIds);
+      const { data: perfs } = await sb.from('empresas_publico').select('user_id, nombre').in('user_id', uniquePropIds);
       const perfMap = {};
       (perfs || []).forEach(p => { perfMap[p.user_id] = p.nombre; });
       Object.entries(propIdMap).forEach(([recursoId, propId]) => {
@@ -292,7 +303,14 @@ async function renderReserv(append = false) {
   let reservQuery = sb.from('reservaciones')
     .select('*')
     .order('created_at', { ascending: false })
-    .range(_reservOffset, _reservOffset + RESERV_PAGE - 1);
+    .order('id',          { ascending: false })
+    .limit(RESERV_PAGE);
+  if (_reservCursor) {
+    reservQuery = reservQuery.or(
+      `created_at.lt.${_reservCursor.created_at},` +
+      `and(created_at.eq.${_reservCursor.created_at},id.lt.${_reservCursor.id})`
+    );
+  }
 
   if (currentUser.rol !== 'superadmin') {
     reservQuery = reservQuery.eq('propietario_id', currentUser.id);
@@ -301,6 +319,11 @@ async function renderReserv(append = false) {
 
   const { data: _pagAdm, error } = await reservQuery;
   if (error) { body.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar.</div>`; return; }
+
+  if (_pagAdm?.length) {
+    const ultimo = _pagAdm[_pagAdm.length - 1];
+    _reservCursor = { created_at: ultimo.created_at, id: ultimo.id };
+  }
 
   const _vistosAdm = new Set(_reservAccum.map(r => r.id));
   (_pagAdm || []).forEach(r => { if (!_vistosAdm.has(r.id)) { _reservAccum.push(r); _vistosAdm.add(r.id); } });
@@ -358,10 +381,10 @@ async function renderReserv(append = false) {
   );
   await Promise.all(fetches);
 
-  // Query directa a perfiles
+  // Query directa a la ficha publica
   const uniquePropIds2 = [...new Set(Object.values(propIdMap2).filter(Boolean))];
   if (uniquePropIds2.length) {
-    const { data: perfs } = await sb.from('perfiles').select('user_id, nombre').in('user_id', uniquePropIds2);
+    const { data: perfs } = await sb.from('empresas_publico').select('user_id, nombre').in('user_id', uniquePropIds2);
     const perfMap2 = {};
     (perfs || []).forEach(p => { perfMap2[p.user_id] = p.nombre; });
     Object.entries(propIdMap2).forEach(([recursoId, propId]) => {
@@ -575,67 +598,14 @@ function cancelarReserva(reservaId, unidad) {
   if (_reservaActiva) return;
   showConfirm('¿Cancelar esta reserva? El recurso volverá a estar disponible y la solicitud se reabrirá para nuevas ofertas.', async () => {
     _reservaActiva = true;
-    const { data: rv } = await sb.from('reservaciones').select('*').eq('id', reservaId).single();
-    const tipoFinal = rv?.recurso_tipo || 'camion';
-
-    // Cancelar la reserva
-    await sb.from('reservaciones').update({ estado: 'Cancelada' }).eq('id', reservaId);
-
-    // Liberar el recurso
-    if (unidad) {
-      const tabla = tipoFinal === 'custodio' ? 'custodios' : tipoFinal === 'patio' ? 'patios' : 'camiones';
-      await sb.from(tabla).update({ estado: 'disponible' }).eq('id', unidad);
-    }
-
-    // Regresar el pedido a abierto para que puedan ofertar de nuevo
-    if (rv?.pedido_id) {
-      const { error: errPedido } = await sb.from('pedidos').update({
-        estado:              'abierto',
-        oferta_pendiente_id: null,
-      }).eq('id', rv.pedido_id);
-      if (errPedido) {
-        _reservaActiva = false;
-        showToast('La reserva se canceló, pero la solicitud no se pudo reabrir: ' + errPedido.message, 'error');
-        await renderReserv();
-        return;
-      }
-
-      // La oferta que ya estaba aceptada (la de quien canceló el viaje) queda
-      // bloqueada para volver a ofertar en esta misma solicitud — canceló un
-      // acuerdo ya cerrado, no es lo mismo que una oferta simplemente rechazada.
-      await sb.from('ofertas')
-        .update({ estado: 'rechazada', permite_reoferta: false })
-        .eq('pedido_id', rv.pedido_id)
-        .eq('estado', 'aceptada');
-
-      // Las demás ofertas que seguían activas (de otras empresas) también se
-      // invalidan para el ciclo de negociación anterior, pero sí podrán
-      // volver a ofertar en la solicitud reabierta.
-      await sb.from('ofertas')
-        .update({ estado: 'rechazada' })
-        .eq('pedido_id', rv.pedido_id)
-        .in('estado', ['enviada', 'contra_oferta']);
-    }
-
-    // Notificar al cliente
-    if (rv?.cliente_user_id) {
-      await sb.from('notificaciones').insert({
-        user_id: rv.cliente_user_id,
-        tipo:    'reserva_cancelada',
-        titulo:  'Reserva cancelada',
-        mensaje: `Tu reserva fue cancelada por el proveedor. Tu solicitud está abierta de nuevo para recibir ofertas.`,
-        leido:   false,
-      });
-    }
-
-    // Notificar a superadmin — un acuerdo ya aprobado se cayó, debe saberlo
-    await sb.rpc('notificar_superadmins', {
-      p_tipo:    'reserva_cancelada_admin',
-      p_titulo:  'Un acuerdo aprobado se canceló',
-      p_mensaje: `${esc(currentUser.nombre)} canceló la reserva con ${esc(rv?.cliente || 'un cliente')} después de que el acuerdo ya había sido aprobado. La solicitud volvió a estar abierta.`,
-    });
-
+    // cancelar_reservacion (RPC, ver supabase/migrations/20260810120000 +
+    // 20260901140000) hace las 7 escrituras de antes en una sola transacción:
+    // cancela la reserva, libera el recurso (incluido lavado, que este
+    // código antes omitía), reabre el pedido, invalida las ofertas y
+    // notifica al cliente y a los superadmins. Ver H-10 en la auditoría.
+    const { error } = await sb.rpc('cancelar_reservacion', { p_reserva_id: reservaId });
     _reservaActiva = false;
+    if (error) { showToast(error.message || 'No se pudo cancelar la reserva', 'error'); return; }
     await renderReserv();
     showToast('Reserva cancelada — solicitud reabierta para nuevas ofertas');
   }, { danger: true, confirmLabel: 'Sí, cancelar' });
@@ -892,12 +862,18 @@ async function _notificarCambioReserva(reservaId, titulo, mensaje) {
     .select('propietario_id').eq('id', reservaId).single();
   if (!r?.propietario_id) { showToast('No se pudo enviar', 'error'); return false; }
 
-  // Este es el único sitio que sigue leyendo los superadmins a mano en vez de
-  // usar notificar_superadmins(): _notificarEmail necesita la lista de ids
-  // para el correo, así que la consulta hace falta igual. Cambiarlo a la RPC
-  // daría tres viajes en vez de dos.
-  const { data: supers } = await sb.from('perfiles').select('user_id').eq('rol', 'superadmin');
-  const destinatarios = [r.propietario_id, ...((supers || []).map(s => s.user_id))];
+  // Este es el único sitio que necesita la LISTA de superadmins en vez de
+  // usar notificar_superadmins(): _notificarEmail necesita los ids para el
+  // correo, así que hace falta traerlos. Cambiarlo a la RPC daría tres
+  // viajes en vez de dos.
+  //
+  // Va por ids_superadmins() y no por un select a perfiles porque quien
+  // llama aquí es un admin o un cliente: con la tabla cerrada (H-01) el
+  // select devolvería vacío SIN error y los superadmins dejarían de recibir
+  // el aviso en silencio. La función solo devuelve ids, ninguna columna
+  // de datos personales.
+  const { data: supers } = await sb.rpc('ids_superadmins');
+  const destinatarios = [r.propietario_id, ...((supers || []).map(s => s.user_id ?? s))];
 
   const { error } = await sb.from('notificaciones').insert(destinatarios.map(uid => ({
     user_id: uid, tipo: 'cambio_reportado', titulo, mensaje, leido: false,
