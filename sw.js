@@ -1,5 +1,5 @@
 // ── SERVICE WORKER — PortGo ────────────────────────────
-const CACHE      = 'portgo-v184';
+const CACHE      = 'portgo-v185';
 const DATA_CACHE = 'portgo-data-v1';
 
 const SHELL = [
@@ -63,6 +63,13 @@ self.addEventListener('activate', e => {
 // Fetch handler
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+
+  // Solo GET. La Cache API no admite otros métodos: un cache.put() con un POST
+  // lanza "Request method POST is unsupported", y caches.match() sobre un POST
+  // no acierta nunca. Dejar pasar el registro, el login y cualquier escritura
+  // directamente a la red evita ese ruido en la consola y en la pestaña Red.
+  if (e.request.method !== 'GET') return;
+
   const isSameOrigin = url.hostname === location.hostname;
   const isSupabaseRest = url.hostname.endsWith('supabase.co') &&
                          url.pathname.startsWith('/rest/v1/') &&
@@ -84,7 +91,15 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       fetch(e.request.clone()).then(res => {
         if (res.ok) {
-          caches.open(DATA_CACHE).then(cache => cache.put(e.request.clone(), res.clone()));
+          // El clon se saca AQUÍ, no dentro del then() de caches.open().
+          // caches.open() es asíncrono: para cuando resolvía, el `return res`
+          // de abajo ya había entregado la respuesta al navegador y el cuerpo
+          // estaba consumido, así que el clone lanzaba
+          //   TypeError: Response body is already used
+          // y la entrada nunca llegaba al caché. Clonar antes es gratis:
+          // clone() no lee el cuerpo, solo abre una segunda vía para leerlo.
+          const copia = res.clone();
+          caches.open(DATA_CACHE).then(cache => cache.put(e.request.clone(), copia));
         }
         return res;
       }).catch(async () => {
@@ -107,7 +122,8 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       fetch(e.request).then(res => {
         if (res.ok) {
-          caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+          const copia = res.clone();          // antes de devolver: ver el comentario de arriba
+          caches.open(CACHE).then(c => c.put(e.request, copia));
         }
         return res;
       }).catch(() => caches.match(e.request))
@@ -119,7 +135,10 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     caches.match(e.request).then(cached =>
       cached || fetch(e.request).then(res => {
-        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        if (res.ok) {
+          const copia = res.clone();          // antes de devolver: ver el comentario de arriba
+          caches.open(CACHE).then(c => c.put(e.request, copia));
+        }
         return res;
       })
     )

@@ -7,6 +7,10 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
+  <!-- El estándar primero; el de apple se conserva porque iOS anterior a 16.4
+       solo entiende ese. Chrome avisa de que el suyo está obsoleto, pero
+       quitarlo sacaría la app del modo pantalla completa en iPhones viejos. -->
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>PortGo — Logística Conectada</title>
 
