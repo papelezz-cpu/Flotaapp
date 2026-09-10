@@ -1,6 +1,43 @@
 // ── MÓDULO DE OPERADORES ───────────────────────────────
 let _operadorEditId = null;
 
+// Documentos que YA tiene el operador que se está editando. Sin esto, editar
+// un teléfono obligaba a volver a subir los cinco archivos: el formulario los
+// exigía siempre y el payload ponía NULL en las columnas cuando no se elegía
+// archivo, así que no relajar una cosa sin la otra es lo que evita que una
+// edición borre las rutas guardadas.
+let _operadorEditDocs = {};
+
+// Campo del formulario → columna donde vive su ruta.
+const OP_DOCS = [
+  { input: 'op-foto-file',        col: 'foto_operador',           label: 'la foto del operador' },
+  { input: 'op-lic-file',         col: 'foto_licencia',           label: 'la foto de la licencia de conducir' },
+  { input: 'op-doc-medico',       col: 'doc_examen_medico',       label: 'el documento del examen médico' },
+  { input: 'op-doc-tox',          col: 'doc_examen_toxicologico', label: 'el documento del examen toxicológico' },
+  { input: 'op-doc-antecedentes', col: 'doc_carta_antecedentes',  label: 'la carta de no antecedentes penales' },
+];
+
+// Aviso de "ya cargado" junto a cada campo de archivo, con enlace al que hay.
+function _pintarDocsExistentes() {
+  OP_DOCS.forEach(({ input, col }) => {
+    const el = document.getElementById(input);
+    if (!el) return;
+    document.getElementById(`${input}-actual`)?.remove();
+    const url = _operadorEditDocs[col];
+    if (!url) return;
+    const nota = document.createElement('div');
+    nota.id = `${input}-actual`;
+    nota.style.cssText = 'font-size:0.72rem;color:var(--text-muted);margin-top:4px';
+    nota.innerHTML = `✓ Ya cargado — <a href="${esc(url)}" target="_blank" rel="noopener">ver el actual</a>. Elige un archivo solo si quieres reemplazarlo.`;
+    el.insertAdjacentElement('afterend', nota);
+  });
+}
+
+function _limpiarDocsExistentes() {
+  _operadorEditDocs = {};
+  OP_DOCS.forEach(({ input }) => document.getElementById(`${input}-actual`)?.remove());
+}
+
 function _autoIdOperador() {
   return `OP-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
 }
@@ -169,9 +206,22 @@ async function editarOperadorRechazado(id) {
     if (el && op[field]) el.value = op[field];
   });
 
-  // No mostrar imágenes previas — se deben subir de nuevo obligatoriamente
+  // Los archivos que ya tiene se conservan: junto a cada campo sale un
+  // "✓ Ya cargado" con enlace al actual, y solo hay que elegir archivo si se
+  // quiere reemplazar. Antes se limpiaban las vistas previas y la validación
+  // los exigía todos, así que corregir una errata en el teléfono obligaba a
+  // volver a subir los cinco documentos.
+  _operadorEditDocs = {
+    foto_operador:           op.foto_operador,
+    foto_licencia:           op.foto_licencia,
+    doc_examen_medico:       op.doc_examen_medico,
+    doc_examen_toxicologico: op.doc_examen_toxicologico,
+    doc_carta_antecedentes:  op.doc_carta_antecedentes,
+    doc_licencia_peligrosa:  op.doc_licencia_peligrosa,
+  };
   document.getElementById('op-foto-preview').innerHTML = '';
   document.getElementById('op-lic-preview').innerHTML  = '';
+  _pintarDocsExistentes();
 
   // Mostrar banner con motivo de rechazo
   const btn = document.querySelector('#admin-content-operador .btn-add');
@@ -197,6 +247,10 @@ function _limpiarFormOperador() {
   });
   document.getElementById('op-foto-preview').innerHTML = '';
   document.getElementById('op-lic-preview').innerHTML  = '';
+  // Sin esto, un alta nueva hecha después de editar heredaría los documentos
+  // del operador anterior: la validación los daría por cumplidos y el payload
+  // guardaría las rutas de otro.
+  _limpiarDocsExistentes();
 }
 
 // Llamada al cambiar empresa (superadmin)
@@ -269,11 +323,15 @@ async function agregarOperador() {
   const docMedFile  = document.getElementById('op-doc-medico')?.files?.[0];
   const docToxFile  = document.getElementById('op-doc-tox')?.files?.[0];
   const docAntFile  = document.getElementById('op-doc-antecedentes')?.files?.[0];
-  if (!fotoFile)   { showToast('Debes adjuntar la foto del operador', 'error'); restore(); return; }
-  if (!licFile)    { showToast('Debes adjuntar la foto de la licencia de conducir', 'error'); restore(); return; }
-  if (!docMedFile) { showToast('Debes adjuntar el documento del examen médico', 'error'); restore(); return; }
-  if (!docToxFile) { showToast('Debes adjuntar el documento del examen toxicológico', 'error'); restore(); return; }
-  if (!docAntFile) { showToast('Debes adjuntar la carta de no antecedentes penales', 'error'); restore(); return; }
+  // Cada documento es obligatorio, pero uno que YA está guardado ya cumple:
+  // en una edición solo se pide el archivo que falta. Sin esto, cambiar un
+  // teléfono obligaba a volver a subir los cinco.
+  const _docFalta = OP_DOCS.find(({ input, col }) =>
+    !document.getElementById(input)?.files?.[0] && !_operadorEditDocs[col]);
+  if (_docFalta) {
+    showToast(`Debes adjuntar ${_docFalta.label}`, 'error');
+    restore(); return;
+  }
 
   // La fecha va con el documento, no aparte. js/vigencias.js vigila
   // fecha_examen_medico, fecha_examen_toxicologico, fecha_carta_antecedentes y
@@ -296,8 +354,11 @@ async function agregarOperador() {
   const isEdit = !!_operadorEditId;
   const id = isEdit ? _operadorEditId : _autoIdOperador();
 
-  // Subir foto del operador
-  let fotoOperadorUrl = null;
+  // OJO al tocar esto: las cuatro variables de abajo entran tal cual en el
+  // payload, así que dejarlas en null cuando no se elige archivo BORRA la ruta
+  // guardada. Por eso cada una cae de vuelta a _operadorEditDocs, que en un
+  // alta nueva está vacío y no estorba.
+  let fotoOperadorUrl = _operadorEditDocs.foto_operador || null;
   if (fotoFile) {
     const ext  = fotoFile.name.split('.').pop();
     const path = `${propietarioId}/${id}/foto_${Date.now()}.${ext}`;
@@ -309,7 +370,7 @@ async function agregarOperador() {
   }
 
   // Subir foto de licencia
-  let fotoLicenciaUrl = null;
+  let fotoLicenciaUrl = _operadorEditDocs.foto_licencia || null;
   if (licFile) {
     const ext  = licFile.name.split('.').pop();
     const path = `${propietarioId}/${id}/licencia_${Date.now()}.${ext}`;
@@ -321,9 +382,11 @@ async function agregarOperador() {
   }
 
   // Subir documentos legales opcionales
-  const _uploadOpDoc = async (inputId, nombre) => {
+  const _uploadOpDoc = async (inputId, nombre, colActual) => {
     const file = document.getElementById(inputId)?.files?.[0];
-    if (!file) return null;
+    // Sin archivo nuevo se devuelve el que ya estaba, no null: null borraría
+    // la ruta guardada al escribir el payload.
+    if (!file) return _operadorEditDocs[colActual] || null;
     const ext  = file.name.split('.').pop();
     const path = `${propietarioId}/${id}/${nombre}_${Date.now()}.${ext}`;
     const { error } = await sb.storage.from('operadores').upload(path, file, { upsert: true });
@@ -331,10 +394,10 @@ async function agregarOperador() {
     return sb.storage.from('operadores').getPublicUrl(path).data?.publicUrl || null;
   };
   const [docMedUrl, docToxUrl, docAntUrl, docPeligrosaUrl] = await Promise.all([
-    _uploadOpDoc('op-doc-medico',       'examen_medico'),
-    _uploadOpDoc('op-doc-tox',          'examen_tox'),
-    _uploadOpDoc('op-doc-antecedentes', 'antecedentes'),
-    _uploadOpDoc('op-doc-peligrosa',    'licencia_peligrosa'),
+    _uploadOpDoc('op-doc-medico',       'examen_medico',      'doc_examen_medico'),
+    _uploadOpDoc('op-doc-tox',          'examen_tox',         'doc_examen_toxicologico'),
+    _uploadOpDoc('op-doc-antecedentes', 'antecedentes',       'doc_carta_antecedentes'),
+    _uploadOpDoc('op-doc-peligrosa',    'licencia_peligrosa', 'doc_licencia_peligrosa'),
   ]);
 
   const payload = {
