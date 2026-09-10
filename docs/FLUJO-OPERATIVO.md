@@ -74,6 +74,25 @@ no `solicitudes_cuenta`.** Si los dos números no coinciden, hay altas a medias.
 El superadmin aprueba con verificación física o sin ella; eso escribe
 `verificado` y `metodo_verificacion` ∈ `fisica` · `documental`.
 
+### Qué datos sobreviven al alta
+
+El formulario de registro pide razón social, RFC y teléfono, pero los guarda
+en `solicitudes_cuenta`. En `perfiles` solo escribe cuatro columnas: `user_id`,
+`nombre`, `rol` y `aprobacion_cuenta`.
+
+**Al aprobar, esos cuatro campos se copian a `perfiles`** — razón social, RFC,
+teléfono y tipo de persona — y solo donde el perfil esté vacío, para que un
+re-registro tras un rechazo no pise lo que la empresa ya haya editado.
+Decidido el 2026-09-10.
+
+Sin ese copiado, la empresa entregaba los datos, el superadmin los revisaba
+para aprobarla, y su tarjeta del Catálogo nacía en blanco hasta que alguien
+los tecleaba otra vez en **Mis unidades → Perfil de empresa**.
+
+**Lo que sigue siendo tarea de la empresa:** años de operación, número de
+unidades, permiso SCT, seguros y descripción. El registro no los pide, así que
+una ficha recién aprobada está incompleta por diseño, no por fallo.
+
 ---
 
 ## 2. Alta de recursos
