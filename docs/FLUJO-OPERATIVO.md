@@ -352,7 +352,17 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
 4. **El estado de los pedidos avanza al pintar la lista** en el navegador. La
    migración que lo baja a pg_cron existe y está pendiente de aplicarse.
 5. **`mensajes` no la usa la PWA.** Existe para el contrato móvil.
-6. **Las 11 RPC transaccionales: 7 en uso.** Quedan fuera `enviar_oferta`,
+6. **El listado de camiones y el detalle de unidad son código muerto.** En
+   `app.html`, `#truck-grid` y `#stats-row` viven dentro del Catálogo con
+   `display:none` y el comentario «elementos ocultos referenciados por JS
+   legacy». `renderCamiones()`, `renderCustodios()` y `renderPatios()` siguen
+   pintando ahí dentro, y `openDetail()` — el modal con las pestañas
+   **Unidad / Empresa / Disponibilidad** — solo se abre desde el botón «Ver
+   detalle» de esas tarjetas invisibles. Nada en `app.html` llama a
+   `cambiarTipoRecurso()`. **No hay forma de abrir una unidad por su ficha
+   desde la app**; el Catálogo muestra empresas, no unidades. Las funciones
+   se conservan porque `modal.js` aún invoca `filtrarRecursos()` al reservar.
+7. **Las 11 RPC transaccionales: 7 en uso.** Quedan fuera `enviar_oferta`,
    `responder_oferta`, `responder_contraoferta` y `enviar_mensaje`.
 
 ---
