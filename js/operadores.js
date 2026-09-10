@@ -275,6 +275,24 @@ async function agregarOperador() {
   if (!docToxFile) { showToast('Debes adjuntar el documento del examen toxicológico', 'error'); restore(); return; }
   if (!docAntFile) { showToast('Debes adjuntar la carta de no antecedentes penales', 'error'); restore(); return; }
 
+  // La fecha va con el documento, no aparte. js/vigencias.js vigila
+  // fecha_examen_medico, fecha_examen_toxicologico, fecha_carta_antecedentes y
+  // fecha_vencimiento, y filtra con .lte. — un campo NULL no entra nunca en esa
+  // comparación. Un operador con el papel subido y sin fecha no aparece jamás
+  // en Vigencias: el documento está, y nada comprueba si sigue vigente. Pedir
+  // el archivo sin pedir la fecha era dar por cubierto un control que no lo
+  // estaba.
+  const _fechaFalta = [
+    ['op-examen',            'la fecha del examen médico'],
+    ['op-examen-tox',        'la fecha del examen toxicológico'],
+    ['op-antecedentes',      'la fecha de la carta de no antecedentes penales'],
+    ['op-fecha-vencimiento', 'la fecha de vencimiento de la licencia'],
+  ].find(([elId]) => !document.getElementById(elId)?.value);
+  if (_fechaFalta) {
+    showToast(`Falta ${_fechaFalta[1]}. Sin ella el documento no se vigila en Vigencias.`, 'error');
+    restore(); return;
+  }
+
   const isEdit = !!_operadorEditId;
   const id = isEdit ? _operadorEditId : _autoIdOperador();
 
