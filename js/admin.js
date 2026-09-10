@@ -71,11 +71,32 @@ function _dbError(error) {
     return col ? `El campo "${col}" es obligatorio y no puede estar vacío.` : 'Falta un campo obligatorio.';
   }
   if (msg.includes('unique') || msg.includes('duplicate key')) {
+    // El nombre de la restricción viaja en `message`; `details` —de donde
+    // salían la columna y el valor— llega NULL desde PostgREST para el 23505.
+    // Mirando solo details, `col` quedaba undefined y cualquier duplicado
+    // caía en "Error al generar el ID", que despista: al repetir una placa
+    // el usuario leía un problema de id.
+    const restr = error?.message?.match(/unique constraint "([^"]+)"/)?.[1] || '';
+    const POR_RESTRICCION = {
+      uq_camiones_placas:           'Ya existe otra unidad registrada con esa placa.',
+      uq_operadores_curp:           'Ya tienes un operador dado de alta con ese CURP.',
+      uq_operadores_num_trabajador: 'Ya tienes un operador con ese número de trabajador.',
+    };
+    if (POR_RESTRICCION[restr]) return POR_RESTRICCION[restr];
+
+    // details sí viene en algunos entornos: si está, da columna y valor.
     const col = error?.details?.match(/Key \(([^)]+)\)/)?.[1];
     const val = error?.details?.match(/\)=\(([^)]+)\)/)?.[1];
-    if (!col || col === 'id') return 'Error al generar el ID del registro. Intenta de nuevo.';
-    if (col === 'placas') return `Ya existe un camión con placas "${val}" en el sistema.`;
-    return `Ya existe un registro con ese valor en el campo "${col}"${val ? ` (valor: ${val})` : ''}.`;
+    if (col === 'placas') return `Ya existe otra unidad con placa "${val}".`;
+    if (col && col !== 'id') {
+      return `Ya existe un registro con ese valor en el campo "${col}"${val ? ` (valor: ${val})` : ''}.`;
+    }
+    // Solo se culpa al id cuando consta que fue el id: la clave primaria de
+    // estas tablas se genera en el navegador y sí puede chocar.
+    if (col === 'id' || /_pkey$/.test(restr)) {
+      return 'Error al generar el ID del registro. Intenta de nuevo.';
+    }
+    return `Ya existe otro registro con ese dato${restr ? ` (${restr})` : ''}.`;
   }
   if (msg.includes('foreign key') || msg.includes('violates foreign key'))
     return 'Referencia inválida: uno de los valores seleccionados no existe en el sistema.';

@@ -377,7 +377,14 @@ async function agregarOperador() {
     const { error: e } = await sb.from('operadores').insert(payload);
     error = e;
   }
-  if (error) { showToast('Error al guardar: ' + (error.message || ''), 'error'); restore(); return; }
+  // _dbError vive en js/admin.js, que carga antes que este archivo. Traduce los
+  // choques de índice único —CURP o número de trabajador repetidos dentro de la
+  // misma empresa— a algo que se entienda; sin él salía el texto crudo de
+  // Postgres hablando de restricciones.
+  if (error) {
+    const detalle = typeof _dbError === 'function' ? _dbError(error) : (error.message || '');
+    showToast('Error al guardar: ' + detalle, 'error'); restore(); return;
+  }
 
   // Constancia de la declaración de consentimiento sobre los datos sensibles
   // de este operador (quién la hizo, para quién y cuándo).
