@@ -165,11 +165,23 @@ function _empresaCardHTML(e) {
         ${currentUser.rol === 'cliente' || !currentUser.id
           ? `<button class="btn-emp-solicitar" onclick="openNuevoPedido('camion')">📋 Publicar solicitud</button>`
           : ''}
-        ${e.telefono || e.descripcion || e.rfc
+        ${_tieneFicha(e)
           ? `<button class="btn-emp-perfil" onclick="abrirPerfilEmpresaCat('${e.user_id}','${escJs(e.nombre)}')">Ver empresa</button>`
           : ''}
       </div>
     </div>`;
+}
+
+// ¿Hay algo que enseñar en el modal de ficha?
+// Antes esta condición miraba solo teléfono, descripción y RFC, pero el modal
+// pinta ocho filas más las reseñas. Una empresa con razón social, años de
+// operación, unidades y seguros — y sin esos tres campos — tenía una ficha
+// completa y ningún botón para abrirla. La lista de aquí es exactamente la que
+// lee abrirPerfilEmpresaCat(): si cambia una, cambia la otra.
+function _tieneFicha(e) {
+  return !!(e.razon_social || e.rfc || e.telefono || e.descripcion ||
+            e.permiso_sct  || e.seguro_rc || e.seguro_carga ||
+            e.anos_operacion || e.num_unidades || e.califs?.length);
 }
 
 // ─── Bloque genérico (camiones / custodios / patios) ────
@@ -313,7 +325,11 @@ async function abrirPerfilEmpresaCat(adminId, adminNombre) {
       ${c.comentario ? `<div class="vcal-comentario">"${esc(c.comentario)}"</div>` : ''}
     </div>`).join('');
 
-  document.getElementById('epc-body').innerHTML = `
+  const vacio = !p?.descripcion && !rows.length && !avg;
+
+  document.getElementById('epc-body').innerHTML = vacio
+    ? `<div class="empty-state"><div class="icon">🏢</div>Esta empresa aún no ha completado su ficha pública.</div>`
+    : `
     ${p?.descripcion ? `<p class="emp-desc" style="margin-bottom:16px">${esc(p.descripcion)}</p>` : ''}
     ${rows.length ? `
     <div class="epc-rows">
