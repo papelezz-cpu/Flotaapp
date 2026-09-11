@@ -250,7 +250,7 @@ footer{padding:34px 0 60px;color:var(--faint);font-size:14px}
 
       <p><b>Y la comprobación que cierra el círculo</b> — volver a la ventana del cliente:</p>
       <div class="paso"><input type="checkbox" id="t9i"><label for="t9i">Iniciar sesión con esa cuenta: <b>entra</b> y ve el inicio de cliente, no la pantalla de acceso</label></div>
-      <div class="paso"><input type="checkbox" id="t9j"><label for="t9j">En F12 → Console: <code>(await sb.from('perfiles').select('rol,aprobacion_cuenta')).data</code> devuelve <b>una fila</b> con <code>rol: "cliente"</code> y <code>aprobacion_cuenta: null</code></label></div>
+      <div class="paso"><input type="checkbox" id="t9j"><label for="t9j">En F12 → Console: <code>(await sb.from('perfiles').select('rol,aprobacion_cuenta')).data</code> devuelve <b>una fila</b> con <code>rol: "cliente"</code> y <code>aprobacion_cuenta: null</code>. Si no te deja pegar, ver la nota de la prueba 17</label></div>
       <div class="espera">
         <div class="h">Por qué el paso i es el importante</div>
         <p>Con el bug, el alta parecía funcionar y la solicitud se aprobaba sin problema. Lo que fallaba era entrar después: sin fila en <code>perfiles</code>, la app no sabe qué rol tiene la cuenta y devuelve al login. Aprobar no basta como prueba; hay que iniciar sesión.</p>
@@ -571,7 +571,13 @@ UPDATE public.perfiles
       <div class="paso"><input type="checkbox" id="t17d"><label for="t17d">Inicio → <b>Reservaciones</b> → en cada fila, el nombre de la empresa que presta el servicio. <b>No debe decir —</b></label></div>
 
       <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Como empresa</h4>
-      <div class="paso"><input type="checkbox" id="t17e"><label for="t17e">F12 → pestaña <b>Console</b> → pegar <code>(await sb.from('perfiles').select('user_id')).data.length</code> y pulsar Enter. Debe responder <b>1</b>: tu propia fila y ninguna más</label></div>
+      <div class="paso"><input type="checkbox" id="t17e"><label for="t17e">F12 → pestaña <b>Console</b> → escribir o pegar <code>(await sb.from('perfiles').select('user_id')).data.length</code> y pulsar Enter. Debe responder <b>1</b>: tu propia fila y ninguna más</label></div>
+      <div class="nota">
+        <div class="h">Si el navegador no te deja pegar en la consola</div>
+        <p>Sale un aviso pidiendo que escribas <code>allow pasting</code> antes de poder pegar. <b>No es un fallo de la app ni de la prueba</b>: es una protección del navegador contra una estafa concreta — convencer a alguien de pegar en la consola un código que le roba la sesión. Como aquí la línea la tienes delante y sabes lo que hace, saltarla es seguro.</p>
+        <p><b>Qué hace esa línea:</b> le pide a Supabase la columna <code>user_id</code> de todas las filas de <code>perfiles</code> que tu sesión <i>tenga permitido</i> leer, y cuenta cuántas son. Solo lee; no escribe ni borra nada. El número que devuelve <b>es</b> el resultado de la prueba: si el RLS hace su trabajo, solo alcanzas tu propia fila.</p>
+        <p><b>Dos formas de pasar:</b> escribir <code>allow pasting</code> en la consola y pulsar Enter — una vez por pestaña, luego ya te deja pegar — o teclear la línea a mano, que nunca se bloquea.</p>
+      </div>
       <div class="paso"><input type="checkbox" id="t17f"><label for="t17f">Inicio → <b>Reservaciones</b>: el nombre del <b>cliente</b> sale en cada fila, tampoco como <code>—</code></label></div>
       <div class="paso"><input type="checkbox" id="t17g"><label for="t17g">En una reserva <b>Activa</b>, pulsar el <b>▾</b> de la fila → grupo <b>Cierre</b> → <b>Cancelar</b>. Ojo: no es «Solicitar cancelación», que es el botón del cliente. La unidad vuelve a <b>disponible</b> y el pedido reaparece como <b>abierto</b> para las demás empresas</label></div>
 
@@ -632,7 +638,7 @@ UPDATE public.perfiles
 
       <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Que la escotilla siga cerrada</h4>
       <p>La función se salta <code>guard_pedido_update</code> con un ajuste local a su transacción. Hay que comprobar que nadie más puede encenderlo.</p>
-      <div class="paso"><input type="checkbox" id="t18i"><label for="t18i">Como <b>cliente</b>, en F12 → Console: <code>await sb.rpc('sincronizar_estados_pedidos')</code> — debe <b>fallar</b>, no ejecutarse</label></div>
+      <div class="paso"><input type="checkbox" id="t18i"><label for="t18i">Como <b>cliente</b>, en F12 → Console: <code>await sb.rpc('sincronizar_estados_pedidos')</code> — debe <b>fallar</b>, no ejecutarse. Si no te deja pegar, ver la nota de la prueba 17</label></div>
       <div class="paso"><input type="checkbox" id="t18j"><label for="t18j">Aceptar una oferta con normalidad <b>sigue funcionando</b> — es la rama del guard que la migración vieja habría borrado</label></div>
       <div class="paso"><input type="checkbox" id="t18k"><label for="t18k">Dar de alta una cuenta nueva <b>sigue funcionando</b> — el guard de perfiles no se tocó, pero conviene confirmarlo tras el susto del día 8</label></div>
 
