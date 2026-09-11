@@ -134,7 +134,7 @@ async function guardarEdicionUsuario() {
     body: JSON.stringify(body)
   });
   const json = await res.json();
-  if (!res.ok) { showToast('Error: ' + (json.error || 'No se pudo guardar.')); return; }
+  if (!res.ok) { showToast('Error: ' + (json.error || 'No se pudo guardar.'), 'error'); return; }
 
   cerrarEditarUsuario();
   await renderUsuarios();
