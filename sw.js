@@ -47,22 +47,28 @@ const SHELL = [
   '/js/main.js'
 ];
 
-// Instalar: cachear app shell
-// Instalación tolerante a fallos, uno por uno y no con addAll.
+// Instalar: cachear app shell, uno por uno y no con addAll.
 //
 // addAll es TODO-O-NADA: si una sola URL de SHELL falla, la promesa se rechaza,
 // el waitUntil falla y el service worker NO SE INSTALA. Se queda mandando el
-// anterior, sin un solo error visible en la aplicación — el síntoma es que la
-// versión del caché no avanza y nadie sabe por qué.
+// anterior, sin un solo error visible en la aplicación — el síntoma sería que la
+// versión del caché no avanza, y nadie sabría por qué.
 //
-// Pasó el 2026-09-11 en la preview de dev: /manifest.json redirige al SSO de
-// Vercel, la petición muere por CORS, y con ella se caía la instalación entera.
-// El navegador seguía con el SW de dos versiones atrás.
+// Esto es prevención, NO la corrección de un fallo observado. Conviene decirlo
+// porque la primera versión de este comentario afirmaba lo contrario: que la
+// instalación se caía en la preview de dev porque /manifest.json redirige al
+// SSO de Vercel. Era falso, y la evidencia lo desmintió el mismo día — el caché
+// portgo-v192 existía con archivos dentro, y para eso el SW v192 (que usaba
+// addAll) tuvo que activarse, luego su addAll había funcionado. El service
+// worker pide el manifiesto con las cookies de sesión y recibe un 200; quien
+// choca con CORS es la etiqueta <link rel="manifest"> de la página, que es otra
+// petición distinta y no afecta a la instalación.
 //
-// En producción no hay SSO, pero el riesgo es el mismo por otra vía: basta con
-// que alguien renombre un archivo y olvide esta lista para que el shell offline
-// deje de existir del todo. Cachear uno a uno degrada en vez de romper: lo que
-// se pueda guardar se guarda, y lo que no, se anota.
+// El motivo real para no usar addAll es el de siempre: basta con que alguien
+// renombre un archivo y olvide esta lista para que el shell offline deje de
+// existir del todo, en silencio y sin síntomas mientras haya red. La lista ya
+// había estado incompleta antes. Cachear uno a uno degrada en vez de romper:
+// lo que se pueda guardar se guarda, y lo que no, se anota.
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
     const cache = await caches.open(CACHE);
