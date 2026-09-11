@@ -15,12 +15,15 @@ const SHELL = [
   '/css/layout.css',
   '/css/components.css',
   '/css/login.css',
+  '/css/detalle.css',
   '/css/theme.css',
   '/js/utils.js',
   '/js/config.js',
   '/js/auth.js',
   '/js/theme.js',
   '/js/views.js',
+  '/js/detalle.js',
+  '/js/notificaciones.js',
   '/js/camiones.js',
   '/js/recursos.js',
   '/js/reservaciones.js',
@@ -126,7 +129,15 @@ self.addEventListener('fetch', e => {
           caches.open(CACHE).then(c => c.put(e.request, copia));
         }
         return res;
-      }).catch(() => caches.match(e.request))
+      }).catch(() =>
+        // ignoreSearch: la lista SHELL precarga '/js/pedidos.js' pero la pagina
+        // pide '/js/pedidos.js?v=72', y la Cache API compara la URL COMPLETA,
+        // query incluida. Sin esto el precacheo no respondia jamas: se
+        // descargaban 33 ficheros en cada instalacion que no se servian nunca,
+        // y sin conexion la app no arrancaba en la primera visita — solo
+        // funcionaba offline quien ya la hubiera cargado online, porque
+        // entonces este mismo network-first ya habia guardado la URL con su ?v=.
+        caches.match(e.request, { ignoreSearch: true }))
     );
     return;
   }
