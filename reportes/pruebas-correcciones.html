@@ -661,6 +661,13 @@ COMMIT;</pre>
         <p>Desde el <b>9 de septiembre</b>, aceptar dispara <code>aceptar_y_cerrar_acuerdo()</code> y el pedido salta de <code>en_negociacion</code> a <code>acordado</code> en la misma transacción, creando la reserva. <b>No existe un punto intermedio donde el pedido siga en negociación con una oferta ya aceptada.</b></p>
         <p>La regla (c) de la función no está de más: es una <b>reparación</b> para las filas que dejó a medias el flujo viejo, cuando aceptar eran tres escrituras sueltas y la pestaña podía cerrarse entre una y otra. La propia migración lo dice en su comentario. Por eso hay que fabricar esa forma a mano.</p>
       </div>
+      <div class="paso"><input type="checkbox" id="t18f0"><label for="t18f0">Dejar un pedido <b>en negociación</b>, desde la app: como <b>cliente</b> publicar una solicitud → como <b>superadmin</b> <b>✓ Aprobar y publicar</b> → como <b>empresa</b>, Inicio → <b>Solicitudes</b> → <b>Hacer oferta</b>. <b>No aceptarla.</b> Con la oferta enviada, el pedido pasa solo a <code>en_negociacion</code></label></div>
+      <div class="nota">
+        <div class="h">Si la consulta de abajo no devuelve nada</div>
+        <p>Es que no queda ningún pedido en <code>en_negociacion</code>: los de los pasos anteriores acabaron en <code>acordado</code> al aceptarlos, o en <code>expirado</code>. No es un fallo de la consulta — hay que crear uno con el paso de arriba.</p>
+        <p>Para verlo: <code>SELECT estado, count(*) FROM public.pedidos GROUP BY estado ORDER BY 2 DESC;</code></p>
+        <p>Y si al ir a ofertar el desplegable de unidades sale vacío, no es esta prueba: es la empresa con documentos vencidos, la misma puerta de la prueba 11.</p>
+      </div>
       <div class="paso"><input type="checkbox" id="t18f"><label for="t18f">Localizar una oferta viva de un pedido en negociación, por <b>psql</b>:</label></div>
       <pre class="cmd">SELECT o.id AS oferta_id, o.estado AS oferta_estado,
        p.id AS pedido_id, p.estado AS pedido_estado
