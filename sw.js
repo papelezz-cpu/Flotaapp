@@ -1,5 +1,5 @@
 // ── SERVICE WORKER — PortGo ────────────────────────────
-const CACHE      = 'portgo-v192';
+const CACHE      = 'portgo-v193';
 const DATA_CACHE = 'portgo-data-v1';
 
 const SHELL = [
@@ -48,10 +48,37 @@ const SHELL = [
 ];
 
 // Instalar: cachear app shell
+// Instalación tolerante a fallos, uno por uno y no con addAll.
+//
+// addAll es TODO-O-NADA: si una sola URL de SHELL falla, la promesa se rechaza,
+// el waitUntil falla y el service worker NO SE INSTALA. Se queda mandando el
+// anterior, sin un solo error visible en la aplicación — el síntoma es que la
+// versión del caché no avanza y nadie sabe por qué.
+//
+// Pasó el 2026-09-11 en la preview de dev: /manifest.json redirige al SSO de
+// Vercel, la petición muere por CORS, y con ella se caía la instalación entera.
+// El navegador seguía con el SW de dos versiones atrás.
+//
+// En producción no hay SSO, pero el riesgo es el mismo por otra vía: basta con
+// que alguien renombre un archivo y olvide esta lista para que el shell offline
+// deje de existir del todo. Cachear uno a uno degrada en vez de romper: lo que
+// se pueda guardar se guarda, y lo que no, se anota.
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())
-  );
+  e.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    const fallos = [];
+    await Promise.all(SHELL.map(async url => {
+      try {
+        await cache.add(url);
+      } catch (err) {
+        fallos.push(url);
+      }
+    }));
+    if (fallos.length) {
+      console.warn(`[sw] ${CACHE}: ${fallos.length} de ${SHELL.length} no se pudieron precachear:`, fallos);
+    }
+    await self.skipWaiting();
+  })());
 });
 
 // Activar: limpiar caches viejos
