@@ -135,6 +135,15 @@ solicitud, esto es lo primero que hay que mirar.
 `ped_insert_own` obliga a que un cliente solo pueda crear pedidos suyos y
 siempre en `pendiente_revision`.
 
+**Ningún servicio se puede pedir para el mismo día.** `js/pedidos.js` pone
+`min = mañana` en los cuatro campos de fecha de alta (camión, custodio, patio,
+lavado). Es una regla de negocio, no una validación del calendario: una
+solicitud para hoy no le da margen a nadie para atenderla.
+
+Consecuencia práctica: **una solicitud con fecha pasada no se puede crear desde
+la app**, ni siquiera para probar. Hay que crearla con la fecha más temprana
+que admita y retrasarla luego por SQL, apartando `trg_guard_pedido_update`.
+
 ### Categorías de carga
 
 Deciden qué campos pide el formulario, y de eso dependen cosas más abajo:

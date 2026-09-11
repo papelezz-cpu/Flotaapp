@@ -623,7 +623,28 @@ UPDATE public.perfiles
       <div class="paso"><input type="checkbox" id="t18b"><label for="t18b">Ejecutarla <b>otra vez</b> seguida: los cinco salen en <b>0</b>. Es idempotente, y de eso depende que cron y navegador puedan convivir</label></div>
 
       <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Que expire lo que debe, y solo eso</h4>
-      <div class="paso"><input type="checkbox" id="t18c"><label for="t18c">Como <b>cliente</b>: publicar una solicitud con <b>fecha de carga de ayer</b>. Como superadmin, aprobarla con <b>✓ Aprobar y publicar</b> y <b>no</b> ofertar</label></div>
+      <div class="paso"><input type="checkbox" id="t18c"><label for="t18c">Como <b>cliente</b>: publicar una solicitud con la <b>fecha de carga más temprana que el formulario permita</b> (mañana). Como <b>superadmin</b>, aprobarla con <b>✓ Aprobar y publicar</b> y <b>no</b> ofertar</label></div>
+      <div class="paso"><input type="checkbox" id="t18c2"><label for="t18c2">Mover esa fecha al pasado <b>por psql</b>, con la cadena de <b>pruebas</b>. Primero localizar la solicitud:</label></div>
+      <pre class="cmd">SELECT id, origen, destino, estado, fecha_ini
+  FROM public.pedidos
+ ORDER BY created_at DESC
+ LIMIT 5;</pre>
+      <div class="paso"><input type="checkbox" id="t18c3"><label for="t18c3">Con ese <code>id</code>, retrasarle la fecha de carga:</label></div>
+      <pre class="cmd">BEGIN;
+ALTER TABLE public.pedidos DISABLE TRIGGER trg_guard_pedido_update;
+UPDATE public.pedidos SET fecha_ini = current_date - 1 WHERE id = '&lt;el id de arriba&gt;';
+ALTER TABLE public.pedidos ENABLE TRIGGER trg_guard_pedido_update;
+COMMIT;</pre>
+      <div class="nota">
+        <div class="h">Por qué no se puede hacer desde la app</div>
+        <p>El formulario no deja elegir una fecha pasada, y tampoco la de hoy: <code>js/pedidos.js</code> pone <code>min</code> en <b>mañana</b> en los cuatro campos de fecha. <b>Ningún servicio se puede pedir para el mismo día</b> — es la regla del negocio, no un fallo del calendario. Por eso la fecha se retrasa después, por SQL.</p>
+        <p>La regla del cron es <code>fecha_ini &lt;= current_date</code>, así que con <b>hoy</b> ya bastaría; se pone ayer para que no quede duda de cuál de las dos cosas disparó el contador.</p>
+      </div>
+      <div class="espera">
+        <div class="h">Por qué hay que apartar el trigger</div>
+        <p><code>psql</code> conecta <b>sin JWT</b>, así que <code>auth.uid()</code> es NULL y <code>guard_pedido_update</code> no reconoce a nadie: ni superadmin, ni dueño del pedido, ni admin. Cae hasta el último <code>RAISE EXCEPTION 'No autorizado'</code> y el <code>UPDATE</code> se revierte entero. Es el mismo muro que tumbó la corrección de datos de H-03.</p>
+        <p>El <code>ENABLE</code> va dentro de la misma transacción a propósito: si algo falla antes del <code>COMMIT</code>, el <code>DISABLE</code> se revierte con todo lo demás y la tabla no se queda sin vigilancia.</p>
+      </div>
       <div class="paso"><input type="checkbox" id="t18d"><label for="t18d">Ejecutar la función: el contador <code>solicitudes_vencidas</code> sube, y esa solicitud queda <b>expirada</b></label></div>
       <div class="paso"><input type="checkbox" id="t18e"><label for="t18e">Publicar otra con <b>fecha futura</b>, también sin ofertas. Ejecutar la función: <b>no</b> debe tocarla</label></div>
 
