@@ -599,6 +599,17 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
    (`aceptar_y_cerrar_acuerdo`, `notificar_superadmins` e `ids_superadmins`
    también se usan, pero son posteriores y no formaban parte de esas 11.)
 
+   **Las dos que contradecían la regla del 9-sep ya no lo hacen.** Hasta el
+   2026-09-11, la rama `aceptar` de `responder_oferta` y de
+   `responder_contraoferta` escribía el flujo viejo —pedido a
+   `pendiente_acuerdo`, sin reservación— y las dos siguen concedidas a
+   `authenticated`, así que eran alcanzables sin pasar por ninguna interfaz.
+   Ahora esa rama delega en `aceptar_y_cerrar_acuerdo()`; las ramas de
+   contraofertar y rechazar no cambiaron. Con eso heredan el bloqueo del
+   pedido y, sobre todo, el desvío por documentos vencidos: **por esa vía una
+   empresa con el permiso SCT vencido cerraba el trato sin que nadie lo
+   mirara.**
+
 ---
 
 ## Cómo mantener este documento
