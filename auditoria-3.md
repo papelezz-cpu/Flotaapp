@@ -39,7 +39,7 @@ a mano todavía.
 | A2 | Precacheo inútil | `ignoreSearch` en el respaldo + los tres ficheros que faltaban en `SHELL` | En `dev` |
 | A3 | CDN sin fijar | Las tres etiquetas con `integrity`; Supabase fijado a 2.116.0 | En `dev` |
 | A4 | Éxito falso | Resultado comprobado en las tres acciones, `rol` validado, último superadmin protegido | Función desplegada en pruebas |
-| A5 | Privilegio por defecto | Migración escrita; **no aplicable por el rol que aplica migraciones** | ⏳ Pendiente, SQL Editor |
+| A5 | Privilegio por defecto | **No se puede aplicar**: exige ser miembro de `supabase_admin`, y ni el rol de migraciones ni el SQL Editor lo son (`ERROR 42501`, comprobado). Se sustituye por detección: `supabase/sondas/exposicion-anon.sql` | Sonda en `dev` |
 | A6 | TRUNCATE | Retirado de las 25 relaciones, preguntando al catálogo en vez de enumerar | Migración aplicada |
 | M7 | Políticas sin `TO` | `ALTER POLICY … TO authenticated` ×33 | Migración aplicada |
 | M8 | RPC del flujo viejo | Su rama `aceptar` delega en `aceptar_y_cerrar_acuerdo` | Migración aplicada |
@@ -76,7 +76,13 @@ Tres cosas que solo salieron al tocar el código:
 
 ## Lo que sigue abierto
 
-- **A5**, que necesita ejecutarse desde el panel.
+- **A5 no se puede cerrar por la vía prevista.** Cambiar los privilegios por
+  defecto de `supabase_admin` exige ser miembro de ese rol, y en Supabase ni el
+  rol que aplica migraciones ni el SQL Editor lo son. Queda como riesgo
+  aceptado y **vigilado**: `supabase/sondas/exposicion-anon.sql` comprueba lo
+  que A5 pretendía evitar —una tabla legible por `anon`— y además el fallo más
+  probable, que A5 no cubría: que alguien cree una tabla y olvide activarle RLS.
+  Cerrarlo de verdad requiere soporte de Supabase.
 - **Las pruebas manuales**, que no se han hecho.
 - **Medir Realtime**, que sigue siendo la partida más grande y necesita la base
   viva. El hallazgo dominante de la 2ª auditoría continúa sin confirmar ni
