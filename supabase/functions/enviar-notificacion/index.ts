@@ -383,6 +383,36 @@ async function filtrarPorRelacion(authHeader: string, ids: string[]): Promise<st
   return ids.filter((_, i) => veredictos[i]);
 }
 
+// El correo de contacto de una reserva NO tiene por que ser el de la cuenta: el
+// campo de js/modal.js viene relleno con el del usuario pero se puede editar, y
+// una empresa que reserva suele poner su buzon de operaciones. Esa direccion es
+// legitima aunque no sea de ningun usuario registrado.
+//
+// La regla no se afloja por eso: se apoya en la fila. Si la direccion es el
+// cliente_email de una reservacion de la que quien llama es parte, es suya para
+// notificar. La consulta va con la identidad del llamante, asi que el propio RLS
+// de reservaciones (cliente_user_id o propietario_id = auth.uid()) garantiza el
+// "es parte" sin que haya que comprobarlo a mano.
+//
+// Una direccion que no aparezca en ninguna reserva suya sigue sin pasar, que es
+// el caso que esto vino a cerrar.
+async function correoDeUnaReservaPropia(authHeader: string, correo: string): Promise<boolean> {
+  const sbCaller = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  // ilike trata % y _ como comodines, y el guion bajo es legal en un correo:
+  // sin escaparlos, 'juan_perez@x.com' casaria tambien con 'juanXperez@x.com'.
+  const patron = correo.replace(/([\\%_])/g, '\\$1');
+  const { data, error } = await sbCaller.from('reservaciones')
+    .select('id').ilike('cliente_email', patron).limit(1);
+  if (error) {
+    console.error('No se pudo comprobar el correo contra las reservas:', error.message);
+    return false;
+  }
+  return (data?.length ?? 0) > 0;
+}
+
 // `clienteEmail` es una direccion suelta, no un id, asi que no se puede
 // comprobar sin traducirla antes. Dos atajos antes de pagar el listado:
 // si es la del propio llamante (js/modal.js: el cliente reserva y se avisa a si
@@ -545,6 +575,9 @@ Deno.serve(async (req) => {
     //                 uno a uno contra puede_notificar(). Aqui estaba el hueco.
     let idsServidor: string[] = [];
     let idsCliente: string[] = [];
+    // Unica direccion que se manda sin pasar por un user_id: el contacto de una
+    // reserva de quien llama. Ver correoDeUnaReservaPropia().
+    let correoDirecto: string | null = null;
 
     if (tipo === 'nueva_solicitud' || tipo === 'solicitudes_lote') {
       idsServidor = await destinatariosEmpresas(
@@ -562,11 +595,17 @@ Deno.serve(async (req) => {
       idsCliente = [payload.propietario_id as string];
 
     } else if (payload.clienteEmail) {
-      // Una direccion suelta no se puede comprobar: se traduce a id y, si no
-      // corresponde a ningun usuario, no se manda nada. Eso cierra el caso de
-      // usar esta funcion para escribirle a una direccion cualquiera.
+      // Dos caminos, y el orden importa porque el segundo es mas caro.
+      // 1. La direccion es de un usuario: se comprueba la relacion como todo lo
+      //    demas, por id.
+      // 2. No lo es, pero figura como contacto de una reserva de quien llama:
+      //    tambien vale, y se manda directa. Es el buzon de operaciones.
       const id = await idDeCorreo(caller, String(payload.clienteEmail));
-      if (id) idsCliente = [id];
+      if (id) {
+        idsCliente = [id];
+      } else if (await correoDeUnaReservaPropia(authHeader, String(payload.clienteEmail))) {
+        correoDirecto = String(payload.clienteEmail);
+      }
 
     } else if (tipo === 'nueva_oferta' && payload.clienteId) {
       idsCliente = [payload.clienteId as string];
@@ -590,7 +629,8 @@ Deno.serve(async (req) => {
     // Respetar la preferencia del usuario, solo en los tipos silenciables.
     if (TIPOS_SILENCIABLES.has(tipo)) ids = await quierenCorreo(sb, ids);
 
-    const emails = [...new Set((await emailsDeIds(sb, ids)).filter(Boolean))];
+    const emails = [...new Set(
+      [...(correoDirecto ? [correoDirecto] : []), ...(await emailsDeIds(sb, ids))].filter(Boolean))];
     if (!emails.length) return json({ ok: true, sent: 0, descartados });
 
     await sendEmailBulk(emails, subject, html);
