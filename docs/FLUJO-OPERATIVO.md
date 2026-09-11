@@ -1,14 +1,19 @@
 # Flujo operativo de PortGo
 
-**Este documento es la fuente de verdad del negocio.** Describe qué puede hacer
-cada rol, en qué orden, y qué regla del motor lo impide cuando no puede.
+**Este documento es la fuente de verdad del negocio.** Describe qué hace cada
+rol, en qué orden ocurren las cosas, y qué regla del motor lo impide cuando
+algo no se puede.
+
+Se lee **antes** de crear o modificar cualquier funcionalidad, para entender
+cómo funciona ya el sistema, y se **actualiza** en el mismo commit que cambie
+algo de lo que dice. Ver la regla #4 de `CLAUDE.md`.
 
 Todo lo que sigue está **leído del esquema y del código**, no recordado. Cada
 afirmación se puede rastrear a un CHECK, un guard trigger, una política RLS o
 una línea concreta. Donde no hay evidencia, se dice.
 
-Última verificación contra el volcado de producción y `dev`: **10 de septiembre
-de 2026**.
+Última verificación contra producción y `dev`: **11 de septiembre de 2026**, con
+las seis migraciones de la ronda 2 ya aplicadas en ambas.
 
 ---
 
@@ -24,6 +29,120 @@ de 2026**.
 
 `perfiles.aprobacion_cuenta` ∈ `null` (activa) · `pendiente` · `rechazada` ·
 `suspendida`. **No tiene CHECK**: cualquier texto entra. `null` significa activa.
+
+---
+
+## Qué hace cada parte
+
+Las diez etapas de más abajo cuentan el ciclo en orden. Esta sección lo cuenta
+por actor: **qué ve, qué puede hacer, y qué no puede** — con quién se lo
+impide, porque en este sistema casi nunca es la interfaz.
+
+La visibilidad se decide con clases en `<body>` (`role-admin`,
+`role-superadmin`) y las pantallas se listan en `C` dentro de `js/views.js`.
+Pero eso es cosmética: **quien decide de verdad son las políticas RLS y los
+guard triggers.** Ocultar un botón no protege nada.
+
+### Cliente — `rol = 'cliente'`
+
+Es quien tiene carga que mover. No posee recursos y nunca ejecuta un servicio.
+
+**Sus pantallas:** Solicitar servicio · Mis solicitudes · Catálogo ·
+Reservaciones · Mis pagos · Privacidad · Avisos.
+
+**Puede:**
+
+- Publicar solicitudes, siempre suyas y siempre en `pendiente_revision`
+  (`ped_insert_own`), con fecha de carga de mañana en adelante.
+- Guardar solicitudes frecuentes como plantillas — sin las fechas, a propósito.
+- Ver el Catálogo de empresas y la ficha pública de cada una.
+- Aceptar una oferta, o **contraofertar** un precio menor (máximo 2 rondas).
+- Subir los documentos que le pida un expediente de viaje.
+- Subir su propia evidencia de cierre, y **pedir** el cierre del servicio.
+- **Solicitar** la cancelación — pedir, no cancelar.
+- Calificar el servicio: una sola vez por reservación.
+- Ejercer derechos ARCO sobre sus datos.
+
+**No puede, y no por la interfaz:**
+
+| Lo que no puede | Quién lo impide |
+|---|---|
+| Poner su pedido en `acordado` o `rechazado` por su cuenta | `guard_pedido_update` |
+| Crearse una reserva ya confirmada y con precio puesto por él | `guard_reservacion_insert` |
+| Tocar precio, unidad o fechas de una reserva | `guard_reservacion_update` |
+| Subir la evidencia que le toca a la empresa | `guard_reservacion_update` |
+| Aprobar su propio cierre o resolver su propia cancelación | `guard_reservacion_update` |
+| **Pedir** un expediente de documentos | No tiene el botón: eso es de la empresa |
+| Revisar o aceptar documentos de un expediente | `guard_expediente_documento` |
+| Leer el perfil de otro usuario | RLS de `perfiles` — solo ve su fila |
+
+### Empresa — `rol = 'admin'`
+
+Es el transportista. Pone los recursos y ejecuta el servicio.
+
+**Sus pantallas:** Solicitudes · Reservaciones · Mis unidades · Operadores ·
+Vigencias · Mi desempeño · Cobros · Privacidad · Avisos.
+
+**Puede:**
+
+- Dar de alta camiones, custodios, patios, lavados y operadores — todos nacen
+  en `aprobacion = 'pendiente'`.
+- Mantener su **ficha pública** (Mis unidades → Perfil de empresa): años,
+  unidades, permiso SCT, seguros, descripción.
+- Ofertar sobre solicitudes en `abierto` o `en_negociacion`, y aceptar una
+  contraoferta del cliente.
+- Asignar chofer, avanzar el seguimiento y subir evidencia de cierre.
+- **Pedir** expedientes de documentos al cliente, y aceptarlos o rechazarlos
+  uno a uno.
+- Mandar avisos fijos: documentos de carga, lugar y hora, retraso, cambio.
+- **Cancelar** una reserva suya, directamente.
+- Cobrar: registrar pagos y ver vencimientos.
+
+**No puede:**
+
+| Lo que no puede | Quién lo impide |
+|---|---|
+| Aprobarse sus propios recursos | `guard_fleet_resource_update` |
+| Transferir un recurso a otro propietario | `guard_fleet_resource_update` |
+| Ver solicitudes en `pendiente_revision` | `ped_select` — para ella no existen |
+| Ofertar con permiso SCT o seguros vencidos | `openHacerOferta`, y de nuevo `guard_oferta_update` |
+| Aceptar su propia oferta, salvo respondiendo una contraoferta | `guard_oferta_update` |
+| Asignar a carga peligrosa un chofer sin licencia vigente | `guard_operador_hazmat` |
+| Avanzar el seguimiento de un camión sin chofer asignado | La interfaz, en el primer paso |
+| Subir evidencia antes del último paso del seguimiento | La interfaz |
+| Aprobar el cierre de su propio servicio | `guard_reservacion_update` |
+| Subir los documentos del expediente en lugar del cliente | `guard_expediente_documento` |
+
+### Superadmin — `rol = 'superadmin'`
+
+Control de PortGo. **No participa en la operación: la habilita y la desatasca.**
+
+**Sus pantallas:** Por aprobar · Usuarios · Solicitudes · Reportes · Catálogo ·
+Vigencias · Reservaciones · Historial · Cobros · Privacidad · Avisos.
+
+**Cuatro cosas pasan por él, y solo cuatro:**
+
+1. **Aprobar cuentas** — con verificación física o documental.
+2. **Aprobar recursos** — flota y operadores, altas y ediciones.
+3. **Aprobar y publicar solicitudes** — hasta entonces las empresas no las ven.
+4. **Resolver los finales** — aprobar cierres y resolver cancelaciones pedidas
+   por el cliente.
+
+**Más dos salidas de emergencia**, que existen porque sin ellas alguien queda
+encerrado:
+
+- **Forzar un acuerdo** cuando la empresa tiene documentos vencidos
+  (`pendiente_acuerdo`). Sin esto, esa empresa no podría cerrar nada.
+- **Gestionar usuarios** con la Edge Function `gestionar-usuario`, que verifica
+  el rol en el servidor y usa la clave de servicio.
+
+**Lo que NO hace, y conviene tener claro:** no aprueba acuerdos. Desde el
+2026-09-09, cuando las dos partes aceptan, la reserva se crea sola.
+
+`is_superadmin()` le abre las ~70 políticas RLS del resto de tablas, y
+`guard_*` le deja pasar en la primera línea de cada guard. **Es la única
+identidad que los guards no cuestionan**, y por eso el trabajo de rutina no
+debe hacerse con ella.
 
 ---
 
@@ -326,6 +445,33 @@ plazo pactado no cambia porque el cliente edite su perfil después.
 
 ---
 
+## Cómo se hablan entre ellos
+
+**No hay chat.** El texto libre entre cliente y empresa se retiró a propósito y
+se sustituyó por botones fijos que escriben una fila en `notificaciones`:
+documentos de carga, lugar y hora, retraso y reporte de cambio
+(`js/reservaciones.js`). La tabla `mensajes` sigue existiendo con sus políticas
+y su RPC, pero **la PWA no la usa**: está para el contrato móvil.
+
+Esto no es una limitación técnica, es una decisión: un aviso con forma fija
+queda registrado, es auditable y no se presta a acordar cosas por fuera del
+sistema.
+
+Quién puede avisar a quién lo decide el RLS de `notificaciones`, y es
+**restringido por relación**: solo puedes notificarte a ti mismo, a los
+superadmins, o a la contraparte de tu reservación u oferta. Un flujo de aviso
+nuevo tiene que encajar en una de esas tres, o hacerse desde un trigger.
+
+Los avisos al superadmin van por `notificar_superadmins()`, que es la llamada
+más repetida del código (15 sitios). Los de oferta y reserva los disparan
+triggers de la base, no el navegador: así llegan aunque la pestaña se cierre.
+
+Cada usuario puede silenciar **correos** por tipo (`perfiles.notif_email`),
+pero **nunca la campana ni el correo transaccional** — ver `TIPOS_SILENCIABLES`
+en la Edge Function `enviar-notificacion`.
+
+---
+
 ## Quién puede cambiar qué
 
 Los **guard triggers** son la capa que RLS no puede dar. RLS decide *si* puedes
@@ -383,8 +529,13 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
 3. **`is_superadmin()` no se salta el RLS de `perfiles`.** Funciona en las ~70
    políticas de otras tablas; en una política *de perfiles* provoca recursión.
    Por eso lee de una vista interna.
-4. **El estado de los pedidos avanza al pintar la lista** en el navegador. La
-   migración que lo baja a pg_cron existe y está pendiente de aplicarse.
+4. **El estado de los pedidos avanza por dos vías a la vez.** Desde el
+   2026-09-11, `sincronizar_estados_pedidos()` corre en pg_cron cada 15
+   minutos en producción y en pruebas — pero las reglas equivalentes siguen
+   en `renderPedidos()`. **Se dejaron a propósito:** son idempotentes y
+   coinciden con las del cron, así que da igual quién las corra, y mientras
+   estén las dos un fallo del cron no congela los estados. Retirarlas del
+   navegador es decisión posterior, cuando el cron lleve tiempo funcionando.
 5. **`mensajes` no la usa la PWA.** Existe para el contrato móvil.
 6. **El listado de camiones y el detalle de unidad son código muerto.** En
    `app.html`, `#truck-grid` y `#stats-row` viven dentro del Catálogo con
@@ -396,16 +547,39 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
    `cambiarTipoRecurso()`. **No hay forma de abrir una unidad por su ficha
    desde la app**; el Catálogo muestra empresas, no unidades. Las funciones
    se conservan porque `modal.js` aún invoca `filtrarRecursos()` al reservar.
-7. **Las 11 RPC transaccionales: 7 en uso.** Quedan fuera `enviar_oferta`,
-   `responder_oferta`, `responder_contraoferta` y `enviar_mensaje`.
+7. **De las 11 RPC transaccionales, 6 se usan.** En uso:
+   `cancelar_reservacion`, `solicitar_cancelacion`, `registrar_evidencias`,
+   `avanzar_tracking`, `abrir_expediente` y `calificar_servicio`. Sin usar:
+   `enviar_oferta`, `responder_oferta`, `responder_contraoferta`,
+   `enviar_mensaje` y `recomendar_unidad` — esos caminos los sigue
+   orquestando el navegador paso a paso, sin atomicidad.
+   (`aceptar_y_cerrar_acuerdo`, `notificar_superadmins` e `ids_superadmins`
+   también se usan, pero son posteriores y no formaban parte de esas 11.)
 
 ---
 
 ## Cómo mantener este documento
 
-Cuando una regla de negocio cambie, **se actualiza aquí en el mismo commit**.
-Un documento que describe el flujo de hace tres semanas es peor que no tenerlo:
-se cree.
+**Se lee antes de construir.** Cualquier funcionalidad nueva, o cualquier
+cambio a una existente, empieza por entender qué hace ya el sistema: qué rol
+la ejecuta, en qué estado tiene que estar la fila, y qué guard la vigila. Casi
+todo lo que parece un hueco ya está resuelto en alguna parte, y casi todo lo
+que parece fácil choca con un guard.
 
-Si al leerlo algo no cuadra con el código, **gana el código** — y hay que
-corregir el documento, no ajustar el código a lo que dice el papel.
+**Se actualiza en el mismo commit que lo cambia.** No después, no en una tarea
+aparte. Un documento que describe el flujo de hace tres semanas es peor que no
+tenerlo, porque se cree.
+
+Qué obliga a tocarlo: un estado nuevo o retirado, un permiso que cambia de
+rol, un guard nuevo o modificado, un paso que se añade o se salta, una
+pantalla que aparece o muere, y cualquier decisión de negocio que se tome en
+una conversación — esas son las que se pierden.
+
+**Si al leerlo algo no cuadra con el código, gana el código** — y hay que
+corregir el documento acto seguido, nunca ajustar el código a lo que dice el
+papel.
+
+Cada afirmación de aquí sale de un `CHECK`, una política, un guard o una línea
+concreta. Al añadir algo, decir de dónde sale; si no se pudo verificar,
+decirlo también. Una frase sin respaldo envenena el resto: si una es de
+memoria, ninguna es fiable.
