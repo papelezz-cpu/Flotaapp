@@ -417,16 +417,38 @@ Ahí es donde está el dinero.
 ```
 EMPRESA sube evidencia   → requiere tracking en el ÚLTIMO paso
 CLIENTE sube la suya     → sin esa restricción
-Ambas partes             → reserva 'PorAprobar'
-SUPERADMIN aprueba       → 'Completada'
+EL PRIMERO que suba      → reserva 'Activa' → 'PorAprobar'
+SUPERADMIN aprueba       → 'Completada'   (rechaza → vuelve a 'Activa')
 CLIENTE califica         → 1 sola vez (UNIQUE parcial por reservación)
 ```
 
 Cada parte sube su propia evidencia: `evidencias` (empresa) y
 `evidencias_cliente` (cliente), las dos arrays de **rutas** de Storage.
 
+**No hacen falta las dos para que la reserva avance.** Hasta el 2026-09-11 este
+documento decía «ambas partes → `PorAprobar`», y era falso: lo desmiente
+`registrar_evidencias`, que es quien manda.
+
+```sql
+v_solicitando := (v_r.estado = 'Activa');
+...
+estado = CASE WHEN v_solicitando THEN 'PorAprobar' ELSE estado END
+```
+
+El primero que sube estando la reserva en `Activa` la mueve a `PorAprobar`; el
+segundo ya la encuentra ahí y solo añade sus archivos. **Y el superadmin puede
+aprobar con una sola evidencia**: `aprobarFinalizacion()` no comprueba que estén
+las dos, el panel únicamente pinta `⚠️ falta` junto a la que no llegó. Quien
+aprueba decide si eso basta.
+
+Consecuencia para quien pruebe esto a mano: tras el cierre de la empresa, la
+reserva **ya no está en el filtro `Activa`** — se ha ido a `PorAprobar`, y ahí
+es donde el cliente encuentra su botón.
+
 La restricción del último paso es **solo para la empresa al solicitar el
-cierre**. Tiene sentido: no se cierra un servicio que no llegó.
+cierre**. Tiene sentido: no se cierra un servicio que no llegó. Y solo aplica
+cuando la reserva está `Activa`: si ya está en `PorAprobar` porque el cliente se
+adelantó, la empresa añade evidencia sin volver a comprobarse el seguimiento.
 
 `calificar_servicio` deriva el `admin_id` del propietario de la reserva, no de
 lo que mande el navegador.
