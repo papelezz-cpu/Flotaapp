@@ -601,7 +601,6 @@ UPDATE public.perfiles
       </div>
     </div>
   </div>
-  </div>
 </section>
 
 <section>
@@ -701,7 +700,32 @@ COMMIT;</pre>
         <p><code>pedidos_reabiertos</code> devuelve <b>1</b>: la regla (b) se llevó el pedido a <code>abierto</code> antes de que la (c) lo viera. <b>Eso es exactamente el fallo de la migración de agosto</b> — el acuerdo se pierde en silencio, porque la regla siguiente busca pedidos en negociación y ya no lo encuentra.</p>
         <p>O si el pedido llega a <code>pendiente_acuerdo</code> pero con <code>oferta_pendiente_id</code> en <code>NULL</code>: el estado avanzó sin dejar dicho qué oferta lo provocó, y el superadmin no tiene qué aprobar.</p>
       </div>
-      <div class="paso"><input type="checkbox" id="t18h"><label for="t18h">Otro pedido en negociación con <b>todas</b> las ofertas rechazadas <b>sí</b> debe volver a <code>abierto</code> y reaparecer para las empresas</label></div>
+      <div class="paso"><input type="checkbox" id="t18h"><label for="t18h">Montar <b>otro</b> pedido en negociación, igual que en el paso anterior: como <b>cliente</b> publicar → como <b>superadmin</b> <b>✓ Aprobar y publicar</b> → como <b>empresa</b> <b>Hacer oferta</b>. Sin aceptar ni rechazar nada</label></div>
+      <div class="paso"><input type="checkbox" id="t18h2"><label for="t18h2">Caducarle la oferta por <b>psql</b>, en vez de rechazarla a mano:</label></div>
+      <pre class="cmd">UPDATE public.ofertas o
+   SET expira_en = now() - interval '1 day'
+  FROM public.pedidos p
+ WHERE p.id = o.pedido_id
+   AND p.estado = 'en_negociacion'
+   AND o.estado = 'enviada';</pre>
+      <div class="nota">
+        <div class="h">Aquí no hace falta apartar ningún trigger</div>
+        <p>Todo el cuerpo de <code>guard_oferta_update</code> vive dentro de un <code>IF NEW.estado = 'aceptada'</code>. Este <code>UPDATE</code> solo mueve <code>expira_en</code>, así que el guard lo deja pasar sin mirar quién eres — al contrario que el paso 18f, donde sí cambiábamos el estado.</p>
+        <p><b>Y por qué caducarla en vez de rechazarla desde la app:</b> si el cliente la rechaza en pantalla, <code>renderPedidos()</code> reabre el pedido él mismo al repintar la lista, y entonces no sabrías si el trabajo lo hizo el navegador o la función. Caducando la oferta, el pedido se queda en negociación hasta que alguien la expire.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t18h3"><label for="t18h3">Ejecutar <code>SELECT * FROM public.sincronizar_estados_pedidos();</code> <b>una sola vez</b>: <code>ofertas_expiradas</code> devuelve <b>1</b> y <code>pedidos_reabiertos</code> devuelve <b>1</b></label></div>
+      <div class="espera">
+        <div class="h">Las dos reglas encadenan en la misma llamada</div>
+        <p>La (a) marca la oferta <code>rechazada</code> por vencida y la (b) ve el pedido ya sin ofertas vivas y lo reabre. Por eso la (a) está duplicada aquí aunque el cron <code>expire-stale-offers</code> ya la haga cada hora: sin ella, la (b) tendría que esperar a la hora en punto para enterarse.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t18h4"><label for="t18h4">Comprobar que volvió a <code>abierto</code>:</label></div>
+      <pre class="cmd">SELECT p.id, p.estado, o.estado AS oferta_estado, o.expira_en
+  FROM public.pedidos p
+  LEFT JOIN public.ofertas o ON o.pedido_id = p.id
+ WHERE p.estado = 'abierto'
+ ORDER BY p.created_at DESC
+ LIMIT 5;</pre>
+      <div class="paso"><input type="checkbox" id="t18h5"><label for="t18h5">Y que <b>reaparece para las empresas</b>: como <b>empresa</b>, Inicio → <b>Solicitudes</b> → esa solicitud vuelve a estar en la lista con su botón <b>Hacer oferta</b>. Es la comprobación que de verdad importa — <code>ped_select</code> solo enseña a las empresas los pedidos en <code>abierto</code> o <code>en_negociacion</code></label></div>
       <div class="espera">
         <div class="h">Por qué esta pareja importa</div>
         <p>La migración de agosto que se descartó reabría el pedido sin mirar si había oferta aceptada. Lo habría pasado a <code>abierto</code>, y entonces la regla siguiente —que busca pedidos en negociación— ya no lo habría encontrado. <b>El acuerdo se perdía en silencio.</b> Estas dos casillas son la prueba de que la versión nueva no hereda ese fallo.</p>
