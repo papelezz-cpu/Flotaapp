@@ -191,6 +191,12 @@ EMPRESA acepta la contraoferta  ─┘     → oferta 'aceptada'
 
 Todo en una transacción. Si algo falla, no queda nada a medias.
 
+**No hay punto intermedio.** El pedido no se queda en `en_negociacion` con una
+oferta ya aceptada: eso solo lo producía el flujo viejo, cuando aceptar eran
+tres escrituras sueltas y la pestaña podía cerrarse entre una y otra. La regla
+(c) de `sincronizar_estados_pedidos()` sigue ahí para reparar esas filas
+históricas, no porque el flujo actual las genere.
+
 **La excepción son los documentos vencidos.** `guard_oferta_update` bloquea la
 aceptación con `DOCUMENTOS_VENCIDOS` si la empresa que emitió la oferta tiene
 vencido el permiso SCT, el seguro RC o el seguro de carga. Entonces:

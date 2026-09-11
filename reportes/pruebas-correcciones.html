@@ -656,8 +656,30 @@ COMMIT;</pre>
       <div class="paso"><input type="checkbox" id="t18e3"><label for="t18e3">Confirmar que sigue viva: <code>SELECT id, estado, fecha_ini FROM public.pedidos ORDER BY created_at DESC LIMIT 3;</code> — debe seguir en <b>abierto</b>, no en <code>expirado</code></label></div>
 
       <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">La regla que la versión de agosto tenía mal</h4>
-      <div class="paso"><input type="checkbox" id="t18f"><label for="t18f">Dejar un pedido en negociación con una oferta <b>aceptada</b> pero sin acuerdo aprobado todavía</label></div>
-      <div class="paso"><input type="checkbox" id="t18g"><label for="t18g">Ejecutar la función: ese pedido debe ir a <b>pendiente_acuerdo</b>, <b>no</b> a <code>abierto</code></label></div>
+      <div class="nota">
+        <div class="h">Esta situación ya no la produce la app</div>
+        <p>Desde el <b>9 de septiembre</b>, aceptar dispara <code>aceptar_y_cerrar_acuerdo()</code> y el pedido salta de <code>en_negociacion</code> a <code>acordado</code> en la misma transacción, creando la reserva. <b>No existe un punto intermedio donde el pedido siga en negociación con una oferta ya aceptada.</b></p>
+        <p>La regla (c) de la función no está de más: es una <b>reparación</b> para las filas que dejó a medias el flujo viejo, cuando aceptar eran tres escrituras sueltas y la pestaña podía cerrarse entre una y otra. La propia migración lo dice en su comentario. Por eso hay que fabricar esa forma a mano.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t18f"><label for="t18f">Localizar una oferta viva de un pedido en negociación, por <b>psql</b>:</label></div>
+      <pre class="cmd">SELECT o.id AS oferta_id, o.estado AS oferta_estado,
+       p.id AS pedido_id, p.estado AS pedido_estado
+  FROM public.ofertas o
+  JOIN public.pedidos p ON p.id = o.pedido_id
+ WHERE p.estado = 'en_negociacion'
+ ORDER BY o.created_at DESC
+ LIMIT 5;</pre>
+      <div class="paso"><input type="checkbox" id="t18f2"><label for="t18f2">Marcar esa oferta como aceptada <b>dejando el pedido en negociación</b> — la forma exacta que dejaba el flujo viejo al morirse a medias:</label></div>
+      <pre class="cmd">BEGIN;
+ALTER TABLE public.ofertas DISABLE TRIGGER USER;
+UPDATE public.ofertas SET estado = 'aceptada' WHERE id = '&lt;oferta_id&gt;';
+ALTER TABLE public.ofertas ENABLE TRIGGER USER;
+COMMIT;</pre>
+      <div class="espera">
+        <div class="h">Por qué <code>DISABLE TRIGGER USER</code> y no solo el guard</div>
+        <p><code>guard_oferta_update</code> rechaza el cambio igual que el de pedidos: sin JWT, <code>auth.uid()</code> es NULL y no reconoce a nadie. Pero apagar solo ese dejaría vivos los triggers de aviso, que mandarían a la empresa y al cliente una notificación de «oferta aceptada» por algo que no hizo ninguno de los dos. <code>USER</code> los aparta todos y el <code>ENABLE</code> los devuelve dentro de la misma transacción.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t18g"><label for="t18g">Ejecutar la función: <code>acuerdos_pendientes</code> devuelve <b>1</b> y <code>pedidos_reabiertos</code> devuelve <b>0</b>. Ese pedido queda en <b>pendiente_acuerdo</b>, <b>no</b> en <code>abierto</code>, y con su <code>oferta_pendiente_id</code> puesto</label></div>
       <div class="paso"><input type="checkbox" id="t18h"><label for="t18h">Otro pedido en negociación con <b>todas</b> las ofertas rechazadas <b>sí</b> debe volver a <code>abierto</code> y reaparecer para las empresas</label></div>
       <div class="espera">
         <div class="h">Por qué esta pareja importa</div>
