@@ -2365,7 +2365,12 @@ async function cerrarAcuerdo(oferta, pedido) {
       : recursoTipo === 'patio' ? 'patios'
       : recursoTipo === 'lavado' ? 'lavados'
       : 'camiones';
-    await sb.from(tablaRecurso).update({ estado: 'ocupado' }).eq('id', oferta.camion_id);
+    // Al reves que liberar: si esto falla, el catalogo ensena como libre una
+    // unidad ya comprometida. La doble reserva la sigue impidiendo el EXCLUDE
+    // reservaciones_sin_solape, asi que es un problema de lo que se ve, no de
+    // integridad — pero hay que enterarse.
+    await actualizarConfirmado(tablaRecurso, { id: oferta.camion_id },
+      { estado: 'ocupado' }, 'la unidad');
   }
 
   // Documentación de puerto/vacíos: se abre sola al hacer match, sin que la

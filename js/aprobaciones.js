@@ -1129,21 +1129,28 @@ async function aprobarFinalizacion(reservaId) {
   }
   const ahora = new Date().toISOString();
 
-  const { error } = await sb.from('reservaciones').update({
+  // actualizarConfirmado y no update+check: un UPDATE bloqueado por RLS afecta
+  // 0 filas y devuelve error null, asi que comprobar el error no basta para
+  // saber si de verdad cambio algo.
+  const ok = await actualizarConfirmado('reservaciones', { id: reservaId }, {
     estado: 'Completada',
     finalizacion_aprobada_por: currentUser.id,
     finalizacion_aprobada_en: ahora,
     plazo_pago: plazo,
     fecha_vencimiento_pago: calcularVencimientoPago(plazo, ahora),
-  }).eq('id', reservaId);
-  if (error) { showToast('Error al aprobar: ' + error.message, 'error'); return; }
+  }, 'la reservación');
+  if (!ok) return;
 
   if (r.pedido_id) {
-    await sb.from('pedidos').update({ estado: 'finalizado' }).eq('id', r.pedido_id);
+    await actualizarConfirmado('pedidos', { id: r.pedido_id },
+      { estado: 'finalizado' }, 'la solicitud');
   }
+  // Si esto falla en silencio la unidad queda 'ocupado' para siempre y el
+  // catalogo la esconde, sin que nadie sepa por que.
   if (r.unidad) {
     const tabla = r.recurso_tipo === 'custodio' ? 'custodios' : r.recurso_tipo === 'patio' ? 'patios' : 'camiones';
-    await sb.from(tabla).update({ estado: 'disponible' }).eq('id', r.unidad);
+    await actualizarConfirmado(tabla, { id: r.unidad },
+      { estado: 'disponible' }, 'la unidad');
   }
 
   await _notificarResolucion(r.cliente_user_id, {
@@ -1215,20 +1222,21 @@ async function _ejecutarAprobarCancelacion(reservaId, nota) {
     .eq('id', reservaId).single();
   if (!r) { showToast('No se encontró la reserva', 'error'); return; }
 
-  const { error } = await sb.from('reservaciones').update({
+  const ok = await actualizarConfirmado('reservaciones', { id: reservaId }, {
     estado:                      'Cancelada',
     cancelacion_resuelta_en:     new Date().toISOString(),
     cancelacion_resuelta_por:    currentUser.id,
     cancelacion_nota_resolucion: nota || null,
-  }).eq('id', reservaId);
-  if (error) { showToast('Error al aprobar: ' + error.message, 'error'); return; }
+  }, 'la reservación');
+  if (!ok) return;
 
   // Liberar la unidad comprometida
   if (r.unidad) {
     const tabla = r.recurso_tipo === 'custodio' ? 'custodios'
                 : r.recurso_tipo === 'patio'    ? 'patios'
                 : r.recurso_tipo === 'lavado'   ? 'lavados' : 'camiones';
-    await sb.from(tabla).update({ estado: 'disponible' }).eq('id', r.unidad);
+    await actualizarConfirmado(tabla, { id: r.unidad },
+      { estado: 'disponible' }, 'la unidad');
   }
 
   // El pedido se cierra: fue el cliente quien desistió del servicio.
