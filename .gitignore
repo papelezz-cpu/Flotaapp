@@ -17,3 +17,7 @@ pruebas/salida/
 
 # Espejo de produccion — volcado con datos personales reales (nunca subir)
 supabase/espejo/
+
+# Respaldos de la promocion: filas reales de clientes, nunca al repositorio
+respaldo-*.csv
+supabase/sondas/*.csv

@@ -22,7 +22,9 @@
 -- toca ninguno, asi que pasa aunque psql conecte sin JWT y auth.uid() sea
 -- NULL. No hace falta apartar el trigger.
 
-begin;
+-- Sin begin/commit propios: aplicar-a-produccion.sh corre toda la tanda con
+-- --single-transaction, y un commit aqui dentro la cerraria antes de tiempo.
+-- Las otras cinco migraciones tampoco los llevan.
 
 -- Solo rellena huecos: nunca pisa un valor que la empresa ya haya escrito.
 -- El nullif(btrim(...),'') trata la cadena vacia como ausencia, porque el
@@ -44,7 +46,6 @@ update public.perfiles p
      or (nullif(btrim(p.tipo_persona), '') is null and nullif(btrim(s.tipo_persona), '') is not null)
    );
 
-commit;
 
 
 -- ── Comprobacion ─────────────────────────────────────────────────────────
