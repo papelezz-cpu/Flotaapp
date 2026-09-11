@@ -10,6 +10,9 @@ const GMAIL_USER = Deno.env.get('GMAIL_USER')!;
 const GMAIL_PASS = Deno.env.get('GMAIL_PASS')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+// Para hablarle a la base COMO el usuario que llama, y no como el servicio.
+// Lo necesita filtrarPorRelacion(): puede_notificar() lee auth.uid().
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
 // ── La UNICA diferencia permitida entre produccion y pruebas ──────────────
 //
@@ -341,6 +344,70 @@ async function idsPorRol(sb: ReturnType<typeof createClient>, rol: string): Prom
   return (data ?? []).map((p: { user_id: string }) => p.user_id);
 }
 
+// ── Quién puede avisar a quién ───────────────────────────────────────────
+//
+// La campana ya resuelve esto: la politica de INSERT de `notificaciones` llama
+// a puede_notificar(), que comprueba la RELACION — a ti mismo, a un superadmin,
+// siendo superadmin, o siendo las dos partes de una misma reservacion o de una
+// misma negociacion.
+//
+// El correo no tenia nada de eso. Los destinatarios llegaban en el cuerpo de la
+// peticion (destinoIds, clienteEmail, propietario_id…) y se usaban tal cual, asi
+// que cualquiera con una cuenta podia hacer que PortGo mandara un correo con
+// asunto y texto suyos a cualquier usuario registrado — o, via clienteEmail, a
+// cualquier direccion de internet. Con el dominio, el SPF y el DKIM de PortGo
+// detras. Phishing con sello de autenticidad, y el alta es autoservicio.
+//
+// Se aplica la MISMA regla que la campana, no una nueva: si la base no te deja
+// ponerle una notificacion a alguien, tampoco le mandas un correo.
+//
+// puede_notificar() lee auth.uid(), asi que hay que llamarla con la identidad de
+// QUIEN LLAMA, no con la clave de servicio — con la de servicio auth.uid() es
+// NULL y la funcion devuelve false siempre.
+async function filtrarPorRelacion(authHeader: string, ids: string[]): Promise<string[]> {
+  if (!ids.length) return [];
+  const sbCaller = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const veredictos = await Promise.all(
+    ids.map(async (id) => {
+      const { data, error } = await sbCaller.rpc('puede_notificar', { p_target: id });
+      // Ante un error se descarta. Un fallo al comprobar el permiso no puede
+      // saldarse mandando el correo: eso convertiria cualquier caida de la RPC
+      // en la puerta abierta que esto viene a cerrar.
+      if (error) console.error('puede_notificar fallo para', id, error.message);
+      return data === true;
+    }),
+  );
+  return ids.filter((_, i) => veredictos[i]);
+}
+
+// `clienteEmail` es una direccion suelta, no un id, asi que no se puede
+// comprobar sin traducirla antes. Dos atajos antes de pagar el listado:
+// si es la del propio llamante (js/modal.js: el cliente reserva y se avisa a si
+// mismo) no hace falta buscar nada.
+async function idDeCorreo(
+  caller: { id: string; email?: string },
+  correo: string,
+): Promise<string | null> {
+  const objetivo = correo.trim().toLowerCase();
+  if (!objetivo) return null;
+  if ((caller.email ?? '').toLowerCase() === objetivo) return caller.id;
+
+  const sbAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await sbAdmin.auth.admin.listUsers({ page, perPage: 200 });
+    const users = data?.users ?? [];
+    if (error || !users.length) return null;
+    const u = users.find((x: { id: string; email?: string }) =>
+      (x.email ?? '').toLowerCase() === objetivo);
+    if (u) return u.id;
+    if (users.length < 200) return null;
+  }
+  return null;
+}
+
 // Correos que el usuario puede apagar desde su perfil (perfiles.notif_email).
 // Son los frecuentes: oportunidades, ofertas recibidas y cola de revisión.
 // Los transaccionales (reserva confirmada, aceptada, rechazada, acuerdo
@@ -468,40 +535,63 @@ Deno.serve(async (req) => {
     // ── A quién le toca este correo ───────────────────────
     // Se resuelven primero los user_id y hasta el final se traducen a correos,
     // para no traer el directorio de usuarios cuando el destinatario es uno.
-    let ids: string[] = [];
-    let directos: string[] = [];
+    //
+    // Se separan por PROCEDENCIA, que es lo que decide si hay que comprobarlos:
+    //
+    //   idsServidor — los elige esta funcion (empresas del ramo, superadmins).
+    //                 De fiar por construccion: el cuerpo de la peticion no
+    //                 influye en quienes son.
+    //   idsCliente  — vienen del cuerpo de la peticion. Hay que comprobarlos
+    //                 uno a uno contra puede_notificar(). Aqui estaba el hueco.
+    let idsServidor: string[] = [];
+    let idsCliente: string[] = [];
 
     if (tipo === 'nueva_solicitud' || tipo === 'solicitudes_lote') {
-      ids = await destinatariosEmpresas(
+      idsServidor = await destinatariosEmpresas(
         sb, tipo === 'nueva_solicitud' ? payload.tipo_camion : null);
 
     } else if (tipo === 'revision_solicitud' || tipo === 'acuerdo') {
       // Solo superadmins: son los que tienen que actuar.
-      ids = await idsPorRol(sb, 'superadmin');
+      idsServidor = await idsPorRol(sb, 'superadmin');
 
     } else if (tipo === 'resolucion') {
-      ids = (Array.isArray(payload.destinoIds) ? payload.destinoIds : [])
+      idsCliente = (Array.isArray(payload.destinoIds) ? payload.destinoIds : [])
         .filter(Boolean) as string[];
 
     } else if (tipo === 'nueva_reserva' && payload.propietario_id) {
-      ids = [payload.propietario_id as string];
+      idsCliente = [payload.propietario_id as string];
 
     } else if (payload.clienteEmail) {
-      directos = [payload.clienteEmail as string];
+      // Una direccion suelta no se puede comprobar: se traduce a id y, si no
+      // corresponde a ningun usuario, no se manda nada. Eso cierra el caso de
+      // usar esta funcion para escribirle a una direccion cualquiera.
+      const id = await idDeCorreo(caller, String(payload.clienteEmail));
+      if (id) idsCliente = [id];
 
     } else if (tipo === 'nueva_oferta' && payload.clienteId) {
-      ids = [payload.clienteId as string];
+      idsCliente = [payload.clienteId as string];
 
     } else if (tipo === 'acuerdo_aprobado') {
-      ids = [payload.clienteId, payload.adminId].filter(Boolean) as string[];
+      idsCliente = [payload.clienteId, payload.adminId].filter(Boolean) as string[];
     }
+
+    // La comprobacion. Un destinatario que venga del cuerpo solo pasa si la base
+    // dice que quien llama tambien podria avisarle por la campana.
+    const idsPermitidos = await filtrarPorRelacion(authHeader, idsCliente);
+    const descartados = idsCliente.length - idsPermitidos.length;
+    if (descartados > 0) {
+      console.warn(
+        `enviar-notificacion: ${descartados} destinatario(s) descartados por relacion ` +
+        `(tipo=${tipo}, llamante=${caller.id})`);
+    }
+
+    let ids = [...idsServidor, ...idsPermitidos];
 
     // Respetar la preferencia del usuario, solo en los tipos silenciables.
     if (TIPOS_SILENCIABLES.has(tipo)) ids = await quierenCorreo(sb, ids);
 
-    let emails = [...directos, ...(await emailsDeIds(sb, ids))];
-    emails = [...new Set(emails.filter(Boolean))];
-    if (!emails.length) return json({ ok: true, sent: 0 });
+    const emails = [...new Set((await emailsDeIds(sb, ids)).filter(Boolean))];
+    if (!emails.length) return json({ ok: true, sent: 0, descartados });
 
     await sendEmailBulk(emails, subject, html);
     // Solo el conteo: devolver la lista de correos permitía a cualquier
@@ -513,6 +603,7 @@ Deno.serve(async (req) => {
       sent: CORREO_BLOQUEADO ? 0 : emails.length,
       correo: CORREO_BLOQUEADO ? 'bloqueado' : 'enviado',
       destinatarios: emails.length,
+      descartados,
     });
   } catch (err) {
     console.error(err);

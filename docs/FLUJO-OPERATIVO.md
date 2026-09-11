@@ -15,6 +15,12 @@ una línea concreta. Donde no hay evidencia, se dice.
 Última verificación contra producción y `dev`: **11 de septiembre de 2026**, con
 las seis migraciones de la ronda 2 ya aplicadas en ambas.
 
+**Alcance: la plataforma web.** Es lo primero que sale, y lo que este documento
+describe. Las aplicaciones móviles se construyen después, cuando la web funcione
+por completo — así que **nada se diseña hoy «para móvil más adelante»** ni se
+justifica dejando código preparado para un cliente que aún no existe.
+Decidido el 2026-09-11.
+
 ---
 
 ## Los tres roles
@@ -451,7 +457,9 @@ plazo pactado no cambia porque el cliente edite su perfil después.
 se sustituyó por botones fijos que escriben una fila en `notificaciones`:
 documentos de carga, lugar y hora, retraso y reporte de cambio
 (`js/reservaciones.js`). La tabla `mensajes` sigue existiendo con sus políticas
-y su RPC, pero **la PWA no la usa**: está para el contrato móvil.
+y su RPC, pero **no se usa**: quedó de la versión con chat y se conserva
+porque retirarla obliga a tocar políticas de acceso que nadie necesita mover
+hoy. No es un hueco que llenar.
 
 Esto no es una limitación técnica, es una decisión: un aviso con forma fija
 queda registrado, es auditable y no se presta a acordar cosas por fuera del
@@ -461,6 +469,26 @@ Quién puede avisar a quién lo decide el RLS de `notificaciones`, y es
 **restringido por relación**: solo puedes notificarte a ti mismo, a los
 superadmins, o a la contraparte de tu reservación u oferta. Un flujo de aviso
 nuevo tiene que encajar en una de esas tres, o hacerse desde un trigger.
+
+**Desde el 2026-09-11 el correo obedece esa misma regla.** Antes no: los
+destinatarios llegaban en el cuerpo de la petición a `enviar-notificacion` y se
+usaban tal cual, así que cualquiera con una cuenta podía hacer que PortGo
+mandara un correo con su texto a cualquier usuario registrado —o, vía
+`clienteEmail`, a cualquier dirección de internet— con el dominio y el DKIM de
+PortGo detrás. Ahora la función separa los destinatarios por procedencia:
+
+| Procedencia | Ejemplos | Se comprueba |
+|---|---|---|
+| Los elige el servidor | empresas del ramo (`nueva_solicitud`), superadmins (`revision_solicitud`, `acuerdo`) | No hace falta: el cuerpo de la petición no influye en quiénes son |
+| Vienen en la petición | `destinoIds`, `clienteEmail`, `propietario_id`, `clienteId`, `adminId` | **Sí**, uno a uno contra `puede_notificar()`, con la identidad de quien llama |
+
+Un destinatario que no pase se descarta en silencio para él y queda contado en
+`descartados` de la respuesta. Y `clienteEmail` ya no admite una dirección
+suelta: se traduce a usuario, y si no corresponde a ninguno no se manda nada.
+
+**Consecuencia para quien añada un aviso nuevo:** si el correo no llega, mirar
+primero si el emisor y el destinatario tienen relación. Es el mismo motivo por
+el que no llegaría la campana.
 
 Los avisos al superadmin van por `notificar_superadmins()`, que es la llamada
 más repetida del código (15 sitios). Los de oferta y reserva los disparan
@@ -536,7 +564,8 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
    coinciden con las del cron, así que da igual quién las corra, y mientras
    estén las dos un fallo del cron no congela los estados. Retirarlas del
    navegador es decisión posterior, cuando el cron lleve tiempo funcionando.
-5. **`mensajes` no la usa la PWA.** Existe para el contrato móvil.
+5. **La tabla `mensajes` no se usa.** Resto de la versión con chat; se
+   conserva con sus políticas porque retirarla no aporta nada hoy.
 6. **El listado de camiones y el detalle de unidad son código muerto.** En
    `app.html`, `#truck-grid` y `#stats-row` viven dentro del Catálogo con
    `display:none` y el comentario «elementos ocultos referenciados por JS
