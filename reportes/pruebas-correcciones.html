@@ -1,0 +1,835 @@
+<title>Pruebas antes de producción</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --ground:#F5F7F9; --surface:#FFFFFF; --surface-2:#FAFBFC;
+  --ink:#0F1720; --ink-2:#33414F; --muted:#5D6B78; --faint:#8493A0;
+  --line:#E0E6EC; --line-soft:#EDF1F4;
+  --accent:#0B6E7F; --accent-ink:#06525F; --accent-soft:#E4F1F3;
+  --ok:#1A6851; --ok-bg:#E4F2EC;
+  --warn:#A15009; --warn-bg:#FBEEE2;
+  --stop:#B3261E; --stop-bg:#FBEAE8;
+  --shadow:0 1px 2px rgba(15,23,32,.05), 0 8px 24px -16px rgba(15,23,32,.28);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0B1015; --surface:#131B22; --surface-2:#101820;
+    --ink:#E5ECF2; --ink-2:#C0CCD6; --muted:#93A2AF; --faint:#6F7F8C;
+    --line:#22303A; --line-soft:#1A2630;
+    --accent:#54C0D1; --accent-ink:#8AD6E2; --accent-soft:#0E313A;
+    --ok:#5FC3A3; --ok-bg:#102C25;
+    --warn:#DC9B52; --warn-bg:#33220F;
+    --stop:#EC8478; --stop-bg:#37191A;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0B1015; --surface:#131B22; --surface-2:#101820;
+  --ink:#E5ECF2; --ink-2:#C0CCD6; --muted:#93A2AF; --faint:#6F7F8C;
+  --line:#22303A; --line-soft:#1A2630;
+  --accent:#54C0D1; --accent-ink:#8AD6E2; --accent-soft:#0E313A;
+  --ok:#5FC3A3; --ok-bg:#102C25;
+  --warn:#DC9B52; --warn-bg:#33220F;
+  --stop:#EC8478; --stop-bg:#37191A;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);
+  font-family:"Source Serif 4",Georgia,serif;font-size:16.5px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4,.ui{font-family:Archivo,"Helvetica Neue",Arial,sans-serif}
+code,pre,.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
+h1,h2,h3{text-wrap:balance;margin:0}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+
+.wrap{max-width:830px;margin:0 auto;padding:0 22px}
+header.hero{padding:52px 0 30px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:Archivo,sans-serif;font-size:11px;font-weight:600;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(30px,5vw,44px);font-weight:700;letter-spacing:-.025em;line-height:1.06}
+.dek{font-size:18px;color:var(--ink-2);margin-top:16px;max-width:62ch}
+p{margin:13px 0;max-width:68ch}
+ul,ol{max-width:68ch;padding-left:21px;margin:12px 0}
+li{margin:5px 0}
+
+.barra{position:sticky;top:0;z-index:20;background:var(--ground);border-bottom:1px solid var(--line);padding:10px 0}
+.barra-in{max-width:830px;margin:0 auto;padding:0 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.prog{flex:1;min-width:130px;height:7px;background:var(--line-soft);border-radius:4px;overflow:hidden}
+.prog>i{display:block;height:100%;width:0;background:var(--ok);transition:width .25s}
+.prog-txt{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.btn-reset{font-family:Archivo,sans-serif;font-size:11.5px;color:var(--muted);background:none;
+  border:1px solid var(--line);border-radius:3px;padding:4px 9px;cursor:pointer}
+.btn-reset:hover{color:var(--accent);border-color:var(--accent)}
+
+section{padding:38px 0;border-bottom:1px solid var(--line-soft)}
+section:last-of-type{border-bottom:0}
+h2{font-size:clamp(21px,3vw,27px);font-weight:700;letter-spacing:-.02em;margin-bottom:6px}
+h3{font-size:16.5px;font-weight:600;margin:26px 0 8px}
+.lede{font-size:17.5px;color:var(--ink-2);max-width:64ch}
+
+.ronda{display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap}
+.pill{font-family:Archivo,sans-serif;font-size:10.5px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;padding:3px 9px;border-radius:3px;white-space:nowrap}
+.pill-ok{color:var(--ok);background:var(--ok-bg)}
+.pill-pend{color:var(--warn);background:var(--warn-bg)}
+
+.prueba{background:var(--surface);border:1px solid var(--line);border-radius:4px;
+  margin:16px 0;box-shadow:var(--shadow);overflow:hidden}
+.p-head{display:flex;align-items:flex-start;gap:12px;padding:14px 17px;background:var(--surface-2);
+  border-bottom:1px solid var(--line-soft)}
+.p-num{font-family:Archivo,sans-serif;font-weight:700;font-size:12px;color:var(--accent);
+  border:1px solid var(--accent);border-radius:3px;min-width:28px;height:24px;
+  display:flex;align-items:center;justify-content:center;flex:none;margin-top:1px;padding:0 4px}
+.p-tit{font-family:Archivo,sans-serif;font-size:16px;font-weight:600;line-height:1.3;flex:1;letter-spacing:-.01em}
+.p-rol{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--faint);
+  background:var(--ground);border:1px solid var(--line);border-radius:3px;padding:2px 7px;white-space:nowrap}
+.p-body{padding:6px 17px 16px}
+.p-body p{margin:11px 0}
+
+.paso{display:flex;gap:11px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line-soft)}
+.paso:last-child{border-bottom:0}
+.paso input[type=checkbox]{width:17px;height:17px;margin:3px 0 0;flex:none;accent-color:var(--ok);cursor:pointer}
+.paso label{flex:1;cursor:pointer;font-size:15.5px;color:var(--ink-2);line-height:1.5}
+.paso input:checked + label{color:var(--faint);text-decoration:line-through;text-decoration-thickness:1px}
+
+.espera{background:var(--ok-bg);border-left:3px solid var(--ok);padding:11px 14px;margin:13px 0;border-radius:0 3px 3px 0}
+.espera .h{font-family:Archivo,sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ok);margin-bottom:5px}
+.espera p,.falla p,.nota p{margin:5px 0;font-size:15px;max-width:none;color:var(--ink-2)}
+.falla{background:var(--stop-bg);border-left:3px solid var(--stop);padding:11px 14px;margin:13px 0;border-radius:0 3px 3px 0}
+.falla .h{font-family:Archivo,sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--stop);margin-bottom:5px}
+.nota{background:var(--accent-soft);border-left:3px solid var(--accent);padding:11px 14px;margin:13px 0;border-radius:0 3px 3px 0}
+.nota .h{font-family:Archivo,sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent-ink);margin-bottom:5px}
+.aviso{background:var(--warn-bg);border:1px solid var(--warn);padding:12px 15px;margin:15px 0;border-radius:4px}
+.aviso .h{font-family:Archivo,sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--warn);margin-bottom:5px}
+.aviso p{margin:5px 0;font-size:15px;max-width:none;color:var(--ink-2)}
+
+pre.cmd{background:var(--surface-2);border:1px solid var(--line);padding:12px 14px;overflow-x:auto;
+  font-size:12.5px;line-height:1.6;margin:12px 0;border-radius:3px;color:var(--ink-2)}
+code{background:var(--surface-2);border:1px solid var(--line-soft);padding:.05em .32em;
+  font-size:.85em;border-radius:2px;color:var(--ink)}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--line);
+  border:1px solid var(--line);margin:18px 0;border-radius:4px;overflow:hidden}
+.kv>div{background:var(--surface);padding:12px 14px}
+.kv dt{font-family:Archivo,sans-serif;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--faint);margin-bottom:4px}
+.kv dd{margin:0;font-size:14px;color:var(--ink-2);line-height:1.4;word-break:break-word}
+.tw{overflow-x:auto;margin:16px 0;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:480px}
+th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+th{font-family:Archivo,sans-serif;font-size:10.5px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--faint);background:var(--surface-2)}
+td{color:var(--ink-2);line-height:1.45}
+tr:last-child td{border-bottom:0}
+td.m{font-family:"JetBrains Mono",monospace;font-size:12px;white-space:nowrap}
+td.hecho{color:var(--ok);font-weight:600;white-space:nowrap}
+footer{padding:34px 0 60px;color:var(--faint);font-size:14px}
+</style>
+
+<div class="barra">
+  <div class="barra-in">
+    <span class="ui" style="font-size:12px;font-weight:600;color:var(--ink)">Ronda 2</span>
+    <span class="prog"><i id="prog-bar"></i></span>
+    <span class="prog-txt" id="prog-txt">0 / 0</span>
+    <button class="btn-reset" id="btn-reset" type="button">Reiniciar</button>
+  </div>
+</div>
+
+<div class="wrap">
+<header class="hero">
+  <div class="eyebrow">PortGo · rama dev · portgo-pruebas</div>
+  <h1>Pruebas antes de producción</h1>
+  <p class="dek">Dos rondas. La primera ya pasó y está en producción desde el 8 de septiembre. La segunda cubre los tres lotes de RPC que Salvador subió después, más el lote de esquema — nada de eso lo ha probado nadie.</p>
+  <dl class="kv">
+    <div><dt>Dónde</dt><dd><a href="https://portgo-git-dev-salvador-s-projects13.vercel.app/app.html">preview de <code>dev</code></a></dd></div>
+    <div><dt>Base</dt><dd><code>portgo-pruebas</code></dd></div>
+    <div><dt>Ronda 2</dt><dd>Repartible en varios días</dd></div>
+    <div><dt>Riesgo</dt><dd>Ninguno: producción no se toca</dd></div>
+  </dl>
+</header>
+
+<section>
+  <div class="ronda"><h2>Ronda 1</h2><span class="pill pill-ok">Pasada · en producción</span></div>
+  <p class="lede">Las ocho pruebas originales, todas superadas. El código correspondiente se promovió a <code>main</code> el 8 de septiembre y las cinco migraciones están aplicadas en producción.</p>
+  <div class="tw"><table>
+    <thead><tr><th class="m">#</th><th>Prueba</th><th>Cubría</th><th>Estado</th></tr></thead>
+    <tbody>
+      <tr><td class="m">1</td><td>Nada se rompió al arrancar</td><td>—</td><td class="hecho">✓ pasada</td></tr>
+      <tr><td class="m">2</td><td>Los datos de empresa siguen viéndose</td><td class="m">H-01</td><td class="hecho">✓ pasada</td></tr>
+      <tr><td class="m">3</td><td>La fuga está cerrada</td><td class="m">H-01</td><td class="hecho">✓ pasada</td></tr>
+      <tr><td class="m">4</td><td>El copo de nieve aparece</td><td class="m">H-03</td><td class="hecho">✓ pasada</td></tr>
+      <tr><td class="m">5</td><td>Aprobar todas, de una</td><td class="m">H-13</td><td class="hecho">✓ pasada</td></tr>
+      <tr><td class="m">6</td><td>Cancelar una reserva, en una transacción</td><td class="m">H-10</td><td class="hecho">✓ pasada</td></tr>
+      <tr><td class="m">7</td><td>La campana solo marca lo que enseñó</td><td class="m">H-11</td><td class="hecho">✓ pasada</td></tr>
+      <tr><td class="m">8</td><td>Reservaciones pagina por cursor</td><td class="m">H-12</td><td class="hecho">✓ pasada</td></tr>
+    </tbody>
+  </table></div>
+  <div class="nota">
+    <div class="h">Lo que se aprendió aplicándolas a producción</div>
+    <p>La promoción falló al primer intento: <code>trg_guard_pedido_update</code> rechazó la corrección de datos de H-03 con <code>No autorizado</code>. No era un problema de datos sino estructural — <code>psql</code> conecta sin JWT, así que <code>auth.uid()</code> es NULL y el guard no reconoce a nadie. La transacción revirtió entera y producción quedó intacta. La migración ahora desactiva ese trigger solo durante el <code>UPDATE</code>.</p>
+    <p>Conviene tenerlo presente para la ronda 2: <b>cualquier migración que toque datos de una tabla con guard va a chocar igual.</b></p>
+  </div>
+</section>
+
+<section>
+  <div class="ronda"><h2>Ronda 2</h2><span class="pill pill-pend">Pendiente · 10 pruebas</span></div>
+  <p class="lede">Diez pruebas, con los pasos concretos: qué pantalla, qué botón, qué debe pasar. Empieza por el alta de cuenta, que además desbloquea el resto.</p>
+
+  <div class="aviso">
+    <div class="h">Antes de empezar</div>
+    <p><b>Ctrl+Shift+R</b> en la primera carga, o el service worker sirve lo de antes.</p>
+    <p><b>El sello de paridad caduca a las 6 horas.</b> Si tiene más, replica antes: <code>bash supabase/replicar-produccion-a-pruebas.sh</code>. Ojo — eso reconstruye pruebas desde producción y <b>borra las migraciones que solo están en pruebas</b>, así que hay que volver a aplicarlas después, en orden de fecha.</p>
+  </div>
+
+  <h3>Preparación — hecha</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Paso</th><th>Estado</th></tr></thead>
+    <tbody>
+      <tr><td>Réplica de producción a pruebas, sello en verde</td><td class="hecho">✓ hecho</td></tr>
+      <tr><td class="m">20260903120000_rpc_aceptar_y_cerrar_acuerdo.sql</td><td class="hecho">✓ aplicada</td></tr>
+      <tr><td class="m">20260908120000_restricciones_e_indices_pendientes.sql</td><td class="hecho">✓ aplicada</td></tr>
+      <tr><td class="m">20260908130000_placa_unica_por_unidad.sql</td><td class="hecho">✓ aplicada</td></tr>
+      <tr><td class="m">20260908140000_sincroniza_estados_por_cron.sql</td><td>⏸ al final, a propósito</td></tr>
+    </tbody>
+  </table></div>
+  <div class="nota">
+    <div class="h">Por qué H-17 va al final y no aquí</div>
+    <p>Esa migración programa un trabajo de pg_cron que <b>escribe cada 15 minutos</b>: expira pedidos cuya fecha ya pasó y reabre los que se quedaron sin ofertas vivas. Durante una tanda de pruebas que dura dos días son ~190 ejecuciones cambiando estados por su cuenta.</p>
+    <p>Con la base quieta, si un estado no es el que esperabas, es un fallo. Con el cron encendido, primero habría que averiguar si lo movió él. Se aísla la variable: las pruebas 9 a 16 con la base quieta, y H-17 después, con su propia prueba.</p>
+  </div>
+
+  <div class="aviso">
+    <div class="h">Dos cosas que esconden botones, y muerden en casi todas las pruebas</div>
+    <p><b>El ▾ de cada fila.</b> Los grupos <b>Documentos</b>, <b>Avisos</b> y <b>Cierre</b> solo se dibujan si la fila de la reservación está desplegada. Si un botón «no aparece», pulsa el ▾ antes de dar nada por roto.</p>
+    <p><b>Las pastillas de filtro.</b> El filtro se traduce a un <code>WHERE estado = …</code> en la propia consulta, así que al cambiar de estado la reserva <b>sale de la lista</b>, no se queda en gris. Pasa al subir evidencia (→ <code>PorAprobar</code>), al aprobar la finalización (→ <code>Completada</code>) y al pedir cancelación. La pastilla <b>Todas</b> las muestra siempre.</p>
+  </div>
+
+  <div class="aviso">
+    <div class="h">Durante los dos días</div>
+    <p><b>El sello caducado no te bloquea.</b> El límite de 6 horas solo lo consultan los guiones automáticos (<code>02-sembrar</code>, <code>03-flujo-completo</code>, <code>01-diagnostico --pruebas</code>). Probar a mano en el navegador no pasa por ahí. El sello certifica la <b>condición de partida</b>, y esa sigue siendo cierta aunque el archivo envejezca.</p>
+    <p><b>No vuelvas a replicar a media tanda</b>: reconstruiría pruebas y borraría el estado que van creando las pruebas, que se encadenan entre sí.</p>
+    <p><b>No promuevas nada a producción</b> hasta terminar, o la base de referencia cambia bajo los pies.</p>
+  </div>
+
+  <div class="prueba">
+    <div class="p-head">
+      <span class="p-num">9</span>
+      <span class="p-tit">Dar de alta un cliente, de principio a fin</span>
+      <span class="p-rol">cliente + superadmin</span>
+    </div>
+    <div class="p-body">
+      <div class="falla">
+        <div class="h">Esta prueba existe por un fallo real</div>
+        <p>El 8 de septiembre el alta de cuentas estaba rota en producción y nadie lo vio: una recursión en las políticas de <code>perfiles</code> hacía fallar la escritura del perfil, el código no comprobaba ese error y el alta seguía adelante. Quedaba la solicitud en el panel, sin perfil, y la cuenta no podía entrar.</p>
+        <p>Ninguna de las ocho pruebas de la ronda 1 lo habría detectado: todas verificaban <b>lectura</b> de perfiles. Va primero porque además desbloquea el resto — sin cuenta de cliente no se pueden hacer las pruebas 10, 14 y 15.</p>
+      </div>
+
+      <div class="nota">
+        <div class="h">Cómo tener dos sesiones a la vez</div>
+        <p>La app guarda la sesión en <code>sessionStorage</code>, que es <b>por pestaña</b>. Así que dos pestañas normales de la misma ventana tienen sesiones de PortGo independientes: una como cliente y otra como superadmin, sin cerrar sesión entre medias.</p>
+        <p><b>La segunda pestaña hay que abrirla en blanco</b> — <code>Ctrl+T</code> y pegar la URL. Si la abres haciendo clic en un enlace desde la primera, hereda una copia de su <code>sessionStorage</code> y acabas con la misma sesión en las dos.</p>
+        <p>No uses incógnito: la preview de <code>dev</code> está detrás del SSO de Vercel y allí no llevas esa cookie, así que te manda a iniciar sesión en Vercel.</p>
+      </div>
+      <p><b>Como cliente</b>, en una de las dos pestañas:</p>
+      <div class="paso"><input type="checkbox" id="t9a"><label for="t9a">Abrir la preview de <code>dev</code>, y en la pantalla de acceso elegir <b>registrarse</b> como <b>cliente</b></label></div>
+      <div class="paso"><input type="checkbox" id="t9b"><label for="t9b">Llenar el formulario con un correo nuevo (por ejemplo <code>tunombre+cli2@gmail.com</code>), marcar la casilla del aviso de privacidad y pulsar <b>Enviar solicitud de registro</b></label></div>
+      <div class="paso"><input type="checkbox" id="t9c"><label for="t9c">Sale el mensaje de solicitud enviada, <b>sin ningún error rojo</b></label></div>
+      <div class="paso"><input type="checkbox" id="t9d"><label for="t9d">Con F12 → Console abierta durante el alta: <b>ninguna línea en rojo</b>, y en Network ninguna petición a <code>perfiles</code> en <b>500</b></label></div>
+
+      <p><b>Como superadmin</b>, en la otra pestaña:</p>
+      <div class="paso"><input type="checkbox" id="t9e"><label for="t9e">Entrar al inicio: la tarjeta <b>Por aprobar</b> muestra el globo rojo, y el número <b>subió en 1</b></label></div>
+      <div class="paso"><input type="checkbox" id="t9f"><label for="t9f">Abrir <b>Por aprobar</b>: la solicitud nueva aparece en el bloque de cuentas</label></div>
+      <div class="paso"><input type="checkbox" id="t9g"><label for="t9g">Aprobarla con <b>✓ Aprobar sin verificación física</b></label></div>
+      <div class="paso"><input type="checkbox" id="t9h"><label for="t9h">El globo de <b>Por aprobar</b> baja en 1</label></div>
+
+      <p><b>Y la comprobación que cierra el círculo</b> — volver a la ventana del cliente:</p>
+      <div class="paso"><input type="checkbox" id="t9i"><label for="t9i">Iniciar sesión con esa cuenta: <b>entra</b> y ve el inicio de cliente, no la pantalla de acceso</label></div>
+      <div class="paso"><input type="checkbox" id="t9j"><label for="t9j">En F12 → Console: <code>(await sb.from('perfiles').select('rol,aprobacion_cuenta')).data</code> devuelve <b>una fila</b> con <code>rol: "cliente"</code> y <code>aprobacion_cuenta: null</code>. Si no te deja pegar, ver la nota de la prueba 17</label></div>
+      <div class="espera">
+        <div class="h">Por qué el paso i es el importante</div>
+        <p>Con el bug, el alta parecía funcionar y la solicitud se aprobaba sin problema. Lo que fallaba era entrar después: sin fila en <code>perfiles</code>, la app no sabe qué rol tiene la cuenta y devuelve al login. Aprobar no basta como prueba; hay que iniciar sesión.</p>
+      </div>
+      <div class="falla">
+        <div class="h">Falla si</div>
+        <p>El globo no sube aunque la solicitud aparezca en el panel. Ese es exactamente el síntoma del 8 de septiembre: el panel lee <code>solicitudes_cuenta</code> y el globo cuenta <code>perfiles.aprobacion_cuenta</code>, así que si el perfil no se creó, uno la ve y el otro no.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="prueba">
+    <div class="p-head">
+      <span class="p-num">10</span>
+      <span class="p-tit">Aceptar una oferta crea la reservación, siempre</span>
+      <span class="p-rol">cliente + empresa</span>
+    </div>
+    <div class="p-body">
+      <div class="nota">
+        <div class="h">La más importante de la ronda</div>
+        <p>El fallo que elimina: la oferta quedaba <code>aceptada</code> y el pedido en <code>pendiente_acuerdo</code> <b>sin reservación</b>. El recurso ni ocupado ni liberado, y solo un superadmin lo destrababa a mano.</p>
+      </div>
+
+      <p><b>Preparar el pedido</b> — como cliente:</p>
+      <div class="paso"><input type="checkbox" id="t10a"><label for="t10a">Inicio → <b>Solicitar servicio</b>. Elegir camión, llenar origen, destino y <b>fechas futuras</b> (una semana adelante), y publicar</label></div>
+      <div class="paso"><input type="checkbox" id="t10b"><label for="t10b">Como <b>superadmin</b>: Por aprobar → la solicitud aparece → <b>✓ Aprobar y publicar</b></label></div>
+      <div class="paso"><input type="checkbox" id="t10c"><label for="t10c">Como <b>empresa</b>: Inicio → <b>Solicitudes</b> → la solicitud aparece → <b>Hacer oferta</b>, poner precio y enviar</label></div>
+
+      <p><b>La vía 1: el cliente acepta la oferta</b></p>
+      <div class="paso"><input type="checkbox" id="t10d"><label for="t10d">Como cliente: Inicio → <b>Mis solicitudes</b> → abrir la solicitud → <b>✓ Aceptar $&lt;precio&gt;</b></label></div>
+      <div class="paso"><input type="checkbox" id="t10e"><label for="t10e">Se abre el formulario de detalles del servicio. Llenar lugar, hora y contacto → <b>✓ Guardar y confirmar</b></label></div>
+      <div class="paso"><input type="checkbox" id="t10f"><label for="t10f">En F12 → Network se ve <b>una sola</b> llamada a <code>rpc/aceptar_y_cerrar_acuerdo</code>, no varios PATCH sueltos</label></div>
+      <div class="paso"><input type="checkbox" id="t10g"><label for="t10g"><b>No hace falta que el superadmin apruebe nada.</b> Desde el 9 de septiembre el acuerdo entre las dos partes crea la reserva directamente. Si el pedido se queda en <code>pendiente_acuerdo</code> esperando aprobación, eso sí es un fallo</label></div>
+
+      <p><b>Los cuatro efectos que hay que ver</b>, inmediatamente:</p>
+      <div class="paso"><input type="checkbox" id="t10h"><label for="t10h">Existe la <b>reservación</b>: Inicio → Reservaciones, aparece en la lista</label></div>
+      <div class="paso"><input type="checkbox" id="t10i"><label for="t10i">La unidad: <b>si la fecha de inicio ya llegó</b>, aparece como ocupada en Mis unidades. <b>Si es futura, sigue disponible</b> — y así debe ser</label></div>
+      <div class="paso"><input type="checkbox" id="t10j"><label for="t10j">El <b>pedido pasó a acordado</b></label></div>
+      <div class="paso"><input type="checkbox" id="t10k"><label for="t10k">Si hubo <b>otras ofertas</b>, quedaron rechazadas y esas empresas recibieron aviso en su campana</label></div>
+      <div class="nota">
+        <div class="h">Por qué la unidad puede seguir disponible</div>
+        <p><code>cerrar_acuerdo</code> solo la marca ocupada si <code>fecha_ini &lt;= hoy</code>. Con un viaje que empieza la semana que viene, el camión <b>está disponible hoy</b>, y eso es lo que el campo describe.</p>
+        <p>La doble reserva no depende de ese campo: la impide la restricción <code>reservaciones_sin_solape</code>, un <code>EXCLUDE</code> con GiST sobre unidad y rango de fechas. Nadie puede reservar esa unidad en esos días aunque diga disponible.</p>
+        <p><b>Lo que sí conviene saber:</b> nada la marca ocupada cuando llega el día. Si el 15 de septiembre esa unidad sigue diciendo disponible, no es un fallo de esta prueba — es un hueco conocido, anotado abajo.</p>
+      </div>
+
+      <p><b>La vía 2: la empresa acepta una contraoferta</b></p>
+      <div class="aviso">
+        <div class="h">La preparación completa, otra vez</div>
+        <p>Hay que rehacer los tres pasos de arriba, <b>incluido el del superadmin</b>. Una solicitud en <code>pendiente_revision</code> <b>no existe para las empresas</b>: la política <code>ped_select</code> solo les deja ver las que están en <code>abierto</code> o <code>en_negociacion</code>, o aquellas donde ya ofertaron. Si la empresa «no ve» tu solicitud, casi siempre es esto y no un problema de unidades.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t10l"><label for="t10l">Como <b>cliente</b>: publicar otra solicitud con fecha futura</label></div>
+      <div class="paso"><input type="checkbox" id="t10o"><label for="t10o">Como <b>superadmin</b>: Por aprobar → <b>✓ Aprobar y publicar</b>. Sin esto la empresa no la verá</label></div>
+      <div class="paso"><input type="checkbox" id="t10p"><label for="t10p">Como <b>empresa</b>: Solicitudes → <b>Hacer oferta</b> con un precio</label></div>
+      <div class="paso"><input type="checkbox" id="t10q"><label for="t10q">Como <b>cliente</b>: abrir la solicitud → <b>↩ Contraofertar</b> con un precio menor</label></div>
+      <div class="paso"><input type="checkbox" id="t10m"><label for="t10m">Como <b>empresa</b>: la contraoferta aparece → aceptarla, y comprobar los mismos cuatro efectos (10h a 10k)</label></div>
+      <div class="paso"><input type="checkbox" id="t10n"><label for="t10n">El aviso de «oferta aceptada» llega <b>una sola vez</b>, no duplicado</label></div>
+      <div class="falla">
+        <div class="h">Falla si</div>
+        <p>Hay reservación pero la unidad sigue <b>disponible</b>, o el pedido se queda en <code>pendiente_acuerdo</code>. Es el estado a medias que esto venía a eliminar.</p>
+        <p>También falla si el aviso llega <b>dos veces</b>: lo disparan los triggers <code>tr_oferta_respuesta</code>, y la RPC no debe insertarlo otra vez.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="prueba">
+    <div class="p-head">
+      <span class="p-num">11</span>
+      <span class="p-tit">Una empresa con documentos vencidos no cierra sola</span>
+      <span class="p-rol">superadmin + empresa</span>
+    </div>
+    <div class="p-body">
+      <p>La RPC es <code>SECURITY DEFINER</code> pero <b>no</b> se salta los guards: <code>auth.uid()</code> sigue saliendo del JWT, así que <code>guard_oferta_update</code> aplica dentro. Esta prueba demuestra que meter la lógica en una función privilegiada no abrió un agujero.</p>
+      <div class="nota">
+        <div class="h">Qué revisa exactamente el guard</div>
+        <p>Al aceptar una oferta, mira el perfil de <b>la empresa que la emitió</b> y falla si alguna de estas tres fechas ya pasó: <code>fecha_vencimiento_permiso_sct</code>, <code>fecha_vencimiento_seguro_rc</code>, <code>fecha_vencimiento_seguro_carga</code>. Si están en <code>null</code> —que es como están hoy las tres— nunca dispara.</p>
+        <p>Salta igual acepte quien acepte: el cliente una oferta, o la empresa una contraoferta. Siempre se miran los papeles de la empresa.</p>
+      </div>
+
+      <div class="aviso">
+        <div class="h">El orden importa: primero la oferta, después el vencimiento</div>
+        <p>Con un documento vencido, la app <b>no deja ni emitir la oferta</b>: <code>openHacerOferta</code> comprueba las tres fechas antes de listar camiones, vacía el desplegable y desactiva el botón de enviar. Si vences el documento primero, te quedas sin poder montar el escenario y parece que el problema son las unidades.</p>
+        <p>Son dos capas del mismo control: el cliente impide emitir, el guard impide aceptar. Esta prueba verifica la segunda, así que la oferta tiene que existir <b>antes</b>.</p>
+      </div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Paso 1 — la oferta, con los documentos todavía en regla</h4>
+      <div class="paso"><input type="checkbox" id="t11a"><label for="t11a">Como <b>cliente</b>: publicar una solicitud. Como <b>superadmin</b>: <b>✓ Aprobar y publicar</b></label></div>
+      <div class="paso"><input type="checkbox" id="t11b"><label for="t11b">Como <b>empresa</b>: <b>Hacer oferta</b>. Debe dejarte elegir camión con normalidad — si ya no te deja, el documento sigue vencido de una vuelta anterior</label></div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Paso 2 — vencer el documento</h4>
+      <p>Por la interfaz no se puede: la empresa edita sus documentos, van a columnas <code>*_pendiente</code>, y el superadmin las aprueba con <b>✓ Aprobar documentos</b> antes de pasar a las vivas. Para montar el escenario es más limpio con SQL — es andamiaje de prueba, no un flujo de usuario.</p>
+      <pre class="cmd">psql "&lt;cadena-pruebas&gt;" -c "
+UPDATE public.perfiles
+   SET fecha_vencimiento_permiso_sct = '2026-01-01'
+ WHERE user_id = '5919a6f2-03f0-4ccc-877f-fb9fc75139da';"</pre>
+      <div class="paso"><input type="checkbox" id="t11j"><label for="t11j">Ejecutado. Ese <code>user_id</code> es el de <code>omar_silvap@hotmail.com</code>, la empresa de pruebas</label></div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Paso 3 — aceptar</h4>
+      <div class="paso"><input type="checkbox" id="t11k"><label for="t11k">Como <b>cliente</b>: abrir la solicitud y aceptar la oferta que quedó pendiente del paso 1</label></div>
+      <div class="paso"><input type="checkbox" id="t11c"><label for="t11c">Sale el mensaje: <b>«Acuerdo aceptado — la empresa tiene documentos vencidos, un administrador lo revisará antes de confirmar»</b></label></div>
+      <div class="espera">
+        <div class="h">Ojo: no es un error, y así debe ser</div>
+        <p>La RPC atrapa el <code>DOCUMENTOS_VENCIDOS</code> y devuelve <code>pendiente_docs</code> en vez de reventar. El mensaje lleva palomita a propósito: la aceptación se registró, lo que no se pudo fue cerrar el trato solo.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t11d"><label for="t11d"><b>No se creó ninguna reservación</b> — comprobarlo en Reservaciones</label></div>
+      <div class="paso"><input type="checkbox" id="t11e"><label for="t11e">La <b>oferta sigue sin aceptar</b>: el <code>UPDATE</code> que la marcaba revirtió</label></div>
+      <div class="paso"><input type="checkbox" id="t11f"><label for="t11f">El <b>pedido quedó en <code>pendiente_acuerdo</code></b>, esperando al superadmin</label></div>
+      <div class="paso"><input type="checkbox" id="t11g"><label for="t11g">El <b>superadmin recibió aviso</b> en su campana: «Acuerdo pendiente — documentos vencidos»</label></div>
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Paso 4 — que el superadmin sí pueda forzarlo</h4>
+      <p>El guard tiene una salida: <code>IF public.is_superadmin() THEN RETURN NEW</code>. Sin ella, una empresa con papeles vencidos quedaría atrapada sin forma de desbloquearse. Hay que comprobar que esa salida existe y funciona.</p>
+      <div class="paso"><input type="checkbox" id="t11h"><label for="t11h">Como <b>superadmin</b>: Por aprobar → el acuerdo aparece → <b>✓ Aprobar acuerdo</b></label></div>
+      <div class="paso"><input type="checkbox" id="t11l"><label for="t11l">Sale un diálogo de advertencia: <b>«⚠️ La empresa … tiene documentos vencidos: Permiso SCT. ¿Aprobar el acuerdo de todas formas?»</b></label></div>
+      <div class="paso"><input type="checkbox" id="t11m"><label for="t11m">Pulsar <b>Aprobar igualmente</b></label></div>
+      <div class="paso"><input type="checkbox" id="t11n"><label for="t11n"><b>Ahora sí se crea la reservación</b>, y el pedido pasa a <code>acordado</code></label></div>
+      <div class="espera">
+        <div class="h">Qué demuestra este paso</div>
+        <p>Que el bloqueo por documentos vencidos <b>avisa pero no encierra</b>. El superadmin lo ve, se le advierte, y decide. Ese es el diseño: el control frena el cierre automático, no la operación entera.</p>
+      </div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Paso 5 — restaurar, al final de todo</h4>
+      <pre class="cmd">psql "&lt;cadena-pruebas&gt;" -c "
+UPDATE public.perfiles
+   SET fecha_vencimiento_permiso_sct = NULL
+ WHERE user_id = '5919a6f2-03f0-4ccc-877f-fb9fc75139da';"</pre>
+      <div class="paso"><input type="checkbox" id="t11i"><label for="t11i">Restaurado a <code>NULL</code>, que es el valor que tenía. <b>Sin esto, las pruebas 12 a 17 fallarán por documentos vencidos</b></label></div>
+      <div class="falla">
+        <div class="h">Falla si</div>
+        <p>El acuerdo se cierra igual y aparece la reservación. Entonces la RPC está saltándose un control de negocio, y eso sería peor que el bug que venía a arreglar.</p>
+        <p>También falla si el superadmin <b>no</b> puede forzarlo en el paso h: el guard tiene que dejarle pasar a él, o una empresa con papeles vencidos quedaría bloqueada para siempre sin salida.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="prueba">
+    <div class="p-head">
+      <span class="p-num">12</span>
+      <span class="p-tit">Tracking, y el expediente de vacíos que se abre solo</span>
+      <span class="p-rol">empresa</span>
+    </div>
+    <div class="p-body">
+      <p>Va antes que las evidencias porque el flujo lo exige: no se puede cerrar un servicio que todavía no llegó a su último paso. Antes el navegador abría el expediente después de avanzar; ahora ocurre dentro de la misma transacción.</p>
+      <div class="aviso">
+        <div class="h">Sin chofer no se avanza</div>
+        <p>Para salir del primer paso hace falta un chofer asignado. Si no lo hay, sale <b>«Asigna un chofer antes de avanzar el seguimiento»</b>. El botón es <b>👷 Asignar chofer</b>, en la misma fila de la reservación.</p>
+        <p>Solo aplica a camiones. Custodios, patios y lavados avanzan sin chofer.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t12a"><label for="t12a">Como <b>empresa</b>: Reservaciones → si la reserva no tiene chofer, <b>👷 Asignar chofer</b> y elegir uno</label></div>
+      <div class="paso"><input type="checkbox" id="t12b"><label for="t12b">Pulsar el botón <b>📍 &lt;estado&gt;</b> de esa reserva; se abre el seguimiento</label></div>
+      <div class="paso"><input type="checkbox" id="t12c"><label for="t12c">Avanzar paso a paso hasta el último. En camión son cinco: <code>Confirmado → En camino → En carga → En tránsito → Entregado</code></label></div>
+      <div class="paso"><input type="checkbox" id="t12d"><label for="t12d">El <b>cliente recibe aviso</b> en su campana en cada avance</label></div>
+      <div class="paso"><input type="checkbox" id="t12e"><label for="t12e">En una reserva que venga de un pedido <b>con contenedor</b>: al llegar a Entregado, el <b>expediente de entrega de vacíos aparece solo</b></label></div>
+      <div class="paso"><input type="checkbox" id="t12f"><label for="t12f">Ese expediente trae su <b>checklist copiado</b>, no vacío</label></div>
+      <div class="paso"><input type="checkbox" id="t12g"><label for="t12g">En una reserva <b>sin</b> contenedor: al llegar a Entregado <b>no</b> se abre ningún expediente</label></div>
+      <div class="aviso">
+        <div class="h">Dos regresiones conocidas — no son fallos</div>
+        <p>Salvador las documentó al hacer el cambio: el aviso de campana dice la clave del paso (<code>En camino</code>) en vez de la etiqueta larga con icono, y el correo del expediente auto-abierto sale del cliente web y no de la RPC. Son las mismas que ya tiene el cliente nativo. No las reportes como fallo.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="prueba">
+    <div class="p-head">
+      <span class="p-num">13</span>
+      <span class="p-tit">Evidencias y cierre del servicio</span>
+      <span class="p-rol">empresa + cliente + superadmin</span>
+    </div>
+    <div class="p-body">
+      <p>Los archivos siguen subiéndose a Storage desde el navegador. Lo que bajó a la transacción es el alta de rutas, el paso a <code>PorAprobar</code>, la fecha de completado y los avisos.</p>
+      <div class="aviso">
+        <div class="h">Requiere la prueba 12 terminada</div>
+        <p>La empresa no puede subir su evidencia hasta que el seguimiento llegue al <b>último paso</b>. Si sale <b>«Primero avanza el seguimiento 📍 hasta "Entregado"»</b>, es que falta completar la 12 sobre esa misma reserva.</p>
+        <p>La restricción es solo para la empresa al <b>solicitar</b> el cierre. El cliente puede subir la suya en cualquier momento.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t13a"><label for="t13a">Como <b>empresa</b>: en esa reserva ya en <code>Entregado</code>, pulsar <b>✓ Completar</b> → subir una imagen cualquiera</label></div>
+      <div class="paso"><input type="checkbox" id="t13b"><label for="t13b">El botón desaparece y en su lugar queda el texto <b>«⏳ Esperando aprobación del superadmin»</b></label></div>
+      <div class="espera">
+        <div class="h">Ese cambio de texto ya es la comprobación</div>
+        <p>La app elige entre las dos cosas mirando <code>evidencias.length</code>: si hay archivos muestra el texto de espera, si no muestra el botón de subir. Que aparezca el texto <b>demuestra que las rutas se guardaron</b> — no hace falta reabrir nada.</p>
+        <p>Y no se puede reabrir, además: en <code>PorAprobar</code> la empresa ya no tiene botón para volver a ver sus archivos. Reaparece como <b>📎 Evidencias (N)</b> cuando la reserva llegue a <code>Completada</code>.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t13c"><label for="t13c">En F12 → Network, <b>una sola</b> llamada a <code>rpc/registrar_evidencias</code></label></div>
+      <div class="paso"><input type="checkbox" id="t13d"><label for="t13d">Como <b>cliente</b>: en la misma reserva, <b>📎 Subir mi evidencia</b> → subir otra imagen → <b>✓ Marcar completado</b></label></div>
+      <div class="paso"><input type="checkbox" id="t13e"><label for="t13e">Con las dos partes, la reserva pasa a <b>PorAprobar</b></label></div>
+      <div class="paso"><input type="checkbox" id="t13f"><label for="t13f">La otra parte y los superadmins reciben aviso en la campana</label></div>
+      <div class="paso"><input type="checkbox" id="t13g"><label for="t13g">Como <b>superadmin</b>: Por aprobar → en esa reserva <b>se ven las dos evidencias</b>, la de la empresa y la del cliente. <b>Aquí es donde se comprueba que los archivos existen de verdad</b>, no solo su ruta</label></div>
+      <div class="paso"><input type="checkbox" id="t13h"><label for="t13h"><b>✓ Aprobar finalización</b> → la reserva queda <b>Completada</b></label></div>
+      <div class="paso"><input type="checkbox" id="t13i"><label for="t13i">Como <b>empresa</b>: ahora la reserva ofrece <b>📎 Evidencias (1)</b>, y al abrirlo se ve el archivo subido</label></div>
+      <div class="falla">
+        <div class="h">Falla si</div>
+        <p>El archivo se sube pero al reabrir la reserva no aparece: la subida funcionó y la transacción no registró la ruta.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="prueba">
+    <div class="p-head">
+      <span class="p-num">14</span>
+      <span class="p-tit">Calificar, y pedir documentación dos veces</span>
+      <span class="p-rol">cliente + empresa</span>
+    </div>
+    <div class="p-body">
+      <div class="aviso">
+        <div class="h">Casi todos estos botones viven detrás del ▾</div>
+        <p>Cada fila de reservación tiene un <b>▾</b> al final. Los grupos <b>Documentos</b>, <b>Avisos</b> y <b>Cierre</b> solo se dibujan si la fila está abierta. Si un botón «no aparece», lo primero es pulsar el ▾.</p>
+        <p>Y recuerda el filtro: al cambiar de estado, la reserva sale de la pastilla en la que estabas mirando. <b>Todas</b> las muestra siempre.</p>
+      </div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Calificar</h4>
+      <div class="paso"><input type="checkbox" id="t14a"><label for="t14a">Como <b>cliente</b>: Reservaciones → pastilla <b>Completadas</b> → en una reserva completada, <b>⭐ Calificar</b> (está en la fila, no hace falta el ▾)</label></div>
+      <div class="paso"><input type="checkbox" id="t14b"><label for="t14b">Poner estrellas y comentario → enviar</label></div>
+      <div class="paso"><input type="checkbox" id="t14c"><label for="t14c">La reseña aparece en Inicio → <b>Catálogo</b> → la ficha de esa empresa, en <b>Ver N reseñas</b></label></div>
+      <div class="paso"><input type="checkbox" id="t14d"><label for="t14d">El botón <b>⭐ Calificar</b> <b>desaparece</b> de esa reserva: solo sale si <code>!r.calificado</code></label></div>
+      <div class="paso"><input type="checkbox" id="t14e"><label for="t14e">La empresa recibe el aviso en su campana</label></div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Pedir documentación de puerto</h4>
+      <div class="paso"><input type="checkbox" id="t14f"><label for="t14f">Como <b>empresa</b>: en una reserva <b>Activa</b>, pulsar el <b>▾</b> → grupo <b>Documentos</b> → <b>🛃 Solicitar · Puerto</b></label></div>
+      <div class="espera">
+        <div class="h">Dos matices del botón</div>
+        <p>Se llama <b>«Solicitar · Puerto»</b>, no «Ingreso a puerto». Y sale <b>siempre para la empresa</b>, exista o no el expediente: si ya existe, en su lugar aparece la pastilla <b>🛃 Puerto ⏳</b>, que lo abre.</p>
+        <p>El de <b>Vacíos</b> se comporta distinto: solo aparece <b>si el expediente ya existe</b>. No se puede pedir a mano — se abre solo al llegar a <code>Entregado</code> con contenedor, que es lo que verificó la prueba 12.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t14g"><label for="t14g">El <b>cliente</b> recibe el aviso en su campana</label></div>
+      <div class="paso"><input type="checkbox" id="t14h"><label for="t14h">Como <b>cliente</b>: en esa reserva, pulsar el <b>▾</b> → grupo <b>Documentos</b> → pastilla <b>🛃 Puerto ⏳</b></label></div>
+      <div class="paso"><input type="checkbox" id="t14i"><label for="t14i">Se abre un <b>modal</b> con la lista de documentos pedidos, cada uno con su nombre y su botón de subir</label></div>
+      <div class="espera">
+        <div class="h">El checklist está dentro del modal</div>
+        <p>No es un listado en la fila. <code>abrirExpediente</code> consulta <code>expediente_documentos</code> ordenado por <code>orden</code> y lo pinta en la ventana que se abre al pulsar la pastilla. Si en la fila solo ves la pastilla, es lo correcto: hay que abrirla.</p>
+        <p>El <b>cliente no ve el botón de solicitar</b> —<code>if (soyCliente) return ''</code>— solo la pastilla del expediente que la empresa ya abrió.</p>
+      </div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Que no se duplique</h4>
+      <div class="paso"><input type="checkbox" id="t14j"><label for="t14j">Como <b>empresa</b>, volver a pulsar <b>🛃 Solicitar · Puerto</b> sobre la misma reserva</label></div>
+      <div class="paso"><input type="checkbox" id="t14k"><label for="t14k"><b>No</b> se crea un segundo expediente ni se duplica el checklist, y <b>no</b> sale error</label></div>
+      <div class="espera">
+        <div class="h">Qué se está comprobando</div>
+        <p>Que <code>abrir_expediente</code> es idempotente: la tabla tiene <code>UNIQUE(reserva_id, etapa)</code>, así que el segundo intento debe encontrar el existente y devolverlo en vez de reventar.</p>
+        <p>Y que <code>calificar_servicio</code> deriva el <code>admin_id</code> del propietario de la reserva, en vez de fiarse de lo que mande el navegador.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="prueba">
+    <div class="p-head">
+      <span class="p-num">15</span>
+      <span class="p-tit">Solicitar cancelación avisa a quien debe</span>
+      <span class="p-rol">cliente + empresa + superadmin</span>
+    </div>
+    <div class="p-body">
+      <p>Antes eran tres escrituras sueltas: si la pestaña se cerraba entre el cambio de estado y los avisos, <b>la empresa no se enteraba</b> de que el cliente había pedido cancelar.</p>
+      <div class="paso"><input type="checkbox" id="t15a"><label for="t15a">Como <b>empresa</b>, avanzar el seguimiento de una reserva <b>Activa</b> un par de pasos, para que haya algo que congelar</label></div>
+      <div class="paso"><input type="checkbox" id="t15b"><label for="t15b">Como <b>cliente</b>: en esa reserva, pulsar el <b>▾</b> → <b>Solicitar cancelación</b></label></div>
+      <div class="paso"><input type="checkbox" id="t15c"><label for="t15c">Elegir motivo y escribir el detalle → confirmar</label></div>
+      <div class="paso"><input type="checkbox" id="t15d"><label for="t15d">La reserva pasa a <b>CancelacionSolicitada</b>. Para verla, pastilla <b>Todas</b> o la de cancelación</label></div>
+      <div class="paso"><input type="checkbox" id="t15e"><label for="t15e">En su lugar aparece el texto <b>«⏳ Cancelación en revisión»</b> — ya no ofrece cancelar otra vez</label></div>
+      <div class="paso"><input type="checkbox" id="t15f"><label for="t15f">Como <b>superadmin</b>: Por aprobar → bloque de cancelaciones → la fila <b>«Punto del viaje»</b> muestra el paso en el que iba al pedirla (<b>En carga</b>, si avanzaste hasta ahí), y sale <b>en rojo</b> por haber arrancado ya</label></div>
+      <div class="espera">
+        <div class="h">Por qué se guarda ese dato</div>
+        <p>Al pedir cancelar, el camión puede estar parado en el patio o a mitad de carretera, y <b>esa diferencia decide quién paga qué</b>. <code>solicitar_cancelacion</code> copia el paso actual a <code>cancelacion_tracking_estado</code> en la misma transacción, para que quede congelado: si la empresa siguiera avanzando el seguimiento, el superadmin ya no sabría dónde estaba el viaje cuando se pidió.</p>
+        <p>Por eso el paso 15a pide avanzar antes. Si pides la cancelación en <code>Confirmado</code>, el valor congelado es <code>Confirmado</code> y la prueba no distingue nada.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t15g"><label for="t15g">La <b>empresa</b> recibe el aviso en su campana</label></div>
+      <div class="paso"><input type="checkbox" id="t15h"><label for="t15h">Los <b>superadmins</b> también</label></div>
+      <div class="paso"><input type="checkbox" id="t15i"><label for="t15i">Como <b>superadmin</b>: Por aprobar → bloque de cancelaciones → <b>✓ Aprobar cancelación</b></label></div>
+      <div class="paso"><input type="checkbox" id="t15j"><label for="t15j">La reserva queda <b>Cancelada</b> y la unidad vuelve a estar disponible</label></div>
+      <div class="falla">
+        <div class="h">Falla si</div>
+        <p>La reserva cambia de estado pero la empresa no recibe aviso. Ese es exactamente el estado a medias que esta corrección venía a eliminar: antes, si la pestaña se cerraba entre una escritura y otra, la solicitud quedaba registrada y nadie se enteraba.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="prueba">
+    <div class="p-head">
+      <span class="p-num">16</span>
+      <span class="p-tit">Las restricciones nuevas muerden</span>
+      <span class="p-rol">empresa</span>
+    </div>
+    <div class="p-body">
+      <p>Las migraciones del principio añadieron índices únicos. Hay que comprobar que rechazan lo que deben <b>y</b> que no rechazan de más.</p>
+      <div class="paso"><input type="checkbox" id="t16a"><label for="t16a">Como <b>empresa</b>: Inicio → <b>Mis unidades</b> → <b>➕ Agregar unidad</b> con la <b>misma placa</b> que una existente: debe rechazarlo con un error visible, no aceptarlo en silencio</label></div>
+      <div class="paso"><input type="checkbox" id="t16b"><label for="t16b">La misma alta con una <b>placa distinta</b> sí funciona</label></div>
+      <div class="paso"><input type="checkbox" id="t16c"><label for="t16c">Inicio → <b>Operadores</b> → dar de alta uno con el <b>mismo CURP</b> que otro de tu empresa: debe rechazarlo</label></div>
+      <div class="paso"><input type="checkbox" id="t16d"><label for="t16d">Dar de alta un operador normal <b>sí funciona</b>, y su número de trabajador sale correlativo</label></div>
+      <div class="paso"><input type="checkbox" id="t16e"><label for="t16e">Comprobar la placa reasignada. <b>Esto va por psql</b>, con la cadena de <b>pruebas</b>: <code>SELECT id, placas FROM camiones WHERE id IN ('T-001','R-8C5DEE8E');</code> — <code>T-001</code> conserva <code>12345</code> y <code>R-8C5DEE8E</code> dice <code>PRUEBA-001</code></label></div>
+      <div class="nota">
+        <div class="h">Por qué no se mira desde la app</div>
+        <p>La versión anterior de este paso decía «abrir la unidad desde el listado de camiones». Ese listado ya no existe: <code>#truck-grid</code> está oculto en <code>app.html</code> y el modal de detalle de unidad solo se abre desde sus tarjetas invisibles. Ver la nota al final de la prueba 17.</p>
+      </div>
+      <div class="nota">
+        <div class="h">De dónde sale esa placa</div>
+        <p><code>R-8C5DEE8E</code> y <code>T-001</code> compartían placa en producción — dos unidades aprobadas, de tipo distinto, con la misma. La migración de la placa única dejó la original en <code>T-001</code>, que es la más antigua, y puso <code>PRUEBA-001</code> en la otra.</p>
+        <p>Es un valor deliberadamente falso: la placa verdadera de esa unidad no se sabe, y una con pinta auténtica sería peor porque alguien podría imprimirla en una carta porte. Se ve a simple vista y se corrige cuando alguien sepa la buena.</p>
+      </div>
+      <div class="falla">
+        <div class="h">Falla si</div>
+        <p>El alta duplicada se acepta: el índice no se creó. O si el alta normal falla: el único quedó más estricto de lo que debía — el de operadores es por empresa, no global.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="prueba">
+    <div class="p-head">
+      <span class="p-num">17</span>
+      <span class="p-tit">Regresión: los nombres de empresa siguen saliendo</span>
+      <span class="p-rol">cliente → empresa → superadmin</span>
+    </div>
+    <div class="p-body">
+      <p>H-01 cerró la lectura directa de <code>perfiles</code> ajenos: todas las pantallas que enseñaban datos de una empresa pasaron a leer la vista <code>empresas_publico</code>. Esta prueba recorre <b>las cinco pantallas que de verdad la usan</b> y comprueba que ninguna se quedó sin datos por el camino.</p>
+      <div class="nota">
+        <div class="h">Qué significa un guión</div>
+        <p>Cuando una pantalla no consigue leer la ficha, no falla: pinta <code>—</code> y sigue. Por eso el guión es la señal que hay que buscar en cada paso — no un error rojo, sino un nombre que falta.</p>
+      </div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Como cliente</h4>
+      <div class="paso"><input type="checkbox" id="t17a"><label for="t17a">Inicio → tarjeta <b>Catálogo</b> («Empresas verificadas»). Cada tarjeta trae el nombre de la empresa y, debajo, pastillas con razón social, RFC y años — las que esa empresa tenga rellenas. <b>Ninguna tarjeta debe salir sin nombre.</b></label></div>
+      <div class="paso"><input type="checkbox" id="t17b"><label for="t17b">En una tarjeta, pulsar <b>Ver empresa</b> (abajo a la derecha). Se abre la ficha con razón social, RFC, teléfono, permiso SCT, años de operación, unidades y seguros. Si la empresa no tiene nada relleno, debe decir <b>«aún no ha completado su ficha pública»</b>, no abrirse en blanco</label></div>
+      <div class="paso"><input type="checkbox" id="t17c"><label for="t17c">Inicio → <b>Mis solicitudes</b> → abrir una solicitud <b>que tenga ofertas</b> → pulsar el <b>nombre de la empresa</b> de una oferta (lleva un <b>Ver →</b> al lado). Se abre su ficha con descripción, calificación y cuántas unidades tiene</label></div>
+      <div class="paso"><input type="checkbox" id="t17d"><label for="t17d">Inicio → <b>Reservaciones</b> → en cada fila, el nombre de la empresa que presta el servicio. <b>No debe decir —</b></label></div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Como empresa</h4>
+      <div class="paso"><input type="checkbox" id="t17e"><label for="t17e">F12 → pestaña <b>Console</b> → escribir o pegar <code>(await sb.from('perfiles').select('user_id')).data.length</code> y pulsar Enter. Debe responder <b>1</b>: tu propia fila y ninguna más</label></div>
+      <div class="nota">
+        <div class="h">Si el navegador no te deja pegar en la consola</div>
+        <p>Sale un aviso pidiendo que escribas <code>allow pasting</code> antes de poder pegar. <b>No es un fallo de la app ni de la prueba</b>: es una protección del navegador contra una estafa concreta — convencer a alguien de pegar en la consola un código que le roba la sesión. Como aquí la línea la tienes delante y sabes lo que hace, saltarla es seguro.</p>
+        <p><b>Qué hace esa línea:</b> le pide a Supabase la columna <code>user_id</code> de todas las filas de <code>perfiles</code> que tu sesión <i>tenga permitido</i> leer, y cuenta cuántas son. Solo lee; no escribe ni borra nada. El número que devuelve <b>es</b> el resultado de la prueba: si el RLS hace su trabajo, solo alcanzas tu propia fila.</p>
+        <p><b>Dos formas de pasar:</b> escribir <code>allow pasting</code> en la consola y pulsar Enter — una vez por pestaña, luego ya te deja pegar — o teclear la línea a mano, que nunca se bloquea.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t17f"><label for="t17f">Inicio → <b>Reservaciones</b>: el nombre del <b>cliente</b> sale en cada fila, tampoco como <code>—</code></label></div>
+      <div class="paso"><input type="checkbox" id="t17g"><label for="t17g">En una reserva <b>Activa</b>, pulsar el <b>▾</b> de la fila → grupo <b>Cierre</b> → <b>Cancelar</b>. Ojo: no es «Solicitar cancelación», que es el botón del cliente. La unidad vuelve a <b>disponible</b> y el pedido reaparece como <b>abierto</b> para las demás empresas</label></div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Como superadmin</h4>
+      <div class="paso"><input type="checkbox" id="t17h"><label for="t17h">Inicio → tarjeta <b>Catálogo</b> («Directorio de proveedores»): las mismas tarjetas se ven igual que las ve el cliente</label></div>
+      <div class="paso"><input type="checkbox" id="t17i"><label for="t17i">Inicio → <b>Reportes</b>: donde se listan empresas, salen con su nombre y no con <code>—</code></label></div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">En los tres</h4>
+      <div class="paso"><input type="checkbox" id="t17j"><label for="t17j">Ninguna de esas pantallas suelta <b>errores rojos</b> en F12 → Console. Los avisos amarillos no cuentan</label></div>
+
+      <div class="falla">
+        <div class="h">Falla si</div>
+        <p>Sale <code>—</code> donde debería ir un nombre: esa pantalla dejó de poder leer la ficha. La causa más probable no es la vista sino el perfil — <code>empresas_publico</code> filtra <code>rol = 'admin'</code>, así que un propietario con otro rol no aparece en ella y todas estas pantallas lo pintan como guión.</p>
+        <p>O si el paso 17e devuelve más de 1: la política de <code>perfiles</code> volvió a abrirse y H-01 está otra vez ahí.</p>
+      </div>
+
+      <div class="nota">
+        <div class="h">Dos pasos que esta prueba tenía y no se podían hacer</div>
+        <p>Pedían abrir el <b>listado de camiones</b> y, desde una unidad, la pestaña <b>Empresa</b>. Ninguna de las dos pantallas existe ya: en <code>app.html</code>, <code>#truck-grid</code> y <code>#stats-row</code> viven dentro del Catálogo con <code>display:none</code> y el comentario «elementos ocultos referenciados por JS legacy». <code>renderCamiones()</code> sigue pintando ahí dentro, y el botón <b>Ver detalle</b> que abre el modal de la unidad solo existe en esas tarjetas invisibles.</p>
+        <p>Es la misma razón por la que el paso <b>16e</b> no se pudo hacer. Está anotado como hueco conocido en <code>docs/FLUJO-OPERATIVO.md</code>; no es una regresión de estas correcciones.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="ronda"><h2>Paso final · H-17</h2><span class="pill pill-pend">Solo cuando 9 a 17 hayan pasado</span></div>
+  <p class="lede">Las cinco transiciones de estado dejan de depender de que alguien abra el navegador. Va aparte porque enciende un proceso que escribe solo cada 15 minutos, y eso conviene observarlo con todo lo demás ya verificado.</p>
+
+  <div class="paso"><input type="checkbox" id="h17a"><label for="h17a">Aplicar: <code>bash supabase/aplicar-a-pruebas.sh supabase/migrations/20260908140000_sincroniza_estados_por_cron.sql</code></label></div>
+
+  <div class="prueba">
+    <div class="p-head">
+      <span class="p-num">18</span>
+      <span class="p-tit">La sincronización hace lo mismo que el navegador</span>
+      <span class="p-rol">psql + cliente</span>
+    </div>
+    <div class="p-body">
+      <p>La función se llama a mano y devuelve un contador por regla, así que no hay que esperar 15 minutos para ver si funciona. Está revocada para <code>anon</code> y <code>authenticated</code>, así que se ejecuta desde psql con la cadena de <b>pruebas</b>:</p>
+      <pre class="cmd">SELECT * FROM public.sincronizar_estados_pedidos();</pre>
+      <div class="paso"><input type="checkbox" id="t18a"><label for="t18a">Devuelve cinco contadores sin error</label></div>
+      <div class="paso"><input type="checkbox" id="t18b"><label for="t18b">Ejecutarla <b>otra vez</b> seguida: los cinco salen en <b>0</b>. Es idempotente, y de eso depende que cron y navegador puedan convivir</label></div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Que expire lo que debe, y solo eso</h4>
+      <div class="paso"><input type="checkbox" id="t18c"><label for="t18c">Como <b>cliente</b>: publicar una solicitud con la <b>fecha de carga más temprana que el formulario permita</b> (mañana). Como <b>superadmin</b>, aprobarla con <b>✓ Aprobar y publicar</b> y <b>no</b> ofertar</label></div>
+      <div class="paso"><input type="checkbox" id="t18c2"><label for="t18c2">Mover esa fecha al pasado <b>por psql</b>, con la cadena de <b>pruebas</b>. Primero localizar la solicitud:</label></div>
+      <pre class="cmd">SELECT id, origen, destino, estado, fecha_ini
+  FROM public.pedidos
+ ORDER BY created_at DESC
+ LIMIT 5;</pre>
+      <div class="paso"><input type="checkbox" id="t18c3"><label for="t18c3">Con ese <code>id</code>, retrasarle la fecha de carga:</label></div>
+      <pre class="cmd">BEGIN;
+ALTER TABLE public.pedidos DISABLE TRIGGER trg_guard_pedido_update;
+UPDATE public.pedidos SET fecha_ini = current_date - 1 WHERE id = '&lt;el id de arriba&gt;';
+ALTER TABLE public.pedidos ENABLE TRIGGER trg_guard_pedido_update;
+COMMIT;</pre>
+      <div class="nota">
+        <div class="h">Por qué no se puede hacer desde la app</div>
+        <p>El formulario no deja elegir una fecha pasada, y tampoco la de hoy: <code>js/pedidos.js</code> pone <code>min</code> en <b>mañana</b> en los cuatro campos de fecha. <b>Ningún servicio se puede pedir para el mismo día</b> — es la regla del negocio, no un fallo del calendario. Por eso la fecha se retrasa después, por SQL.</p>
+        <p>La regla del cron es <code>fecha_ini &lt;= current_date</code>, así que con <b>hoy</b> ya bastaría; se pone ayer para que no quede duda de cuál de las dos cosas disparó el contador.</p>
+      </div>
+      <div class="espera">
+        <div class="h">Por qué hay que apartar el trigger</div>
+        <p><code>psql</code> conecta <b>sin JWT</b>, así que <code>auth.uid()</code> es NULL y <code>guard_pedido_update</code> no reconoce a nadie: ni superadmin, ni dueño del pedido, ni admin. Cae hasta el último <code>RAISE EXCEPTION 'No autorizado'</code> y el <code>UPDATE</code> se revierte entero. Es el mismo muro que tumbó la corrección de datos de H-03.</p>
+        <p>El <code>ENABLE</code> va dentro de la misma transacción a propósito: si algo falla antes del <code>COMMIT</code>, el <code>DISABLE</code> se revierte con todo lo demás y la tabla no se queda sin vigilancia.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t18d"><label for="t18d">Ejecutar la función: <code>solicitudes_vencidas</code> devuelve <b>1</b>, y esa solicitud queda <b>expirada</b></label></div>
+      <div class="nota">
+        <div class="h">Los cinco números no son un marcador</div>
+        <p>Cada uno dice <b>cuántas filas cambió esa llamada</b>, no cuántas lleva en total: en la migración, cada regla es <code>WITH x AS (UPDATE … RETURNING 1) SELECT count(*)</code>, que cuenta lo que acaba de tocar.</p>
+        <p>Por eso un <b>0</b> no es un fallo: significa «esta vez no cambié nada por esta regla», que es justo lo que se espera cuando ya no queda trabajo pendiente. Es lo mismo que comprueba el paso 18b.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t18e"><label for="t18e">Publicar otra con <b>fecha futura</b> (vale la de mañana que ofrece el formulario), también sin ofertas, y aprobarla</label></div>
+      <div class="paso"><input type="checkbox" id="t18e2"><label for="t18e2">Ejecutar la función: <code>solicitudes_vencidas</code> devuelve <b>0</b>. <b>Ese cero es el aprobado</b> — quiere decir que no expiró nada, y lo único expirable que había era esta solicitud</label></div>
+      <div class="paso"><input type="checkbox" id="t18e3"><label for="t18e3">Confirmar que sigue viva: <code>SELECT id, estado, fecha_ini FROM public.pedidos ORDER BY created_at DESC LIMIT 3;</code> — debe seguir en <b>abierto</b>, no en <code>expirado</code></label></div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">La regla que la versión de agosto tenía mal</h4>
+      <div class="nota">
+        <div class="h">Esta situación ya no la produce la app</div>
+        <p>Desde el <b>9 de septiembre</b>, aceptar dispara <code>aceptar_y_cerrar_acuerdo()</code> y el pedido salta de <code>en_negociacion</code> a <code>acordado</code> en la misma transacción, creando la reserva. <b>No existe un punto intermedio donde el pedido siga en negociación con una oferta ya aceptada.</b></p>
+        <p>La regla (c) de la función no está de más: es una <b>reparación</b> para las filas que dejó a medias el flujo viejo, cuando aceptar eran tres escrituras sueltas y la pestaña podía cerrarse entre una y otra. La propia migración lo dice en su comentario. Por eso hay que fabricar esa forma a mano.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t18f0"><label for="t18f0">Dejar un pedido <b>en negociación</b>, desde la app: como <b>cliente</b> publicar una solicitud → como <b>superadmin</b> <b>✓ Aprobar y publicar</b> → como <b>empresa</b>, Inicio → <b>Solicitudes</b> → <b>Hacer oferta</b>. <b>No aceptarla.</b> Con la oferta enviada, el pedido pasa solo a <code>en_negociacion</code></label></div>
+      <div class="nota">
+        <div class="h">Si la consulta de abajo no devuelve nada</div>
+        <p>Es que no queda ningún pedido en <code>en_negociacion</code>: los de los pasos anteriores acabaron en <code>acordado</code> al aceptarlos, o en <code>expirado</code>. No es un fallo de la consulta — hay que crear uno con el paso de arriba.</p>
+        <p>Para verlo: <code>SELECT estado, count(*) FROM public.pedidos GROUP BY estado ORDER BY 2 DESC;</code></p>
+        <p>Y si al ir a ofertar el desplegable de unidades sale vacío, no es esta prueba: es la empresa con documentos vencidos, la misma puerta de la prueba 11.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t18f"><label for="t18f">Localizar una oferta viva de un pedido en negociación, por <b>psql</b>:</label></div>
+      <pre class="cmd">SELECT o.id AS oferta_id, o.estado AS oferta_estado,
+       p.id AS pedido_id, p.estado AS pedido_estado
+  FROM public.ofertas o
+  JOIN public.pedidos p ON p.id = o.pedido_id
+ WHERE p.estado = 'en_negociacion'
+ ORDER BY o.created_at DESC
+ LIMIT 5;</pre>
+      <div class="paso"><input type="checkbox" id="t18f2"><label for="t18f2">Marcar esa oferta como aceptada <b>dejando el pedido en negociación</b> — la forma exacta que dejaba el flujo viejo al morirse a medias:</label></div>
+      <pre class="cmd">BEGIN;
+ALTER TABLE public.ofertas DISABLE TRIGGER USER;
+UPDATE public.ofertas SET estado = 'aceptada' WHERE id = '&lt;oferta_id&gt;';
+ALTER TABLE public.ofertas ENABLE TRIGGER USER;
+COMMIT;</pre>
+      <div class="espera">
+        <div class="h">Por qué <code>DISABLE TRIGGER USER</code> y no solo el guard</div>
+        <p><code>guard_oferta_update</code> rechaza el cambio igual que el de pedidos: sin JWT, <code>auth.uid()</code> es NULL y no reconoce a nadie. Pero apagar solo ese dejaría vivos los triggers de aviso, que mandarían a la empresa y al cliente una notificación de «oferta aceptada» por algo que no hizo ninguno de los dos. <code>USER</code> los aparta todos y el <code>ENABLE</code> los devuelve dentro de la misma transacción.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t18g"><label for="t18g">Ejecutar la función: <code>acuerdos_pendientes</code> devuelve <b>1</b> y <code>pedidos_reabiertos</code> devuelve <b>0</b></label></div>
+      <pre class="cmd">SELECT * FROM public.sincronizar_estados_pedidos();</pre>
+      <div class="paso"><input type="checkbox" id="t18g2"><label for="t18g2">Confirmar dónde acabó el pedido. No hace falta copiar ningún <code>id</code>:</label></div>
+      <pre class="cmd">SELECT p.id, p.estado, p.oferta_pendiente_id, o.estado AS oferta_estado
+  FROM public.pedidos p
+  LEFT JOIN public.ofertas o ON o.id = p.oferta_pendiente_id
+ WHERE p.estado = 'pendiente_acuerdo'
+ ORDER BY p.created_at DESC
+ LIMIT 5;</pre>
+      <div class="paso"><input type="checkbox" id="t18g3"><label for="t18g3">Ahí está tu pedido, con <code>oferta_pendiente_id</code> <b>relleno</b> y <code>oferta_estado</code> en <b>aceptada</b></label></div>
+      <div class="falla">
+        <div class="h">Falla si</div>
+        <p><code>pedidos_reabiertos</code> devuelve <b>1</b>: la regla (b) se llevó el pedido a <code>abierto</code> antes de que la (c) lo viera. <b>Eso es exactamente el fallo de la migración de agosto</b> — el acuerdo se pierde en silencio, porque la regla siguiente busca pedidos en negociación y ya no lo encuentra.</p>
+        <p>O si el pedido llega a <code>pendiente_acuerdo</code> pero con <code>oferta_pendiente_id</code> en <code>NULL</code>: el estado avanzó sin dejar dicho qué oferta lo provocó, y el superadmin no tiene qué aprobar.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t18h"><label for="t18h">Montar <b>otro</b> pedido en negociación, igual que en el paso anterior: como <b>cliente</b> publicar → como <b>superadmin</b> <b>✓ Aprobar y publicar</b> → como <b>empresa</b> <b>Hacer oferta</b>. Sin aceptar ni rechazar nada</label></div>
+      <div class="paso"><input type="checkbox" id="t18h2"><label for="t18h2">Caducarle la oferta por <b>psql</b>, en vez de rechazarla a mano:</label></div>
+      <pre class="cmd">UPDATE public.ofertas o
+   SET expira_en = now() - interval '1 day'
+  FROM public.pedidos p
+ WHERE p.id = o.pedido_id
+   AND p.estado = 'en_negociacion'
+   AND o.estado = 'enviada';</pre>
+      <div class="nota">
+        <div class="h">Aquí no hace falta apartar ningún trigger</div>
+        <p>Todo el cuerpo de <code>guard_oferta_update</code> vive dentro de un <code>IF NEW.estado = 'aceptada'</code>. Este <code>UPDATE</code> solo mueve <code>expira_en</code>, así que el guard lo deja pasar sin mirar quién eres — al contrario que el paso 18f, donde sí cambiábamos el estado.</p>
+        <p><b>Y por qué caducarla en vez de rechazarla desde la app:</b> si el cliente la rechaza en pantalla, <code>renderPedidos()</code> reabre el pedido él mismo al repintar la lista, y entonces no sabrías si el trabajo lo hizo el navegador o la función. Caducando la oferta, el pedido se queda en negociación hasta que alguien la expire.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t18h3"><label for="t18h3">Ejecutar <code>SELECT * FROM public.sincronizar_estados_pedidos();</code> <b>una sola vez</b>: <code>ofertas_expiradas</code> devuelve <b>1</b> y <code>pedidos_reabiertos</code> devuelve <b>1</b></label></div>
+      <div class="espera">
+        <div class="h">Las dos reglas encadenan en la misma llamada</div>
+        <p>La (a) marca la oferta <code>rechazada</code> por vencida y la (b) ve el pedido ya sin ofertas vivas y lo reabre. Por eso la (a) está duplicada aquí aunque el cron <code>expire-stale-offers</code> ya la haga cada hora: sin ella, la (b) tendría que esperar a la hora en punto para enterarse.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t18h4"><label for="t18h4">Comprobar que volvió a <code>abierto</code>:</label></div>
+      <pre class="cmd">SELECT p.id, p.estado, o.estado AS oferta_estado, o.expira_en
+  FROM public.pedidos p
+  LEFT JOIN public.ofertas o ON o.pedido_id = p.id
+ WHERE p.estado = 'abierto'
+ ORDER BY p.created_at DESC
+ LIMIT 5;</pre>
+      <div class="paso"><input type="checkbox" id="t18h5"><label for="t18h5">Y que <b>reaparece para las empresas</b>: como <b>empresa</b>, Inicio → <b>Solicitudes</b> → esa solicitud vuelve a estar en la lista con su botón <b>Hacer oferta</b>. Es la comprobación que de verdad importa — <code>ped_select</code> solo enseña a las empresas los pedidos en <code>abierto</code> o <code>en_negociacion</code></label></div>
+      <div class="espera">
+        <div class="h">Por qué esta pareja importa</div>
+        <p>La migración de agosto que se descartó reabría el pedido sin mirar si había oferta aceptada. Lo habría pasado a <code>abierto</code>, y entonces la regla siguiente —que busca pedidos en negociación— ya no lo habría encontrado. <b>El acuerdo se perdía en silencio.</b> Estas dos casillas son la prueba de que la versión nueva no hereda ese fallo.</p>
+      </div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Que la escotilla siga cerrada</h4>
+      <p>La función se salta <code>guard_pedido_update</code> con un ajuste local a su transacción. Hay que comprobar que nadie más puede encenderlo.</p>
+      <div class="paso"><input type="checkbox" id="t18i"><label for="t18i">Como <b>cliente</b>, en F12 → Console: <code>await sb.rpc('sincronizar_estados_pedidos')</code> — debe <b>fallar</b>, no ejecutarse. Si no te deja pegar, ver la nota de la prueba 17</label></div>
+      <div class="paso"><input type="checkbox" id="t18j"><label for="t18j">Aceptar una oferta con normalidad <b>sigue funcionando</b> — es la rama del guard que la migración vieja habría borrado</label></div>
+      <div class="paso"><input type="checkbox" id="t18k"><label for="t18k">Dar de alta una cuenta nueva <b>sigue funcionando</b> — el guard de perfiles no se tocó, pero conviene confirmarlo tras el susto del día 8</label></div>
+
+      <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">Que el cron corra solo</h4>
+      <div class="paso"><input type="checkbox" id="t18l"><label for="t18l"><code>SELECT jobname, schedule, active FROM cron.job;</code> muestra <code>portgo-sincronizar-estados</code>, <code>*/15 * * * *</code>, activo</label></div>
+      <div class="paso"><input type="checkbox" id="t18m"><label for="t18m">Pasados 15+ minutos: <code>SELECT status, start_time FROM cron.job_run_details ORDER BY start_time DESC LIMIT 5;</code> muestra ejecuciones en <code>succeeded</code></label></div>
+      <div class="falla">
+        <div class="h">Falla si</div>
+        <p>Las ejecuciones salen <code>failed</code>. Lo más probable: la escotilla no funciona y el guard rechaza al cron con <code>No autorizado</code> — el mismo muro que tumbó la corrección de datos de H-03.</p>
+        <p>O si aceptar una oferta deja de funcionar: entonces el <code>CREATE OR REPLACE</code> del guard perdió alguna rama y hay que compararlo con el vigente.</p>
+      </div>
+      <div class="nota">
+        <div class="h">Las reglas del navegador siguen puestas</div>
+        <p>No se retiraron a propósito: son idempotentes y coinciden con las del cron, así que da igual quién las corra, y mientras estén las dos un fallo del cron no congela los estados. Retirarlas es decisión posterior, cuando el cron lleve tiempo funcionando.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Lo que estas pruebas no demuestran</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Qué queda sin probar</th><th>Por qué</th></tr></thead>
+    <tbody>
+      <tr><td>Que la transacción revierte de verdad al interrumpirse</td><td>Habría que cortar la red a mitad de la RPC. Lo que sí se comprueba es que el estado final es coherente, que es el síntoma que importaba</td></tr>
+      <tr><td>La paginación por cursor en varias páginas</td><td>Harían falta más de 30 reservaciones</td></tr>
+      <tr><td>La campana con más de 20 avisos sin leer</td><td>No hay volumen. La petición <code>PATCH</code> sí se verifica</td></tr>
+      <tr><td>El rendimiento de los índices nuevos</td><td>Con estas filas cualquier plan es instantáneo</td></tr>
+      <tr><td>Que producción se comporte igual</td><td>Un resultado limpio aquí es condición necesaria, no suficiente. La ronda 1 ya lo demostró: la promoción falló por un guard que en pruebas nunca se ejercitó</td></tr>
+      <tr><td>Que una unidad se marque ocupada al llegar su fecha</td><td><b>No ocurre, y no está cubierto por ninguna prueba.</b> Los cuatro sitios que ponen <code>estado='ocupado'</code> exigen <code>fecha_ini &lt;= hoy</code>, y nada vuelve a mirarlo después. Una reserva a futuro deja la unidad diciendo «disponible» indefinidamente. No hay riesgo de doble reserva —lo impide <code>reservaciones_sin_solape</code>— pero el catálogo muestra como libre un camión que está en ruta. Candidato natural para el cron de H-17</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Si todo pasa: promover</h2>
+  <div class="aviso">
+    <div class="h">Migraciones primero, código después</div>
+    <p>El código llama a <code>aceptar_y_cerrar_acuerdo</code>. Si llega antes que su migración, aceptar una oferta devuelve 404 en producción.</p>
+  </div>
+  <div class="paso"><input type="checkbox" id="p1"><label for="p1">Aplicar a producción, en orden de fecha, las <b>cuatro</b> migraciones de la ronda 2 (las tres del principio más la de H-17)</label></div>
+  <div class="paso"><input type="checkbox" id="p2"><label for="p2">Confirmar por sonda que existen antes de tocar <code>main</code></label></div>
+  <div class="paso"><input type="checkbox" id="p3"><label for="p3">Merge <code>dev</code> → <code>main</code></label></div>
+  <div class="paso"><input type="checkbox" id="p4"><label for="p4"><b>Verificar que <code>js/config.js</code> apunta a <code>xnyqsewaluezkkrlyhxg</code></b> antes de commitear</label></div>
+  <div class="paso"><input type="checkbox" id="p5"><label for="p5">Push a <code>main</code> y repetir las pruebas 9, 11 y 16 sobre producción</label></div>
+  <div class="nota">
+    <div class="h">Dos avisos de la ronda 1 que siguen valiendo</div>
+    <p><b>El guion de producción rechaza <code>CONCURRENTLY</code>.</b> Ninguna de las tres migraciones de esta ronda lo usa, así que las tres pasan juntas.</p>
+    <p><b>Cuidado con las migraciones que tocan datos.</b> La de la placa hace un <code>UPDATE</code> sobre <code>camiones</code>, pero su guard solo vigila <code>aprobacion</code> y <code>propietario_id</code>, así que pasa. Está comprobado, no supuesto.</p>
+  </div>
+</section>
+
+<footer>
+  <p>Ronda 1 escrita el 1 de septiembre y superada; el código correspondiente está en producción desde el 8. Ronda 2 escrita el 8 de septiembre. El progreso se guarda en este navegador.</p>
+</footer>
+</div>
+
+<script>
+(function () {
+  var CLAVE = 'portgo-pruebas-r2';
+  var cajas = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox]'));
+  var bar = document.getElementById('prog-bar');
+  var txt = document.getElementById('prog-txt');
+
+  function leer() {
+    try {
+      var v = window.localStorage.getItem(CLAVE);
+      return v ? JSON.parse(v) : {};
+    } catch (e) { return {}; }
+  }
+  function guardar(estado) {
+    try { window.localStorage.setItem(CLAVE, JSON.stringify(estado)); } catch (e) { /* sin almacenamiento: la página sigue sirviendo */ }
+  }
+  function pintar() {
+    var n = cajas.filter(function (c) { return c.checked; }).length;
+    var t = cajas.length;
+    bar.style.width = t ? (n / t * 100) + '%' : '0';
+    txt.textContent = n + ' / ' + t;
+  }
+
+  var estado = leer();
+  cajas.forEach(function (c) {
+    if (estado[c.id]) c.checked = true;
+    c.addEventListener('change', function () {
+      var e = leer();
+      if (c.checked) { e[c.id] = 1; } else { delete e[c.id]; }
+      guardar(e);
+      pintar();
+    });
+  });
+  pintar();
+
+  document.getElementById('btn-reset').addEventListener('click', function () {
+    cajas.forEach(function (c) { c.checked = false; });
+    guardar({});
+    pintar();
+  });
+})();
+</script>

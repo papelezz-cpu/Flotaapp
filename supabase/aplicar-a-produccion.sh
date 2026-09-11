@@ -67,6 +67,39 @@ OK="$(printf '%s' "$OK" | tr -d '\r' | sed 's/ó/o/g; s/Ó/O/g' | tr '[:lower:]'
 if [ "$OK" != "APLICAR A PRODUCCION" ]; then echo "  Cancelado. No se tocó nada."; exit 0; fi
 echo
 
+# CREATE INDEX CONCURRENTLY no puede correr dentro de un bloque de transacción.
+# Con --single-transaction, un solo archivo que lo use tumba TODA la tanda.
+# Mismo defecto que tenía aplicar-a-pruebas.sh, y aquí importa más: una tanda
+# a medias en producción es peor que en pruebas.
+#
+# Aquí NO se ofrece correr sin transacción. Este guion acepta varios archivos y
+# los aplica juntos precisamente para que sean atómicos entre sí; renunciar a
+# eso a mitad de una promoción es cambiar el trato. Se rechaza antes de tocar
+# nada y se dice exactamente qué hacer.
+#
+# La detección ignora los comentarios: una migración puede hablar de
+# CONCURRENTLY en su cabecera sin usarlo.
+CONC=()
+for f in "$@"; do
+  if grep -vE '^\s*--' "$f" | grep -qiE '\bCONCURRENTLY\b'; then CONC+=("$f"); fi
+done
+if [ ${#CONC[@]} -gt 0 ]; then
+  echo "  ✗ ALTO: estos archivos usan CONCURRENTLY, que Postgres prohíbe dentro" >&2
+  echo "    de una transacción, y este guion aplica todo en una sola:" >&2
+  for f in "${CONC[@]}"; do echo "      · $f" >&2; done
+  echo >&2
+  echo "    No se aplicó NADA. Producción quedó intacta." >&2
+  echo >&2
+  echo "    Dos salidas:" >&2
+  echo "      1. Si no hace falta CONCURRENTLY —con tablas de miles de filas no" >&2
+  echo "         hace falta: el índice se construye en milisegundos— quítalo del" >&2
+  echo "         archivo y vuelve a correr esto." >&2
+  echo "      2. Si de verdad hace falta, ese archivo va aparte y a mano:" >&2
+  echo "           psql \"<cadena-produccion>\" -v ON_ERROR_STOP=1 -f <archivo>" >&2
+  echo "         y el resto de la tanda por este guion, sin él." >&2
+  exit 2
+fi
+
 # -f por archivo dentro de una sola sesión con --single-transaction: psql abre
 # cada archivo en binario y respeta los CRLF que puedan vivir dentro de un
 # cuerpo de función. Ver replicar-produccion-a-pruebas.sh.

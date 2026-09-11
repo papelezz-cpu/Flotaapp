@@ -100,35 +100,27 @@ async function avanzarTracking() {
     return;
   }
 
-  await sb.from('reservaciones')
-    .update({ tracking_estado: next.key })
-    .eq('id', trackingReservaId);
+  // avanzar_tracking (RPC, ver supabase/migrations/20260810120000): mueve el
+  // paso, avisa al cliente y —al llegar a "Entregado"— abre solo el expediente
+  // de vacíos si el viaje llevó contenedor, todo en una transacción. Antes eran
+  // 3 escrituras sueltas más la apertura del expediente por separado. Ver H-10.
+  const { data: nuevoEstado, error } = await sb.rpc('avanzar_tracking', { p_reserva_id: trackingReservaId });
+  if (error) { showToast(error.message || 'No se pudo avanzar el seguimiento', 'error'); return; }
 
-  trackingReserva = { ...trackingReserva, tracking_estado: next.key };
+  trackingReserva = { ...trackingReserva, tracking_estado: nuevoEstado || next.key };
   renderTrackingModal();
 
   const esUltimo = idx + 1 === TRACKING_ESTADOS.length - 1;
   if (esUltimo) showToast('✓ Servicio marcado como finalizado');
 
-  // Al entregar se abre solo el expediente de vacíos si hubo contenedor.
-  // Nadie se acuerda de pedirlo, y es justo donde empiezan a correr las
-  // demoras: se cobran por día hasta que el contenedor entra al depósito.
-  if (next.key === 'Entregado' && typeof abrirExpedienteVaciosSiAplica === 'function') {
-    await abrirExpedienteVaciosSiAplica(trackingReserva);
+  // La RPC ya abrió el expediente de vacíos (si aplicaba) dentro de su
+  // transacción; el correo queda fuera de ella por diseño, así que lo
+  // disparamos aquí para conservar el aviso que antes mandaba el cliente.
+  // _emailDocsSolicitados no envía nada si el expediente no llegó a crearse.
+  if ((nuevoEstado || next.key) === 'Entregado' && typeof _emailDocsSolicitados === 'function') {
+    await _emailDocsSolicitados(trackingReservaId, 'entrega_vacios');
   }
   if (document.getElementById('view-reservaciones').classList.contains('active')) renderReserv();
-
-  // Notificar al cliente sobre el avance del tracking
-  if (trackingReserva.cliente_user_id) {
-    const r = trackingReserva;
-    await sb.from('notificaciones').insert({
-      user_id: r.cliente_user_id,
-      tipo:    'tracking_actualizado',
-      titulo:  `${next.icon} ${next.label}`,
-      mensaje: `Tu servicio "${r.unidad}" avanzó a: ${next.label}.`,
-      leido:   false,
-    });
-  }
 }
 
 function closeTracking() {

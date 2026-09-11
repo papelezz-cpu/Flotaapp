@@ -49,38 +49,47 @@ async function solicitarDocumentacion(reservaId, etapa) {
   showConfirm(
     `¿Solicitar al cliente los ${cfg.titulo.toLowerCase()}? Le llegará aviso por campana y correo.`,
     async () => {
-      const { data: exist } = await sb.from('expedientes')
-        .select('id').eq('reserva_id', reservaId).eq('etapa', etapa).maybeSingle();
-      if (exist) { abrirExpediente(reservaId, etapa); return; }
-
-      const { data: exp, error } = await sb.from('expedientes')
-        .insert({ reserva_id: reservaId, etapa, solicitado_por: currentUser.id })
-        .select().single();
+      // abrir_expediente (RPC, ver supabase/migrations/20260810120000): crea el
+      // expediente, copia el checklist del catálogo y avisa al cliente por
+      // campana, todo en una transacción. Es idempotente — si ya existe,
+      // devuelve el mismo id sin duplicar nada. Antes eran 3 escrituras
+      // sueltas (expediente + checklist + notificación). Ver H-10.
+      const { error } = await sb.rpc('abrir_expediente', {
+        p_reserva_id:     reservaId,
+        p_etapa:          etapa,
+        p_solo_si_aplica: false,
+      });
       if (error) { console.error(error); showToast('No se pudo solicitar: ' + (error.message || ''), 'error'); return; }
 
-      // El checklist se copia del catálogo, no se referencia: si mañana editan
-      // el catálogo, este expediente debe seguir diciendo lo que se pidió.
-      const { data: cat } = await sb.from('documentos_catalogo')
-        .select('*').eq('etapa', etapa).eq('activo', true).order('orden');
-
-      if (cat?.length) {
-        const { error: e2 } = await sb.from('expediente_documentos').insert(cat.map(c => ({
-          expediente_id: exp.id,
-          nombre:        c.nombre,
-          descripcion:   c.descripcion,
-          obligatorio:   c.obligatorio,
-          orden:         c.orden,
-        })));
-        if (e2) { console.error(e2); showToast('El expediente se creó pero sin lista: ' + e2.message, 'error'); }
-      }
-
-      await _avisarCliente(reservaId, etapa, 'solicitud');
+      await _emailDocsSolicitados(reservaId, etapa);
       showToast('✓ Documentación solicitada al cliente');
       abrirExpediente(reservaId, etapa);
       if (document.getElementById('view-reservaciones')?.classList.contains('active')) renderReserv();
     },
     { confirmLabel: 'Solicitar' }
   );
+}
+
+// Solo el correo de "documentación solicitada". La notificación de campana la
+// inserta ahora la RPC abrir_expediente dentro de su transacción; el correo se
+// mantiene fuera (fire-and-forget) por la misma razón que el resto de la app:
+// no atar un commit a que responda el SMTP. No envía nada si el expediente no
+// llegó a crearse — p. ej. "entrega_vacios" en un viaje sin contenedor.
+async function _emailDocsSolicitados(reservaId, etapa) {
+  const cfg = EXP_ETAPAS[etapa];
+  if (!cfg) return;
+  const { data: r } = await sb.from('reservaciones')
+    .select('cliente_user_id, unidad').eq('id', reservaId).single();
+  if (!r?.cliente_user_id) return;
+  const { data: exp } = await sb.from('expedientes')
+    .select('id').eq('reserva_id', reservaId).eq('etapa', etapa).maybeSingle();
+  if (!exp) return;
+  _notificarEmail({
+    tipo: 'resolucion', destinoIds: [r.cliente_user_id],
+    titulo: 'Documentación solicitada',
+    mensaje: `El transportista necesita los ${cfg.titulo.toLowerCase()} para el servicio "${r.unidad}". Súbelos desde Reservaciones.`,
+    nota: null, aprobado: true,
+  });
 }
 
 async function _avisarCliente(reservaId, etapa, motivo, detalle = '') {
@@ -467,38 +476,31 @@ async function _refrescarExpediente() {
 }
 
 // ── Crear el expediente automáticamente (sin que nadie se acuerde de pedirlo) ──
-// Copia el catálogo y avisa al cliente, igual que solicitarDocumentacion,
-// pero sin el diálogo de confirmación — es el sistema el que lo dispara.
-// No hace nada si ya existe (idempotente: seguro de llamar más de una vez).
+// Igual que solicitarDocumentacion pero sin el diálogo de confirmación — lo
+// dispara el sistema al cerrar el acuerdo (js/pedidos.js) o al entregar. Usa la
+// misma RPC abrir_expediente, que es idempotente. El caller ya decidió que la
+// etapa aplica, así que p_solo_si_aplica va en false: para "entrega_vacios" el
+// filtro por contenedor lo hace avanzar_tracking, no este flujo.
 async function _crearExpedienteAuto(reservaId, etapa) {
   const cfg = EXP_ETAPAS[etapa];
   if (!cfg) return;
 
-  const { data: exist } = await sb.from('expedientes')
-    .select('id').eq('reserva_id', reservaId).eq('etapa', etapa).maybeSingle();
-  if (exist) return;
-
-  const { data: exp, error } = await sb.from('expedientes')
-    .insert({ reserva_id: reservaId, etapa, solicitado_por: currentUser.id })
-    .select().single();
+  const { data: exp, error } = await sb.rpc('abrir_expediente', {
+    p_reserva_id:     reservaId,
+    p_etapa:          etapa,
+    p_solo_si_aplica: false,
+  });
   if (error) { console.error(`No se pudo abrir el expediente de ${etapa}:`, error); return; }
+  if (!exp) return;
 
-  const { data: cat } = await sb.from('documentos_catalogo')
-    .select('*').eq('etapa', etapa).eq('activo', true).order('orden');
-  if (cat?.length) {
-    await sb.from('expediente_documentos').insert(cat.map(c => ({
-      expediente_id: exp.id, nombre: c.nombre, descripcion: c.descripcion,
-      obligatorio: c.obligatorio, orden: c.orden,
-    })));
-  }
-  await _avisarCliente(reservaId, etapa, 'solicitud');
+  await _emailDocsSolicitados(reservaId, etapa);
   showToast(`${cfg.icon} Se abrió el expediente de ${cfg.titulo.toLowerCase()}`);
 }
 
 // ── Se dispara solo al entregar ─────────────────────────
-// El expediente de vacíos nadie se acuerda de pedirlo, y es justo donde corren
-// las demoras. Se abre al llegar el tracking a "Entregado" si hubo contenedor
-// (respaldo por si el pedido no traía marcado patio_externo al hacer match).
+// NOTA: avanzar_tracking (RPC) ya abre el expediente de vacíos server-side al
+// llegar a "Entregado" si hubo contenedor. Esta función queda como respaldo
+// manual; ningún flujo la llama hoy.
 async function abrirExpedienteVaciosSiAplica(reserva) {
   if (!reserva?.pedido_id) return;
   const { data: ped } = await sb.from('pedidos')

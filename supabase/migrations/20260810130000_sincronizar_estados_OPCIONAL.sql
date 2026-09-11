@@ -1,3 +1,28 @@
+-- ██████████████████████████████████████████████████████████████████████████
+-- ⛔ OBSOLETA — NO APLICAR. La sustituye 20260908140000_sincroniza_estados_por_cron.sql
+--
+-- Anotado el 2026-09-08. Este archivo se queda como historia, no como algo
+-- ejecutable. Aplicarlo hoy haría daño por dos vías:
+--
+-- 1) Su CREATE OR REPLACE del guard usa la versión de agosto, y le BORRARÍA
+--    tres ramas añadidas después:
+--      · la de orfandad por borrado de cuenta (20260827190000) — sin ella,
+--        dar de baja una cuenta vuelve a fallar;
+--      · el permiso del CLIENTE para 'pendiente_acuerdo' -> 'acordado';
+--      · la rama del ADMIN para esa misma transición.
+--    Las dos últimas son de las que depende aceptar_y_cerrar_acuerdo
+--    (20260903120000). Esto rompería esa RPC.
+--
+-- 2) Su función de sincronización va corta y tiene un fallo propio:
+--      · le falta la quinta regla, "solicitud sin ofertas vivas cuya fecha de
+--        carga ya llegó" -> expirado, añadida al navegador después;
+--      · su regla (b) reabre un pedido 'en_negociacion' sin excluir las
+--        ofertas 'aceptada', así que lo pasaría a 'abierto' y la regla (c) ya
+--        no lo encontraría para llevarlo a 'pendiente_acuerdo'.
+--
+-- La migración nueva parte del guard VIGENTE y le añade solo la escotilla.
+-- ██████████████████████████████████████████████████████████████████████████
+--
 -- ──────────────────────────────────────────────────────────────────────────
 -- ⚠ MIGRACIÓN OPCIONAL — LEE ESTO ANTES DE APLICARLA
 --

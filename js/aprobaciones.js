@@ -895,13 +895,35 @@ function verDocRegistro(path) {
   });
 }
 
+// Datos que el registro pide y que la ficha del perfil vuelve a pedir.
+const _CAMPOS_FICHA = ['razon_social', 'rfc', 'telefono', 'tipo_persona'];
+
 async function aprobarCuenta(userId, metodo) {
   const esFisica = metodo === 'fisica';
-  const { data: sc } = await sb.from('solicitudes_cuenta')
-    .select('nombre').eq('user_id', userId).single();
+  const [{ data: sc }, { data: pf }] = await Promise.all([
+    sb.from('solicitudes_cuenta')
+      .select(['nombre', ..._CAMPOS_FICHA].join(', ')).eq('user_id', userId).maybeSingle(),
+    sb.from('perfiles')
+      .select(_CAMPOS_FICHA.join(', ')).eq('user_id', userId).maybeSingle(),
+  ]);
+
+  // El registro pide razon social, RFC y telefono, pero solo los guarda en
+  // solicitudes_cuenta: js/auth.js escribe en perfiles nada mas user_id,
+  // nombre, rol y aprobacion_cuenta. Sin este copiado la empresa entrega esos
+  // datos, el superadmin los revisa para aprobarla, y su ficha publica nace
+  // vacia -- ninguna tarjeta del Catalogo, ningun boton "Ver empresa" -- hasta
+  // que alguien los vuelve a teclear en Mis unidades > Perfil de empresa.
+  //
+  // Solo se rellena lo que este vacio. Un re-registro tras un rechazo no debe
+  // pisar lo que la empresa ya haya editado por su cuenta.
+  const ficha = {};
+  _CAMPOS_FICHA.forEach(k => {
+    const v = (sc?.[k] ?? '').toString().trim();
+    if (v && !pf?.[k]) ficha[k] = v;
+  });
 
   const [{ error }] = await Promise.all([
-    sb.from('perfiles').update({ aprobacion_cuenta: null, metodo_verificacion: metodo, verificado: esFisica }).eq('user_id', userId),
+    sb.from('perfiles').update({ aprobacion_cuenta: null, metodo_verificacion: metodo, verificado: esFisica, ...ficha }).eq('user_id', userId),
     sb.from('solicitudes_cuenta').update({ estado: 'aprobada' }).eq('user_id', userId),
   ]);
   if (error) { showToast('Error al aprobar', 'error'); return; }

@@ -108,11 +108,32 @@ When reporting anything measured in `portgo-pruebas`, state the parity stamp (da
 
 ---
 
+## 🛑 RULE #4 — EL FLUJO OPERATIVO ES LA FUENTE DE VERDAD DEL NEGOCIO
+
+**Antes de decidir, proponer o construir cualquier cosa que toque el flujo entre cliente, empresa y superadmin, lee [docs/FLUJO-OPERATIVO.md](docs/FLUJO-OPERATIVO.md).** No de memoria, no "según recuerdo del código": abre el archivo.
+
+Ese documento recoge lo que ya se verificó contra el esquema, los guards y las políticas RLS: los estados válidos de cada tabla, quién puede provocar cada transición, qué regla la bloquea cuando no puede, y los huecos conocidos que **no** son fallos nuevos. Está ahí precisamente porque cada uno de esos hechos costó una sesión de pruebas manuales averiguarlo.
+
+### Qué obliga
+
+1. **Toda afirmación sobre el flujo tiene que estar en el documento, o verificarse antes de decirla.** Si el documento no lo cubre, se lee el código y **se añade al documento** — no se contesta de memoria y se sigue adelante.
+2. **Toda decisión de negocio nueva se escribe ahí en el mismo commit que la implementa.** Un cambio de regla que no queda documentado se pierde: la siguiente sesión no lo sabrá y volverá a proponer lo contrario. Ya pasó con «las dos partes aceptan y la reserva se crea sin superadmin» (2026-09-09), que contradecía lo que este mismo archivo decía más abajo.
+3. **Si el documento y el código se contradicen, gana el código** — y hay que corregir el documento acto seguido, nunca ajustar el código a lo que dice el papel.
+4. **Un hueco listado en «Huecos conocidos» no se reporta como hallazgo nuevo** ni se "arregla" por iniciativa propia. Está ahí verificado y con decisión tomada de dejarlo; si conviene resolverlo, se propone, no se hace.
+
+### Qué prohíbe
+
+- **Inventar estados, botones, etiquetas o pasos.** Los estados canónicos salen de los `CHECK`; las etiquetas de la interfaz, del HTML. Si no aparece en uno de los dos, no existe — y describir al usuario un botón que no existe le hace perder el tiempo buscándolo. Ya pasó varias veces durante las pruebas de septiembre 2026.
+- **Suponer el orden de una secuencia.** Los cuatro tracking son distintos por `recurso_tipo`, y las precedencias (chofer antes de avanzar, tracking antes de evidencia, oferta antes de vencer un documento) están escritas porque el orden inverso falla.
+- **Dar por hecho un permiso.** Quién puede hacer qué lo deciden los guard triggers, no la intuición. La tabla de guards del documento dice qué impide cada uno.
+
+---
+
 ## Project Overview
 
 **PortGo** is a PWA logistics platform for port transport services built as a fully client-side app with Supabase as the backend (PostgreSQL + Auth + Realtime + Storage).
 
-**Business flow:** Client posts a transport request (`pedido`) → superadmin reviews and publishes it → companies (`admin`) bid (`ofertas`) → client accepts a bid → superadmin approves the agreement → a `reservación` is created and tracked to completion → client rates the service.
+**Business flow:** Client posts a transport request (`pedido`) → superadmin reviews and publishes it → companies (`admin`) bid (`ofertas`) → **both sides accept and the `reservación` is created in the same transaction, with no superadmin step** → tracked to completion → superadmin approves the closure → client rates the service. The superadmin only re-enters the agreement when the company has expired documents (`pendiente_acuerdo`). Full detail, verified against the schema and the guard triggers: [docs/FLUJO-OPERATIVO.md](docs/FLUJO-OPERATIVO.md) — see [Rule #4](#-rule-4--el-flujo-operativo-es-la-fuente-de-verdad-del-negocio).
 
 **Stack:** Vanilla JS (plain `<script>` tags, global scope, loaded in order), plain CSS, Supabase JS SDK v2 from CDN, no build tooling, no package manager, no tests.
 
@@ -299,7 +320,7 @@ All tables in `public` with RLS enabled.
 ### `pedidos` — client transport requests. PK `id` (uuid)
 `cliente_id/_nombre/_email` (denormalized), `tipo_camion`, `tipo_carga`, `origen`, `destino`, `fecha_ini/_fin`, `precio_cliente`, `oferta_pendiente_id`, `rechazo_nota`, special-requirement bools.
 Cargo-driven fields (the request is built from the load, not from the truck): `categoria_carga`, `peso_carga`, `num_tarimas`, `num_bultos`, `contenedor_N_tipo/_peso`, `num_contenedores`, `largo/ancho/alto_m`, `hazmat_clase/_un`, `temp_min/_max`, `origen/destino_lat/_lng` (map pin), `plazo_pago`, `detalles_*` (lugar, hora, contacto — captured when the client accepts an offer).
-**`estado` flow:** `pendiente_revision` → (SA approves) → `abierto` → `en_negociacion` → (client accepts, SA reviews) → `pendiente_acuerdo` → `acordado` → `finalizado` (service closed and approved). Also `cancelado`, `rechazado`, and `expirado` (was `acordado` and `fecha_fin` passed without completion). Cancelling a reservation returns the pedido to `abierto` and invalidates its ofertas.
+**`estado` flow:** `pendiente_revision` → (SA approves) → `abierto` → `en_negociacion` → (both sides accept) → `acordado` → `finalizado` (service closed and approved). `pendiente_acuerdo` is the **detour**, not a step: `guard_oferta_update` sends the pedido there when the accepting company has an expired SCT permit or insurance, and only the superadmin can force it through. Also `cancelado`, `rechazado`, and `expirado` (was `acordado` and `fecha_fin` passed without completion). Cancelling a reservation returns the pedido to `abierto` and invalidates its ofertas.
 
 > ⚠️ **The state machine advances as a side effect of rendering the list** — `renderPedidos()` in [js/pedidos.js:239-292](js/pedidos.js) expires stale offers, reopens pedidos with no live offers, and marks past-due agreements `expirado`. If nobody opens "Solicitudes" in the web app, none of that happens. The optional migration `20260810130000_sincronizar_estados_OPCIONAL.sql` moves it to pg_cron; it is **not applied** by default.
 
