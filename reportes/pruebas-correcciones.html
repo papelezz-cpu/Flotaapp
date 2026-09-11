@@ -686,7 +686,21 @@ COMMIT;</pre>
         <div class="h">Por qué <code>DISABLE TRIGGER USER</code> y no solo el guard</div>
         <p><code>guard_oferta_update</code> rechaza el cambio igual que el de pedidos: sin JWT, <code>auth.uid()</code> es NULL y no reconoce a nadie. Pero apagar solo ese dejaría vivos los triggers de aviso, que mandarían a la empresa y al cliente una notificación de «oferta aceptada» por algo que no hizo ninguno de los dos. <code>USER</code> los aparta todos y el <code>ENABLE</code> los devuelve dentro de la misma transacción.</p>
       </div>
-      <div class="paso"><input type="checkbox" id="t18g"><label for="t18g">Ejecutar la función: <code>acuerdos_pendientes</code> devuelve <b>1</b> y <code>pedidos_reabiertos</code> devuelve <b>0</b>. Ese pedido queda en <b>pendiente_acuerdo</b>, <b>no</b> en <code>abierto</code>, y con su <code>oferta_pendiente_id</code> puesto</label></div>
+      <div class="paso"><input type="checkbox" id="t18g"><label for="t18g">Ejecutar la función: <code>acuerdos_pendientes</code> devuelve <b>1</b> y <code>pedidos_reabiertos</code> devuelve <b>0</b></label></div>
+      <pre class="cmd">SELECT * FROM public.sincronizar_estados_pedidos();</pre>
+      <div class="paso"><input type="checkbox" id="t18g2"><label for="t18g2">Confirmar dónde acabó el pedido. No hace falta copiar ningún <code>id</code>:</label></div>
+      <pre class="cmd">SELECT p.id, p.estado, p.oferta_pendiente_id, o.estado AS oferta_estado
+  FROM public.pedidos p
+  LEFT JOIN public.ofertas o ON o.id = p.oferta_pendiente_id
+ WHERE p.estado = 'pendiente_acuerdo'
+ ORDER BY p.created_at DESC
+ LIMIT 5;</pre>
+      <div class="paso"><input type="checkbox" id="t18g3"><label for="t18g3">Ahí está tu pedido, con <code>oferta_pendiente_id</code> <b>relleno</b> y <code>oferta_estado</code> en <b>aceptada</b></label></div>
+      <div class="falla">
+        <div class="h">Falla si</div>
+        <p><code>pedidos_reabiertos</code> devuelve <b>1</b>: la regla (b) se llevó el pedido a <code>abierto</code> antes de que la (c) lo viera. <b>Eso es exactamente el fallo de la migración de agosto</b> — el acuerdo se pierde en silencio, porque la regla siguiente busca pedidos en negociación y ya no lo encuentra.</p>
+        <p>O si el pedido llega a <code>pendiente_acuerdo</code> pero con <code>oferta_pendiente_id</code> en <code>NULL</code>: el estado avanzó sin dejar dicho qué oferta lo provocó, y el superadmin no tiene qué aprobar.</p>
+      </div>
       <div class="paso"><input type="checkbox" id="t18h"><label for="t18h">Otro pedido en negociación con <b>todas</b> las ofertas rechazadas <b>sí</b> debe volver a <code>abierto</code> y reaparecer para las empresas</label></div>
       <div class="espera">
         <div class="h">Por qué esta pareja importa</div>
