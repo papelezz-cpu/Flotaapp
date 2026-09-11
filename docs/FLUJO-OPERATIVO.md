@@ -316,6 +316,20 @@ EMPRESA acepta la contraoferta  ─┘     → oferta 'aceptada'
 
 Todo en una transacción. Si algo falla, no queda nada a medias.
 
+**Y solo una de las dos vías gana.** Las dos pueden dispararse a la vez sobre el
+mismo pedido —el cliente acepta la oferta A mientras la empresa Y acepta la
+contraoferta de su oferta B—, y son dos personas distintas haciendo cada una
+algo permitido. Desde el 2026-09-11 `aceptar_y_cerrar_acuerdo` y
+`cerrar_acuerdo` bloquean la fila del pedido (`FOR UPDATE`) antes de comprobar
+su estado, así que la segunda espera, re-lee el pedido ya en `acordado` y sale
+con *«Esta solicitud ya no está en negociación»*. Debajo, el índice parcial
+`uq_reservaciones_pedido_vivo` lo impide de forma declarativa.
+
+Se bloquea el **pedido** y no la oferta porque las dos vías entran por ofertas
+distintas: el pedido es su único punto común. El índice es **parcial**
+(`estado not in ('Cancelada','Rechazada')`) porque cancelar reabre el pedido y
+otra empresa puede ganarlo después — ver §9.
+
 **No hay punto intermedio.** El pedido no se queda en `en_negociacion` con una
 oferta ya aceptada: eso solo lo producía el flujo viejo, cuando aceptar eran
 tres escrituras sueltas y la pestaña podía cerrarse entre una y otra. La regla
