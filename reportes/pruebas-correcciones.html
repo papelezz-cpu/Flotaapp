@@ -645,8 +645,15 @@ COMMIT;</pre>
         <p><code>psql</code> conecta <b>sin JWT</b>, así que <code>auth.uid()</code> es NULL y <code>guard_pedido_update</code> no reconoce a nadie: ni superadmin, ni dueño del pedido, ni admin. Cae hasta el último <code>RAISE EXCEPTION 'No autorizado'</code> y el <code>UPDATE</code> se revierte entero. Es el mismo muro que tumbó la corrección de datos de H-03.</p>
         <p>El <code>ENABLE</code> va dentro de la misma transacción a propósito: si algo falla antes del <code>COMMIT</code>, el <code>DISABLE</code> se revierte con todo lo demás y la tabla no se queda sin vigilancia.</p>
       </div>
-      <div class="paso"><input type="checkbox" id="t18d"><label for="t18d">Ejecutar la función: el contador <code>solicitudes_vencidas</code> sube, y esa solicitud queda <b>expirada</b></label></div>
-      <div class="paso"><input type="checkbox" id="t18e"><label for="t18e">Publicar otra con <b>fecha futura</b>, también sin ofertas. Ejecutar la función: <b>no</b> debe tocarla</label></div>
+      <div class="paso"><input type="checkbox" id="t18d"><label for="t18d">Ejecutar la función: <code>solicitudes_vencidas</code> devuelve <b>1</b>, y esa solicitud queda <b>expirada</b></label></div>
+      <div class="nota">
+        <div class="h">Los cinco números no son un marcador</div>
+        <p>Cada uno dice <b>cuántas filas cambió esa llamada</b>, no cuántas lleva en total: en la migración, cada regla es <code>WITH x AS (UPDATE … RETURNING 1) SELECT count(*)</code>, que cuenta lo que acaba de tocar.</p>
+        <p>Por eso un <b>0</b> no es un fallo: significa «esta vez no cambié nada por esta regla», que es justo lo que se espera cuando ya no queda trabajo pendiente. Es lo mismo que comprueba el paso 18b.</p>
+      </div>
+      <div class="paso"><input type="checkbox" id="t18e"><label for="t18e">Publicar otra con <b>fecha futura</b> (vale la de mañana que ofrece el formulario), también sin ofertas, y aprobarla</label></div>
+      <div class="paso"><input type="checkbox" id="t18e2"><label for="t18e2">Ejecutar la función: <code>solicitudes_vencidas</code> devuelve <b>0</b>. <b>Ese cero es el aprobado</b> — quiere decir que no expiró nada, y lo único expirable que había era esta solicitud</label></div>
+      <div class="paso"><input type="checkbox" id="t18e3"><label for="t18e3">Confirmar que sigue viva: <code>SELECT id, estado, fecha_ini FROM public.pedidos ORDER BY created_at DESC LIMIT 3;</code> — debe seguir en <b>abierto</b>, no en <code>expirado</code></label></div>
 
       <h4 style="font-family:Archivo,sans-serif;font-size:14px;margin:22px 0 6px">La regla que la versión de agosto tenía mal</h4>
       <div class="paso"><input type="checkbox" id="t18f"><label for="t18f">Dejar un pedido en negociación con una oferta <b>aceptada</b> pero sin acuerdo aprobado todavía</label></div>
