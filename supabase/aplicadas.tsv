@@ -1,0 +1,15 @@
+# Libro mayor de migraciones aplicadas.
+#
+# Una línea por (archivo, proyecto). Lo escriben aplicar-a-pruebas.sh y
+# aplicar-a-produccion.sh al terminar bien; no se edita a mano.
+#
+# ⚠ Las migraciones ANTERIORES a la creación de este archivo no están
+#   registradas: no se sabe cuáles corren dónde, y por eso existe esto.
+#   Lo de aquí es fiable; la ausencia de una línea no prueba nada sobre
+#   lo anterior al 2026-09-11.
+#
+# fecha_utc	entorno	proyecto_ref	archivo	sha256
+2026-09-11T22:33:16Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260911120000_cierre_acuerdo_sin_carrera.sql	411eafa84c820e1f1782348fc6e28c53f5dffb6b0b9428242c7f392a09446cd2
+2026-09-11T22:33:16Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260911130000_permisos_cierra_anon_y_truncate.sql	93f95a4ada49a6acef050d0ffb53faddf1681bbe2b1918ba1c9b5f8f1da5e861
+2026-09-11T22:33:16Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260911140000_rpc_viejas_delegan_en_el_cierre.sql	62875d0381979b53c10854a431d60f75bc90b1c27a535f103fd8a2e132063b44
+2026-09-11T22:33:16Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260911150000_truncate_tambien_en_la_vista.sql	f30925ecc83f2d7f2358fc28362c9321c1a37ecf14be1b2e2eb80ccc48de7557

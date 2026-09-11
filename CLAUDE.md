@@ -217,8 +217,17 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
     ├── functions/
     │   ├── gestionar-usuario/   # Privileged user CRUD (superadmin only, service role key)
     │   └── enviar-notificacion/ # Email notifications
-    ├── migrations/         # 25 SQL migrations — the source of truth for schema, RLS,
+    ├── migrations/         # 63 SQL migrations — the source of truth for schema, RLS,
     │                       #   guard triggers and the business RPCs
+    ├── aplicadas.tsv       # Migration ledger: which .sql ran against which project,
+    │                       #   when, and the sha256 of the file at that moment. Written
+    │                       #   automatically by the two aplicar-a-* scripts; committed.
+    │                       #   The hash matters: a migration can be edited after it ran
+    ├── estado-migraciones.sh  # Reads that ledger and prints, per environment: applied
+    │                       #   (✓), applied but the file changed since (≠), or no record
+    │                       #   (·). Touches no database. Entries start 2026-09-11 —
+    │                       #   a `·` on anything older means "unknown", not "pending"
+    ├── registrar-aplicada.sh  # Appends to the ledger. Called by the apply scripts
     ├── espejo/             # (gitignored) production dump + paridad.json stamp. Real
     │                       #   personal data — never commit, never share
     ├── replicar-produccion-a-pruebas.sh  # Rule #3: rebuilds portgo-pruebas as an exact
