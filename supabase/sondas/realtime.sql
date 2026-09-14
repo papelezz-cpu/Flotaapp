@@ -32,15 +32,38 @@ SELECT
   END AS concepto,
   sum(calls)                                   AS llamadas,
   round(sum(total_exec_time)::numeric / 1000, 1) AS segundos,
-  round(100 * sum(total_exec_time)::numeric
-        / nullif(sum(sum(total_exec_time)) OVER (), 0), 2) AS pct
+  -- El cast va FUERA de la division: sum(sum(...)) OVER () devuelve double
+  -- precision, y numeric/double vuelve a ser double, para el que no existe
+  -- round(x, n). Fallo real el 2026-09-14.
+  round((100 * sum(total_exec_time)
+        / nullif(sum(sum(total_exec_time)) OVER (), 0))::numeric, 2) AS pct_acumulado
   FROM extensions.pg_stat_statements
  GROUP BY 1
  ORDER BY 4 DESC NULLS LAST;
 
 \echo ''
-\echo '    Desde cuando acumula (si es reciente, el reparto aun no es estable):'
-SELECT stats_reset FROM extensions.pg_stat_statements_info;
+\echo '    ⚠ ESE PORCENTAJE ES ACUMULADO, Y ENGANA SI NO SE MIRA DESDE CUANDO.'
+\echo '    El 2026-09-14 el acumulado seguia diciendo 84 % para Realtime, pero'
+\echo '    incluia los 4 meses y medio ANTERIORES al arreglo de agosto. Medido'
+\echo '    por ritmo diario, Realtime habia bajado un 88 %: de 4 964 llamadas'
+\echo '    al dia a 571. Mirar el acumulado sin mirar stats_reset lleva a la'
+\echo '    conclusion contraria y a "optimizar" lo que ya esta optimizado.'
+SELECT stats_reset,
+       now() - stats_reset            AS lleva_acumulando,
+       'divide entre los dias para tener el ritmo' AS como_leerlo
+  FROM extensions.pg_stat_statements_info;
+
+\echo ''
+\echo '    Ritmo diario de Realtime — esto SI refleja el comportamiento actual:'
+SELECT sum(calls)                                        AS llamadas_totales,
+       round((sum(calls) / greatest(extract(epoch from now() - i.stats_reset)/86400, 1))::numeric, 0)
+                                                         AS llamadas_por_dia,
+       round((sum(total_exec_time)/1000
+              / greatest(extract(epoch from now() - i.stats_reset)/86400, 1))::numeric, 1)
+                                                         AS segundos_por_dia
+  FROM extensions.pg_stat_statements, extensions.pg_stat_statements_info i
+ WHERE query LIKE 'SELECT wal->>%'
+ GROUP BY i.stats_reset;
 
 \echo ''
 \echo '════════════════════════════════════════════════════════════════'
