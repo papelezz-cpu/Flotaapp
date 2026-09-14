@@ -108,24 +108,39 @@ When reporting anything measured in `portgo-pruebas`, state the parity stamp (da
 
 ---
 
-## 🛑 RULE #4 — EL FLUJO OPERATIVO ES LA FUENTE DE VERDAD DEL NEGOCIO
+## 🛑 RULE #4 — EL FLUJO OPERATIVO SE LEE ANTES DE CONSTRUIR Y SE ACTUALIZA DESPUÉS
 
-**Antes de decidir, proponer o construir cualquier cosa que toque el flujo entre cliente, empresa y superadmin, lee [docs/FLUJO-OPERATIVO.md](docs/FLUJO-OPERATIVO.md).** No de memoria, no "según recuerdo del código": abre el archivo.
+**[docs/FLUJO-OPERATIVO.md](docs/FLUJO-OPERATIVO.md) es cómo funciona este sistema.** No un resumen ni una guía de apoyo: es la descripción de qué hace el cliente, qué hace la empresa, qué hace el superadmin, en qué orden, y qué regla del motor lo impide cuando algo no se puede.
 
-Ese documento recoge lo que ya se verificó contra el esquema, los guards y las políticas RLS: los estados válidos de cada tabla, quién puede provocar cada transición, qué regla la bloquea cuando no puede, y los huecos conocidos que **no** son fallos nuevos. Está ahí precisamente porque cada uno de esos hechos costó una sesión de pruebas manuales averiguarlo.
+Recoge lo que ya se verificó contra el esquema, los guards y las políticas RLS. Está ahí porque cada uno de esos hechos costó una sesión de pruebas manuales averiguarlo, y porque lo que no queda escrito se pierde: la siguiente sesión no lo sabe y vuelve a proponer lo contrario.
 
-### Qué obliga
+### Antes de construir — se lee
 
-1. **Toda afirmación sobre el flujo tiene que estar en el documento, o verificarse antes de decirla.** Si el documento no lo cubre, se lee el código y **se añade al documento** — no se contesta de memoria y se sigue adelante.
-2. **Toda decisión de negocio nueva se escribe ahí en el mismo commit que la implementa.** Un cambio de regla que no queda documentado se pierde: la siguiente sesión no lo sabrá y volverá a proponer lo contrario. Ya pasó con «las dos partes aceptan y la reserva se crea sin superadmin» (2026-09-09), que contradecía lo que este mismo archivo decía más abajo.
-3. **Si el documento y el código se contradicen, gana el código** — y hay que corregir el documento acto seguido, nunca ajustar el código a lo que dice el papel.
-4. **Un hueco listado en «Huecos conocidos» no se reporta como hallazgo nuevo** ni se "arregla" por iniciativa propia. Está ahí verificado y con decisión tomada de dejarlo; si conviene resolverlo, se propone, no se hace.
+**Cualquier funcionalidad nueva, y cualquier cambio a una existente, empieza abriendo ese archivo.** No de memoria, no "según recuerdo del código": se abre.
+
+Antes de proponer nada hay que poder responder, con el documento delante:
+
+1. **Qué rol la ejecuta**, y qué ve ese rol — la sección *Qué hace cada parte* lo dice por actor, con lo que puede y lo que no.
+2. **En qué estado tiene que estar la fila**, y a cuál pasa — los estados canónicos salen de los `CHECK`; si uno no está en la lista, no existe.
+3. **Qué guard vigila esa transición** — la tabla de guards dice qué impide cada uno. Casi nunca es la interfaz la que decide.
+4. **Si ya está resuelto en otra parte** — y si lo que parece un hueco está en *Huecos conocidos*, que son cosas verificadas y con decisión tomada de dejarlas: no se reportan como hallazgo nuevo ni se "arreglan" por iniciativa propia; se propone.
+
+Si el documento no cubre lo que hace falta saber, **se lee el código y se añade al documento** — no se contesta de memoria y se sigue adelante.
+
+### Después de cambiar — se actualiza
+
+**En el mismo commit que implementa el cambio.** No después, no en una tarea aparte, no "cuando se estabilice".
+
+Obligan a tocarlo: un estado nuevo o retirado, un permiso que cambia de rol, un guard nuevo o modificado, un paso que se añade o se salta, una pantalla que aparece o muere, y **cualquier decisión de negocio tomada en una conversación** — esas son las que se pierden. Ya pasó con «las dos partes aceptan y la reserva se crea sin superadmin» (2026-09-09), que contradecía lo que este mismo archivo decía más abajo.
+
+**Si el documento y el código se contradicen, gana el código** — y hay que corregir el documento acto seguido, nunca ajustar el código a lo que dice el papel.
 
 ### Qué prohíbe
 
-- **Inventar estados, botones, etiquetas o pasos.** Los estados canónicos salen de los `CHECK`; las etiquetas de la interfaz, del HTML. Si no aparece en uno de los dos, no existe — y describir al usuario un botón que no existe le hace perder el tiempo buscándolo. Ya pasó varias veces durante las pruebas de septiembre 2026.
+- **Inventar estados, botones, etiquetas o pasos.** Los estados salen de los `CHECK`; las etiquetas de la interfaz, del HTML. Si no aparece en uno de los dos, no existe — y describir al usuario un botón que no existe le hace perder el tiempo buscándolo. Pasó varias veces durante las pruebas de septiembre 2026.
 - **Suponer el orden de una secuencia.** Los cuatro tracking son distintos por `recurso_tipo`, y las precedencias (chofer antes de avanzar, tracking antes de evidencia, oferta antes de vencer un documento) están escritas porque el orden inverso falla.
-- **Dar por hecho un permiso.** Quién puede hacer qué lo deciden los guard triggers, no la intuición. La tabla de guards del documento dice qué impide cada uno.
+- **Dar por hecho un permiso.** Quién puede hacer qué lo deciden los guard triggers, no la intuición.
+- **Añadir al documento algo sin respaldo.** Cada afirmación sale de un `CHECK`, una política, un guard o una línea concreta; lo que no se pudo verificar se dice. Una frase de memoria envenena el resto: si una no es fiable, ninguna lo es.
 
 ---
 
@@ -133,7 +148,7 @@ Ese documento recoge lo que ya se verificó contra el esquema, los guards y las 
 
 **PortGo** is a PWA logistics platform for port transport services built as a fully client-side app with Supabase as the backend (PostgreSQL + Auth + Realtime + Storage).
 
-**Business flow:** Client posts a transport request (`pedido`) → superadmin reviews and publishes it → companies (`admin`) bid (`ofertas`) → **both sides accept and the `reservación` is created in the same transaction, with no superadmin step** → tracked to completion → superadmin approves the closure → client rates the service. The superadmin only re-enters the agreement when the company has expired documents (`pendiente_acuerdo`). Full detail, verified against the schema and the guard triggers: [docs/FLUJO-OPERATIVO.md](docs/FLUJO-OPERATIVO.md) — see [Rule #4](#-rule-4--el-flujo-operativo-es-la-fuente-de-verdad-del-negocio).
+**Business flow:** Client posts a transport request (`pedido`) → superadmin reviews and publishes it → companies (`admin`) bid (`ofertas`) → **both sides accept and the `reservación` is created in the same transaction, with no superadmin step** → tracked to completion → superadmin approves the closure → client rates the service. The superadmin only re-enters the agreement when the company has expired documents (`pendiente_acuerdo`). Full detail, verified against the schema and the guard triggers: [docs/FLUJO-OPERATIVO.md](docs/FLUJO-OPERATIVO.md) — see [Rule #4](#-rule-4--el-flujo-operativo-se-lee-antes-de-construir-y-se-actualiza-después).
 
 **Stack:** Vanilla JS (plain `<script>` tags, global scope, loaded in order), plain CSS, Supabase JS SDK v2 from CDN, no build tooling, no package manager, no tests.
 
@@ -202,8 +217,17 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
     ├── functions/
     │   ├── gestionar-usuario/   # Privileged user CRUD (superadmin only, service role key)
     │   └── enviar-notificacion/ # Email notifications
-    ├── migrations/         # 25 SQL migrations — the source of truth for schema, RLS,
+    ├── migrations/         # 63 SQL migrations — the source of truth for schema, RLS,
     │                       #   guard triggers and the business RPCs
+    ├── aplicadas.tsv       # Migration ledger: which .sql ran against which project,
+    │                       #   when, and the sha256 of the file at that moment. Written
+    │                       #   automatically by the two aplicar-a-* scripts; committed.
+    │                       #   The hash matters: a migration can be edited after it ran
+    ├── estado-migraciones.sh  # Reads that ledger and prints, per environment: applied
+    │                       #   (✓), applied but the file changed since (≠), or no record
+    │                       #   (·). Touches no database. Entries start 2026-09-11 —
+    │                       #   a `·` on anything older means "unknown", not "pending"
+    ├── registrar-aplicada.sh  # Appends to the ledger. Called by the apply scripts
     ├── espejo/             # (gitignored) production dump + paridad.json stamp. Real
     │                       #   personal data — never commit, never share
     ├── replicar-produccion-a-pruebas.sh  # Rule #3: rebuilds portgo-pruebas as an exact
@@ -331,7 +355,7 @@ Cargo-driven fields (the request is built from the load, not from the truck): `c
 `pedido_id` (links back for cancel-reopen), `propietario_id`, `cliente_user_id`, `cliente/_email`, `unidad`, `recurso_tipo` (`camion`|`custodio`|`patio`|`lavado`), `fecha_ini/_fin`, `precio_acordado`, `completado_en`, `calificado`.
 **`estado`:** `Pendiente` | `Activa` | `PorAprobar` (closure requested, waiting on SA) | `CancelacionSolicitada` (client asked to cancel, SA resolves) | `Completada` | `Cancelada`.
 **`tracking_estado`:** five steps, **different per `recurso_tipo`** — camión `Confirmado→En camino→En carga→En tránsito→Entregado`; custodio `Confirmado→Asignado→En ruta→En servicio→Finalizado`; patio `Confirmado→Listo→Recibido→En almacenaje→Liberado`; lavado `Confirmado→Recibido→En lavado→Control→Listo`. Defined in `TRACKING_POR_TIPO` (js/tracking.js) and duplicated in the SQL function `tracking_pasos()`.
-**Closure evidence:** each side has its own column — `evidencias` (company) and `evidencias_cliente` (client), both arrays of storage **paths**; plus `finalizacion_solicitada_por`. Both sides must upload before the SA can approve.
+**Closure evidence:** each side has its own column — `evidencias` (company) and `evidencias_cliente` (client), both arrays of storage **paths**; plus `finalizacion_solicitada_por`. **Whichever side uploads first moves the reservation `Activa` → `PorAprobar`** — `registrar_evidencias` does `estado = CASE WHEN v_solicitando THEN 'PorAprobar' ELSE estado END`, where `v_solicitando` is `estado = 'Activa'`. The SA can approve with only one side's evidence: `aprobarFinalizacion()` never checks for both, the panel just flags `⚠️ falta` next to the missing one. (This line used to say both sides were required, until the code said otherwise on 2026-09-11.)
 **Billing:** `pagado`, `pagado_en/_por`, `pago_metodo`, `pago_referencia`, `plazo_pago` (snapshot of the agreed term), `fecha_vencimiento_pago`. The `trg_sync_datos_pago` trigger clears the payment fields when `pagado` goes back to false.
 **Cancellation:** `cancelacion_motivo`, `cancelacion_detalle`, `cancelacion_solicitada_en/_por`, `cancelacion_tracking_estado` (freezes how far the trip had gone).
 `reservaciones_historico`: archived rows + `archivado_at/_por`.

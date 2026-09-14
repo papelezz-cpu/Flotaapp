@@ -109,6 +109,9 @@ for f in "$@"; do ARGS+=(-f "$f"); done
 if psql "$CONN_PROD" --single-transaction -v ON_ERROR_STOP=1 -q -o /dev/null "${ARGS[@]}"; then
   echo "  ✓ Aplicado a producción."
   echo
+  REF_PROD="$(printf '%s' "$CONN_PROD" | sed -n 's|.*postgres\.\([a-z0-9]*\).*||p')"
+  bash "$AQUI/registrar-aplicada.sh" produccion "${REF_PROD:-desconocido}" "$@"
+  echo
   echo "  Comprueba que producción y pruebas volvieron a coincidir:"
   echo "    bash supabase/verificar-paridad.sh --detalle"
 else

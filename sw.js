@@ -1,5 +1,5 @@
 // ── SERVICE WORKER — PortGo ────────────────────────────
-const CACHE      = 'portgo-v190';
+const CACHE      = 'portgo-v193';
 const DATA_CACHE = 'portgo-data-v1';
 
 const SHELL = [
@@ -15,12 +15,15 @@ const SHELL = [
   '/css/layout.css',
   '/css/components.css',
   '/css/login.css',
+  '/css/detalle.css',
   '/css/theme.css',
   '/js/utils.js',
   '/js/config.js',
   '/js/auth.js',
   '/js/theme.js',
   '/js/views.js',
+  '/js/detalle.js',
+  '/js/notificaciones.js',
   '/js/camiones.js',
   '/js/recursos.js',
   '/js/reservaciones.js',
@@ -44,11 +47,44 @@ const SHELL = [
   '/js/main.js'
 ];
 
-// Instalar: cachear app shell
+// Instalar: cachear app shell, uno por uno y no con addAll.
+//
+// addAll es TODO-O-NADA: si una sola URL de SHELL falla, la promesa se rechaza,
+// el waitUntil falla y el service worker NO SE INSTALA. Se queda mandando el
+// anterior, sin un solo error visible en la aplicación — el síntoma sería que la
+// versión del caché no avanza, y nadie sabría por qué.
+//
+// Esto es prevención, NO la corrección de un fallo observado. Conviene decirlo
+// porque la primera versión de este comentario afirmaba lo contrario: que la
+// instalación se caía en la preview de dev porque /manifest.json redirige al
+// SSO de Vercel. Era falso, y la evidencia lo desmintió el mismo día — el caché
+// portgo-v192 existía con archivos dentro, y para eso el SW v192 (que usaba
+// addAll) tuvo que activarse, luego su addAll había funcionado. El service
+// worker pide el manifiesto con las cookies de sesión y recibe un 200; quien
+// choca con CORS es la etiqueta <link rel="manifest"> de la página, que es otra
+// petición distinta y no afecta a la instalación.
+//
+// El motivo real para no usar addAll es el de siempre: basta con que alguien
+// renombre un archivo y olvide esta lista para que el shell offline deje de
+// existir del todo, en silencio y sin síntomas mientras haya red. La lista ya
+// había estado incompleta antes. Cachear uno a uno degrada en vez de romper:
+// lo que se pueda guardar se guarda, y lo que no, se anota.
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())
-  );
+  e.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    const fallos = [];
+    await Promise.all(SHELL.map(async url => {
+      try {
+        await cache.add(url);
+      } catch (err) {
+        fallos.push(url);
+      }
+    }));
+    if (fallos.length) {
+      console.warn(`[sw] ${CACHE}: ${fallos.length} de ${SHELL.length} no se pudieron precachear:`, fallos);
+    }
+    await self.skipWaiting();
+  })());
 });
 
 // Activar: limpiar caches viejos
@@ -126,7 +162,15 @@ self.addEventListener('fetch', e => {
           caches.open(CACHE).then(c => c.put(e.request, copia));
         }
         return res;
-      }).catch(() => caches.match(e.request))
+      }).catch(() =>
+        // ignoreSearch: la lista SHELL precarga '/js/pedidos.js' pero la pagina
+        // pide '/js/pedidos.js?v=72', y la Cache API compara la URL COMPLETA,
+        // query incluida. Sin esto el precacheo no respondia jamas: se
+        // descargaban 33 ficheros en cada instalacion que no se servian nunca,
+        // y sin conexion la app no arrancaba en la primera visita — solo
+        // funcionaba offline quien ya la hubiera cargado online, porque
+        // entonces este mismo network-first ya habia guardado la URL con su ?v=.
+        caches.match(e.request, { ignoreSearch: true }))
     );
     return;
   }

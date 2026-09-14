@@ -93,6 +93,11 @@ fi
 if [ $? -eq 0 ]; then
   echo "  ✓ Aplicado."
   echo
+  # Libro mayor: sin esto, saber qué corre dónde exige preguntarle a quien lo
+  # aplicó. Ver supabase/registrar-aplicada.sh.
+  REF_PRUE="$(printf '%s' "$CONN_PRUE" | sed -n 's|.*postgres\.\([a-z0-9]*\).*||p')"
+  bash "$AQUI/registrar-aplicada.sh" pruebas "${REF_PRUE:-desconocido}" "$ARCHIVO"
+  echo
   echo "  Ahora vuelve a verificar la paridad para dejar constancia de en qué"
   echo "  se separa pruebas de producción por este cambio:"
   echo "    bash supabase/verificar-paridad.sh --detalle"
