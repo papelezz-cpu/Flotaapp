@@ -20,3 +20,4 @@
 2026-09-14T19:16:28Z	produccion		supabase/migrations/20260911150000_truncate_tambien_en_la_vista.sql	f30925ecc83f2d7f2358fc28362c9321c1a37ecf14be1b2e2eb80ccc48de7557
 2026-09-14T19:16:28Z	produccion		supabase/migrations/20260914120000_cambio_de_rol_por_rpc.sql	241acf9a1c87448f08df3e765bed65d43db7c703e822aa3bc4581d43aee87ad0
 2026-09-14T22:16:50Z	pruebas		supabase/migrations/20260914130000_la_vista_no_se_escribe.sql	9d4a812bc4b5000fd3d73b1406d3554fa09e8025154dfd9db8457b99af8e405a
+2026-09-14T22:51:34Z	produccion		supabase/migrations/20260914130000_la_vista_no_se_escribe.sql	9d4a812bc4b5000fd3d73b1406d3554fa09e8025154dfd9db8457b99af8e405a
