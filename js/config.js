@@ -7,7 +7,7 @@ const { createClient } = supabase;
 
 const sb = createClient(
   'https://xskgnudiznryhgagxadu.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhza2dudWRpem5yeWhnYWd4YWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNTE4OTksImV4cCI6MjEwMjcyNzg5OX0.RaXMKuGWTqsRkDI-IFOO6FM2NrFe9DIluStZRZoFiEo',
+  'sb_publishable_Nkc1GRJ0nfaRfrnsSRG4qQ_n66HVSEg',
   { auth: { storage: window.sessionStorage, persistSession: true } }
 );
 
