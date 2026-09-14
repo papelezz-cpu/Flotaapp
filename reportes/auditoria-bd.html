@@ -1,0 +1,1607 @@
+<title>Auditoría de la base de PortGo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --ground:#F5F7F9; --surface:#FFFFFF; --surface-2:#FAFBFC;
+  --ink:#0F1720; --ink-2:#33414F; --muted:#5D6B78; --faint:#8493A0;
+  --line:#E0E6EC; --line-soft:#EDF1F4;
+  --accent:#0B6E7F; --accent-ink:#06525F; --accent-soft:#E4F1F3;
+  --crit:#B3261E; --crit-bg:#FBEAE8;
+  --alta:#A15009; --alta-bg:#FBEEE2;
+  --media:#75620F; --media-bg:#F8F2DC;
+  --baja:#1A6851; --baja-bg:#E4F2EC;
+  --none:#5D6B78; --none-bg:#EDF1F4;
+  --shadow:0 1px 2px rgba(15,23,32,.05), 0 8px 24px -16px rgba(15,23,32,.28);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0B1015; --surface:#131B22; --surface-2:#101820;
+    --ink:#E5ECF2; --ink-2:#C0CCD6; --muted:#93A2AF; --faint:#6F7F8C;
+    --line:#22303A; --line-soft:#1A2630;
+    --accent:#54C0D1; --accent-ink:#8AD6E2; --accent-soft:#0E313A;
+    --crit:#EC8478; --crit-bg:#37191A;
+    --alta:#DC9B52; --alta-bg:#33220F;
+    --media:#C6B25C; --media-bg:#2C2712;
+    --baja:#5FC3A3; --baja-bg:#102C25;
+    --none:#93A2AF; --none-bg:#1A2630;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0B1015; --surface:#131B22; --surface-2:#101820;
+  --ink:#E5ECF2; --ink-2:#C0CCD6; --muted:#93A2AF; --faint:#6F7F8C;
+  --line:#22303A; --line-soft:#1A2630;
+  --accent:#54C0D1; --accent-ink:#8AD6E2; --accent-soft:#0E313A;
+  --crit:#EC8478; --crit-bg:#37191A;
+  --alta:#DC9B52; --alta-bg:#33220F;
+  --media:#C6B25C; --media-bg:#2C2712;
+  --baja:#5FC3A3; --baja-bg:#102C25;
+  --none:#93A2AF; --none-bg:#1A2630;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Source Serif 4",Georgia,"Times New Roman",serif;
+  font-size:17px; line-height:1.62; -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4,.ui{font-family:Archivo,"Helvetica Neue",Arial,sans-serif}
+code,kbd,pre,.mono{font-family:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+h1,h2,h3,h4{text-wrap:balance;margin:0}
+a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:2px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+
+.wrap{max-width:1240px;margin:0 auto;padding:0 24px}
+.layout{display:block}
+@media (min-width:1120px){
+  .layout{display:grid;grid-template-columns:212px minmax(0,1fr);gap:48px;align-items:start}
+}
+.toc{display:none}
+@media (min-width:1120px){
+  .toc{display:block;position:sticky;top:78px;max-height:calc(100vh - 100px);overflow-y:auto;padding:4px 0 40px}
+}
+.toc ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.toc a{
+  display:block;padding:5px 10px;font-family:Archivo,sans-serif;font-size:12.5px;
+  line-height:1.35;color:var(--muted);text-decoration:none;border-left:2px solid var(--line);
+}
+.toc a:hover{color:var(--accent);border-left-color:var(--accent);background:var(--surface-2)}
+.toc .toc-h{
+  font-family:Archivo,sans-serif;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--faint);padding:0 0 8px 10px;
+}
+
+.top{
+  position:sticky;top:0;z-index:30;background:var(--ground);
+  border-bottom:1px solid var(--line);
+}
+.top-in{max-width:1240px;margin:0 auto;padding:11px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.mark{
+  font-family:Archivo,sans-serif;font-weight:700;font-size:13px;letter-spacing:-.01em;
+  display:flex;align-items:center;gap:8px;color:var(--ink)
+}
+.mark i{
+  width:9px;height:9px;background:var(--accent);display:block;
+  clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);
+}
+.top-meta{margin-left:auto;font-family:Archivo,sans-serif;font-size:11.5px;color:var(--faint);letter-spacing:.02em}
+
+header.hero{padding:64px 0 40px;border-bottom:1px solid var(--line)}
+.eyebrow{
+  font-family:Archivo,sans-serif;font-size:11px;font-weight:600;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:18px
+}
+h1{font-size:clamp(34px,5.2vw,54px);font-weight:700;letter-spacing:-.025em;line-height:1.04}
+.dek{font-size:19px;color:var(--ink-2);max-width:64ch;margin-top:18px;line-height:1.55}
+.facts{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);margin-top:34px;border-radius:3px;overflow:hidden
+}
+.fact{background:var(--surface);padding:13px 15px}
+.fact dt{font-family:Archivo,sans-serif;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:0 0 5px}
+.fact dd{margin:0;font-family:"JetBrains Mono",monospace;font-size:14px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+
+section{padding:52px 0;border-bottom:1px solid var(--line-soft)}
+section:last-of-type{border-bottom:0}
+.sec-n{
+  font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--accent);
+  letter-spacing:.08em;margin-bottom:9px;font-weight:600
+}
+h2{font-size:clamp(23px,3vw,31px);font-weight:700;letter-spacing:-.02em;line-height:1.15}
+h3{font-size:18px;font-weight:600;letter-spacing:-.01em;margin:38px 0 12px}
+h4{font-size:14.5px;font-weight:600;margin:24px 0 8px}
+p{margin:14px 0;max-width:70ch}
+ul,ol{max-width:70ch;padding-left:22px;margin:14px 0}
+li{margin:6px 0}
+.lede{font-size:18.5px;color:var(--ink-2);max-width:66ch}
+
+.scores{display:grid;gap:11px;margin-top:26px}
+.score{display:grid;grid-template-columns:170px minmax(0,1fr) 46px;gap:16px;align-items:center}
+@media (max-width:600px){.score{grid-template-columns:118px minmax(0,1fr) 40px;gap:10px}}
+.score .lbl{font-family:Archivo,sans-serif;font-size:13.5px;font-weight:500;color:var(--ink-2)}
+.bar{height:9px;background:var(--line-soft);position:relative;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent)}
+.bar[data-band="low"]>i{background:var(--crit)}
+.bar[data-band="mid"]>i{background:var(--alta)}
+.bar[data-band="ok"]>i{background:var(--baja)}
+.score .num{
+  font-family:"JetBrains Mono",monospace;font-size:14px;font-weight:600;
+  text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)
+}
+.global{
+  display:flex;align-items:baseline;gap:14px;padding:20px 22px;background:var(--surface);
+  border:1px solid var(--line);border-left:3px solid var(--accent);margin-top:28px;border-radius:3px;flex-wrap:wrap
+}
+.global b{font-family:Archivo,sans-serif;font-size:40px;font-weight:700;color:var(--accent);line-height:1;font-variant-numeric:tabular-nums}
+.global span{font-size:15.5px;color:var(--muted);max-width:56ch}
+
+.chip{
+  display:inline-flex;align-items:center;gap:6px;font-family:Archivo,sans-serif;
+  font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  padding:3px 8px;border-radius:2px;white-space:nowrap
+}
+.chip::before{content:"";width:6px;height:6px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);background:currentColor;flex:none}
+.c-crit{color:var(--crit);background:var(--crit-bg)}
+.c-alta{color:var(--alta);background:var(--alta-bg)}
+.c-media{color:var(--media);background:var(--media-bg)}
+.c-baja{color:var(--baja);background:var(--baja-bg)}
+.c-none{color:var(--none);background:var(--none-bg)}
+.c-fix{color:var(--baja);background:var(--baja-bg)}
+.c-fix::before{clip-path:none;border-radius:50%}
+.find.hecho{border-left:3px solid var(--baja)}
+.find.hecho>.fh{background:var(--baja-bg)}
+.tachado{text-decoration:line-through;text-decoration-thickness:1px;opacity:.62}
+.estado-tabla td:first-child{white-space:nowrap}
+
+.find{
+  background:var(--surface);border:1px solid var(--line);border-radius:3px;
+  margin:20px 0;box-shadow:var(--shadow);overflow:hidden
+}
+.find>.fh{
+  display:flex;align-items:flex-start;gap:12px;padding:16px 20px;
+  border-bottom:1px solid var(--line-soft);flex-wrap:wrap;background:var(--surface-2)
+}
+.fid{
+  font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:600;color:var(--faint);
+  padding-top:2px;flex:none
+}
+.ft{font-family:Archivo,sans-serif;font-size:16.5px;font-weight:600;line-height:1.3;flex:1 1 320px;letter-spacing:-.01em}
+.fb{padding:6px 20px 20px}
+.fb p{margin:12px 0}
+dl.grid{display:grid;gap:0;margin:16px 0 0;border-top:1px solid var(--line-soft)}
+dl.grid>div{
+  display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;
+  padding:9px 0;border-bottom:1px solid var(--line-soft)
+}
+@media (max-width:620px){dl.grid>div{grid-template-columns:1fr;gap:2px}}
+dl.grid dt{
+  font-family:Archivo,sans-serif;font-size:10.5px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--faint);padding-top:4px
+}
+dl.grid dd{margin:0;font-size:15.5px;color:var(--ink-2);line-height:1.5}
+.yes{color:var(--alta);font-weight:600}
+.no{color:var(--muted)}
+
+.ev{
+  background:var(--surface-2);border:1px solid var(--line-soft);border-left:3px solid var(--accent);
+  padding:12px 15px;margin:14px 0;font-family:"JetBrains Mono",monospace;font-size:12.5px;
+  line-height:1.72;color:var(--ink-2);overflow-x:auto;border-radius:0 3px 3px 0
+}
+.ev .k{color:var(--accent);font-weight:600}
+.ev .cm{color:var(--faint)}
+.ev b{color:var(--ink);font-weight:600}
+pre.sql{
+  background:var(--surface-2);border:1px solid var(--line);padding:15px 17px;overflow-x:auto;
+  font-size:12.5px;line-height:1.68;margin:14px 0;border-radius:3px;color:var(--ink-2)
+}
+pre.sql .k{color:var(--accent);font-weight:600}
+pre.sql .cm{color:var(--faint);font-style:italic}
+code{background:var(--surface-2);border:1px solid var(--line-soft);padding:.06em .34em;font-size:.85em;border-radius:2px;color:var(--ink)}
+
+.warn{
+  background:var(--crit-bg);border:1px solid var(--crit);
+  border-radius:3px;padding:13px 16px;margin:16px 0
+}
+.warn .wh{
+  font-family:Archivo,sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--crit);margin-bottom:6px
+}
+.warn p{margin:6px 0;font-size:15px;max-width:none;color:var(--ink-2)}
+.note{
+  background:var(--accent-soft);border-left:3px solid var(--accent);padding:13px 16px;margin:16px 0;border-radius:0 3px 3px 0
+}
+.note p{margin:6px 0;font-size:15.5px;max-width:none;color:var(--ink-2)}
+.note .wh{font-family:Archivo,sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:6px}
+
+.tw{overflow-x:auto;margin:20px 0;border:1px solid var(--line);border-radius:3px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+th{
+  font-family:Archivo,sans-serif;font-size:10.5px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--faint);background:var(--surface-2);
+  border-bottom:1px solid var(--line);white-space:nowrap
+}
+td{color:var(--ink-2);line-height:1.45}
+tr:last-child td{border-bottom:0}
+td.m,th.m{font-family:"JetBrains Mono",monospace;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.n{text-align:right;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;font-size:12.5px}
+tbody tr:hover td{background:var(--surface-2)}
+
+.phase{
+  display:grid;grid-template-columns:52px minmax(0,1fr);gap:20px;padding:22px 0;
+  border-bottom:1px solid var(--line-soft)
+}
+.phase:last-child{border-bottom:0}
+.pn{
+  font-family:Archivo,sans-serif;font-size:12px;font-weight:700;color:var(--accent);
+  border:1px solid var(--accent);border-radius:2px;height:30px;display:flex;
+  align-items:center;justify-content:center;letter-spacing:.04em
+}
+.phase h3{margin:0 0 4px;font-size:17px}
+.phase .ph-m{font-family:Archivo,sans-serif;font-size:11.5px;color:var(--faint);margin-bottom:10px;letter-spacing:.02em}
+
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin:20px 0;border-radius:3px;overflow:hidden}
+.kv>div{background:var(--surface);padding:13px 15px}
+.kv dt{font-family:Archivo,sans-serif;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
+.kv dd{margin:0;font-size:14.5px;color:var(--ink-2);line-height:1.4}
+
+footer{padding:44px 0 72px;color:var(--faint);font-size:14px}
+footer p{max-width:70ch}
+hr.rule{border:0;border-top:1px solid var(--line);margin:34px 0}
+</style>
+
+<div class="top">
+  <div class="top-in">
+    <span class="mark"><i></i>PortGo</span>
+    <span class="ui" style="font-size:12px;color:var(--muted)">Auditoría de base de datos</span>
+    <span class="top-meta">31 ago 2026 · act. 1 sep · xnyqsewaluezkkrlyhxg</span>
+  </div>
+</div>
+
+<div class="wrap">
+<header class="hero">
+  <div class="eyebrow">Auditoría técnica · PostgreSQL 17.6 / Supabase</div>
+  <h1>La base aguanta hoy. Lo que falla es lo que ya está escrito.</h1>
+  <p class="dek">Veinticuatro tablas, 43 índices, 74 políticas RLS y 13.178 líneas de cliente, medidas contra el volcado real de producción del 31 de agosto. La estructura está mejor de lo que sugiere su historia. Lo que queda son fugas de datos personales, columnas que nadie lee y consultas que envejecerán mal.</p>
+  <dl class="facts">
+    <div class="fact"><dt>Tablas</dt><dd>24</dd></div>
+    <div class="fact"><dt>Índices</dt><dd>43</dd></div>
+    <div class="fact"><dt>Políticas RLS</dt><dd>74</dd></div>
+    <div class="fact"><dt>Funciones</dt><dd>43</dd></div>
+    <div class="fact"><dt>Triggers</dt><dd>22</dd></div>
+    <div class="fact"><dt>Filas hoy</dt><dd>1.150</dd></div>
+  </dl>
+</header>
+
+<div class="layout">
+<nav class="toc" aria-label="Índice">
+  <div class="toc-h">Contenido</div>
+  <ol>
+    <li><a href="#estado">Estado de las correcciones</a></li>
+    <li><a href="#alcance">Alcance y evidencia</a></li>
+    <li><a href="#diagnostico">Diagnóstico general</a></li>
+    <li><a href="#inventario">Inventario del esquema</a></li>
+    <li><a href="#top10">Los 10 problemas</a></li>
+    <li><a href="#seguridad">Seguridad y acceso</a></li>
+    <li><a href="#redundancia">Duplicidad y normalización</a></li>
+    <li><a href="#campos">Campos</a></li>
+    <li><a href="#indices">Índices</a></li>
+    <li><a href="#consultas">Consultas y N+1</a></li>
+    <li><a href="#integridad">Integridad</a></li>
+    <li><a href="#escalabilidad">Escalabilidad</a></li>
+    <li><a href="#convenciones">Convenciones</a></li>
+    <li><a href="#sincambio">Lo que ya está bien</a></li>
+    <li><a href="#matriz">Matriz final</a></li>
+    <li><a href="#beneficio">Beneficio / riesgo</a></li>
+    <li><a href="#plan">Plan por fases</a></li>
+    <li><a href="#migraciones">Migraciones SQL</a></li>
+  </ol>
+</nav>
+
+<main>
+<section id="estado">
+  <div class="sec-n">00 · actualizado 1 sep 2026</div>
+  <h2>Estado de las correcciones</h2>
+  <p class="lede">La auditoría se entregó el 31 de agosto. Un día después, seis de los hallazgos están corregidos y verificados en <code>portgo-pruebas</code>. El resto del informe se conserva tal como se escribió: es el diagnóstico, no el parte de avance.</p>
+
+  <div class="tw"><table class="estado-tabla">
+    <thead><tr><th class="m">ID</th><th>Hallazgo</th><th>Estado</th><th>Cómo se comprobó</th></tr></thead>
+    <tbody>
+      <tr><td class="m">H-01</td><td>Fuga del expediente completo de <code>perfiles</code></td><td><span class="chip c-fix">Resuelto</span></td><td>Sesión real de empresa: <code>perfiles</code> devuelve <b>1 fila</b> (antes 12), incluso pidiendo <code>rfc, nota_rechazo_cuenta, fotos_verificacion</code>. <code>empresas_publico</code> devuelve las 3 empresas</td></tr>
+      <tr><td class="m">H-03</td><td><code>refrigerado</code> / <code>temp_controlada</code> divergían</td><td><span class="chip c-fix">Resuelto</span></td><td>40 pedidos: <code>temp_controlada=true</code> en 3, <code>refrigerado=true</code> en 3, <b>divergencias 0</b></td></tr>
+      <tr><td class="m">H-10</td><td>RPC transaccionales sin usar</td><td><span class="chip c-fix">Resuelto</span></td><td><code>cancelarReserva()</code> llama a <code>cancelar_reservacion</code>. La RPC ganó el bypass <code>is_superadmin()</code> que el botón ya concedía</td></tr>
+      <tr><td class="m">H-11</td><td>La campana marcaba leídas las no mostradas</td><td><span class="chip c-fix">Resuelto</span></td><td><code>.in('id', idsNoLeidos)</code> añadido al <code>UPDATE</code></td></tr>
+      <tr><td class="m">H-12</td><td>Paginación por <code>OFFSET</code> en reservaciones</td><td><span class="chip c-fix">Resuelto</span></td><td>Cursor <code>(created_at, id)</code> como en <code>pedidos.js</code>, más el índice compuesto que faltaba</td></tr>
+      <tr><td class="m">H-13</td><td>N+1 al aprobar en lote</td><td><span class="chip c-fix">Resuelto</span></td><td>Un solo <code>UPDATE … .in()</code>, y ahora comprueba el error</td></tr>
+      <tr><td class="m">H-06 · H-07</td><td>Columnas muertas y huérfanas</td><td><span class="chip c-media">Pendiente</span></td><td>—</td></tr>
+      <tr><td class="m">H-08</td><td>FK sin índice</td><td><span class="chip c-media">Pendiente</span></td><td>—</td></tr>
+      <tr><td class="m">H-14</td><td>Dos CHECK en <code>NOT VALID</code></td><td><span class="chip c-media">Pendiente</span></td><td>—</td></tr>
+      <tr><td class="m">H-15</td><td>UNIQUE de operadores y camiones</td><td><span class="chip c-media">Pendiente</span></td><td>—</td></tr>
+      <tr><td class="m">resto</td><td>H-02, H-04, H-05, H-09, H-16 a H-21</td><td><span class="chip c-baja">Sin abordar</span></td><td>—</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="warn">
+    <div class="wh">Nada de esto está en producción</div>
+    <p>Las seis correcciones viven en la rama <code>dev</code> y en <code>portgo-pruebas</code>. Producción sigue con la política defectuosa de <code>perfiles</code> y con todo lo demás tal como lo describe este informe. Promoverlo es una decisión aparte.</p>
+  </div>
+
+  <h3>Tres errores de la primera versión, corregidos</h3>
+  <p>Aparecieron al implementar H-01, y se corrigen en el cuerpo del informe donde tocaba. Se enumeran aquí porque quien leyó la versión del 31 de agosto se llevó dos de ellos:</p>
+  <ul>
+    <li><b>El SQL proponía <code>security_invoker = true</code></b>, que habría hecho la vista inútil: aplicaría el RLS del que consulta y devolvería cero filas en cuanto se cerrara la tabla. Va en su valor por defecto.</li>
+    <li><b>Las rutas de documentos no son descargables por terceros.</b> Storage limita el <code>SELECT</code> sobre los objetos al dueño o al superadmin, así que nadie puede firmar una URL ajena. Se filtra el inventario, no el contenido.</li>
+    <li><b>Faltaba señalar que no existe política SELECT de superadmin</b> sobre <code>perfiles</code>. Es el paso cuya omisión rompe el cierre: sin crearla, retirar la política vieja deja ciego todo el panel de superadmin.</li>
+  </ul>
+</section>
+
+<section id="alcance">
+  <div class="sec-n">01</div>
+  <h2>Alcance y evidencia</h2>
+  <p class="lede">Todo lo que sigue está medido, no supuesto. Esta sección dice exactamente sobre qué, y —más importante— qué no se pudo comprobar.</p>
+
+  <h3>Lo que se leyó</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Fuente</th><th>Qué aporta</th><th class="m">Tamaño</th></tr></thead>
+    <tbody>
+      <tr><td class="m">supabase/espejo/01-esquema-public.sql</td><td>Volcado <code>pg_dump --schema-only</code> de <b>producción</b>, 31 ago 2026 13:29. Tablas, columnas, tipos, constraints, índices, RLS, triggers, funciones, grants.</td><td class="m">174 KB</td></tr>
+      <tr><td class="m">supabase/espejo/05-datos-public.sql</td><td>Volcado de datos de producción. Sirve para conteos de filas y densidad real de columnas. <b>No se transcribe ningún dato personal en este informe.</b></td><td class="m">351 KB</td></tr>
+      <tr><td class="m">supabase/espejo/08-realtime.sql, 09-extensiones.txt, 11-cron.txt</td><td>Publicación Realtime, extensiones instaladas, trabajos pg_cron activos.</td><td class="m">—</td></tr>
+      <tr><td class="m">js/ (28 archivos)</td><td>385 llamadas <code>sb.from(...)</code> y 23 <code>sb.rpc(...)</code>, revisadas una por una.</td><td class="m">13.178 líneas</td></tr>
+      <tr><td class="m">supabase/migrations/ (47)</td><td>Historia y justificación de cada objeto.</td><td class="m">6.501 líneas</td></tr>
+      <tr><td class="m">supabase/functions/, android/</td><td>Verificación cruzada de uso de columnas fuera de la PWA.</td><td class="m">—</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Lo que no se pudo hacer</h3>
+  <div class="warn">
+    <div class="wh">Evidencia insuficiente — declarado, no disfrazado</div>
+    <p><b>No hubo conexión viva a la base.</b> Esta sesión no tiene credenciales ni herramienta de acceso a Postgres, así que <b>no se ejecutó ni un solo <code>EXPLAIN</code> ni <code>EXPLAIN ANALYZE</code></b>, y no se leyeron <code>pg_stat_statements</code>, <code>pg_stat_user_indexes</code> ni <code>pg_stat_user_tables</code>.</p>
+    <p>Consecuencia concreta y importante: <b>ninguna recomendación de índice de este informe está respaldada por uso medido.</b> Cada una se justifica por la forma de una consulta real citada con archivo y línea, y por su patrón de acceso. Cuando el punto 7 del encargo pide «frecuencia de utilización, si existe información disponible», la respuesta honesta es que no existe todavía.</p>
+    <p><code>pg_stat_statements 1.11</code> <b>sí está instalada</b> en producción. Cuando haya acceso a psql, una sola consulta a esa vista convierte la mitad de las hipótesis de este informe en hechos. Es el primer paso recomendado de la Fase 1.</p>
+  </div>
+
+  <div class="note">
+    <div class="wh">Sobre la Regla #3 y el sello de paridad</div>
+    <p>El sello <code>supabase/espejo/paridad.json</code> del <b>31 ago 2026 22:06 UTC</b> dice <b>«diverge»</b>: 69 diferencias entre producción y <code>portgo-pruebas</code> (4 funciones, 4 permisos de función, 28 de filas y contenido, 5 usuarios; 0 dimensiones no verificables).</p>
+    <p>Eso <b>no invalida nada de este informe</b>, y conviene decir por qué en lugar de dejarlo como salvedad al pie: <b>todas las cifras de aquí salen del volcado de producción</b>, no de pruebas. No se sembró, no se ejecutó ni se midió nada contra <code>portgo-pruebas</code>. La divergencia importa para las pruebas funcionales, no para esta lectura de esquema.</p>
+    <p>La consecuencia práctica sí aplica más adelante: <b>ninguna migración propuesta puede validarse en pruebas mientras el sello diga «diverge»</b>. Antes de la Fase 1 hay que volver a replicar.</p>
+  </div>
+
+  <h3>Una discrepancia encontrada de paso</h3>
+  <p>El volcado versionado en git, <code>supabase/esquema/01-esquema-public.sql</code> —descrito en <code>volcar-esquema.sh</code> como «el plano» para reconstruir la base— tiene <b>22 tablas</b>. Producción tiene <b>24</b>. Faltan <code>consentimientos</code> y <code>solicitudes_arco</code>, creadas por la migración <code>20260728160000_consentimientos_y_arco.sql</code>.</p>
+  <div class="ev"><span class="cm"># tablas en cada volcado</span><br>
+  esquema/01-esquema-public.sql   <b>22</b>  <span class="cm">← versionado en git, obsoleto</span><br>
+  espejo/01-esquema-public.sql    <b>24</b>  <span class="cm">← lectura fresca de producción</span><br><br>
+  <span class="cm"># ausentes del plano versionado</span><br>
+  public.consentimientos   <span class="cm">(consentimientos LFPDPPP)</span><br>
+  public.solicitudes_arco  <span class="cm">(derechos ARCO)</span></div>
+  <p>Si ese archivo se usara para restaurar, se perderían las dos tablas del expediente de protección de datos justo las que existen para demostrar cumplimiento. Se detalla como <b>H-18</b>.</p>
+</section>
+
+<section id="diagnostico">
+  <div class="sec-n">02</div>
+  <h2>Diagnóstico general</h2>
+  <p class="lede">Siete dimensiones sobre 100, más seguridad, que el encargo no pedía puntuar pero que es donde está el hallazgo más grave.</p>
+
+  <div class="scores">
+    <div class="score"><span class="lbl">Diseño de base de datos</span><span class="bar" data-band="ok"><i style="width:74%"></i></span><span class="num">74</span></div>
+    <div class="score"><span class="lbl">Normalización</span><span class="bar" data-band="mid"><i style="width:66%"></i></span><span class="num">66</span></div>
+    <div class="score"><span class="lbl">Índices</span><span class="bar" data-band="ok"><i style="width:81%"></i></span><span class="num">81</span></div>
+    <div class="score"><span class="lbl">Consultas</span><span class="bar" data-band="mid"><i style="width:62%"></i></span><span class="num">62</span></div>
+    <div class="score"><span class="lbl">Integridad</span><span class="bar" data-band="ok"><i style="width:73%"></i></span><span class="num">73</span></div>
+    <div class="score"><span class="lbl">Escalabilidad</span><span class="bar" data-band="mid"><i style="width:64%"></i></span><span class="num">64</span></div>
+    <div class="score"><span class="lbl">Mantenibilidad</span><span class="bar" data-band="ok"><i style="width:71%"></i></span><span class="num">71</span></div>
+    <div class="score"><span class="lbl">Seguridad y acceso</span><span class="bar" data-band="low"><i style="width:56%"></i></span><span class="num">56</span></div>
+  </div>
+
+  <div class="global">
+    <b>68</b>
+    <span>Una base cuidada por encima de la media para su tamaño, con una fuga de datos personales que hay que cerrar antes que ninguna otra cosa.</span>
+  </div>
+
+  <h3>Cómo leer estas notas</h3>
+  <p><b>Índices (81)</b> y <b>Diseño (74)</b> están altos por un motivo verificable: ya hubo una auditoría previa aplicada (<code>20260826120000_auditoria_indices_e_integridad.sql</code>) y se nota. Los índices parciales corresponden a consultas reales, no a teoría; hay una restricción <code>EXCLUDE</code> con <code>btree_gist</code> impidiendo la doble reserva en el motor; las 36 funciones <code>SECURITY DEFINER</code> fijan <code>search_path</code> las 36.</p>
+  <p><b>Consultas (62)</b> es la nota más baja de las siete pedidas: 70 <code>select('*')</code>, paginación por <code>OFFSET</code> en la tabla que más crecerá, un N+1 real y once RPC transaccionales escritas y sin usar.</p>
+  <p><b>Seguridad (56)</b> baja casi entera por un solo hallazgo, <b>H-01</b>. El resto del perímetro está bien: <code>anon</code> quedó sin privilegios de tabla, todas las políticas evalúan <code>auth.uid()</code> una sola vez por consulta y las funciones privilegiadas están fijadas.</p>
+</section>
+
+<section id="inventario">
+  <div class="sec-n">03</div>
+  <h2>Inventario del esquema</h2>
+  <p class="lede">24 tablas, 1.150 filas. El volumen actual es el dato que más condiciona este informe: casi nada duele hoy, y esa es exactamente la ventana para arreglarlo barato.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Tabla</th><th class="n">Filas</th><th>Propósito</th><th class="m">PK</th><th class="n">Cols</th><th class="n">Índ.</th><th>Notas de auditoría</th></tr></thead>
+    <tbody>
+      <tr><td class="m">notificaciones</td><td class="n">866</td><td>Avisos en la campana</td><td class="m">id uuid</td><td class="n">8</td><td class="n">1</td><td>Crecimiento sin techo, ya con purga mensual por pg_cron</td></tr>
+      <tr><td class="m">catalogos</td><td class="n">50</td><td>Valores de combos</td><td class="m">clave, valor</td><td class="n">7</td><td class="n">1</td><td>PK compuesta correcta; índice parcial por <code>activo</code></td></tr>
+      <tr><td class="m">pedidos</td><td class="n">40</td><td>Solicitudes de transporte</td><td class="m">id uuid</td><td class="n">63</td><td class="n">5</td><td><b>63 columnas</b> para 4 tipos de solicitud; grupo repetitivo de contenedores</td></tr>
+      <tr><td class="m">expediente_documentos</td><td class="n">39</td><td>Checklist por expediente</td><td class="m">id uuid</td><td class="n">12</td><td class="n">1</td><td>Copiado del catálogo, no referenciado: correcto</td></tr>
+      <tr><td class="m">ofertas</td><td class="n">34</td><td>Pujas de empresas</td><td class="m">id uuid</td><td class="n">16</td><td class="n">2</td><td>CHECK de estado y ronda presentes</td></tr>
+      <tr><td class="m">mensajes</td><td class="n">22</td><td>Chat — sin uso en la PWA</td><td class="m">id uuid</td><td class="n">9</td><td class="n">3</td><td>Vive para el contrato móvil; falta CHECK de exclusividad</td></tr>
+      <tr><td class="m">reservaciones</td><td class="n">20</td><td>Reservas activas</td><td class="m">id uuid</td><td class="n">51</td><td class="n">6</td><td>6 triggers de UPDATE + EXCLUDE antisolape; 6 columnas muertas</td></tr>
+      <tr><td class="m">perfiles</td><td class="n">12</td><td>Un registro por usuario</td><td class="m">user_id uuid</td><td class="n">37</td><td class="n">3</td><td><b>Expuesta entera a cualquier autenticado (H-01)</b></td></tr>
+      <tr><td class="m">camiones</td><td class="n">11</td><td>Flota tractor</td><td class="m">id text</td><td class="n">50</td><td class="n">2</td><td>PK de texto generada en cliente; sin UNIQUE en placas</td></tr>
+      <tr><td class="m">documentos_catalogo</td><td class="n">9</td><td>Checklist maestro</td><td class="m">id uuid</td><td class="n">8</td><td class="n">0</td><td>Tabla de referencia, no necesita índices</td></tr>
+      <tr><td class="m">expedientes</td><td class="n">8</td><td>Expediente por etapa</td><td class="m">id uuid</td><td class="n">16</td><td class="n">1</td><td>UNIQUE(reserva_id, etapa) correcto</td></tr>
+      <tr><td class="m">solicitudes_cuenta</td><td class="n">7</td><td>Alta de cuenta</td><td class="m">id uuid</td><td class="n">47</td><td class="n">1</td><td>Datos fiscales completos aquí, duplicados parcialmente en perfiles</td></tr>
+      <tr><td class="m">reservaciones_historico</td><td class="n">6</td><td>Archivo de reservas</td><td class="m">id uuid</td><td class="n">15</td><td class="n">0</td><td>Sin FK a propósito: debe sobrevivir al borrado</td></tr>
+      <tr><td class="m">custodios</td><td class="n">6</td><td>Recurso de custodia</td><td class="m">id text</td><td class="n">21</td><td class="n">2</td><td>Secuencia <code>custodios_seq</code> muerta</td></tr>
+      <tr><td class="m">patios</td><td class="n">5</td><td>Recurso de patio</td><td class="m">id text</td><td class="n">19</td><td class="n">2</td><td>Secuencia <code>patios_seq</code> muerta</td></tr>
+      <tr><td class="m">calificaciones</td><td class="n">4</td><td>Reseña del servicio</td><td class="m">id uuid</td><td class="n">7</td><td class="n">2</td><td>UNIQUE parcial por reservación: correcto</td></tr>
+      <tr><td class="m">app_config</td><td class="n">4</td><td>Ajustes en caliente</td><td class="m">clave</td><td class="n">4</td><td class="n">0</td><td>Única tabla legible por <code>anon</code></td></tr>
+      <tr><td class="m">plantillas_pedido</td><td class="n">3</td><td>Solicitudes frecuentes</td><td class="m">id uuid</td><td class="n">52</td><td class="n">1</td><td>Espejo de pedidos: hereda sus columnas duplicadas</td></tr>
+      <tr><td class="m">operadores</td><td class="n">3</td><td>Choferes</td><td class="m">id text</td><td class="n">38</td><td class="n">2</td><td>Carrera en <code>num_trabajador</code>, sin UNIQUE</td></tr>
+      <tr><td class="m">lavados</td><td class="n">1</td><td>Recurso de lavado</td><td class="m">id text</td><td class="n">18</td><td class="n">2</td><td>Índice parcial sobre <code>id</code>, no sobre fecha</td></tr>
+      <tr><td class="m">consentimientos</td><td class="n">0</td><td>Consentimiento LFPDPPP</td><td class="m">id uuid</td><td class="n">8</td><td class="n">2</td><td><b>Vacía.</b> Se escribe en registro y alta de operador: revisar</td></tr>
+      <tr><td class="m">solicitudes_arco</td><td class="n">0</td><td>Derechos ARCO</td><td class="m">id uuid</td><td class="n">11</td><td class="n">2</td><td>Vacía y esperable: nadie ha ejercido derechos aún</td></tr>
+      <tr><td class="m">pagos</td><td class="n">0</td><td>Registro de pagos</td><td class="m">id uuid</td><td class="n">14</td><td class="n">0</td><td>Funcionalidad no construida; 2 FK sin índice</td></tr>
+      <tr><td class="m">documentos_fiscales</td><td class="n">0</td><td>CFDI / carta porte</td><td class="m">id uuid</td><td class="n">16</td><td class="n">0</td><td>Funcionalidad no construida; 3 FK sin índice</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note">
+    <div class="wh">Un dato que merece revisión, no una recomendación</div>
+    <p><code>consentimientos</code> tiene <b>0 filas</b>. La documentación del proyecto dice que se escribe «en registro y en alta de operador», y hay 12 perfiles y 3 operadores dados de alta. O bien esos registros son anteriores a la tabla (creada el 28 jul 2026), o bien la escritura no está ocurriendo. <b>Evidencia insuficiente para afirmar cuál de las dos</b>: haría falta comparar <code>created_at</code> de perfiles contra la fecha de la migración, y eso son datos personales que este informe no extrae. Vale la pena mirarlo, porque un consentimiento no registrado es exactamente lo que una autoridad pide ver.</p>
+  </div>
+</section>
+
+<section id="top10">
+  <div class="sec-n">04</div>
+  <h2>Los 10 problemas, por impacto real</h2>
+  <p class="lede">Ordenados por daño si nada cambia, no por dificultad. El primero está en otra categoría que el resto.</p>
+  <div class="tw"><table>
+    <thead><tr><th class="m">#</th><th>Problema</th><th>Dónde</th><th>Prioridad</th><th>Tipo</th></tr></thead>
+    <tbody>
+      <tr><td class="m">1</td><td>Cualquier usuario autenticado lee el expediente fiscal y las rutas a documentos privados de todos los demás</td><td class="m">perfiles · RLS</td><td><span class="chip c-crit">Crítica</span></td><td>Seguridad</td></tr>
+      <tr><td class="m">2</td><td><code>refrigerado</code> y <code>temp_controlada</code> guardan el mismo hecho y no coinciden; se lee la columna que el esquema declara obsoleta</td><td class="m">pedidos</td><td><span class="chip c-alta">Alta</span></td><td>Redundancia</td></tr>
+      <tr><td class="m">3</td><td>Once RPC transaccionales existen y no se usan: cancelar una reserva son 6 escrituras sueltas sin transacción</td><td class="m">js/reservaciones.js</td><td><span class="chip c-alta">Alta</span></td><td>Integridad</td></tr>
+      <tr><td class="m">4</td><td>Paginación por <code>OFFSET</code> sobre <code>reservaciones</code>, y sin índice por <code>created_at</code> para ordenarla</td><td class="m">js/reservaciones.js</td><td><span class="chip c-alta">Alta</span></td><td>Escalabilidad</td></tr>
+      <tr><td class="m">5</td><td>Abrir la campana marca leídas <b>todas</b> las notificaciones, no las 20 que se vieron</td><td class="m">js/notificaciones.js</td><td><span class="chip c-alta">Alta</span></td><td>Consultas</td></tr>
+      <tr><td class="m">6</td><td>N+1: aprobar en lote hace un <code>UPDATE</code> por solicitud, secuencial</td><td class="m">js/aprobaciones.js</td><td><span class="chip c-media">Media</span></td><td>Consultas</td></tr>
+      <tr><td class="m">7</td><td>Ocho columnas muertas, dos de ellas con datos ya escritos que nadie lee</td><td class="m">reservaciones, perfiles, pedidos</td><td><span class="chip c-media">Media</span></td><td>Diseño</td></tr>
+      <tr><td class="m">8</td><td>Falta UNIQUE en claves de negocio, y <code>num_trabajador</code> se calcula con una carrera de lectura-escritura</td><td class="m">operadores, camiones</td><td><span class="chip c-media">Media</span></td><td>Integridad</td></tr>
+      <tr><td class="m">9</td><td>14 claves foráneas sin índice; borrar un usuario recorre 14 tablas enteras</td><td class="m">varias</td><td><span class="chip c-media">Media</span></td><td>Índices</td></tr>
+      <tr><td class="m">10</td><td>Dos CHECK en <code>NOT VALID</code>: vigilan lo nuevo, nunca revisaron lo viejo</td><td class="m">reservaciones</td><td><span class="chip c-media">Media</span></td><td>Integridad</td></tr>
+    </tbody>
+  </table></div>
+</section>
+<section id="seguridad">
+  <div class="sec-n">05</div>
+  <h2>Seguridad y acceso</h2>
+
+  <div class="find hecho">
+    <div class="fh">
+      <span class="fid">H-01</span>
+      <span class="ft">Una política llamada «Leer nombre de empresa» entrega la fila entera de <code>perfiles</code></span>
+      <span class="chip c-crit">Crítica</span>
+      <span class="chip c-fix">Resuelto 1 sep</span>
+    </div>
+    <div class="fb">
+      <p>RLS en PostgreSQL filtra <b>filas, no columnas</b>. Una política <code>FOR SELECT</code> que deja pasar la fila deja pasar sus 37 columnas. Esta política deja pasar todas las filas de <code>perfiles</code> a cualquiera con sesión iniciada.</p>
+      <div class="ev"><span class="cm">-- producción, tal cual está hoy</span><br>
+<span class="k">CREATE POLICY</span> "Leer nombre de empresa" <span class="k">ON</span> public.perfiles<br>
+&nbsp;&nbsp;<span class="k">FOR SELECT USING</span> ((( <span class="k">SELECT</span> auth.uid() <span class="k">AS</span> uid) <span class="k">IS NOT NULL</span>));<br><br>
+<span class="cm">-- sin cláusula TO → aplica a PUBLIC</span><br>
+<span class="cm">-- sin restricción de fila → todas las filas</span><br>
+<span class="cm">-- RLS no restringe columnas → las 37</span></div>
+      <p>Lo que queda al alcance de cualquier cliente o empresa registrada, sobre todos los demás: <code>rfc</code>, <code>razon_social</code>, <code>tipo_persona</code>, <code>telefono</code>, <code>aprobacion_cuenta</code>, <code>nota_rechazo_cuenta</code>, y las rutas de <code>doc_permiso_sct</code>, <code>doc_seguro_rc</code>, <code>doc_seguro_carga</code> y <code>fotos_verificacion</code>.</p>
+      <div class="note">
+        <div class="wh">Corregido el 1 sep — qué son exactamente esas rutas</div>
+        <p>La primera versión de este informe daba a entender más de lo que es. Lo que se filtra es la <b>ruta</b>, no el archivo. Las políticas de storage <code>reg_select</code> y <code>"Propietario y superadmin leen archivos"</code> limitan el <code>SELECT</code> sobre <code>storage.objects</code> al dueño o al superadmin, así que un tercero con la ruta <b>no puede firmar una URL ni descargar nada</b>. Es fuga de inventario —que existen, cómo se llaman, cuántos son— no de contenido.</p>
+        <p>Lo más sensible del conjunto no son los documentos, entonces, sino <code>nota_rechazo_cuenta</code>: el texto libre que el superadmin escribió al rechazar una cuenta, legible por la competencia. Y el nombre, teléfono y RFC de los perfiles de <b>cliente</b>, que ninguna pantalla muestra: se filtran y ya.</p>
+      </div>
+      <p>No hace falta ningún ataque para llegar ahí. El propio código ya lo hace:</p>
+      <div class="ev"><b>js/detalle.js:27</b>&nbsp;&nbsp;sb.from(<span class="k">'perfiles'</span>).select(<span class="k">'*'</span>).eq(<span class="k">'user_id'</span>, c.propietario_id).single()<br>
+<b>js/detalle.js:96</b>&nbsp;&nbsp;<span class="cm">(igual)</span><br>
+<b>js/admin.js:218</b>&nbsp;&nbsp;sb.from(<span class="k">'perfiles'</span>).select(<span class="k">'*'</span>).eq(<span class="k">'user_id'</span>, currentUser.id).single()<br><br>
+<span class="cm"># abrir el detalle de un camión descarga el expediente fiscal</span><br>
+<span class="cm"># completo de la empresa dueña, para pintar su nombre</span></div>
+      <p>El nombre de la política dice la intención real: se quería resolver un nombre para mostrar. Lo que se concedió fue la tabla.</p>
+      <div class="note">
+        <div class="wh">Nota fina, para no exagerar el hallazgo</div>
+        <p>La política no lleva <code>TO authenticated</code>, así que nominalmente alcanza también a <code>anon</code>. En la práctica <code>anon</code> no puede leerla porque la migración <code>20260827160000_anon_sin_privilegios_de_tabla.sql</code> le quitó el <code>GRANT</code>. Es decir: hoy la barrera contra el usuario anónimo es el permiso de tabla, no la política. Funciona, pero descansa en una sola capa donde debería haber dos.</p>
+      </div>
+      <p>Efecto colateral: la política <code>"Leer propio perfil"</code> queda <b>completamente subsumida</b> por esta. Al ser ambas permisivas, PostgreSQL evalúa las dos y las une con OR en cada lectura. Una de ellas no aporta nada.</p>
+      <dl class="grid">
+        <div><dt>Problema</dt><dd>Política de SELECT sin restricción de fila sobre una tabla con datos fiscales y rutas a documentos privados.</dd></div>
+        <div><dt>Evidencia</dt><dd>Texto de la política en el volcado de producción; <code>js/detalle.js:27,96</code>; <code>js/admin.js:218</code>.</dd></div>
+        <div><dt>Impacto</dt><dd>Exposición de datos personales y fiscales de 12 titulares hoy, de todos los que haya mañana. Alcanza al expediente que sostiene el cumplimiento LFPDPPP del propio proyecto.</dd></div>
+        <div><dt>Riesgo actual</dt><dd>Materializado, no hipotético: la app ya descarga esas columnas en un flujo normal de uso.</dd></div>
+        <div><dt>Cambio recomendado</dt><dd>Vista <code>perfiles_publico</code> con <code>security_invoker</code> que exponga solo <code>user_id, nombre, rol, verificado</code>; <code>GRANT SELECT</code> a <code>authenticated</code> sobre la vista. Sustituir la política por lectura de fila propia más superadmin. Redirigir a la vista las lecturas de perfiles ajenos.</dd></div>
+        <div><dt>Beneficio</dt><dd>Cierra la fuga sin perder el nombre para mostrar, que es lo único que la UI necesitaba.</dd></div>
+        <div><dt>Riesgo del cambio</dt><dd>Medio. Toca varias rutas de lectura, incluidos los <i>embeds</i> <code>propietario:perfiles(nombre)</code> de <code>js/vigencias.js:21-25</code>, que hay que repuntar a la vista. Si se aplica la política sin cambiar el código, esas pantallas se quedan sin nombre de empresa.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="yes">Sí</dd></div>
+        <div><dt>¿Código?</dt><dd class="yes">Sí — detalle.js, camiones.js, recursos.js, vigencias.js, reservaciones.js</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-crit">Crítica</span> — antes que cualquier otro punto de este informe</dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="find">
+    <div class="fh">
+      <span class="fid">H-02</span>
+      <span class="ft"><code>GRANT ALL</code> a <code>authenticated</code> en las 24 tablas</span>
+      <span class="chip c-baja">Baja</span>
+    </div>
+    <div class="fb">
+      <p><code>GRANT ALL ON TABLE</code> incluye <code>TRUNCATE</code>, <code>REFERENCES</code> y <code>TRIGGER</code> además de los cuatro verbos que la aplicación usa. <code>TRUNCATE</code> además <b>no pasa por RLS</b>.</p>
+      <p>Ahora la parte honesta: <b>no hay ruta de explotación hoy</b>. PostgREST nunca emite <code>TRUNCATE</code>, y el cliente solo habla con la base a través de PostgREST. Esto es higiene de mínimo privilegio, no un agujero. Se incluye porque el encargo pide revisar privilegios excesivos, y estos lo son; no porque haya que correr a arreglarlo.</p>
+      <p>En la misma línea: <code>anon</code> conserva <code>GRANT ALL</code> sobre 16 funciones, entre ellas funciones de trigger (<code>guard_*</code>, <code>sync_datos_pago</code>, <code>limitar_plantillas</code>). PostgREST no expone funciones que devuelven <code>trigger</code>, así que tampoco son invocables. Restos de la concesión automática de Supabase en cada <code>CREATE FUNCTION</code>.</p>
+      <dl class="grid">
+        <div><dt>Cambio recomendado</dt><dd>Sustituir por <code>GRANT SELECT, INSERT, UPDATE, DELETE</code> explícito. Revocar de <code>anon</code> las funciones de trigger.</dd></div>
+        <div><dt>Riesgo del cambio</dt><dd>Bajo, pero real si se hace a ciegas: revocar de más rompe escrituras. Aplicar tabla por tabla y verificar el flujo completo en pruebas.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="yes">Sí</dd></div>
+        <div><dt>¿Código?</dt><dd class="no">No</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-baja">Baja</span></dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <h3>Lo que se revisó y salió limpio</h3>
+  <ul>
+    <li><b>Inyección SQL: sin superficie.</b> El cliente no construye SQL. Las 385 llamadas pasan por el SDK, que parametriza. No hay concatenación de consultas en <code>js/</code>.</li>
+    <li><b><code>anon</code> sin privilegios de tabla</b> salvo <code>SELECT</code> sobre <code>app_config</code>. La migración de endurecimiento hizo su trabajo.</li>
+    <li><b>36 de 36 funciones <code>SECURITY DEFINER</code> fijan <code>search_path</code>.</b> Sin excepciones.</li>
+    <li><b>Clave de servicio fuera del cliente.</b> Solo <code>anon key</code> en <code>js/config.js</code>, que es pública por diseño.</li>
+  </ul>
+</section>
+
+<section id="redundancia">
+  <div class="sec-n">06</div>
+  <h2>Duplicidad y normalización</h2>
+  <p class="lede">1NF, 2NF y 3NF se cumplen razonablemente salvo en dos puntos concretos. Lo que sí abunda es duplicidad de información entre columnas.</p>
+
+  <div class="find hecho">
+    <div class="fh">
+      <span class="fid">H-03</span>
+      <span class="ft">Dos columnas para «va refrigerado», y la app lee la que el esquema declara obsoleta</span>
+      <span class="chip c-alta">Alta</span>
+      <span class="chip c-fix">Resuelto 1 sep</span>
+    </div>
+    <div class="fb">
+      <p>El comentario de la columna en producción es explícito sobre cuál manda:</p>
+      <div class="ev"><span class="k">COMMENT ON COLUMN</span> public.pedidos.refrigerado <span class="k">IS</span><br>
+&nbsp;&nbsp;<span class="cm">'Atributo transversal… Reemplaza el antiguo checkbox temp_controlada,</span><br>
+&nbsp;&nbsp;<span class="cm">&nbsp;que se sigue escribiendo por compatibilidad.'</span></div>
+      <p>El código hace lo contrario. Escribe las dos desde la misma casilla, pero <b>lee solo la vieja</b>:</p>
+      <div class="ev"><span class="cm"># ESCRITURA — las dos, desde el mismo checkbox #np-refrigerado</span><br>
+<b>js/pedidos.js:1435</b>&nbsp;&nbsp;temp_controlada: _campoAplica(<span class="k">'refri'</span>) &amp;&amp; vb(<span class="k">'np-refrigerado'</span>)<br>
+<b>js/pedidos.js:1445</b>&nbsp;&nbsp;refrigerado:&nbsp;&nbsp;&nbsp;&nbsp; _campoAplica(<span class="k">'refri'</span>) &amp;&amp; vb(<span class="k">'np-refrigerado'</span>)<br><br>
+<span class="cm"># LECTURA — solo la vieja</span><br>
+<b>js/pedidos.js:669</b>&nbsp;&nbsp;&nbsp;<span class="k">if</span> (p.temp_controlada) chips.push(<span class="k">'❄️ Temp. controlada'</span>)<br>
+<b>js/aprobaciones.js:1000</b> <span class="k">if</span> (p.temp_controlada) chips.push(<span class="k">'❄️ Temp. controlada'</span>)<br><br>
+<span class="cm"># plantillas usa solo la nueva</span><br>
+<b>js/plantillas.js:27</b>&nbsp;&nbsp;[<span class="k">'np-refrigerado'</span>, <span class="k">'refrigerado'</span>, <span class="k">'bool'</span>]</div>
+      <p>Y los datos de producción muestran que las dos columnas <b>ya no coinciden</b>:</p>
+      <div class="ev"><span class="cm">-- 40 pedidos en producción</span><br>
+temp_controlada   40/40 con valor,  <b>3 en true</b><br>
+refrigerado&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 40/40 con valor,  <b>0 en true</b></div>
+      <p>Esos tres pedidos son anteriores a la columna nueva. Cualquier código que se escriba mañana leyendo <code>refrigerado</code> —el cliente Android, un reporte, una consulta de negocio— los verá como carga seca. En transporte portuario esa confusión es la diferencia entre un <i>reefer</i> y un contenedor normal.</p>
+      <dl class="grid">
+        <div><dt>Problema</dt><dd>El mismo hecho en dos columnas, sin ninguna restricción que las obligue a coincidir, y con la documentación invertida respecto al comportamiento.</dd></div>
+        <div><dt>Evidencia</dt><dd><code>COMMENT</code> del esquema; <code>js/pedidos.js:1435,1445,669</code>; <code>js/aprobaciones.js:1000</code>; <code>js/plantillas.js:27</code>; densidad medida sobre las 40 filas.</dd></div>
+        <div><dt>Impacto</dt><dd>Un pedido refrigerado puede mostrarse como no refrigerado según qué columna lea quien pregunte.</dd></div>
+        <div><dt>Riesgo actual</dt><dd>3 filas ya divergen. Bajo en volumen, alto en consecuencia operativa.</dd></div>
+        <div><dt>Cambio recomendado</dt><dd>Igualar el histórico (<code>UPDATE pedidos SET refrigerado = true WHERE temp_controlada AND NOT refrigerado</code>), pasar las dos lecturas a <code>refrigerado</code> y dejar <code>temp_controlada</code> como columna generada o retirarla en una segunda fase.</dd></div>
+        <div><dt>Beneficio</dt><dd>Una sola fuente de verdad para un atributo que decide el tipo de unidad.</dd></div>
+        <div><dt>Riesgo del cambio</dt><dd>Bajo. El <code>UPDATE</code> toca 3 filas y es idempotente. Retirar la columna es aparte y destructivo.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="yes">Sí — corrección de datos</dd></div>
+        <div><dt>¿Código?</dt><dd class="yes">Sí — 2 lecturas</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-alta">Alta</span></dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="find">
+    <div class="fh">
+      <span class="fid">H-04</span>
+      <span class="ft">Grupo repetitivo de contenedores: 1NF con tope de dos</span>
+      <span class="chip c-media">Media</span>
+    </div>
+    <div class="fb">
+      <p><code>pedidos</code> guarda los contenedores como columnas numeradas: <code>contenedor_1_tipo</code>, <code>contenedor_1_peso</code>, <code>contenedor_2_tipo</code>, <code>contenedor_2_peso</code>. Es el grupo repetitivo clásico que 1NF proscribe, y trae el límite estructural de que <b>un pedido de tres contenedores no se puede representar</b>, aunque <code>num_contenedores</code> sea un <code>smallint</code> capaz de valer 3.</p>
+      <div class="ev"><span class="cm">-- densidad medida, 40 pedidos</span><br>
+num_contenedores    5/40   (12%)<br>
+contenedor_1_tipo   5/40   (12%)<br>
+contenedor_2_tipo   3/40   ( 8%)</div>
+      <p>Y aquí va la contención que el encargo pide expresamente. <b>Normalizar esto hoy sería un error.</b> Una tabla hija <code>pedido_contenedores</code> añade un JOIN a todas las lecturas de pedidos, y a cambio resuelve un caso que aún no ha ocurrido en 40 solicitudes. La recomendación no es hacerlo, es <b>tener escrito el disparador</b>: en cuanto exista el primer pedido de tres contenedores, la tabla hija es la salida correcta y no un tercer juego de columnas.</p>
+      <dl class="grid">
+        <div><dt>Cambio recomendado</dt><dd>Ninguno ahora. Cuando aparezca el tercer contenedor: tabla hija <code>pedido_contenedores(pedido_id, orden, tipo, peso)</code> con <code>UNIQUE(pedido_id, orden)</code>, y migrar las dos parejas actuales.</dd></div>
+        <div><dt>Riesgo de no hacerlo</dt><dd>Que la solución sea <code>contenedor_3_*</code>. Ahí el coste se multiplica.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="no">No por ahora</dd></div>
+        <div><dt>¿Código?</dt><dd class="no">No por ahora</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-media">Media</span> — decisión documentada, no obra</dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="find">
+    <div class="fh">
+      <span class="fid">H-05</span>
+      <span class="ft"><code>pedidos</code>: 63 columnas para cuatro tipos de solicitud distintos</span>
+      <span class="chip c-media">Media</span>
+    </div>
+    <div class="fb">
+      <p>La tabla sirve a solicitudes de camión, custodio, patio y lavado, y cada tipo aporta sus columnas. El resultado es una tabla ancha y hueca:</p>
+      <div class="ev"><span class="cm">-- columnas por debajo del 25% de ocupación, 40 pedidos</span><br>
+num_vehiculos&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1/40 ( 2%)   largo_m&nbsp;&nbsp; 0/40 (0%)<br>
+tipo_vehiculos&nbsp;&nbsp;&nbsp;&nbsp; 1/40 ( 2%)   ancho_m&nbsp;&nbsp; 0/40 (0%)<br>
+area_necesaria&nbsp;&nbsp;&nbsp;&nbsp; 1/40 ( 2%)   alto_m&nbsp;&nbsp;&nbsp; 0/40 (0%)<br>
+num_custodios&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 4/40 (10%)   temp_min  0/40 (0%)<br>
+zona_cobertura&nbsp;&nbsp;&nbsp;&nbsp; 4/40 (10%)   temp_max  0/40 (0%)<br>
+horario_servicio   4/40 (10%)   hazmat_un 1/40 (2%)</div>
+      <p>La lectura correcta no es «hay que partir la tabla». En Postgres una columna nula ocupa un bit del mapa de nulos, no una columna vacía: 63 columnas mayormente nulas cuestan muy poco espacio. El coste real es otro y es de mantenimiento: <b>ninguna restricción impide guardar un pedido de patio con <code>hazmat_clase</code></b>, porque no hay forma de expresar «estas columnas solo aplican a este tipo» sin un CHECK por tipo.</p>
+      <p>Recomendación proporcionada: no partir la tabla; añadir CHECK por categoría cuando el formulario se estabilice, y mientras tanto <b>no añadir más columnas de tipo específico</b> a <code>pedidos</code>. Un quinto tipo de recurso sí justificaría la separación.</p>
+      <dl class="grid">
+        <div><dt>¿Migración?</dt><dd class="no">No ahora</dd></div>
+        <div><dt>¿Código?</dt><dd class="no">No</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-media">Media</span> — deuda de diseño acotada</dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <h3>Duplicidad estructural: dos mecanismos para el mismo problema</h3>
+  <p>La aprobación de ediciones está resuelta dos veces, de dos maneras distintas:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Dónde</th><th>Mecanismo</th><th>Coste</th></tr></thead>
+    <tbody>
+      <tr><td class="m">perfiles</td><td>Seis columnas sombra: <code>doc_*_pendiente</code>, <code>fecha_vencimiento_*_pendiente</code>, más la bandera <code>perfil_docs_pendiente</code></td><td>Cada documento nuevo exige dos columnas más</td></tr>
+      <tr><td class="m">camiones, custodios,<br>patios, lavados, operadores</td><td><code>snapshot_anterior jsonb</code> + <code>campos_editados text[]</code> + <code>es_edicion bool</code></td><td>Ninguno: absorbe campos nuevos sin tocar el esquema</td></tr>
+    </tbody>
+  </table></div>
+  <p>El segundo enfoque es mejor y ya está usado por cinco tablas. Converger <code>perfiles</code> hacia él <b>no es urgente</b> —funciona— pero es la respuesta correcta la próxima vez que se toque esa tabla. <span class="chip c-baja">Baja</span></p>
+
+  <h3>Duplicidad de información: denormalización deliberada</h3>
+  <p><code>pedidos.cliente_nombre</code> y <code>cliente_email</code>, <code>reservaciones.cliente</code>, <code>cliente_email</code> y <code>telefono</code>, <code>ofertas.admin_nombre</code>, <code>operador_nombre</code>: todos son copias de datos que viven en <code>perfiles</code> o <code>auth.users</code>.</p>
+  <p><b>Esto está bien y no debe deshacerse.</b> Son instantáneas del momento del acuerdo: el nombre con el que se contrató no debe cambiar porque el usuario edite su perfil dos años después, y las tablas históricas deben sobrevivir al borrado de la cuenta. Es denormalización con propósito, no descuido. <span class="chip c-none">Sin cambio</span></p>
+  <p>La excepción es <code>reservaciones.cliente_email</code>, que <b>sí</b> se usó como criterio de filtrado en el pasado y ya fue corregido: el comentario en <code>js/reservaciones.js:120-124</code> documenta por qué ahora se filtra por <code>cliente_user_id</code>. Corrección acertada, se deja constancia.</p>
+</section>
+<section id="campos">
+  <div class="sec-n">07</div>
+  <h2>Campos</h2>
+
+  <div class="find">
+    <div class="fh">
+      <span class="fid">H-06</span>
+      <span class="ft">Ocho columnas sin una sola referencia en todo el proyecto</span>
+      <span class="chip c-media">Media</span>
+    </div>
+    <div class="fb">
+      <p>Método, porque el encargo advierte de no concluir a la ligera: para cada columna se buscó el nombre en <code>js/</code>, <code>android/</code>, <code>supabase/functions/</code>, <code>app.html</code> <b>y</b> en las 47 migraciones, cuerpos de función y triggers incluidos. Las que siguen aparecen <b>únicamente en su propia definición</b>.</p>
+      <div class="tw"><table>
+        <thead><tr><th>Columna</th><th>Tipo</th><th class="n">Con dato</th><th>Lectura</th><th>Veredicto</th></tr></thead>
+        <tbody>
+          <tr><td class="m">reservaciones.peso_kg</td><td class="m">numeric</td><td class="n">0/20</td><td>ninguna</td><td>Carta Porte no construida</td></tr>
+          <tr><td class="m">reservaciones.descripcion_mercancia</td><td class="m">text</td><td class="n">0/20</td><td>ninguna</td><td>Carta Porte no construida</td></tr>
+          <tr><td class="m">reservaciones.clave_sat_mercancia</td><td class="m">text</td><td class="n">0/20</td><td>ninguna</td><td>Carta Porte no construida</td></tr>
+          <tr><td class="m">reservaciones.unidad_medida_sat</td><td class="m">text</td><td class="n">0/20</td><td>ninguna</td><td>Carta Porte no construida</td></tr>
+          <tr><td class="m">reservaciones.num_piezas</td><td class="m">integer</td><td class="n">0/20</td><td>ninguna</td><td>Carta Porte no construida</td></tr>
+          <tr><td class="m">reservaciones.num_pedido_factura</td><td class="m">text</td><td class="n">0/20</td><td>ninguna</td><td>Carta Porte no construida</td></tr>
+          <tr><td class="m">perfiles.regimen_fiscal</td><td class="m">text</td><td class="n">0/12</td><td>ninguna</td><td>Duplica <code>solicitudes_cuenta</code></td></tr>
+          <tr><td class="m">perfiles.cp_fiscal</td><td class="m">text</td><td class="n">0/12</td><td>ninguna</td><td>Duplica <code>solicitudes_cuenta</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>Las seis de <code>reservaciones</code> forman un conjunto coherente: son los campos de <b>Carta Porte</b>. Encajan con las tablas <code>documentos_fiscales</code> y <code>pagos</code>, que existen, tienen CHECK bien puestos y <b>cero filas</b>. Es una funcionalidad preparada y no construida, no un descuido.</p>
+      <p>Por eso <b>la recomendación no es borrarlas</b>. Es decidir: si Carta Porte sigue en el plan, se documentan como reserva y se dejan; si no, se retiran junto con las dos tablas vacías. Lo que no conviene es que sigan ahí sin que nadie sepa cuál de las dos cosas son.</p>
+      <p>Las dos de <code>perfiles</code> son distintas: <code>solicitudes_cuenta</code> ya captura <code>rfc</code>, <code>regimen_fiscal</code> equivalente y el CP, y esas sí se llenan. Las de <code>perfiles</code> nacieron duplicadas y nunca se poblaron.</p>
+      <dl class="grid">
+        <div><dt>Impacto</dt><dd>Ninguno en rendimiento. El coste es de comprensión: ocho columnas que cualquiera que lea el esquema tiene que investigar para descubrir que no hacen nada.</dd></div>
+        <div><dt>Cambio recomendado</dt><dd>Decisión de producto sobre Carta Porte. Para las dos de <code>perfiles</code>: <code>COMMENT</code> marcándolas obsoletas ahora, retirada más adelante.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="yes">Sí, si se retiran</dd></div>
+        <div><dt>¿Código?</dt><dd class="no">No</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-media">Media</span></dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="find">
+    <div class="fh">
+      <span class="fid">H-07</span>
+      <span class="ft">Dos columnas huérfanas <b>con datos dentro</b>: se escribieron y ya nadie las lee</span>
+      <span class="chip c-media">Media</span>
+    </div>
+    <div class="fb">
+      <p>Caso aparte del anterior, y más incómodo, porque aquí sí hay información real atrapada:</p>
+      <div class="ev"><span class="cm">-- pedidos, 40 filas</span><br>
+detalles_lugar&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 18/40   <span class="cm">← se lee en el código</span><br>
+detalles_hora&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 18/40   <span class="cm">← se lee en el código</span><br>
+detalles_contacto_nombre  <b>16/40</b>   <span class="cm">← CERO referencias</span><br>
+detalles_contacto_tel&nbsp;&nbsp;&nbsp;&nbsp; <b>16/40</b>   <span class="cm">← CERO referencias</span></div>
+      <p>Sus hermanas <code>detalles_lugar</code> y <code>detalles_hora</code> se leen con normalidad. Estas dos se llenaron en 16 pedidos —una versión anterior las escribía— y hoy no las consulta nada. El nombre y el teléfono de contacto que un cliente dio al aceptar una oferta están guardados donde nadie los mira.</p>
+      <p>Nótese que <code>pedidos</code> ya tiene <code>contacto_nombre</code> y <code>contacto_tel</code> (28/40), que sí se usan. Es decir: el dato de contacto está en dos sitios y solo uno se lee.</p>
+      <dl class="grid">
+        <div><dt>Problema</dt><dd>Información capturada al usuario, almacenada, y nunca mostrada ni utilizada.</dd></div>
+        <div><dt>Evidencia</dt><dd>0 apariciones en <code>js/</code>, <code>android/</code>, funciones y migraciones; 16 filas con valor en producción.</dd></div>
+        <div><dt>Impacto</dt><dd>Doble: funcional —un dato operativo perdido— y de protección de datos, porque son datos personales conservados sin finalidad, justo lo que la LFPDPPP pide evitar.</dd></div>
+        <div><dt>Cambio recomendado</dt><dd>Decidir cuál pareja es la buena. Si manda <code>contacto_*</code>: volcar las 16 filas donde <code>contacto_tel</code> esté vacío y retirar las <code>detalles_contacto_*</code>. Si manda la otra: restaurar la lectura.</dd></div>
+        <div><dt>Riesgo del cambio</dt><dd>Bajo con el volcado previo; alto si se retiran sin mirar, porque se pierden 16 contactos.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="yes">Sí</dd></div>
+        <div><dt>¿Código?</dt><dd class="yes">Sí, si se restaura la lectura</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-media">Media</span></dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <h3>Campos que deberían ser NOT NULL</h3>
+  <p>El encargo pide identificar columnas que nunca deberían aceptar NULL. Aquí hay que ser cuidadoso, porque varias nulables lo son <b>a propósito</b>: <code>ON DELETE SET NULL</code> exige que la columna acepte NULL, y las tablas históricas dependen de eso.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Columna</th><th>Hoy</th><th>Recomendación</th><th>Por qué</th></tr></thead>
+    <tbody>
+      <tr><td class="m">reservaciones.estado</td><td class="m">NULL, def. 'Activa'</td><td><b>NOT NULL</b></td><td>Una reserva sin estado no es representable en la máquina de estados. 20/20 tienen valor.</td></tr>
+      <tr><td class="m">reservaciones.recurso_tipo</td><td class="m">NOT NULL ✓</td><td>—</td><td>Ya correcto</td></tr>
+      <tr><td class="m">reservaciones.created_at</td><td class="m">NULL, def. now()</td><td><b>NOT NULL</b></td><td>Se ordena por ella en las dos vistas principales; un NULL rompe el orden</td></tr>
+      <tr><td class="m">pedidos.created_at</td><td class="m">NULL, def. now()</td><td><b>NOT NULL</b></td><td>Es la clave de la paginación keyset. Un NULL la rompe en silencio</td></tr>
+      <tr><td class="m">notificaciones.created_at</td><td class="m">NULL, def. now()</td><td><b>NOT NULL</b></td><td>Índice de orden y criterio de la purga por retención</td></tr>
+      <tr><td class="m">notificaciones.leido</td><td class="m">NULL, def. false</td><td><b>NOT NULL</b></td><td>La purga filtra <code>leido = true</code>; un NULL no entra ni en true ni en false</td></tr>
+      <tr><td class="m">perfiles.rol</td><td class="m">NOT NULL ✓</td><td>—</td><td>Ya correcto, con CHECK</td></tr>
+      <tr><td class="m">reservaciones.propietario_id</td><td class="m">NULL</td><td><span class="chip c-none">Sin cambio</span></td><td><b>Debe seguir nulable:</b> <code>ON DELETE SET NULL</code>. El CHECK <code>reservaciones_partes_presentes</code> ya cubre el caso vivo</td></tr>
+      <tr><td class="m">pedidos.cliente_id</td><td class="m">NULL</td><td><span class="chip c-none">Sin cambio</span></td><td>Igual: <code>SET NULL</code> + CHECK <code>pedidos_cliente_presente</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>Las cinco columnas de fecha y bandera con <code>DEFAULT</code> pero nulables son el caso más claro: tienen valor por defecto, nunca se insertan explícitamente en NULL, y hay lógica que depende de que no lo sean. Añadir <code>NOT NULL</code> es barato —Postgres 17 no reescribe la tabla— y elimina una clase entera de fallo silencioso. <span class="chip c-baja">Baja</span> por impacto hoy, pero de las mejores relaciones beneficio/esfuerzo del informe.</p>
+
+  <h3>Tipos de datos</h3>
+  <p>Revisados los 24 <code>CREATE TABLE</code>. La conclusión general es <b>que no hay que tocar casi nada</b>, y conviene decirlo con la misma claridad que los problemas:</p>
+  <ul>
+    <li><b><code>numeric</code> sin precisión para dinero</b> (<code>precio_cliente</code>, <code>precio_oferta</code>, <code>precio_acordado</code>, <code>pagos.monto</code>). <code>numeric</code> sin argumentos es exacto y de precisión arbitraria, así que <b>no hay pérdida</b> —el error de usar <code>float</code> no está cometido—. Fijar <code>numeric(14,2)</code> como ya hacen <code>patios.precio_dia</code> y <code>lavados.precio_lavado</code> daría consistencia, pero es cosmético. <span class="chip c-baja">Baja</span></li>
+    <li><b><code>text</code> en todas partes en lugar de <code>varchar(n)</code>.</b> En PostgreSQL <code>text</code> y <code>varchar</code> tienen el mismo rendimiento y almacenamiento; <code>varchar(n)</code> solo añade una restricción de longitud. No es un defecto. <span class="chip c-none">Sin cambio</span></li>
+    <li><b>Estados como <code>text</code> + CHECK en vez de <code>enum</code>.</b> Deliberado y correcto: un <code>enum</code> exige <code>ALTER TYPE</code> para añadir un valor y no se puede quitar ninguno. Con CHECK, cada migración de estado es una línea. <span class="chip c-none">Sin cambio</span></li>
+    <li><b><code>uuid</code> como PK en 19 tablas, <code>text</code> en las 5 de flota.</b> Los ids de flota (<code>C-002</code>, <code>CUS-004</code>, <code>OP-001</code>) son legibles para el operador humano, y aparecen en pantalla. Justificado. <span class="chip c-none">Sin cambio</span></li>
+    <li><b>Coordenadas como <code>numeric</code> sueltas</b> (<code>origen_lat</code>, <code>origen_lng</code>, <code>destino_lat</code>, <code>destino_lng</code>). Funciona para guardar y pintar un pin. Si algún día hay que preguntar «unidades a menos de 50 km», eso pide PostGIS y un índice GiST. Hoy no se pregunta. <span class="chip c-none">Sin cambio</span>, con disparador anotado.</li>
+  </ul>
+</section>
+
+<section id="indices">
+  <div class="sec-n">08</div>
+  <h2>Índices</h2>
+  <p class="lede">43 índices. La sorpresa agradable de esta auditoría: <b>no hay ninguno duplicado y ninguno redundante por prefijo</b>. Los parciales corresponden a consultas que existen de verdad.</p>
+
+  <div class="warn">
+    <div class="wh">Recordatorio de método</div>
+    <p>Sin <code>pg_stat_user_indexes</code> no se puede afirmar que un índice <b>no se usa</b>. Por eso esta sección <b>no propone eliminar ni uno solo</b>. Proponer un <code>DROP INDEX</code> sin dato de uso sería exactamente el cambio teórico que el encargo prohíbe.</p>
+  </div>
+
+  <h3>Los que faltan</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Índice propuesto</th><th>Consulta que lo justifica</th><th>Prioridad</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="m">reservaciones (created_at DESC)</td>
+        <td>Las dos vistas principales ordenan por <code>created_at DESC</code> y no hay índice: <code>js/reservaciones.js:130</code> (cliente) y <code>:294</code> (admin/SA). Hoy son 20 filas y se ordenan en memoria; es el índice que más se va a echar de menos.</td>
+        <td><span class="chip c-alta">Alta</span></td>
+      </tr>
+      <tr>
+        <td class="m">notificaciones (user_id)<br>WHERE NOT leido</td>
+        <td><code>js/notificaciones.js:57</code> hace <code>UPDATE … .eq('user_id',…).eq('leido',false)</code>. El índice existente <code>(user_id, created_at DESC)</code> no cubre el predicado de <code>leido</code>. Es además la tabla más grande (866 filas).</td>
+        <td><span class="chip c-alta">Alta</span></td>
+      </tr>
+      <tr>
+        <td class="m">reservaciones (created_at)<br>para reportes</td>
+        <td><code>js/reportes.js:33</code> filtra <code>gte/lte</code> sobre <code>created_at</code>. Lo cubre el mismo índice de la primera fila.</td>
+        <td><span class="chip c-media">Media</span></td>
+      </tr>
+      <tr>
+        <td class="m">14 columnas FK sin índice</td>
+        <td>Ver detalle debajo. Justificación distinta a las anteriores: no es velocidad de lectura, es el coste de borrar la fila padre.</td>
+        <td><span class="chip c-media">Media</span></td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <div class="find">
+    <div class="fh">
+      <span class="fid">H-08</span>
+      <span class="ft">14 claves foráneas sin índice, y una función que las recorre todas</span>
+      <span class="chip c-media">Media</span>
+    </div>
+    <div class="fb">
+      <p>PostgreSQL indexa automáticamente la clave <b>primaria</b>, nunca la <b>foránea</b> del lado hijo. Cada vez que se borra o se actualiza la clave de una fila padre, el motor tiene que comprobar los hijos; sin índice, eso es un recorrido secuencial de la tabla hija entera, una por cada FK.</p>
+      <p>Eso importa aquí porque <b>el borrado de cuenta es una función existente</b> —<code>gestionar-usuario</code> acción <code>eliminar</code>, más la migración <code>20260827190000_desbloquea_el_borrado_de_cuenta.sql</code>— y es también el mecanismo con el que se atiende una solicitud ARCO de cancelación.</p>
+      <div class="tw"><table>
+        <thead><tr><th>Tabla</th><th>Columna FK</th><th>Referencia</th><th>Acción</th></tr></thead>
+        <tbody>
+          <tr><td class="m">reservaciones</td><td class="m">cancelacion_solicitada_por</td><td class="m">auth.users</td><td class="m">SET NULL</td></tr>
+          <tr><td class="m">reservaciones</td><td class="m">cancelacion_resuelta_por</td><td class="m">auth.users</td><td class="m">SET NULL</td></tr>
+          <tr><td class="m">reservaciones</td><td class="m">pagado_por</td><td class="m">auth.users</td><td class="m">SET NULL</td></tr>
+          <tr><td class="m">pagos</td><td class="m">reservacion_id</td><td class="m">reservaciones</td><td class="m">—</td></tr>
+          <tr><td class="m">pagos</td><td class="m">registrado_por</td><td class="m">auth.users</td><td class="m">SET NULL</td></tr>
+          <tr><td class="m">documentos_fiscales</td><td class="m">reservacion_id</td><td class="m">reservaciones</td><td class="m">—</td></tr>
+          <tr><td class="m">documentos_fiscales</td><td class="m">emitido_por</td><td class="m">auth.users</td><td class="m">SET NULL</td></tr>
+          <tr><td class="m">documentos_fiscales</td><td class="m">cancelado_por</td><td class="m">auth.users</td><td class="m">SET NULL</td></tr>
+          <tr><td class="m">mensajes</td><td class="m">de_user_id</td><td class="m">auth.users</td><td class="m">CASCADE</td></tr>
+          <tr><td class="m">calificaciones</td><td class="m">cliente_id</td><td class="m">perfiles</td><td class="m">SET NULL</td></tr>
+          <tr><td class="m">pedidos</td><td class="m">oferta_pendiente_id</td><td class="m">ofertas</td><td class="m">—</td></tr>
+          <tr><td class="m">expedientes</td><td class="m">incidente_reportado_por</td><td class="m">auth.users</td><td class="m">SET NULL</td></tr>
+          <tr><td class="m">solicitudes_arco</td><td class="m">atendida_por</td><td class="m">auth.users</td><td class="m">SET NULL</td></tr>
+          <tr><td class="m">reservaciones_historico</td><td class="m">archivado_por</td><td class="m">auth.users</td><td class="m">SET NULL</td></tr>
+        </tbody>
+      </table></div>
+      <p>Y aquí la contención, porque el encargo insiste en no añadir índices por reflejo: <b>no hay que crear los catorce</b>. Cuatro de esas tablas están vacías y otras dos no crecerán. La regla razonable es indexar la FK cuando la tabla hija crezca sin techo <b>y</b> el padre se borre de verdad. Eso deja seis: las tres de <code>reservaciones</code>, <code>mensajes.de_user_id</code> y las dos <code>reservacion_id</code> de <code>pagos</code> y <code>documentos_fiscales</code>, estas últimas en cuanto la facturación se construya.</p>
+      <dl class="grid">
+        <div><dt>Impacto</dt><dd>Hoy, microsegundos. Con 100.000 reservaciones, borrar una cuenta pasa a ser un recorrido completo por FK, sosteniendo bloqueos mientras dura.</dd></div>
+        <div><dt>Riesgo actual</dt><dd>Bajo, y con fecha: aparece cuando alguien ejerza una cancelación ARCO sobre una base ya grande.</dd></div>
+        <div><dt>Beneficio</dt><dd>El borrado de cuenta deja de degradarse con el tamaño de la base.</dd></div>
+        <div><dt>Riesgo del cambio</dt><dd>Muy bajo. Seis índices pequeños. Usar <code>CREATE INDEX CONCURRENTLY</code> para no bloquear escrituras.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="yes">Sí</dd></div>
+        <div><dt>¿Código?</dt><dd class="no">No</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-media">Media</span></dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="find">
+    <div class="fh">
+      <span class="fid">H-09</span>
+      <span class="ft"><code>idx_pedidos_fecha</code> no cubre el desempate de su propia paginación</span>
+      <span class="chip c-media">Media</span>
+    </div>
+    <div class="fb">
+      <p>Este es el único índice del esquema que está <b>mal diseñado</b> respecto a la consulta que lo usa. La paginación de solicitudes ordena por dos columnas; el índice solo tiene una.</p>
+      <div class="ev"><span class="cm">-- el índice</span><br>
+<span class="k">CREATE INDEX</span> idx_pedidos_fecha <span class="k">ON</span> pedidos <span class="k">USING</span> btree (created_at <span class="k">DESC</span>);<br><br>
+<span class="cm">-- la consulta, js/pedidos.js:212-214</span><br>
+.order(<span class="k">'created_at'</span>, { ascending: <span class="k">false</span> })<br>
+.order(<span class="k">'id'</span>, &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { ascending: <span class="k">false</span> })<br>
+.limit(30)</div>
+      <p>Con el índice actual, las filas que empatan en <code>created_at</code> hay que ordenarlas aparte por <code>id</code>. El arreglo es de una línea: <code>(created_at DESC, id DESC)</code>.</p>
+      <p>Hay un segundo detalle en la misma consulta que <b>no</b> se recomienda cambiar todavía. El cursor se expresa como un OR:</p>
+      <div class="ev"><span class="cm">-- js/pedidos.js:218-221</span><br>
+.or(<span class="k">`created_at.lt.${c.created_at},and(created_at.eq.${c.created_at},id.lt.${c.id})`</span>)<br><br>
+<span class="cm">-- que llega al motor como</span><br>
+<span class="k">WHERE</span> created_at &lt; X <span class="k">OR</span> (created_at = X <span class="k">AND</span> id &lt; Y)</div>
+      <p>La forma que Postgres recorre de un tirón con el índice compuesto es la comparación de filas, <code>(created_at, id) &lt; (X, Y)</code>, y <b>PostgREST no sabe expresarla</b>. Es una limitación del cliente, no del esquema. La salida real, si algún día pesa, es mover esa consulta a una RPC —donde se puede escribir el SQL exacto— que es la misma dirección que apunta H-10. Mientras tanto, el índice compuesto ya mejora el caso común.</p>
+      <dl class="grid">
+        <div><dt>Cambio recomendado</dt><dd>Reemplazar por <code>(created_at DESC, id DESC)</code> con <code>CONCURRENTLY</code>, y retirar el antiguo solo después de comprobar que el nuevo se usa.</dd></div>
+        <div><dt>Riesgo del cambio</dt><dd>Muy bajo. El índice nuevo sirve para todo lo que servía el viejo.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="yes">Sí</dd></div>
+        <div><dt>¿Código?</dt><dd class="no">No</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-media">Media</span></dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <h3>Índices duplicados, redundantes o inútiles</h3>
+  <p><b>No se encontró ninguno.</b> Se comprobaron los tres patrones que pide el encargo:</p>
+  <ul>
+    <li><b>Duplicados exactos</b> (dos índices sobre las mismas columnas con distinto nombre): ninguno entre los 43.</li>
+    <li><b>Redundantes por prefijo</b> (existe <code>(a)</code> y además <code>(a,b)</code>): ninguno. Los tres compuestos —<code>idx_calificaciones_admin</code>, <code>idx_notificaciones_user_fecha</code>, <code>idx_plantillas_cliente</code>— no tienen un índice suelto sobre su primera columna.</li>
+    <li><b>Parciales solapados:</b> <code>idx_pedidos_abiertos</code> (<code>WHERE estado='abierto'</code>) e <code>idx_pedidos_cola_revision</code> (<code>WHERE estado IN ('pendiente_revision','pendiente_acuerdo')</code>) tienen predicados disjuntos. Sirven a consultas distintas y reales: <code>js/aprobaciones.js:76-77</code> usa el segundo.</li>
+  </ul>
+  <p>Un matiz sobre orden de columnas, ya que el encargo lo pregunta expresamente: <code>idx_pedidos_cola_revision (estado, created_at)</code> lleva <code>estado</code> primero pese a que el predicado parcial ya limita <code>estado</code> a dos valores. <b>Es correcto igual</b>, porque las dos consultas que lo usan filtran por un solo estado y ordenan por fecha, así que la columna líder separa las dos colas. <span class="chip c-none">Sin cambio</span></p>
+</section>
+<section id="consultas">
+  <div class="sec-n">09</div>
+  <h2>Consultas y N+1</h2>
+  <p class="lede">385 llamadas a la base desde el cliente. La buena noticia es que el patrón N+1 clásico está en general resuelto con carga por lotes; lo que queda son cuatro casos concretos.</p>
+
+  <div class="find hecho">
+    <div class="fh">
+      <span class="fid">H-10</span>
+      <span class="ft">Once RPC transaccionales escritas, probadas y sin usar</span>
+      <span class="chip c-alta">Alta</span>
+      <span class="chip c-fix">Resuelto 1 sep</span>
+    </div>
+    <div class="fb">
+      <p>La migración <code>20260810120000_rpc_transacciones.sql</code> define once funciones que meten cada flujo multipaso en <b>una sola transacción</b>. El cliente llama a RPC 23 veces, pero solo a dos funciones, y <b>ninguna de las once</b>:</p>
+      <div class="ev"><span class="cm"># todas las llamadas sb.rpc() del cliente</span><br>
+21 × notificar_superadmins<br>
+&nbsp;2 × cerrar_acuerdo<br><br>
+<span class="cm"># de las 11 transaccionales: 0 llamadas</span><br>
+enviar_oferta · responder_oferta · responder_contraoferta<br>
+cancelar_reservacion · solicitar_cancelacion · registrar_evidencias<br>
+avanzar_tracking · abrir_expediente · calificar_servicio<br>
+enviar_mensaje · recomendar_unidad</div>
+      <p>El caso concreto. <code>cancelarReserva()</code> son una lectura y <b>seis escrituras encadenadas sin transacción</b>:</p>
+      <div class="ev"><b>js/reservaciones.js:578</b>&nbsp; select reservación<br>
+<b>js/reservaciones.js:582</b>&nbsp; update reservaciones → <span class="k">'Cancelada'</span><br>
+<b>js/reservaciones.js:587</b>&nbsp; update &lt;tabla recurso&gt; → <span class="k">'disponible'</span><br>
+<b>js/reservaciones.js:592</b>&nbsp; update pedidos → reabrir<br>
+<b>js/reservaciones.js:606</b>&nbsp; update ofertas<br>
+<b>js/reservaciones.js:614</b>&nbsp; update ofertas<br>
+<b>js/reservaciones.js:622</b>&nbsp; insert notificaciones<br>
+<b>js/reservaciones.js:632</b>&nbsp; rpc notificar_superadmins</div>
+      <p>Si el navegador se cierra entre la línea 582 y la 587, la reserva queda <b>Cancelada</b> y la unidad sigue <b>ocupada</b>. Nadie puede volver a reservarla y nada lo señala. La migración <code>20260728120000</code> existe precisamente porque eso ya pasó una vez.</p>
+      <p><code>cancelar_reservacion(p_reserva_id, …)</code> hace exactamente esos seis pasos en una transacción, revalidando al llamante porque <code>SECURITY DEFINER</code> se salta RLS. Los triggers guardianes siguen aplicando dentro. Está escrita. Solo hay que llamarla.</p>
+      <div class="note">
+        <div class="wh">Por qué esto pesa más de lo que parece</div>
+        <p>El contrato móvil (<code>docs/CONTRATO-MOVIL.md</code>) da por hecho que los clientes nativos usan las RPC. Mientras la PWA orquestre a mano, hay <b>dos implementaciones distintas del mismo flujo de negocio</b>, y solo una es atómica. Cada arreglo futuro hay que hacerlo dos veces, o divergen.</p>
+      </div>
+      <dl class="grid">
+        <div><dt>Problema</dt><dd>Flujos multipaso ejecutados como escrituras sueltas desde el navegador, existiendo ya la versión transaccional en la base.</dd></div>
+        <div><dt>Evidencia</dt><dd>Recuento de <code>sb.rpc(</code> por función; <code>js/reservaciones.js:578-632</code>; migración <code>20260810120000</code>.</dd></div>
+        <div><dt>Impacto</dt><dd>Estados incoherentes ante cualquier interrupción: pestaña cerrada, red caída, error a medias. Recurso bloqueado sin reserva viva.</dd></div>
+        <div><dt>Riesgo actual</dt><dd>Real y ya materializado una vez.</dd></div>
+        <div><dt>Cambio recomendado</dt><dd>Sustituir por la RPC, empezando por <code>cancelar_reservacion</code> y <code>registrar_evidencias</code>, que son las de más pasos.</dd></div>
+        <div><dt>Beneficio</dt><dd>Atomicidad real, menos viajes de red, y una sola implementación compartida con los clientes nativos.</dd></div>
+        <div><dt>Riesgo del cambio</dt><dd>Medio: cambia el manejo de errores, que pasa de siete comprobaciones a una. Hay que probar el flujo completo, incluido el camino de rechazo de los triggers guardianes.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="no">No — ya están creadas</dd></div>
+        <div><dt>¿Código?</dt><dd class="yes">Sí</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-alta">Alta</span></dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="find hecho">
+    <div class="fh">
+      <span class="fid">H-11</span>
+      <span class="ft">Abrir la campana marca leídas notificaciones que nunca se mostraron</span>
+      <span class="chip c-alta">Alta</span>
+      <span class="chip c-fix">Resuelto 1 sep</span>
+    </div>
+    <div class="fb">
+      <p>El panel carga 20. El <code>UPDATE</code> no filtra por esas 20:</p>
+      <div class="ev"><span class="cm">// js/notificaciones.js:12-16 — se cargan 20</span><br>
+sb.from(<span class="k">'notificaciones'</span>).select(<span class="k">'*'</span>)<br>
+&nbsp;&nbsp;.eq(<span class="k">'user_id'</span>, currentUser.id)<br>
+&nbsp;&nbsp;.order(<span class="k">'created_at'</span>, { ascending: <span class="k">false</span> })<br>
+&nbsp;&nbsp;.limit(<b>20</b>);<br><br>
+<span class="cm">// js/notificaciones.js:57-58 — se marcan TODAS</span><br>
+<span class="k">await</span> sb.from(<span class="k">'notificaciones'</span>).update({ leido: <span class="k">true</span> })<br>
+&nbsp;&nbsp;.eq(<span class="k">'user_id'</span>, currentUser.id).eq(<span class="k">'leido'</span>, <span class="k">false</span>);<br>
+&nbsp;&nbsp;<span class="cm">// ← sin .in('id', idsNoLeidos)</span></div>
+      <p>Un usuario con 60 sin leer abre la campana, ve 20, y las 40 que no llegó a ver quedan marcadas como leídas. Además del problema funcional, ese <code>UPDATE</code> ataca un predicado no indexado y, en una tabla de 866 filas que crece 0,56 por usuario y día, escribe muchas más filas de las necesarias.</p>
+      <p>La corrección es una línea: la lista <code>idsNoLeidos</code> <b>ya está calculada</b> en la línea 51 y no se usa para el filtro.</p>
+      <dl class="grid">
+        <div><dt>Cambio recomendado</dt><dd>Añadir <code>.in('id', idsNoLeidos)</code> al <code>UPDATE</code>. Añadir el índice parcial <code>(user_id) WHERE NOT leido</code>.</dd></div>
+        <div><dt>Beneficio</dt><dd>Deja de perderse el aviso de novedad; el <code>UPDATE</code> escribe como mucho 20 filas.</dd></div>
+        <div><dt>Riesgo del cambio</dt><dd>Muy bajo. La variable ya existe.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="yes">Solo el índice</dd></div>
+        <div><dt>¿Código?</dt><dd class="yes">Sí — una línea</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-alta">Alta</span> — coste mínimo, efecto visible</dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="find hecho">
+    <div class="fh">
+      <span class="fid">H-12</span>
+      <span class="ft">Paginación por OFFSET en <code>reservaciones</code>, teniendo keyset al lado en <code>pedidos</code></span>
+      <span class="chip c-alta">Alta</span>
+      <span class="chip c-fix">Resuelto 1 sep</span>
+    </div>
+    <div class="fb">
+      <p>El mismo proyecto resuelve el mismo problema de dos maneras, y la buena ya está escrita.</p>
+      <div class="ev"><span class="cm">// pedidos — keyset, con desempate correcto. js/pedidos.js:212-222</span><br>
+.order(<span class="k">'created_at'</span>,{ascending:<span class="k">false</span>}).order(<span class="k">'id'</span>,{ascending:<span class="k">false</span>}).limit(30)<br>
+.or(<span class="k">`created_at.lt.${cur.created_at},and(created_at.eq.…,id.lt.…)`</span>)<br><br>
+<span class="cm">// reservaciones — OFFSET. js/reservaciones.js:130 y :294</span><br>
+.order(<span class="k">'created_at'</span>,{ascending:<span class="k">false</span>})<br>
+.range(_reservOffset, _reservOffset + <b>30</b> - 1)</div>
+      <p>Con <code>OFFSET</code>, el motor produce y descarta todas las filas anteriores. En la página 50 lee 1.500 filas para entregar 30. Y como <b>no hay índice sobre <code>created_at</code></b> en esta tabla (ver sección de índices), a eso se suma ordenar el conjunto entero en cada página.</p>
+      <p>Hay un segundo efecto menos evidente: con <code>OFFSET</code>, si llega una reserva nueva mientras el usuario pagina, las filas se desplazan y una se ve dos veces o ninguna. El keyset de <code>pedidos</code> no tiene ese problema.</p>
+      <dl class="grid">
+        <div><dt>Impacto</dt><dd>Crece con el cuadrado del uso: más reservas y más páginas visitadas.</dd></div>
+        <div><dt>Riesgo actual</dt><dd>Nulo con 20 filas. Es una recomendación por trayectoria, dicho abiertamente.</dd></div>
+        <div><dt>Cambio recomendado</dt><dd>Portar el patrón de <code>pedidos.js</code> a las dos consultas, y crear el índice <code>(created_at DESC, id DESC)</code>.</dd></div>
+        <div><dt>Riesgo del cambio</dt><dd>Bajo: el patrón está probado en producción en el módulo de al lado. Cuidado con reiniciar el cursor al cambiar de filtro.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="yes">Solo el índice</dd></div>
+        <div><dt>¿Código?</dt><dd class="yes">Sí</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-alta">Alta</span></dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="find hecho">
+    <div class="fh">
+      <span class="fid">H-13</span>
+      <span class="ft">N+1 real: aprobar en lote hace un UPDATE por solicitud</span>
+      <span class="chip c-media">Media</span>
+      <span class="chip c-fix">Resuelto 1 sep</span>
+    </div>
+    <div class="fb">
+      <div class="ev"><span class="cm">// js/aprobaciones.js:1609-1613</span><br>
+<span class="k">const</span> { data: solic } = <span class="k">await</span> sb.from(<span class="k">'pedidos'</span>)<br>
+&nbsp;&nbsp;.select(<span class="k">'id, cliente_id, tipo_camion, origen, destino'</span>)<br>
+&nbsp;&nbsp;.eq(<span class="k">'estado'</span>, <span class="k">'pendiente_revision'</span>);<br><br>
+<span class="k">for</span> (<span class="k">const</span> p <span class="k">of</span> solic) {&nbsp;&nbsp;<span class="cm">// ← una consulta por fila, en serie</span><br>
+&nbsp;&nbsp;<span class="k">await</span> sb.from(<span class="k">'pedidos'</span>).update({ estado: <span class="k">'abierto'</span>, rechazo_nota: <span class="k">null</span> }).eq(<span class="k">'id'</span>, p.id);<br>
+}</div>
+      <p>Con 50 solicitudes en cola son 50 viajes de red secuenciales. Vale la pena señalar que el <code>SELECT</code> de la línea 1609 está <b>bien hecho</b> —pide cinco columnas, no <code>*</code>—, así que el problema es solo el bucle. Se arregla con un <code>.in()</code>:</p>
+      <div class="ev"><span class="cm">// una sola consulta</span><br>
+<span class="k">await</span> sb.from(<span class="k">'pedidos'</span>).update({ estado: <span class="k">'abierto'</span>, rechazo_nota: <span class="k">null</span> })<br>
+&nbsp;&nbsp;.in(<span class="k">'id'</span>, solic.map(p =&gt; p.id));</div>
+      <p>Los triggers guardianes siguen ejecutándose fila a fila dentro del motor, que es donde deben ejecutarse; lo que desaparece son las 50 idas y vueltas.</p>
+      <dl class="grid">
+        <div><dt>Riesgo del cambio</dt><dd>Bajo. Un matiz: hoy, si una fila falla, las anteriores ya se aplicaron. Con <code>.in()</code> el lote es una sola sentencia y falla entero, que es el comportamiento deseable en una acción llamada «aprobar todas».</dd></div>
+        <div><dt>¿Migración?</dt><dd class="no">No</dd></div>
+        <div><dt>¿Código?</dt><dd class="yes">Sí</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-media">Media</span></dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <h3>SELECT * — 70 casos</h3>
+  <p>El encargo pide detectarlos todos y decidir. La respuesta no es «cámbialos los 70»: en muchos, la función <b>necesita</b> la fila entera —<code>js/admin.js:490</code> guarda <code>snapshot_anterior</code>, <code>js/tracking.js:43</code> alimenta la máquina de estados—. Ahí <code>select('*')</code> es lo correcto.</p>
+  <p>Los que sí importan son los que traen tablas anchas para usar poco:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Ubicación</th><th class="n">Cols</th><th>Qué se usa</th><th>Recomendación</th></tr></thead>
+    <tbody>
+      <tr><td class="m">js/detalle.js:27, :96</td><td class="n">37</td><td>El nombre de la empresa</td><td><b>Cambiar ya</b> — es la vía por la que H-01 filtra el expediente fiscal</td></tr>
+      <tr><td class="m">js/pedidos.js:212</td><td class="n">63</td><td>~25 columnas al pintar la tarjeta</td><td>Lista explícita: 63 columnas × 30 filas por página</td></tr>
+      <tr><td class="m">js/pedidos.js:229</td><td class="n">63</td><td>Igual, con <code>limit(100)</code></td><td>Lista explícita</td></tr>
+      <tr><td class="m">js/reservaciones.js:127, :293</td><td class="n">51</td><td>~20 columnas en la tabla</td><td>Lista explícita</td></tr>
+      <tr><td class="m">js/aprobaciones.js:76-86</td><td class="n">63 / 51</td><td>Cabecera de la cola</td><td>Lista explícita</td></tr>
+    </tbody>
+  </table></div>
+  <p>Con los volúmenes de hoy esto es ancho de banda, no tiempo de base. Pero en <code>detalle.js</code> deja de ser una cuestión de rendimiento y pasa a ser de privacidad, y por eso está en la Fase 1 junto a H-01.</p>
+
+  <h3>Lo que ya está resuelto y conviene no romper</h3>
+  <ul>
+    <li><b>Carga por lotes de ofertas.</b> <code>js/pedidos.js:252-256</code> recoge los ids de la página y pide sus ofertas con un <code>.in()</code>. Es la solución correcta al N+1 y ya está puesta.</li>
+    <li><b>Mapas de propietarios.</b> <code>js/camiones.js:67-74</code> y <code>js/recursos.js:39,115</code> hacen lo mismo con los dueños en vez de consultar por fila.</li>
+    <li><b><i>Embeds</i> con proyección.</b> <code>js/vigencias.js:21-25</code> usa <code>propietario:perfiles(nombre)</code> pidiendo columna por columna. Es el mejor código de acceso a datos del proyecto.</li>
+    <li><b><code>count: 'exact', head: true</code></b> en <code>js/cobros.js:146</code> y <code>js/vigencias.js:266-294</code>: cuenta sin traer filas.</li>
+    <li><b>Reportes acotados por fecha.</b> <code>js/reportes.js:31-35</code> filtra por rango en vez de traerlo todo, con seis meses por defecto.</li>
+  </ul>
+</section>
+
+<section id="integridad">
+  <div class="sec-n">10</div>
+  <h2>Integridad</h2>
+
+  <div class="find">
+    <div class="fh">
+      <span class="fid">H-14</span>
+      <span class="ft">Dos CHECK en <code>NOT VALID</code>: vigilan lo nuevo, nunca miraron lo viejo</span>
+      <span class="chip c-media">Media</span>
+    </div>
+    <div class="fb">
+      <div class="ev"><span class="k">ALTER TABLE</span> reservaciones <span class="k">ADD CONSTRAINT</span> reservaciones_estado_check<br>
+&nbsp;&nbsp;<span class="k">CHECK</span> (estado = <span class="k">ANY</span> (<span class="k">ARRAY</span>[<span class="k">'Pendiente'</span>,<span class="k">'Activa'</span>,…])) <b>NOT VALID</b>;<br><br>
+<span class="k">ALTER TABLE</span> reservaciones <span class="k">ADD CONSTRAINT</span> reservaciones_recurso_tipo_check<br>
+&nbsp;&nbsp;<span class="k">CHECK</span> (recurso_tipo = <span class="k">ANY</span> (<span class="k">ARRAY</span>[<span class="k">'camion'</span>,…])) <b>NOT VALID</b>;</div>
+      <p><code>NOT VALID</code> significa que la restricción se aplica a lo que entre a partir de ahora, pero <b>las filas que ya estaban nunca se revisaron</b>. Postgres además no puede confiar en ellas para razonar sobre la tabla.</p>
+      <p>El proyecto ya tiene la herramienta para cerrarlo: <code>supabase/preflight-auditoria.sql</code> comprueba justo estos casos en modo solo lectura. Con 20 filas, <code>VALIDATE CONSTRAINT</code> es instantáneo y toma un bloqueo suave que no impide leer ni escribir.</p>
+      <p>Se señala el contraste, porque habla bien del esquema: el tercer CHECK de la misma tabla, <code>reservaciones_partes_presentes</code>, <b>sí</b> está validado —aparece dentro del <code>CREATE TABLE</code> del volcado, que es como <code>pg_dump</code> distingue unos de otros—.</p>
+      <dl class="grid">
+        <div><dt>Cambio recomendado</dt><dd>Ejecutar el preflight; si sale limpio, <code>ALTER TABLE … VALIDATE CONSTRAINT</code> para las dos.</dd></div>
+        <div><dt>Riesgo del cambio</dt><dd>Bajo, pero no cero: si alguna fila histórica viola el CHECK, <code>VALIDATE</code> falla en seco. De ahí que el preflight vaya primero, no después.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="yes">Sí</dd></div>
+        <div><dt>¿Código?</dt><dd class="no">No</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-media">Media</span></dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="find">
+    <div class="fh">
+      <span class="fid">H-15</span>
+      <span class="ft">Carrera de lectura-escritura al numerar operadores, sin UNIQUE que la detenga</span>
+      <span class="chip c-media">Media</span>
+    </div>
+    <div class="fb">
+      <div class="ev"><span class="cm">// js/operadores.js:9-17</span><br>
+<span class="k">const</span> { data } = <span class="k">await</span> sb.from(<span class="k">'operadores'</span>)<br>
+&nbsp;&nbsp;.select(<span class="k">'num_trabajador'</span>).eq(<span class="k">'propietario_id'</span>, propietarioId);<br>
+<span class="k">const</span> max = nums.length ? Math.max(...nums) : 0;<br>
+<span class="k">return</span> String(max + 1).padStart(3, <span class="k">'0'</span>);&nbsp;&nbsp;<span class="cm">// ← calculado en el navegador</span></div>
+      <p>Dos altas simultáneas de la misma empresa leen el mismo máximo y generan el mismo número. No hay <code>UNIQUE(propietario_id, num_trabajador)</code>, así que la base lo acepta sin decir nada y la empresa acaba con dos trabajadores 004.</p>
+      <p>Otras claves de negocio sin unicidad, comprobadas contra los datos reales:</p>
+      <div class="tw"><table>
+        <thead><tr><th>Restricción propuesta</th><th class="n">Duplicados hoy</th><th>Comentario</th></tr></thead>
+        <tbody>
+          <tr><td class="m">operadores (propietario_id, num_trabajador)</td><td class="n">0 de 3</td><td>Cierra la carrera de arriba</td></tr>
+          <tr><td class="m">operadores (propietario_id, curp)</td><td class="n">0 de 3</td><td>Por empresa, <b>no global</b>: un chofer puede trabajar para dos transportistas</td></tr>
+          <tr><td class="m">camiones (placas) WHERE placas IS NOT NULL</td><td class="n">0 de 11</td><td>Una placa identifica un vehículo en todo el país</td></tr>
+        </tbody>
+      </table></div>
+      <p>Las tres aplican limpias hoy. Esa ventana se cierra sola en cuanto entre el primer duplicado.</p>
+      <dl class="grid">
+        <div><dt>Impacto</dt><dd>Identificadores de negocio ambiguos, imposibles de desambiguar a posteriori.</dd></div>
+        <div><dt>Riesgo actual</dt><dd>Bajo por volumen: hace falta concurrencia real en la misma empresa.</dd></div>
+        <div><dt>Cambio recomendado</dt><dd>Los tres índices únicos. Para <code>num_trabajador</code>, mover además el cálculo a la base —una secuencia por empresa o el <code>UNIQUE</code> con reintento—; el <code>UNIQUE</code> solo convierte el fallo silencioso en un error visible, que ya es mucho mejor.</dd></div>
+        <div><dt>Riesgo del cambio</dt><dd>Bajo hoy, con 0 duplicados verificados. Si se aplica más adelante sobre datos sucios, falla al crearse.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="yes">Sí</dd></div>
+        <div><dt>¿Código?</dt><dd class="yes">Sí, para el reintento</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-media">Media</span></dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <h3>Relaciones implícitas que deberían ser explícitas</h3>
+  <p>Cuatro columnas <code>uuid</code> apuntan a un usuario sin declararlo:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Columna</th><th>Apunta a</th><th>Veredicto</th></tr></thead>
+    <tbody>
+      <tr><td class="m">perfiles.docs_aprobados_por</td><td class="m">auth.users</td><td>Añadir FK <code>ON DELETE SET NULL</code></td></tr>
+      <tr><td class="m">expedientes.solicitado_por</td><td class="m">auth.users</td><td>Añadir FK <code>ON DELETE SET NULL</code></td></tr>
+      <tr><td class="m">expediente_documentos.subido_por</td><td class="m">auth.users</td><td>Añadir FK <code>ON DELETE SET NULL</code></td></tr>
+      <tr><td class="m">reservaciones.finalizacion_aprobada_por</td><td class="m">auth.users</td><td>Añadir FK <code>ON DELETE SET NULL</code></td></tr>
+      <tr><td class="m">reservaciones_historico.cliente_user_id</td><td class="m">—</td><td><span class="chip c-none">Sin cambio</span> — correcto: el archivo debe sobrevivir al borrado del usuario</td></tr>
+    </tbody>
+  </table></div>
+  <p>Y dos relaciones polimórficas que <b>no pueden</b> tener FK, resueltas bien: <code>reservaciones.unidad</code> apunta a una de cuatro tablas según <code>recurso_tipo</code>, y el trigger <code>trg_guard_unidad_existe</code> hace el trabajo que la FK no puede hacer. Es la solución correcta al problema. <span class="chip c-none">Sin cambio</span></p>
+
+  <h3>Un CHECK que falta en <code>mensajes</code></h3>
+  <p><code>mensajes</code> tiene <code>reserva_id</code> y <code>pedido_id</code>, ambos nulables, y la convención es que se rellene <b>uno</b>. Nada lo obliga: caben filas con los dos, o con ninguno, y los dos índices parciales las tratarían como conversaciones distintas. La tabla no la usa la PWA, así que es <span class="chip c-baja">Baja</span>, pero el contrato móvil sí la usará: <code>CHECK ((reserva_id IS NULL) &lt;&gt; (pedido_id IS NULL))</code>.</p>
+</section>
+<section id="escalabilidad">
+  <div class="sec-n">11</div>
+  <h2>Escalabilidad</h2>
+  <p class="lede">Proyección a 10.000, 100.000 y 1.000.000 de usuarios sobre la tasa real medida: 866 notificaciones en 128 días con 12 usuarios, es decir <b>0,56 notificaciones por usuario y día</b>.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Tabla</th><th class="n">Hoy</th><th class="n">10 mil</th><th class="n">100 mil</th><th class="n">1 millón</th><th>Qué se rompe primero</th></tr></thead>
+    <tbody>
+      <tr><td class="m">notificaciones</td><td class="n">866</td><td class="n">~2 M/año</td><td class="n">~20 M/año</td><td class="n">~200 M/año</td><td>Nada en lectura: la campana pide 20 por índice. El problema es almacenamiento, ya mitigado con la purga mensual</td></tr>
+      <tr><td class="m">reservaciones</td><td class="n">20</td><td class="n">~50 mil</td><td class="n">~500 mil</td><td class="n">~5 M</td><td><b>La paginación OFFSET (H-12)</b>, y el <code>REPLICA IDENTITY FULL</code> sobre 51 columnas</td></tr>
+      <tr><td class="m">pedidos</td><td class="n">40</td><td class="n">~100 mil</td><td class="n">~1 M</td><td class="n">~10 M</td><td>Nada grave: ya usa keyset. Falta el desempate en el índice (H-09)</td></tr>
+      <tr><td class="m">ofertas</td><td class="n">34</td><td class="n">~300 mil</td><td class="n">~3 M</td><td class="n">~30 M</td><td>Bien indexada por <code>pedido_id</code> y <code>admin_id</code>. La expiración ya es un cron horario</td></tr>
+      <tr><td class="m">mensajes</td><td class="n">22</td><td colspan="3" class="n">depende del cliente móvil</td><td>El índice GIN sobre <code>participantes</code> ya está puesto</td></tr>
+      <tr><td class="m">perfiles</td><td class="n">12</td><td class="n">10 mil</td><td class="n">100 mil</td><td class="n">1 M</td><td><b>H-01 empeora con cada fila:</b> hoy filtra 12 expedientes, luego un millón</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Tablas de crecimiento indefinido</h3>
+  <p>Cuatro candidatas. Solo una tiene política de retención, y es la correcta:</p>
+  <ul>
+    <li><b><code>notificaciones</code> — resuelta.</b> <code>purgar_notificaciones_leidas()</code> corre el día 1 de cada mes a las 03:00 y borra solo las <b>leídas</b> de más de 180 días, con tope por ejecución. Verificado activo en el cron de producción. La migración argumenta explícitamente que <b>no</b> es por rendimiento sino por almacenamiento y protección de datos, lo cual es la razón correcta. <span class="chip c-none">Sin cambio</span></li>
+    <li><b><code>mensajes</code> — sin retención.</b> Hoy da igual porque la PWA no la usa. Cuando el cliente móvil la active, hará falta una política equivalente: llevan texto libre entre personas.</li>
+    <li><b><code>reservaciones_historico</code> — por diseño.</b> Es el archivo; debe crecer. Lo que le falta no es purga sino un índice si algún día se consulta: hoy tiene <b>cero</b>.</li>
+    <li><b><code>consentimientos</code> — debe crecer.</b> Es prueba de cumplimiento. Nunca purgar.</li>
+  </ul>
+
+  <h3><code>REPLICA IDENTITY FULL</code> en seis tablas</h3>
+  <p>Con <code>FULL</code>, cada <code>UPDATE</code> escribe en el WAL la fila anterior <b>completa</b> además de la nueva. En <code>reservaciones</code> son 51 columnas por actualización.</p>
+  <p>Parece un hallazgo, y no lo es del todo. La migración <code>20260828160000</code> documenta la medición que lo motivó —con <code>DEFAULT</code>, Realtime descartaba los <code>DELETE</code> porque el filtro <code>propietario_id</code> no viajaba en el WAL, verificado con un WebSocket real— y cuantifica el coste: <b>202 updates en cuatro meses sobre 20 filas</b>. También deja escrita la salida para cuando pese: <code>REPLICA IDENTITY USING INDEX</code> sobre un índice que incluya la columna del filtro.</p>
+  <p>El veredicto de auditoría es por tanto <span class="chip c-none">Sin cambio</span>, con un disparador: <b>revisar cuando <code>reservaciones</code> pase de ~10.000 updates al mes</b>. Se incluye porque el encargo pide detectar cuellos de botella futuros, no porque haya nada que arreglar hoy.</p>
+
+  <div class="find">
+    <div class="fh">
+      <span class="fid">H-16</span>
+      <span class="ft">Ninguna tabla tiene <code>updated_at</code></span>
+      <span class="chip c-media">Media</span>
+    </div>
+    <div class="fb">
+      <p>Cero apariciones de <code>updated_at</code> en las 24 tablas. <code>reservaciones</code> tiene una máquina de seis estados, seis triggers de <code>UPDATE</code> y ninguna constancia de cuándo cambió por última vez.</p>
+      <p>Tres consecuencias concretas:</p>
+      <ul>
+        <li><b>El cliente móvil no puede sincronizar por incrementos.</b> Sin <code>updated_at</code> no hay «dame lo que cambió desde X»; solo queda recargar todo.</li>
+        <li><b>La caché no puede invalidarse selectivamente.</b> El service worker es <i>network-first</i> justamente porque no hay forma barata de saber si algo cambió.</li>
+        <li><b>No hay rastro forense.</b> Cuando una reserva aparezca en un estado raro, <code>created_at</code> dirá cuándo nació y nada dirá cuándo se torció.</li>
+      </ul>
+      <p>Es de las intervenciones más baratas del informe: una columna con <code>DEFAULT now()</code> y <b>un</b> trigger genérico reutilizado en las tablas mutables. No rompe nada porque nadie la lee todavía.</p>
+      <dl class="grid">
+        <div><dt>Cambio recomendado</dt><dd><code>updated_at timestamptz NOT NULL DEFAULT now()</code> + trigger <code>BEFORE UPDATE</code> compartido en <code>reservaciones</code>, <code>pedidos</code>, <code>ofertas</code>, <code>perfiles</code> y las cinco de flota.</dd></div>
+        <div><dt>Riesgo del cambio</dt><dd>Bajo, con un matiz: es un trigger más sobre <code>reservaciones</code>, que ya tiene seis. Debe ir el último y limitarse a asignar la fecha.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="yes">Sí</dd></div>
+        <div><dt>¿Código?</dt><dd class="no">No para crearla</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-media">Media</span></dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="find">
+    <div class="fh">
+      <span class="fid">H-17</span>
+      <span class="ft">La máquina de estados avanza al pintar la pantalla — parcialmente</span>
+      <span class="chip c-media">Media</span>
+    </div>
+    <div class="fb">
+      <p>Este hallazgo obliga a corregir la versión fácil. La documentación del proyecto dice que <code>renderPedidos()</code> hace avanzar los estados como efecto secundario de dibujar la lista, y que si nadie abre «Solicitudes», nada ocurre. <b>Eso ya no es del todo cierto</b>, y conviene decirlo con precisión:</p>
+      <div class="ev"><span class="cm"># cron activo en producción, verificado</span><br>
+expire-stale-offers&nbsp;&nbsp;&nbsp; <span class="k">0 * * * *</span>&nbsp;&nbsp; activo=true<br>
+purgar-notificaciones&nbsp; <span class="k">0 3 1 * *</span>&nbsp;&nbsp; activo=true</div>
+      <p>La expiración de ofertas <b>sí</b> tiene cobertura de servidor, cada hora. Lo que sigue dependiendo de que alguien abra el navegador son las otras dos transiciones de <code>js/pedidos.js:239-292</code>: <b>reabrir</b> un pedido cuyas ofertas murieron todas, y marcar <b>expirado</b> un acuerdo cuya fecha pasó.</p>
+      <p>La migración <code>20260810130000_sincronizar_estados_OPCIONAL.sql</code> lleva esas dos a pg_cron y <b>no está aplicada</b>. Dado que el mecanismo ya está probado en producción con las otras dos tareas, aplicarla es de riesgo bajo y cierra la brecha.</p>
+      <dl class="grid">
+        <div><dt>Impacto</dt><dd>Un pedido puede quedarse en <code>en_negociacion</code> sin ninguna oferta viva, invisible para las empresas, hasta que un superadmin abra la pantalla.</dd></div>
+        <div><dt>Riesgo del cambio</dt><dd>Medio: pasa a haber dos actores escribiendo los mismos estados, cron y navegador. Hay que comprobar que las transiciones son idempotentes antes de aplicarla.</dd></div>
+        <div><dt>¿Migración?</dt><dd class="yes">Sí — ya escrita, sin aplicar</dd></div>
+        <div><dt>¿Código?</dt><dd class="no">No</dd></div>
+        <div><dt>Prioridad</dt><dd><span class="chip c-media">Media</span></dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section id="convenciones">
+  <div class="sec-n">12</div>
+  <h2>Convenciones</h2>
+  <p class="lede">Menos caóticas de lo habitual. Hay una convención real y se respeta casi siempre; lo que hay son cuatro excepciones concretas.</p>
+
+  <h3>Marcas de tiempo: la convención existe</h3>
+  <div class="ev"><span class="cm"># sufijos temporales en las 24 tablas</span><br>
+created_at&nbsp;&nbsp; <b>20 tablas</b>   <span class="cm">← creación, en inglés, uniforme</span><br>
+*_en&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>16 columnas</b>  <span class="cm">← eventos, en español: pagado_en, subido_en…</span><br>
+*_at (otro)&nbsp; <b>1 columna</b>&nbsp;&nbsp; <span class="cm">← reservaciones_historico.archivado_at</span></div>
+  <p>La regla es clara: <code>created_at</code> para la creación, <code>_en</code> en español para todo lo demás. <b>Hay exactamente una excepción</b>, <code>archivado_at</code>, que mezcla participio español con sufijo inglés. Nombrar cosas rara vez sale tan bien; el hallazgo es la excepción, no el conjunto.</p>
+
+  <h3>Nombres de clave foránea: dos palabras para lo mismo</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Columna</th><th>Tablas</th><th>Apunta a</th></tr></thead>
+    <tbody>
+      <tr><td class="m">reserva_id</td><td class="m">expedientes, mensajes</td><td class="m">reservaciones</td></tr>
+      <tr><td class="m">reservacion_id</td><td class="m">calificaciones, pagos, documentos_fiscales</td><td class="m">reservaciones</td></tr>
+    </tbody>
+  </table></div>
+  <p>Recomendación: <b>no renombrar</b>. Cinco tablas, sus índices, sus políticas RLS y todo el código que las lee, a cambio de coherencia estética. Lo sensato es fijar <code>reservacion_id</code> —mayoría— para lo que se cree de aquí en adelante y dejar constancia. <span class="chip c-baja">Baja</span></p>
+
+  <h3>Un problema real detrás de un nombre: dos padres para el mismo usuario</h3>
+  <p>Esto sí importa, porque no es cosmético. La misma idea de «usuario» se referencia contra dos tablas distintas:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Columna</th><th>Referencia</th><th>Consecuencia</th></tr></thead>
+    <tbody>
+      <tr><td class="m">pedidos.cliente_id</td><td class="m">public.perfiles(user_id)</td><td>Se anula al borrar el <b>perfil</b></td></tr>
+      <tr><td class="m">plantillas_pedido.cliente_id</td><td class="m">auth.users(id)</td><td>Cascada al borrar el <b>usuario</b></td></tr>
+      <tr><td class="m">notificaciones.user_id</td><td class="m">public.perfiles(user_id)</td><td>Cascada al borrar el <b>perfil</b></td></tr>
+      <tr><td class="m">consentimientos.user_id</td><td class="m">auth.users(id)</td><td>Cascada al borrar el <b>usuario</b></td></tr>
+    </tbody>
+  </table></div>
+  <p>Dos columnas con el mismo nombre y el mismo significado se comportan distinto al borrar. En el flujo de baja de cuenta —que existe y es la vía de una cancelación ARCO— el orden en que se borren <code>perfiles</code> y <code>auth.users</code> decide qué sobrevive. <b>Merece una revisión explícita del flujo de borrado</b>, más que un renombrado. <span class="chip c-media">Media</span></p>
+</section>
+
+<section id="sincambio">
+  <div class="sec-n">13</div>
+  <h2>Lo que ya está bien</h2>
+  <p class="lede">El encargo pide una categoría «sin cambio necesario» y advierte contra modificar por modificar. Esta sección es tan parte del resultado como las anteriores: <b>son decisiones que conviene proteger de futuras auditorías, incluida esta.</b></p>
+
+  <div class="kv">
+    <div><dt>RLS · coste por consulta</dt><dd>Las <b>74 políticas</b> envuelven <code>auth.uid()</code> y <code>is_superadmin()</code> en un subselect escalar. Se evalúan una vez por consulta, no una por fila. Comprobado: <b>0 casos sin envolver</b>.</dd></div>
+    <div><dt>Funciones privilegiadas</dt><dd><b>36 de 36</b> funciones <code>SECURITY DEFINER</code> fijan <code>search_path</code>. Sin excepciones.</dd></div>
+    <div><dt>Doble reserva</dt><dd><code>reservaciones_sin_solape</code>: <code>EXCLUDE USING gist</code> con <code>btree_gist</code> sobre unidad y rango de fechas. El motor impide el solape; no se confía en el navegador.</dd></div>
+    <div><dt>Triggers guardianes</dt><dd>Once triggers deciden qué transición es legal para quién. Leen <code>auth.uid()</code>, así que <b>siguen aplicando dentro de funciones <code>SECURITY DEFINER</code></b>. Es la capa que RLS no puede dar.</dd></div>
+    <div><dt>Datos temporales</dt><dd>El checklist se <b>copia</b> de <code>documentos_catalogo</code> al crear el expediente en vez de referenciarlo. Editar el catálogo no reescribe expedientes pasados. Es el modelado correcto de un dato con historia.</dd></div>
+    <div><dt>Estado de cobro derivado</dt><dd><code>estadoCobro()</code> se calcula desde <code>pagado</code> y <code>fecha_vencimiento_pago</code> en vez de almacenarse. Ninguna tarea diaria que pueda quedarse atrás.</dd></div>
+    <div><dt>Índices parciales</dt><dd>Las nueve colas de aprobación tienen índice parcial con el predicado exacto de su consulta. Ocupan casi nada y sirven a algo real.</dd></div>
+    <div><dt>Retención con criterio</dt><dd>La purga de notificaciones se justifica por almacenamiento y LFPDPPP, y dice expresamente que <b>no</b> es por rendimiento. Es el razonamiento correcto.</dd></div>
+  </div>
+
+  <div class="note">
+    <div class="wh">Sobre el sello de paridad, otra vez</div>
+    <p>La disciplina de Regla #3 —replicar producción a pruebas y verificar 18 dimensiones antes de sembrar— es la razón por la que esta auditoría pudo medir densidad real de columnas y conteos exactos sin tocar producción. <b>El volcado existía porque el procedimiento existe.</b></p>
+  </div>
+</section>
+<section id="matriz">
+  <div class="sec-n">14</div>
+  <h2>Matriz final</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Prio</th><th class="m">ID</th><th>Problema</th><th>Tabla / consulta</th><th>Tipo</th><th>Impacto</th><th>Solución</th><th>Cód.</th><th>Migr.</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chip c-crit">Crítica</span></td><td class="m">H-01</td><td>Política SELECT sin restricción expone datos fiscales y rutas a documentos privados</td><td class="m">perfiles</td><td>Seguridad</td><td>Datos personales de todos los titulares</td><td>Vista <code>perfiles_publico</code> + política de fila propia</td><td>Sí</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-alta">Alta</span></td><td class="m">H-03</td><td><code>refrigerado</code> y <code>temp_controlada</code> divergen</td><td class="m">pedidos</td><td>Redundancia</td><td>Reefer mostrado como carga seca</td><td>Igualar histórico, leer una sola</td><td>Sí</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-alta">Alta</span></td><td class="m">H-10</td><td>Once RPC transaccionales sin usar; cancelar = 6 escrituras sueltas</td><td class="m">js/reservaciones.js</td><td>Integridad</td><td>Recurso bloqueado sin reserva viva</td><td>Llamar a <code>cancelar_reservacion</code></td><td>Sí</td><td>No</td></tr>
+      <tr><td><span class="chip c-alta">Alta</span></td><td class="m">H-11</td><td>La campana marca leídas las no mostradas</td><td class="m">notificaciones</td><td>Consultas</td><td>Avisos perdidos sin verse</td><td><code>.in('id', idsNoLeidos)</code> + índice parcial</td><td>Sí</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-alta">Alta</span></td><td class="m">H-12</td><td>Paginación OFFSET sin índice de orden</td><td class="m">reservaciones</td><td>Escalabilidad</td><td>Degradación con el uso</td><td>Keyset como en <code>pedidos.js</code> + índice</td><td>Sí</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-media">Media</span></td><td class="m">H-06</td><td>Ocho columnas sin referencia alguna</td><td class="m">reservaciones, perfiles</td><td>Diseño</td><td>Esquema confuso</td><td>Decidir Carta Porte; comentar u obsoletar</td><td>No</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-media">Media</span></td><td class="m">H-07</td><td>Dos columnas huérfanas con 16 filas de datos</td><td class="m">pedidos</td><td>Redundancia</td><td>Dato operativo perdido + LFPDPPP</td><td>Volcar a <code>contacto_*</code> y retirar</td><td>Sí</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-media">Media</span></td><td class="m">H-08</td><td>14 FK sin índice; borrar cuenta recorre tablas enteras</td><td class="m">varias</td><td>Índices</td><td>Baja de cuenta se degrada</td><td>Seis índices <code>CONCURRENTLY</code></td><td>No</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-media">Media</span></td><td class="m">H-09</td><td>Índice sin la columna de desempate del keyset</td><td class="m">pedidos</td><td>Índices</td><td>Orden extra por página</td><td><code>(created_at DESC, id DESC)</code></td><td>No</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-media">Media</span></td><td class="m">H-13</td><td>N+1 al aprobar en lote</td><td class="m">js/aprobaciones.js</td><td>Consultas</td><td>N viajes secuenciales</td><td>Un <code>UPDATE … .in()</code></td><td>Sí</td><td>No</td></tr>
+      <tr><td><span class="chip c-media">Media</span></td><td class="m">H-14</td><td>Dos CHECK en <code>NOT VALID</code></td><td class="m">reservaciones</td><td>Integridad</td><td>Histórico nunca verificado</td><td>Preflight y <code>VALIDATE CONSTRAINT</code></td><td>No</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-media">Media</span></td><td class="m">H-15</td><td>Carrera en <code>num_trabajador</code>, sin UNIQUE</td><td class="m">operadores, camiones</td><td>Integridad</td><td>Identificadores ambiguos</td><td>Tres índices únicos</td><td>Sí</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-media">Media</span></td><td class="m">H-16</td><td>Ninguna tabla tiene <code>updated_at</code></td><td class="m">todas</td><td>Mantenibilidad</td><td>Sin sincronía incremental ni rastro</td><td>Columna + trigger compartido</td><td>No</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-media">Media</span></td><td class="m">H-17</td><td>Dos transiciones aún dependen del navegador</td><td class="m">pedidos</td><td>Integridad</td><td>Pedido invisible para empresas</td><td>Aplicar la migración OPCIONAL</td><td>No</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-media">Media</span></td><td class="m">H-04</td><td>Grupo repetitivo de contenedores, tope de 2</td><td class="m">pedidos</td><td>Diseño</td><td>Tercer contenedor irrepresentable</td><td>Tabla hija cuando aparezca</td><td>No</td><td>No</td></tr>
+      <tr><td><span class="chip c-media">Media</span></td><td class="m">H-05</td><td>63 columnas para 4 tipos de solicitud</td><td class="m">pedidos</td><td>Diseño</td><td>Sin restricción por tipo</td><td>CHECK por categoría; no partir</td><td>No</td><td>No</td></tr>
+      <tr><td><span class="chip c-baja">Baja</span></td><td class="m">H-18</td><td>Volcado versionado con 22 de 24 tablas</td><td class="m">supabase/esquema/</td><td>Mantenibilidad</td><td>Restauración incompleta</td><td>Regenerar con <code>volcar-esquema.sh</code></td><td>No</td><td>No</td></tr>
+      <tr><td><span class="chip c-baja">Baja</span></td><td class="m">H-02</td><td><code>GRANT ALL</code> a <code>authenticated</code> en 24 tablas</td><td class="m">todas</td><td>Seguridad</td><td>Sin ruta de explotación hoy</td><td>Verbos explícitos</td><td>No</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-baja">Baja</span></td><td class="m">H-19</td><td>Dos secuencias muertas y sin referencias</td><td class="m">custodios_seq, patios_seq</td><td>Mantenibilidad</td><td>Ruido en el esquema</td><td>Retirar (destructivo)</td><td>No</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-baja">Baja</span></td><td class="m">H-20</td><td>Cinco columnas con DEFAULT pero nulables</td><td class="m">varias</td><td>Integridad</td><td>Fallo silencioso posible</td><td><code>SET NOT NULL</code></td><td>No</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-baja">Baja</span></td><td class="m">H-21</td><td>Falta CHECK de exclusividad</td><td class="m">mensajes</td><td>Integridad</td><td>Solo afecta al cliente móvil</td><td>CHECK de <code>XOR</code></td><td>No</td><td>Sí</td></tr>
+      <tr><td><span class="chip c-none">Sin cambio</span></td><td class="m">—</td><td><code>REPLICA IDENTITY FULL</code>, denormalización de nombres, <code>text</code> vs <code>varchar</code>, estados con CHECK, PK de texto en flota, coordenadas sueltas</td><td class="m">varias</td><td>—</td><td>Decisiones correctas y documentadas</td><td>No tocar</td><td>No</td><td>No</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="beneficio">
+  <div class="sec-n">15</div>
+  <h2>Los 10 cambios de mayor beneficio</h2>
+  <p class="lede">Ordenados por <b>beneficio ÷ (riesgo × esfuerzo)</b>, que no es el mismo orden que por gravedad. Aquí sube lo barato.</p>
+  <div class="tw"><table>
+    <thead><tr><th class="m">#</th><th>Cambio</th><th class="m">ID</th><th>Esfuerzo</th><th>Riesgo</th><th>Por qué está aquí</th></tr></thead>
+    <tbody>
+      <tr><td class="m">1</td><td>Filtrar el <code>UPDATE</code> de la campana por los ids mostrados</td><td class="m">H-11</td><td>1 línea</td><td>Mínimo</td><td>La variable ya está calculada dos líneas antes</td></tr>
+      <tr><td class="m">2</td><td>Índice <code>(created_at DESC, id DESC)</code> en <code>pedidos</code></td><td class="m">H-09</td><td>1 sentencia</td><td>Mínimo</td><td>Sirve para todo lo que servía el anterior</td></tr>
+      <tr><td class="m">3</td><td>Índice por <code>created_at</code> en <code>reservaciones</code></td><td class="m">H-12</td><td>1 sentencia</td><td>Mínimo</td><td>Dos consultas principales ordenan sin índice</td></tr>
+      <tr><td class="m">4</td><td>Bucle de aprobación en lote → un <code>.in()</code></td><td class="m">H-13</td><td>2 líneas</td><td>Bajo</td><td>Además hace el lote atómico</td></tr>
+      <tr><td class="m">5</td><td>Vista <code>perfiles_publico</code> y cierre de la política</td><td class="m">H-01</td><td>Medio</td><td>Medio</td><td>Beneficio máximo del informe; el esfuerzo lo baja de puesto, no de importancia</td></tr>
+      <tr><td class="m">6</td><td>Tres índices únicos de negocio</td><td class="m">H-15</td><td>3 sentencias</td><td>Bajo hoy</td><td>0 duplicados verificados: la ventana está abierta y se cierra sola</td></tr>
+      <tr><td class="m">7</td><td><code>VALIDATE CONSTRAINT</code> de los dos CHECK</td><td class="m">H-14</td><td>2 sentencias</td><td>Bajo</td><td>Instantáneo con 20 filas; el preflight ya existe</td></tr>
+      <tr><td class="m">8</td><td><code>updated_at</code> + trigger compartido</td><td class="m">H-16</td><td>Bajo</td><td>Bajo</td><td>Habilita la sincronía del cliente móvil</td></tr>
+      <tr><td class="m">9</td><td>Igualar <code>refrigerado</code> y pasar las lecturas</td><td class="m">H-03</td><td>Bajo</td><td>Bajo</td><td>3 filas a corregir, 2 lecturas a cambiar</td></tr>
+      <tr><td class="m">10</td><td><code>cancelarReserva()</code> → <code>cancelar_reservacion</code></td><td class="m">H-10</td><td>Medio</td><td>Medio</td><td>La función ya existe y está probada; solo cambia el manejo de errores</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="plan">
+  <div class="sec-n">16</div>
+  <h2>Plan de optimización</h2>
+  <p class="lede">Cinco fases en orden de dependencia. La fase 0 no estaba en el encargo y va primero de todos modos.</p>
+
+  <div class="phase">
+    <span class="pn">0</span>
+    <div>
+      <h3>Recuperar la evidencia que falta</h3>
+      <div class="ph-m">Sin riesgo · solo lectura · antes de decidir nada</div>
+      <ol>
+        <li>Volver a replicar producción a <code>portgo-pruebas</code>: el sello dice <b>«diverge»</b> y ninguna migración de este plan puede validarse hasta que diga lo contrario.</li>
+        <li>Consultar <code>pg_stat_statements</code> —ya instalada— para las 20 consultas más costosas, y <code>pg_stat_user_indexes</code> para el uso real de los 43 índices. <b>Eso convierte en hechos las hipótesis de las secciones 8 y 9</b>, y es lo único que permitiría proponer un <code>DROP INDEX</code> con fundamento.</li>
+        <li><code>EXPLAIN ANALYZE</code> sobre las dos consultas de <code>reservaciones</code> y la de <code>pedidos</code>.</li>
+        <li>Regenerar el volcado versionado (H-18) para que el plano vuelva a tener 24 tablas.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="phase">
+    <span class="pn">1</span>
+    <div>
+      <h3>Cambios sin riesgo</h3>
+      <div class="ph-m">Sin tocar lógica de negocio · reversibles</div>
+      <ul>
+        <li><b>H-11</b> — <code>.in('id', idsNoLeidos)</code> en el <code>UPDATE</code> de la campana.</li>
+        <li><b>H-13</b> — bucle de aprobación en lote a un solo <code>UPDATE</code>.</li>
+        <li><b>H-14</b> — preflight y <code>VALIDATE CONSTRAINT</code> de los dos CHECK.</li>
+        <li><b>H-20</b> — <code>SET NOT NULL</code> en las cinco columnas con DEFAULT.</li>
+        <li><b>H-06</b> — <code>COMMENT</code> marcando las ocho columnas muertas, sin retirar nada aún.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="phase">
+    <span class="pn">2</span>
+    <div>
+      <h3>Consultas</h3>
+      <div class="ph-m">Requiere código · requiere prueba funcional</div>
+      <ul>
+        <li><b>H-01</b> — vista <code>perfiles_publico</code>, repuntar las lecturas, cerrar la política. <b>Va aquí y no en la fase 3 porque es lo más grave del informe.</b></li>
+        <li><b>H-12</b> — keyset en las dos consultas de <code>reservaciones</code>.</li>
+        <li><b>H-10</b> — <code>cancelarReserva()</code> y <code>registrar_evidencias</code> a sus RPC.</li>
+        <li>Listas de columnas explícitas en los cinco <code>select('*')</code> de tablas anchas.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="phase">
+    <span class="pn">3</span>
+    <div>
+      <h3>Índices</h3>
+      <div class="ph-m">Todos con <code>CONCURRENTLY</code> · ninguna eliminación sin datos de la fase 0</div>
+      <ul>
+        <li><b>Añadir:</b> <code>reservaciones (created_at DESC, id DESC)</code>; <code>notificaciones (user_id) WHERE NOT leido</code>; <code>pedidos (created_at DESC, id DESC)</code>; las seis FK de H-08 que lo justifican.</li>
+        <li><b>Modificar:</b> retirar <code>idx_pedidos_fecha</code> <i>solo después</i> de comprobar que el nuevo compuesto se usa.</li>
+        <li><b>Eliminar:</b> nada. <span class="chip c-none">Evidencia insuficiente</span> hasta tener <code>pg_stat_user_indexes</code>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="phase">
+    <span class="pn">4</span>
+    <div>
+      <h3>Modelo de datos</h3>
+      <div class="ph-m">Cambios estructurales · incluye pasos destructivos</div>
+      <ul>
+        <li><b>H-03</b> — igualar el histórico de <code>refrigerado</code> y unificar la lectura.</li>
+        <li><b>H-15</b> — los tres índices únicos, más el reintento en el alta de operador.</li>
+        <li><b>H-16</b> — <code>updated_at</code> y trigger compartido.</li>
+        <li>Las cuatro FK que faltan sobre columnas <code>*_por</code>.</li>
+        <li><b>H-07</b> — volcar los 16 contactos y retirar el par huérfano. <b>Destructivo.</b></li>
+        <li><b>H-19</b> — retirar las dos secuencias muertas. <b>Destructivo.</b></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="phase">
+    <span class="pn">5</span>
+    <div>
+      <h3>Escalabilidad</h3>
+      <div class="ph-m">Nada que hacer hoy · disparadores escritos</div>
+      <ul>
+        <li><b>H-17</b> — aplicar <code>20260810130000_sincronizar_estados_OPCIONAL.sql</code>.</li>
+        <li>Retención para <code>mensajes</code> <b>antes</b> de que el cliente móvil empiece a escribir en ella.</li>
+        <li><code>REPLICA IDENTITY USING INDEX</code> cuando <code>reservaciones</code> pase de ~10.000 updates al mes.</li>
+        <li>Tabla hija <code>pedido_contenedores</code> cuando aparezca el primer pedido de tres contenedores.</li>
+        <li>PostGIS y GiST si alguna vez se pregunta por proximidad geográfica.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="migraciones">
+  <div class="sec-n">17</div>
+  <h2>Migraciones</h2>
+  <p class="lede">SQL solo para lo que este informe recomienda de verdad. No hay una sola sentencia especulativa.</p>
+
+  <div class="warn">
+    <div class="wh">Antes de ejecutar cualquiera de estas</div>
+    <p>Nada de esto se ha aplicado. Van <b>primero a <code>portgo-pruebas</code></b>, con el sello de paridad en verde, y a producción solo con autorización expresa para cada cambio concreto. El sello de hoy dice «diverge»: <b>la fase 0 es obligatoria antes que la primera sentencia</b>.</p>
+  </div>
+
+  <h3>Fase 1 — sin riesgo</h3>
+  <pre class="sql"><span class="cm">-- H-14 · validar lo que los CHECK nunca revisaron.
+-- Ejecutar ANTES: psql "$CONN" -f supabase/preflight-auditoria.sql
+-- Si el preflight devuelve filas, PARAR: VALIDATE fallaría en seco.</span>
+<span class="k">ALTER TABLE</span> public.reservaciones <span class="k">VALIDATE CONSTRAINT</span> reservaciones_estado_check;
+<span class="k">ALTER TABLE</span> public.reservaciones <span class="k">VALIDATE CONSTRAINT</span> reservaciones_recurso_tipo_check;
+
+<span class="cm">-- H-20 · columnas con DEFAULT que nunca deberían ser NULL.
+-- En PG 17 no reescribe la tabla; solo verifica.</span>
+<span class="k">ALTER TABLE</span> public.reservaciones  <span class="k">ALTER COLUMN</span> estado     <span class="k">SET NOT NULL</span>;
+<span class="k">ALTER TABLE</span> public.reservaciones  <span class="k">ALTER COLUMN</span> created_at <span class="k">SET NOT NULL</span>;
+<span class="k">ALTER TABLE</span> public.pedidos        <span class="k">ALTER COLUMN</span> created_at <span class="k">SET NOT NULL</span>;
+<span class="k">ALTER TABLE</span> public.notificaciones <span class="k">ALTER COLUMN</span> created_at <span class="k">SET NOT NULL</span>;
+<span class="k">ALTER TABLE</span> public.notificaciones <span class="k">ALTER COLUMN</span> leido      <span class="k">SET NOT NULL</span>;
+
+<span class="cm">-- H-06 · dejar constancia sin retirar nada todavía.</span>
+<span class="k">COMMENT ON COLUMN</span> public.perfiles.regimen_fiscal <span class="k">IS</span>
+  <span class="k">'SIN USO. 0 filas con valor, 0 referencias en el proyecto. El dato vive en solicitudes_cuenta.'</span>;
+<span class="k">COMMENT ON COLUMN</span> public.perfiles.cp_fiscal <span class="k">IS</span>
+  <span class="k">'SIN USO. 0 filas con valor, 0 referencias en el proyecto. El dato vive en solicitudes_cuenta.'</span>;</pre>
+
+  <h3>Fase 2 — H-01, el cambio que importa</h3>
+  <div class="warn">
+    <div class="wh">Corregido el 1 sep — dos errores en el SQL que se publicó primero</div>
+    <p><b>1. <code>security_invoker</code> iba al revés.</b> La primera versión proponía <code>security_invoker = true</code>. Con ese valor la vista aplica el RLS del <i>que consulta</i>, así que en cuanto se cierre la tabla devolvería cero filas: sería inútil. Tiene que quedarse en su valor por defecto (<code>false</code>), con el que corre con permisos de su dueño y el filtro de seguridad va escrito <b>dentro</b> de la vista.</p>
+    <p><b>2. Faltaba la política SELECT del superadmin.</b> <code>perfiles</code> tenía cinco políticas y <b>ninguna</b> daba SELECT al superadmin: hoy lee los perfiles ajenos colándose por la misma política defectuosa. Retirarla sin crear esa política deja ciegos de golpe el panel de aprobaciones, la verificación presencial, la gestión de usuarios y las vigencias. Es el detalle que más fácil rompe el cierre.</p>
+    <p>Abajo va el SQL corregido, que es el que se aplicó.</p>
+  </div>
+  <pre class="sql"><span class="cm">-- La ficha pública: exactamente las columnas que catalogo.js y detalle.js
+-- ya mostraban. security_invoker se queda en su valor por defecto (false)
+-- A PROPÓSITO: con true la vista aplicaría el RLS del que consulta y
+-- devolvería cero filas en cuanto se cierre la tabla.
+-- El filtro de seguridad va DENTRO: WHERE rol = 'admin' deja fuera por
+-- completo los perfiles de cliente.</span>
+<span class="k">CREATE OR REPLACE VIEW</span> public.empresas_publico <span class="k">AS</span>
+  <span class="k">SELECT</span> user_id, nombre, razon_social, rfc, descripcion, telefono,
+         anos_operacion, num_unidades, seguro_rc, seguro_carga, permiso_sct,
+         verificado, fecha_vencimiento_permiso_sct,
+         fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga
+    <span class="k">FROM</span> public.perfiles
+   <span class="k">WHERE</span> rol = <span class="k">'admin'</span>;
+
+<span class="k">REVOKE ALL ON</span> public.empresas_publico <span class="k">FROM</span> anon, public;
+<span class="k">GRANT SELECT ON</span> public.empresas_publico <span class="k">TO</span> authenticated;
+
+<span class="cm">-- EL PASO QUE NO SE PUEDE OLVIDAR: hoy no existe ninguna política que dé
+-- SELECT al superadmin. Sin esto, cerrar la tabla lo deja ciego.</span>
+<span class="k">CREATE POLICY</span> perfiles_superadmin_select <span class="k">ON</span> public.perfiles
+  <span class="k">FOR SELECT TO</span> authenticated
+  <span class="k">USING</span> ( (<span class="k">SELECT</span> public.is_superadmin()) );
+
+<span class="cm">-- Política de lectura propia + superadmin, usando el helper que ya existe
+-- en vez de repetir la subconsulta a mano.</span>
+<span class="k">CREATE POLICY</span> perfiles_lectura_propia <span class="k">ON</span> public.perfiles
+  <span class="k">FOR SELECT TO</span> authenticated
+  <span class="k">USING</span> ( user_id = (<span class="k">SELECT</span> auth.uid()) <span class="k">OR</span> (<span class="k">SELECT</span> public.is_superadmin()) );
+
+<span class="cm">-- Y solo cuando el código lea de la vista (detalle.js, camiones.js,
+-- recursos.js, vigencias.js, reservaciones.js), retirar las dos antiguas.
+-- Hacerlo antes deja las pantallas sin nombre de empresa.</span>
+<span class="cm">-- DROP POLICY "Leer nombre de empresa" ON public.perfiles;</span>
+<span class="cm">-- DROP POLICY "Leer propio perfil"    ON public.perfiles;</span></pre>
+  <div class="warn">
+    <div class="wh">⚠️ Cambio destructivo — las dos DROP POLICY</div>
+    <p>Van comentadas a propósito. Retirar <code>"Leer nombre de empresa"</code> mientras el código siga haciendo <code>select('*')</code> sobre <code>perfiles</code> ajenos <b>rompe</b> el detalle de unidad, el catálogo de camiones y recursos, y los avisos de vigencia. Forma segura: desplegar primero el código que lee de la vista, comprobar las cinco pantallas, y solo entonces ejecutar los dos <code>DROP</code>. Reversión: volver a crear la política, que es una sentencia.</p>
+  </div>
+
+  <h3>Fase 3 — índices</h3>
+  <pre class="sql"><span class="cm">-- CONCURRENTLY no bloquea escrituras. No puede ir dentro de una
+-- transacción, así que este bloque se ejecuta suelto, sentencia a sentencia.</span>
+
+<span class="cm">-- H-12 · las dos vistas de reservaciones ordenan por aquí y no hay índice.</span>
+<span class="k">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> idx_reservaciones_fecha
+  <span class="k">ON</span> public.reservaciones (created_at <span class="k">DESC</span>, id <span class="k">DESC</span>);
+
+<span class="cm">-- H-11 · el UPDATE de la campana filtra por leido, que no está indexado.</span>
+<span class="k">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> idx_notificaciones_no_leidas
+  <span class="k">ON</span> public.notificaciones (user_id) <span class="k">WHERE NOT</span> leido;
+
+<span class="cm">-- H-09 · el keyset ordena por (created_at, id); el índice solo tenía la primera.</span>
+<span class="k">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> idx_pedidos_fecha_id
+  <span class="k">ON</span> public.pedidos (created_at <span class="k">DESC</span>, id <span class="k">DESC</span>);
+
+<span class="cm">-- H-08 · solo las seis FK que lo justifican: tabla hija que crece
+-- y padre que se borra de verdad. Las otras ocho se dejan sin índice
+-- a propósito, sobre tablas vacías o que no crecen.</span>
+<span class="k">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> idx_reservaciones_pagado_por
+  <span class="k">ON</span> public.reservaciones (pagado_por) <span class="k">WHERE</span> pagado_por <span class="k">IS NOT NULL</span>;
+<span class="k">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> idx_reservaciones_canc_solicitada_por
+  <span class="k">ON</span> public.reservaciones (cancelacion_solicitada_por) <span class="k">WHERE</span> cancelacion_solicitada_por <span class="k">IS NOT NULL</span>;
+<span class="k">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> idx_reservaciones_canc_resuelta_por
+  <span class="k">ON</span> public.reservaciones (cancelacion_resuelta_por) <span class="k">WHERE</span> cancelacion_resuelta_por <span class="k">IS NOT NULL</span>;
+<span class="k">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> idx_mensajes_de_user
+  <span class="k">ON</span> public.mensajes (de_user_id);
+<span class="k">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> idx_pagos_reservacion
+  <span class="k">ON</span> public.pagos (reservacion_id);
+<span class="k">CREATE INDEX CONCURRENTLY IF NOT EXISTS</span> idx_docfiscales_reservacion
+  <span class="k">ON</span> public.documentos_fiscales (reservacion_id);</pre>
+  <div class="note">
+    <div class="wh">Sobre retirar <code>idx_pedidos_fecha</code></div>
+    <p>El compuesto nuevo cubre todo lo que cubría el antiguo, así que en teoría sobra. <b>No se propone el <code>DROP</code> aquí.</b> Primero hay que ver en <code>pg_stat_user_indexes</code> que el nuevo recibe los escaneos; retirar un índice porque «debería» ser redundante es exactamente el cambio teórico que el encargo prohíbe.</p>
+  </div>
+
+  <h3>Fase 4 — modelo</h3>
+  <pre class="sql"><span class="cm">-- H-03 · las 3 filas donde las dos columnas del mismo hecho discrepan.
+-- Idempotente: correrlo dos veces no cambia nada la segunda.</span>
+<span class="k">UPDATE</span> public.pedidos <span class="k">SET</span> refrigerado = <span class="k">true</span>
+ <span class="k">WHERE</span> temp_controlada <span class="k">IS TRUE AND</span> refrigerado <span class="k">IS NOT TRUE</span>;
+
+<span class="cm">-- H-15 · verificado: 0 duplicados hoy, las tres aplican limpias.</span>
+<span class="k">CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS</span> uq_operadores_num_trabajador
+  <span class="k">ON</span> public.operadores (propietario_id, num_trabajador)
+  <span class="k">WHERE</span> num_trabajador <span class="k">IS NOT NULL</span>;
+<span class="k">CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS</span> uq_operadores_curp
+  <span class="k">ON</span> public.operadores (propietario_id, curp) <span class="k">WHERE</span> curp <span class="k">IS NOT NULL</span>;
+<span class="k">CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS</span> uq_camiones_placas
+  <span class="k">ON</span> public.camiones (placas) <span class="k">WHERE</span> placas <span class="k">IS NOT NULL</span>;
+
+<span class="cm">-- H-16 · una columna y un solo trigger reutilizado.</span>
+<span class="k">CREATE OR REPLACE FUNCTION</span> public.tocar_updated_at() <span class="k">RETURNS trigger</span>
+  <span class="k">LANGUAGE</span> plpgsql <span class="k">SECURITY INVOKER SET</span> search_path = <span class="k">''</span> <span class="k">AS</span> $$
+<span class="k">BEGIN</span> <span class="k">NEW</span>.updated_at := now(); <span class="k">RETURN NEW</span>; <span class="k">END</span> $$;
+
+<span class="k">ALTER TABLE</span> public.reservaciones
+  <span class="k">ADD COLUMN IF NOT EXISTS</span> updated_at timestamptz <span class="k">NOT NULL DEFAULT</span> now();
+<span class="cm">-- El nombre empieza por z_ para que corra DESPUÉS de los seis
+-- triggers guardianes: PostgreSQL los ordena alfabéticamente.</span>
+<span class="k">CREATE OR REPLACE TRIGGER</span> z_trg_reservaciones_updated_at
+  <span class="k">BEFORE UPDATE ON</span> public.reservaciones
+  <span class="k">FOR EACH ROW EXECUTE FUNCTION</span> public.tocar_updated_at();
+<span class="cm">-- Repetir el par ADD COLUMN + CREATE TRIGGER en pedidos, ofertas,
+-- perfiles, camiones, custodios, patios, lavados y operadores.</span>
+
+<span class="cm">-- Las cuatro relaciones implícitas que deberían ser explícitas.</span>
+<span class="k">ALTER TABLE</span> public.perfiles <span class="k">ADD CONSTRAINT</span> perfiles_docs_aprobados_por_fkey
+  <span class="k">FOREIGN KEY</span> (docs_aprobados_por) <span class="k">REFERENCES</span> auth.users(id) <span class="k">ON DELETE SET NULL NOT VALID</span>;
+<span class="k">ALTER TABLE</span> public.expedientes <span class="k">ADD CONSTRAINT</span> expedientes_solicitado_por_fkey
+  <span class="k">FOREIGN KEY</span> (solicitado_por) <span class="k">REFERENCES</span> auth.users(id) <span class="k">ON DELETE SET NULL NOT VALID</span>;
+<span class="k">ALTER TABLE</span> public.expediente_documentos <span class="k">ADD CONSTRAINT</span> expdocs_subido_por_fkey
+  <span class="k">FOREIGN KEY</span> (subido_por) <span class="k">REFERENCES</span> auth.users(id) <span class="k">ON DELETE SET NULL NOT VALID</span>;
+<span class="k">ALTER TABLE</span> public.reservaciones <span class="k">ADD CONSTRAINT</span> reservaciones_finaliz_aprobada_por_fkey
+  <span class="k">FOREIGN KEY</span> (finalizacion_aprobada_por) <span class="k">REFERENCES</span> auth.users(id) <span class="k">ON DELETE SET NULL NOT VALID</span>;
+<span class="cm">-- NOT VALID a propósito: puede haber uuid históricos sin usuario.
+-- Validar después, una a una, tras comprobar con el preflight.</span>
+
+<span class="cm">-- H-21 · exactamente uno de los dos, ni ninguno ni los dos.</span>
+<span class="k">ALTER TABLE</span> public.mensajes <span class="k">ADD CONSTRAINT</span> mensajes_un_solo_hilo
+  <span class="k">CHECK</span> ((reserva_id <span class="k">IS NULL</span>) &lt;&gt; (pedido_id <span class="k">IS NULL</span>)) <span class="k">NOT VALID</span>;</pre>
+
+  <h3>Cambios destructivos</h3>
+  <div class="warn">
+    <div class="wh">⚠️ Cambio destructivo — H-07, columnas con datos dentro</div>
+    <p><b>Qué:</b> <code>pedidos.detalles_contacto_nombre</code> y <code>pedidos.detalles_contacto_tel</code>. <b>Contienen 16 filas con datos reales de contacto.</b></p>
+    <p><b>Forma segura:</b> volcar primero, verificar el volcado, y solo después retirar. Nunca en la misma migración.</p>
+    <pre class="sql" style="margin-top:10px"><span class="cm">-- paso 1: rescatar el dato donde no exista ya</span>
+<span class="k">UPDATE</span> public.pedidos
+   <span class="k">SET</span> contacto_nombre = <span class="k">COALESCE</span>(contacto_nombre, detalles_contacto_nombre),
+       contacto_tel&nbsp;&nbsp;&nbsp; = <span class="k">COALESCE</span>(contacto_tel,&nbsp;&nbsp;&nbsp; detalles_contacto_tel)
+ <span class="k">WHERE</span> detalles_contacto_nombre <span class="k">IS NOT NULL</span> <span class="k">OR</span> detalles_contacto_tel <span class="k">IS NOT NULL</span>;
+
+<span class="cm">-- paso 2: comprobar que no queda nada solo en las viejas</span>
+<span class="k">SELECT</span> count(*) <span class="k">FROM</span> public.pedidos
+ <span class="k">WHERE</span> (detalles_contacto_tel <span class="k">IS NOT NULL AND</span> contacto_tel <span class="k">IS NULL</span>)
+    <span class="k">OR</span> (detalles_contacto_nombre <span class="k">IS NOT NULL AND</span> contacto_nombre <span class="k">IS NULL</span>);
+<span class="cm">-- debe devolver 0. Si no, PARAR.</span>
+
+<span class="cm">-- paso 3: en una migración POSTERIOR, y solo entonces</span>
+<span class="cm">-- ALTER TABLE public.pedidos DROP COLUMN detalles_contacto_nombre;</span>
+<span class="cm">-- ALTER TABLE public.pedidos DROP COLUMN detalles_contacto_tel;</span></pre>
+  </div>
+
+  <div class="warn">
+    <div class="wh">⚠️ Cambio destructivo — H-19, las dos secuencias muertas</div>
+    <p><b>Qué:</b> <code>public.custodios_seq</code> y <code>public.patios_seq</code>.</p>
+    <p><b>Para qué sirven:</b> para nada. Verificado: <b>0 referencias</b> en <code>js/</code>, en las 47 migraciones y en las Edge Functions; sin <code>OWNED BY</code>; ninguna columna las usa como <code>DEFAULT</code>. Los cinco catálogos de flota generan su id con <code>crypto.randomUUID()</code> en el navegador (<code>js/admin.js:898,1093,1280,1434</code> y <code>js/operadores.js:5</code>).</p>
+    <p><b>Qué se pierde si la lectura es errónea:</b> el contador. Si algo remoto llamara a <code>nextval</code>, empezaría a fallar. Por eso conviene <b>confirmar con <code>pg_stat_user_sequences</code> en la fase 0</b> que nadie las ha tocado, antes de retirarlas.</p>
+    <pre class="sql" style="margin-top:10px"><span class="cm">-- solo tras confirmar uso cero en la fase 0</span>
+<span class="cm">-- DROP SEQUENCE IF EXISTS public.custodios_seq;</span>
+<span class="cm">-- DROP SEQUENCE IF EXISTS public.patios_seq;</span></pre>
+  </div>
+</section>
+
+<footer>
+  <hr class="rule">
+  <p><b>Método.</b> Auditoría realizada el 31 de agosto de 2026 sobre el volcado de esquema y datos de producción (<code>xnyqsewaluezkkrlyhxg</code>, PostgreSQL 17.6), las 47 migraciones del repositorio y las 13.178 líneas del cliente. Producción no se modificó: todo lo leído procede de volcados generados por los guiones de replicación, que solo leen.</p>
+  <p><b>Limitación declarada.</b> Sin conexión viva a la base no se ejecutó ningún <code>EXPLAIN</code> ni se leyeron estadísticas de uso. Ninguna recomendación de índice está respaldada por uso medido, y por eso no se propone eliminar ninguno. La fase 0 del plan existe para cerrar esa brecha.</p>
+  <p><b>Nada de lo aquí propuesto se ha aplicado</b> a ninguna de las dos bases.</p>
+</footer>
+
+</main>
+</div>
+</div>

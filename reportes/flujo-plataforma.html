@@ -1,0 +1,1387 @@
+<meta charset="utf-8">
+<title>Flujo operativo de PortGo</title>
+<style>
+  @page { size: A4; margin: 17mm 16mm 19mm; }
+
+  :root {
+    --ink:    #16181d;
+    --muted:  #5b6470;
+    --line:   #c9ced6;
+    --soft:   #f2f4f7;
+    --gate:   #9c4a0a;
+    --money:  #96211d;
+    --ok:     #1f6b3f;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font: 10.5pt/1.55 "Charter", "Georgia", serif;
+    color: var(--ink);
+    background: #fff;
+    margin: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  h1, h2, h3, h4, .lane-h, figcaption, .tag, th, .num {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  /* ── Portada ───────────────────────────────────────── */
+  .cover { height: 247mm; display: flex; flex-direction: column; }
+  .cover-top { flex: 1; }
+  .cover h1 {
+    font-size: 30pt; line-height: 1.1; margin: 46mm 0 0; letter-spacing: -0.5px;
+  }
+  .cover .sub {
+    font-size: 13pt; color: var(--muted); margin: 10px 0 0; font-style: italic;
+  }
+  .cover .rule { height: 3px; background: var(--ink); width: 62px; margin: 26px 0; }
+  .cover .lede { font-size: 11pt; max-width: 118mm; }
+  .cover-foot {
+    border-top: 1px solid var(--line); padding-top: 10px;
+    font-size: 8.5pt; color: var(--muted); display: flex; justify-content: space-between;
+  }
+
+  /* ── Estructura ────────────────────────────────────── */
+  .sec { page-break-before: always; }
+  h2 {
+    font-size: 16pt; margin: 0 0 2px; letter-spacing: -0.3px;
+    padding-bottom: 6px; border-bottom: 2px solid var(--ink);
+  }
+  h2 .num { color: var(--muted); font-weight: 400; margin-right: 9px; }
+  h3 { font-size: 11.5pt; margin: 20px 0 6px; }
+  h4 { font-size: 9.5pt; margin: 15px 0 4px; text-transform: uppercase;
+       letter-spacing: 0.8px; color: var(--muted); }
+  p  { margin: 0 0 9px; }
+  ul, ol { margin: 0 0 9px; padding-left: 19px; }
+  li { margin-bottom: 3px; }
+  code {
+    font: 9pt "Consolas", "Menlo", monospace;
+    background: var(--soft); padding: 0.5px 3px; border-radius: 2px;
+  }
+  strong { font-weight: 600; }
+
+  /* ── Tablas ────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 14px; font-size: 9.5pt; }
+  th {
+    text-align: left; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--muted); border-bottom: 1.5px solid var(--ink);
+    padding: 0 8px 4px 0; vertical-align: bottom;
+  }
+  td { padding: 5px 8px 5px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr { break-inside: avoid; }
+
+  /* ── Cajas ─────────────────────────────────────────── */
+  .box { border-left: 3px solid var(--line); padding: 8px 0 8px 12px; margin: 12px 0;
+         break-inside: avoid; }
+  .box .h { font-family: "Segoe UI", Arial, sans-serif; font-size: 8.5pt;
+            text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 4px; }
+  .box p:last-child { margin-bottom: 0; }
+  .gate  { border-left-color: var(--gate);  }
+  .gate  .h { color: var(--gate); }
+  .money { border-left-color: var(--money); }
+  .money .h { color: var(--money); }
+  .ask   { border-left-color: var(--ink); background: var(--soft);
+           padding: 9px 12px; }
+  .ask .h { color: var(--ink); }
+
+  /* ── Figuras ───────────────────────────────────────── */
+  figure { margin: 16px 0; break-inside: avoid; text-align: center; }
+  svg { max-width: 100%; height: auto; }
+  figcaption {
+    font-size: 8.5pt; color: var(--muted); margin-top: 7px;
+    text-align: left; line-height: 1.4;
+  }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  .lane-h { font-size: 10px; font-weight: 600; letter-spacing: 0.6px;
+            text-transform: uppercase; }
+
+  /* ── Pasos numerados ───────────────────────────────── */
+  .paso {
+    display: grid; grid-template-columns: 26px 1fr; gap: 11px;
+    margin: 0 0 13px; break-inside: avoid;
+  }
+  .paso-n {
+    font-family: "Segoe UI", Arial, sans-serif; font-size: 9pt; font-weight: 700;
+    color: #fff; background: var(--ink); border-radius: 50%;
+    width: 21px; height: 21px; line-height: 21px; text-align: center; margin-top: 2px;
+  }
+  .paso.sa  .paso-n { background: var(--gate); }
+  .paso-who {
+    font-family: "Segoe UI", Arial, sans-serif; font-size: 7.5pt; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase; color: var(--muted);
+  }
+  .paso.sa .paso-who { color: var(--gate); }
+  .paso-ruta {
+    font-family: "Segoe UI", Arial, sans-serif; font-size: 8.5pt;
+    color: var(--muted); margin: 1px 0 4px;
+  }
+  .paso p { margin: 0 0 5px; }
+  .paso p:last-child { margin-bottom: 0; }
+  .btn {
+    display: inline-block; font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 8.5pt; font-weight: 600; border: 1px solid #8b94a1;
+    border-radius: 3px; padding: 1px 6px; background: #fff;
+    white-space: nowrap; margin: 1px 2px 1px 0;
+  }
+  .btn-sa { border-color: var(--gate); color: var(--gate); }
+  .stop {
+    font-size: 9pt; color: var(--money); margin: 4px 0 0;
+    padding-left: 13px; text-indent: -13px;
+  }
+  .stop::before { content: "⊘  "; font-weight: 700; }
+
+  /* ── Índice ────────────────────────────────────────── */
+  .toc { font-size: 10pt; }
+  .toc li { margin-bottom: 5px; }
+  .toc .t { font-weight: 600; }
+  .toc .d { color: var(--muted); }
+</style>
+
+<!-- ══════════════════════════ PORTADA ══════════════════════════ -->
+<div class="cover">
+  <div class="cover-top">
+    <h1>Flujo operativo<br>de PortGo</h1>
+    <p class="sub">Cómo opera la plataforma entre cliente, empresa y superadmin</p>
+    <div class="rule"></div>
+    <p class="lede">
+      Documento para revisión. Describe el ciclo completo de un servicio de
+      transporte portuario tal y como el sistema lo ejecuta hoy: quién actúa en
+      cada punto, qué lo autoriza, y qué lo impide cuando no se puede.
+    </p>
+    <p class="lede">
+      Todo lo que se afirma aquí está leído del esquema de la base y del código
+      —restricciones <code>CHECK</code>, políticas de acceso, disparadores de
+      control—, no de la documentación previa. Donde el sistema no hace algo
+      que podría esperarse, se dice explícitamente en lugar de omitirlo.
+    </p>
+    <p class="lede">
+      Cada etapa cierra con un <b>punto a validar</b>: una decisión de diseño
+      que el sistema ya tomó y que conviene confirmar contra la operación real.
+    </p>
+  </div>
+  <div class="cover-foot">
+    <span>Verificado contra producción y el entorno de pruebas</span>
+    <span>11 de septiembre de 2026</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════ ÍNDICE ══════════════════════════ -->
+<div class="sec">
+  <h2>Cómo leer este documento</h2>
+
+  <p>
+    El ciclo se cuenta dos veces, a propósito. Primero <b>por actor</b> —qué
+    hace cada uno y qué no puede hacer— y después <b>por etapa</b>, en el orden
+    en que ocurren las cosas. Quien conoce el proceso suele encontrar antes los
+    huecos leyendo por actor; quien audita una operación concreta la sigue mejor
+    por etapa.
+  </p>
+
+  <ol class="toc">
+    <li><span class="t">Los tres actores</span> — <span class="d">qué aporta cada uno y dónde se le frena</span></li>
+    <li><span class="t">Antes de operar</span> — <span class="d">alta de cuenta, de flota y de operadores · pasos 1 a 5</span></li>
+    <li><span class="t">De la solicitud al acuerdo</span> — <span class="d">publicar, revisar, ofertar y negociar · pasos 6 a 11</span></li>
+    <li><span class="t">Del acuerdo al cobro</span> — <span class="d">seguimiento, documentos, cierre, pago y cancelación · pasos 12 a 24</span></li>
+    <li><span class="t">Los estados</span> — <span class="d">las tres máquinas que gobiernan el ciclo</span></li>
+    <li><span class="t">Los controles</span> — <span class="d">qué impide cada regla, y por qué existe</span></li>
+    <li><span class="t">Dónde está el dinero</span> — <span class="d">precio, plazo, demoras</span></li>
+    <li><span class="t">Áreas de oportunidad</span> — <span class="d">lo verificado que hoy no resuelve el sistema</span></li>
+  </ol>
+
+  <div class="box">
+    <div class="h">Los pasos van numerados de principio a fin</div>
+    <p>
+      Del <b>1</b> al <b>24</b>, sin reiniciar por sección: el 1 es crear la
+      cuenta y el 24, resolver una cancelación. Cada paso dice <b>quién</b>
+      actúa, <b>por dónde llega</b> y <b>qué botón pulsa</b>, con la etiqueta
+      exacta que aparece en pantalla —<span class="btn">✓ Completar</span>,
+      <span class="btn">👷 Asignar chofer</span>—. Los pasos del superadmin van
+      en otro color.
+    </p>
+    <p>
+      Una línea marcada con <b>⊘</b> es un freno: algo que el sistema no deja
+      hacer en ese punto, y el motivo.
+    </p>
+  </div>
+
+  <div class="box ask">
+    <div class="h">Una aclaración sobre los controles</div>
+    <p>
+      En esta plataforma <b>ocultar un botón no protege nada</b>. Lo que decide
+      de verdad son dos capas del servidor: las políticas de acceso, que deciden
+      <i>si</i> alguien puede escribir una fila, y los disparadores de control
+      —los llamamos <i>guards</i>—, que deciden <i>qué cambio de estado</i> es
+      legal para quien lo intenta.
+    </p>
+    <p>
+      Importa para la revisión: cuando este documento dice que alguien «no
+      puede» algo, casi siempre es el servidor quien lo impide, y seguiría
+      impidiéndolo aunque la pantalla cambiara.
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 1. ACTORES ══════════════════════════ -->
+<div class="sec">
+  <h2><span class="num">1</span>Los tres actores</h2>
+
+  <p>
+    Solo existen tres papeles. No hay operadores con cuenta propia, ni
+    despachadores, ni roles intermedios: el chofer es un dato de la empresa, no
+    un usuario.
+  </p>
+
+  <figure>
+    <svg viewBox="0 0 700 250" role="img" aria-label="El cliente aporta la carga, la empresa aporta el recurso, y el superadmin autoriza a ambos sin participar en la operación">
+      <defs>
+        <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <!-- Cliente -->
+      <rect x="20" y="70" width="170" height="72" rx="4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <text x="105" y="96" text-anchor="middle" font-size="13" font-weight="600" font-family="Segoe UI, Arial">CLIENTE</text>
+      <text x="105" y="116" text-anchor="middle" font-size="11" fill="#5b6470" font-family="Segoe UI, Arial">Tiene la carga</text>
+      <text x="105" y="132" text-anchor="middle" font-size="11" fill="#5b6470" font-family="Segoe UI, Arial">Paga el servicio</text>
+
+      <!-- Empresa -->
+      <rect x="510" y="70" width="170" height="72" rx="4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <text x="595" y="96" text-anchor="middle" font-size="13" font-weight="600" font-family="Segoe UI, Arial">EMPRESA</text>
+      <text x="595" y="116" text-anchor="middle" font-size="11" fill="#5b6470" font-family="Segoe UI, Arial">Pone el recurso</text>
+      <text x="595" y="132" text-anchor="middle" font-size="11" fill="#5b6470" font-family="Segoe UI, Arial">Ejecuta el viaje</text>
+
+      <!-- Superadmin -->
+      <rect x="270" y="185" width="160" height="50" rx="4" fill="none" stroke="#9c4a0a" stroke-width="1.6"/>
+      <text x="350" y="207" text-anchor="middle" font-size="13" font-weight="600" fill="#9c4a0a" font-family="Segoe UI, Arial">SUPERADMIN</text>
+      <text x="350" y="224" text-anchor="middle" font-size="11" fill="#9c4a0a" font-family="Segoe UI, Arial">Autoriza y desatasca</text>
+
+      <!-- Negociación entre cliente y empresa -->
+      <line x1="195" y1="98" x2="505" y2="98" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"/>
+      <text x="350" y="91" text-anchor="middle" font-size="11" font-family="Segoe UI, Arial">solicita</text>
+      <line x1="505" y1="122" x2="195" y2="122" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"/>
+      <text x="350" y="138" text-anchor="middle" font-size="11" font-family="Segoe UI, Arial">oferta y presta el servicio</text>
+
+      <!-- Compuertas del superadmin -->
+      <line x1="300" y1="180" x2="150" y2="147" stroke="#9c4a0a" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#a1)" color="#9c4a0a"/>
+      <line x1="400" y1="180" x2="550" y2="147" stroke="#9c4a0a" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#a1)" color="#9c4a0a"/>
+      <text x="350" y="170" text-anchor="middle" font-size="10.5" fill="#9c4a0a" font-family="Segoe UI, Arial">aprueba cuentas, recursos y solicitudes</text>
+
+      <!-- Nota -->
+      <text x="350" y="34" text-anchor="middle" font-size="11.5" font-style="italic" fill="#5b6470">El trato es entre cliente y empresa.</text>
+      <text x="350" y="50" text-anchor="middle" font-size="11.5" font-style="italic" fill="#5b6470">El superadmin habilita las condiciones; no es parte del trato.</text>
+    </svg>
+    <figcaption>
+      <b>El superadmin no participa en la operación: la habilita.</b> Aprueba
+      quién puede operar y con qué recursos, y resuelve los finales conflictivos.
+      La línea discontinua marca autorización, no intervención.
+    </figcaption>
+  </figure>
+
+  <h3>Cliente</h3>
+  <p>
+    Publica solicitudes de transporte, negocia el precio, sube los documentos
+    del viaje que le pidan, aporta su evidencia al cerrar y califica. Puede
+    guardar solicitudes frecuentes como plantillas —sin las fechas, a propósito,
+    para que nadie reutilice una fecha vieja por descuido.
+  </p>
+
+  <table>
+    <thead><tr><th style="width:54%">Lo que no puede hacer</th><th>Por qué se le impide</th></tr></thead>
+    <tbody>
+      <tr><td>Dar por cerrado su propio pedido</td><td>Cerrar es consecuencia de que ambas partes acepten, no una acción suelta</td></tr>
+      <tr><td>Crearse una reserva ya confirmada y con el precio que él ponga</td><td>El precio nace de una oferta de la empresa, no de una declaración del cliente</td></tr>
+      <tr><td>Tocar precio, unidad o fechas de una reserva en curso</td><td>Son los términos pactados; cambiarlos es renegociar</td></tr>
+      <tr><td>Subir la evidencia que le corresponde a la empresa</td><td>Cada parte responde de la suya</td></tr>
+      <tr><td>Aprobar su propio cierre o resolver su propia cancelación</td><td>Nadie resuelve un conflicto en el que es parte</td></tr>
+      <tr><td>Pedir un expediente de documentos</td><td>Quien necesita el papel es el transportista; él lo pide</td></tr>
+      <tr><td>Ver los datos de otro usuario</td><td>Solo alcanza su propia ficha</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Empresa transportista</h3>
+  <p>
+    Da de alta su flota —camiones, custodios, patios, lavados— y a sus
+    operadores, mantiene su ficha pública, oferta sobre las solicitudes
+    abiertas, ejecuta el servicio y cobra. Es la única que puede pedir
+    documentos y la única que puede cancelar una reserva directamente.
+  </p>
+
+  <table>
+    <thead><tr><th style="width:54%">Lo que no puede hacer</th><th>Por qué se le impide</th></tr></thead>
+    <tbody>
+      <tr><td>Aprobarse sus propios recursos</td><td>La habilitación es externa; si no, el control no existe</td></tr>
+      <tr><td>Traspasar un recurso a otro propietario</td><td>Evita blanquear un historial cambiando de dueño</td></tr>
+      <tr><td>Ver solicitudes que el superadmin no ha publicado</td><td>Para ella, sencillamente no existen todavía</td></tr>
+      <tr><td>Ofertar con permiso de transporte o seguros vencidos</td><td>Se comprueba dos veces: al listar unidades y otra vez al aceptar</td></tr>
+      <tr><td>Aceptar su propia oferta</td><td>Solo puede aceptar si responde a una contraoferta del cliente</td></tr>
+      <tr><td>Poner a carga peligrosa un chofer sin licencia vigente</td><td>Control específico de materiales peligrosos</td></tr>
+      <tr><td>Avanzar el viaje de un camión sin chofer asignado</td><td>No hay viaje sin responsable identificado</td></tr>
+      <tr><td>Aprobar el cierre de su propio servicio</td><td>Lo aprueba el superadmin, que revisa la evidencia de ambas</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Superadmin</h3>
+  <p>Solo cuatro cosas pasan por él, y dos salidas de emergencia.</p>
+
+  <ol>
+    <li><b>Aprobar cuentas</b>, con verificación presencial o documental.</li>
+    <li><b>Aprobar recursos</b>: altas de flota y operadores, y también sus ediciones.</li>
+    <li><b>Aprobar y publicar solicitudes</b>: hasta ese momento ninguna empresa las ve.</li>
+    <li><b>Resolver los finales</b>: aprobar cierres y resolver cancelaciones pedidas por el cliente.</li>
+  </ol>
+
+  <p>Y dos salidas que existen porque sin ellas alguien queda encerrado:</p>
+  <ul>
+    <li><b>Forzar un acuerdo</b> cuando la empresa tiene documentos vencidos. Sin esto, esa empresa no podría cerrar nada y quedaría bloqueada sin recurso.</li>
+    <li><b>Gestionar usuarios</b> directamente: crear, editar, dar de baja.</li>
+  </ul>
+
+  <div class="box gate">
+    <div class="h">Lo que el superadmin ya no hace</div>
+    <p>
+      <b>No aprueba acuerdos.</b> Hasta el 9 de septiembre de 2026 era un paso
+      obligatorio; hoy, cuando las dos partes aceptan, la reserva se crea sola.
+      Es el cambio de proceso más reciente y el que más conviene confirmar
+      contra la operación real.
+    </p>
+  </div>
+
+  <div class="box ask">
+    <div class="h">Punto a validar</div>
+    <p>
+      El superadmin es la única identidad que los controles del servidor no
+      cuestionan: pasa por encima de todos ellos. Eso lo hace indispensable
+      para desatascar, y peligroso para el trabajo de rutina. <b>¿Está claro
+      en la operación quién tiene ese perfil y para qué se usa?</b>
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 2. PREPARATIVOS ══════════════════════════ -->
+<div class="sec">
+  <h2><span class="num">2</span>Antes de operar: cuenta y recursos</h2>
+
+  <p>
+    Nadie publica ni oferta nada hasta tener la cuenta activa, y ninguna
+    empresa puede ofertar con una unidad que no esté aprobada. Estos dos
+    trámites son la puerta de entrada.
+  </p>
+
+  <h3>Alta de cuenta</h3>
+
+  <div class="paso">
+    <div class="paso-n">1</div>
+    <div>
+      <div class="paso-who">Cliente o empresa</div>
+      <div class="paso-ruta">Pantalla de acceso</div>
+      <p>Pulsa <span class="btn">Crear cuenta</span> y elige si se registra como cliente o como empresa. El formulario pide datos fiscales, domicilio y documentos —identificación, constancia fiscal, acta constitutiva—.</p>
+      <p>Termina con <span class="btn">Enviar solicitud de registro</span>. La sesión se cierra sola: todavía no puede entrar.</p>
+    </div>
+  </div>
+
+  <div class="paso sa">
+    <div class="paso-n">2</div>
+    <div>
+      <div class="paso-who">Superadmin</div>
+      <div class="paso-ruta">Inicio → <b>Por aprobar</b> → pestaña <b>👤 Cuentas</b></div>
+      <p>Revisa los datos y los documentos adjuntos, y decide con uno de tres botones:</p>
+      <p>
+        <span class="btn btn-sa">✓ Aprobar sin verificación física</span>
+        <span class="btn btn-sa">✓ Aprobar con verificación física</span>
+        <span class="btn btn-sa">✕ Rechazar</span>
+      </p>
+      <p>Al aprobar, la cuenta queda activa y se copian al perfil la razón social, el RFC y el teléfono que se dieron en el registro. Si rechaza, escribe el motivo y el solicitante lo ve al intentar entrar; puede corregir y volver a enviar.</p>
+    </div>
+  </div>
+
+  <div class="box gate">
+    <div class="h">El contador de «Por aprobar»</div>
+    <p>
+      El globo rojo cuenta cuentas en estado pendiente. Si el número no coincide
+      con lo que hay dentro, significa que algún alta quedó a medias —solicitud
+      sin perfil—, y esa cuenta no podrá entrar aunque se apruebe.
+    </p>
+  </div>
+
+  <h3>Alta de flota y operadores</h3>
+
+  <div class="paso">
+    <div class="paso-n">3</div>
+    <div>
+      <div class="paso-who">Empresa</div>
+      <div class="paso-ruta">Inicio → <b>Mis unidades</b> → pestañas <b>🚛 Camiones</b> · <b>👮 Custodios</b> · <b>🏭 Patios</b> · <b>🚿 Lavado</b> · <b>👷 Operadores</b></div>
+      <p>Cada pestaña tiene su formulario de alta. En camiones: <span class="btn">➕ Agregar unidad</span>, se rellenan tipo, placas, capacidad, precio por día, y se cierra con <span class="btn">➕ Enviar a aprobación</span>.</p>
+      <p>Las demás terminan con <span class="btn">➕ Agregar custodio</span>, <span class="btn">➕ Agregar patio</span> o <span class="btn">➕ Agregar servicio</span>.</p>
+      <p class="stop">El alta de operador exige las cuatro fechas de vigencia —licencia, examen médico, toxicológico y carta de antecedentes— junto con sus documentos. Sin fecha, el papel no se vigila nunca.</p>
+    </div>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">4</div>
+    <div>
+      <div class="paso-who">Empresa</div>
+      <div class="paso-ruta">Inicio → <b>Mis unidades</b> → bloque <b>Perfil de empresa</b></div>
+      <p>Completa lo que el registro no pidió y que su ficha pública necesita: años de operación, número de unidades, permiso de transporte, seguros y descripción. Guarda con <span class="btn">💾 Guardar perfil</span>.</p>
+      <p>Los documentos de la empresa y sus fechas de vencimiento se envían aparte, con <span class="btn">📤 Enviar documentos para aprobación</span>, porque los revisa el superadmin.</p>
+      <p class="stop">Sin permiso de transporte y seguros vigentes, más adelante no podrá ofertar. Conviene hacerlo aquí y no descubrirlo con una solicitud delante.</p>
+    </div>
+  </div>
+
+  <div class="paso sa">
+    <div class="paso-n">5</div>
+    <div>
+      <div class="paso-who">Superadmin</div>
+      <div class="paso-ruta">Inicio → <b>Por aprobar</b> → pestaña <b>📦 Recursos</b></div>
+      <p>Revisa cada alta y resuelve con <span class="btn btn-sa">✓ Aprobar</span> o <span class="btn btn-sa">✕ Rechazar con comentarios</span>. Si hay varias del mismo tipo, <span class="btn btn-sa">✓ Aprobar todos</span> las despacha de una vez.</p>
+      <p>En la misma pestaña aprueba los documentos de empresa con <span class="btn btn-sa">✓ Aprobar documentos</span>.</p>
+    </div>
+  </div>
+
+  <div class="box gate">
+    <div class="h">Editar un recurso aprobado lo devuelve a revisión</div>
+    <p>
+      Cuando la empresa pulsa <span class="btn">✏ Editar</span> sobre una unidad
+      ya aprobada, el sistema guarda cómo estaba antes y marca exactamente qué
+      campos cambiaron, para que el superadmin compare las dos versiones en
+      lugar de revisar la ficha entera de nuevo. Mientras tanto, la unidad
+      vuelve a estar pendiente.
+    </p>
+  </div>
+
+  <div class="box ask">
+    <div class="h">Punto a validar</div>
+    <p>
+      Cada edición vuelve a pasar por aprobación, incluso un cambio de precio
+      por día. <b>¿Es proporcionado?</b> Si una empresa ajusta tarifas a menudo,
+      hoy eso genera cola de revisión y deja la unidad fuera del mercado hasta
+      que alguien la mire.
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 2. SOLICITUD → ACUERDO ══════════════════════════ -->
+<div class="sec">
+  <h2><span class="num">3</span>De la solicitud al acuerdo</h2>
+
+  <figure>
+    <svg viewBox="0 0 700 470" role="img" aria-label="El cliente publica, el superadmin aprueba y publica, la empresa oferta, el cliente acepta o contraoferta, y cuando ambos aceptan se crea la reserva">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <!-- Cabeceras de carril -->
+      <text x="110" y="18" text-anchor="middle" class="lane-h" font-size="10">CLIENTE</text>
+      <text x="350" y="18" text-anchor="middle" class="lane-h" font-size="10" fill="#9c4a0a">SUPERADMIN</text>
+      <text x="590" y="18" text-anchor="middle" class="lane-h" font-size="10">EMPRESA</text>
+      <line x1="20" y1="26" x2="680" y2="26" stroke="#c9ced6" stroke-width="1"/>
+      <line x1="230" y1="26" x2="230" y2="460" stroke="#e6e9ee" stroke-width="1"/>
+      <line x1="470" y1="26" x2="470" y2="460" stroke="#e6e9ee" stroke-width="1"/>
+
+      <!-- 1. Cliente publica -->
+      <rect x="20" y="44" width="180" height="42" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="110" y="62" text-anchor="middle" font-size="11.5" font-family="Segoe UI, Arial">Publica la solicitud</text>
+      <text x="110" y="78" text-anchor="middle" font-size="10" fill="#5b6470" font-family="Consolas, monospace">pendiente_revision</text>
+
+      <!-- 2. SA aprueba -->
+      <rect x="260" y="110" width="180" height="42" rx="3" fill="none" stroke="#9c4a0a" stroke-width="1.5"/>
+      <text x="350" y="128" text-anchor="middle" font-size="11.5" fill="#9c4a0a" font-family="Segoe UI, Arial">Aprueba y publica</text>
+      <text x="350" y="144" text-anchor="middle" font-size="10" fill="#9c4a0a" font-family="Consolas, monospace">abierto</text>
+      <path d="M110,88 L110,131 L256,131" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"/>
+
+      <!-- 3. Empresa oferta -->
+      <rect x="500" y="176" width="180" height="42" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="590" y="194" text-anchor="middle" font-size="11.5" font-family="Segoe UI, Arial">Hace una oferta</text>
+      <text x="590" y="210" text-anchor="middle" font-size="10" fill="#5b6470" font-family="Consolas, monospace">en_negociacion</text>
+      <path d="M440,131 L470,131 L470,197 L496,197" fill="none" stroke="#9c4a0a" stroke-width="1.3" marker-end="url(#a2)" color="#9c4a0a"/>
+      <text x="464" y="166" text-anchor="end" font-size="10" fill="#9c4a0a" font-family="Segoe UI, Arial">ahora ya la ve</text>
+
+      <!-- 4. Cliente responde -->
+      <rect x="20" y="242" width="180" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="110" y="260" text-anchor="middle" font-size="11.5" font-family="Segoe UI, Arial">Acepta</text>
+      <text x="110" y="276" text-anchor="middle" font-size="11.5" font-family="Segoe UI, Arial">o contraoferta</text>
+      <text x="110" y="290" text-anchor="middle" font-size="9.5" fill="#5b6470" font-family="Segoe UI, Arial">máximo 2 rondas</text>
+      <path d="M500,197 L230,197 L230,263 L204,263" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"/>
+
+      <!-- ciclo de contraoferta -->
+      <path d="M110,298 L110,320 L590,320 L590,224" fill="none" stroke="currentColor" stroke-width="1.1" stroke-dasharray="4 3" marker-end="url(#a2)"/>
+      <text x="350" y="334" text-anchor="middle" font-size="10" font-style="italic" fill="#5b6470">si contraoferta, vuelve a la empresa</text>
+
+      <!-- 5. Acuerdo -->
+      <rect x="150" y="356" width="400" height="56" rx="3" fill="#f2f4f7" stroke="currentColor" stroke-width="2"/>
+      <text x="350" y="378" text-anchor="middle" font-size="12.5" font-weight="600" font-family="Segoe UI, Arial">Las dos partes han aceptado</text>
+      <text x="350" y="397" text-anchor="middle" font-size="11" font-family="Segoe UI, Arial">La reserva se crea, confirmada y con precio</text>
+      <path d="M110,298 L110,384 L146,384" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"/>
+      <path d="M590,224 L590,384 L554,384" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"/>
+
+      <text x="350" y="436" text-anchor="middle" font-size="11" font-style="italic" fill="#5b6470">Todo ocurre en una sola operación: o pasa entero, o no pasa nada.</text>
+      <text x="350" y="454" text-anchor="middle" font-size="11" font-style="italic" fill="#9c4a0a">El superadmin no interviene en este paso.</text>
+    </svg>
+    <figcaption>
+      <b>El superadmin aparece una sola vez, al principio.</b> Autoriza que la
+      solicitud se publique y desaparece del trato. La flecha discontinua es el
+      ciclo de negociación, limitado a dos rondas.
+    </figcaption>
+  </figure>
+
+  <h3>Paso a paso</h3>
+
+  <div class="paso">
+    <div class="paso-n">6</div>
+    <div>
+      <div class="paso-who">Cliente</div>
+      <div class="paso-ruta">Inicio → tarjeta <b>Solicitar servicio</b></div>
+      <p>Elige el tipo de servicio y describe la carga. El formulario cambia según la categoría: contenerizada pide contenedores, hazmat pide clase y número ONU, sobredimensionada pide medidas.</p>
+      <p>Puede marcar origen y destino exactos con <span class="btn">📍 Asignar ubicación</span>, que abre un mapa. Es opcional y complementa la dirección escrita, no la sustituye.</p>
+      <p>Publica con <span class="btn">📋 Publicar solicitud</span>.</p>
+      <p class="stop">La fecha de carga mínima es mañana. No se puede pedir un servicio para hoy.</p>
+    </div>
+  </div>
+
+  <div class="paso sa">
+    <div class="paso-n">7</div>
+    <div>
+      <div class="paso-who">Superadmin</div>
+      <div class="paso-ruta">Inicio → <b>Por aprobar</b> → pestaña <b>📋 Solicitudes</b></div>
+      <p>Revisa la solicitud y la publica con <span class="btn btn-sa">✓ Aprobar y publicar</span>, o la devuelve con <span class="btn btn-sa">✕ Rechazar</span> y una nota. Con varias en cola, <span class="btn btn-sa">✓ Aprobar todas</span>.</p>
+      <p><b>Hasta este momento ninguna empresa ve la solicitud.</b> Si la rechaza, el cliente la corrige con <span class="btn">🔄 Corregir y reenviar</span>.</p>
+    </div>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">8</div>
+    <div>
+      <div class="paso-who">Empresa</div>
+      <div class="paso-ruta">Inicio → <b>Solicitudes</b></div>
+      <p>Ve el mercado de solicitudes publicadas. Sobre la que le interese pulsa <span class="btn">Hacer oferta</span>, elige una de sus unidades aprobadas del tipo pedido, pone precio y confirma con <span class="btn">Enviar oferta</span>.</p>
+      <p>La solicitud pasa a estar en negociación y el cliente recibe aviso.</p>
+      <p class="stop">Si el desplegable de unidades sale vacío, no es un fallo: o no tiene unidades aprobadas de ese tipo, o sus documentos de empresa están vencidos. El botón queda desactivado.</p>
+    </div>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">9</div>
+    <div>
+      <div class="paso-who">Cliente</div>
+      <div class="paso-ruta">Inicio → <b>Mis solicitudes</b> → abrir la solicitud</div>
+      <p>Ve las ofertas recibidas, con el nombre de cada empresa. Pulsando el nombre se abre su ficha: descripción, calificación y unidades.</p>
+      <p>Sobre la oferta elegida tiene dos caminos:</p>
+      <p>
+        <span class="btn">✓ Aceptar $18,500</span> cierra el trato al precio ofertado.<br>
+        <span class="btn">↩ Contraofertar</span> abre un campo para proponer menos, y se envía con <span class="btn">Enviar contraoferta</span>.
+      </p>
+      <p>También puede descartar una oferta con <span class="btn">✕ Rechazar</span>.</p>
+    </div>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">10</div>
+    <div>
+      <div class="paso-who">Empresa</div>
+      <div class="paso-ruta">Inicio → <b>Solicitudes</b> → la solicitud con contraoferta</div>
+      <p>Si hubo contraoferta, aparece <span class="btn">Responder</span>: puede aceptar el precio del cliente, o mandar una segunda oferta. <b>Ahí se acaban las rondas.</b></p>
+    </div>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">11</div>
+    <div>
+      <div class="paso-who">El sistema</div>
+      <div class="paso-ruta">Al aceptar cualquiera de los dos</div>
+      <p>En una sola operación: la oferta queda aceptada, la solicitud pasa a acordada, <b>se crea la reserva ya confirmada y con el precio</b>, y las demás ofertas se rechazan con aviso a sus empresas.</p>
+      <p>El cliente ve <i>«Acuerdo cerrado — ya tienes una reserva»</i>. No hay paso intermedio ni espera.</p>
+      <p class="stop">Salvo que la empresa tenga documentos vencidos. Entonces sale <i>«Acuerdo aceptado — la empresa tiene documentos vencidos»</i>, la solicitud queda a la espera, y el superadmin decide en <b>Por aprobar → 🤝 Acuerdos</b> con <span class="btn btn-sa">✓ Aprobar acuerdo</span> o <span class="btn btn-sa">Aprobar igualmente</span> tras la advertencia.</p>
+    </div>
+  </div>
+
+  <h3>La publicación y su filtro</h3>
+  <p>
+    Una solicitud recién creada no existe para las empresas: pueden ver
+    únicamente las que ya están publicadas o en negociación. Esto no es un
+    detalle de presentación, es el propio permiso de lectura. <b>Si una empresa
+    dice que «no le aparece» una solicitud, lo primero a comprobar es si ya fue
+    publicada.</b>
+  </p>
+  <p>
+    Ningún servicio puede pedirse para el mismo día: la fecha mínima de carga es
+    mañana. Es una regla de negocio deliberada —una solicitud para hoy no da
+    margen a nadie— y hace imposible registrar a posteriori un viaje que ya
+    ocurrió.
+  </p>
+
+  <h3>Lo que se pide según la carga</h3>
+  <p>
+    El formulario se construye desde la carga, no desde el camión, y esa
+    elección arrastra consecuencias hasta el final del ciclo:
+  </p>
+
+  <table>
+    <thead><tr><th>Categoría</th><th>Datos que pide</th><th>¿Exigirá devolver contenedor?</th></tr></thead>
+    <tbody>
+      <tr><td>General</td><td>peso, tarimas, contenedores, refrigeración</td><td>Solo si se declaró contenedor</td></tr>
+      <tr><td>Contenerizada</td><td>peso, contenedores, refrigeración</td><td>Siempre</td></tr>
+      <tr><td>Consolidada</td><td>peso, tarimas, refrigeración</td><td>No</td></tr>
+      <tr><td>Suelta</td><td>peso, tarimas, bultos, refrigeración</td><td>No</td></tr>
+      <tr><td>Sobredimensionada</td><td>peso y dimensiones</td><td>No</td></tr>
+      <tr><td>Hazmat</td><td>peso, clase y número ONU</td><td>No</td></tr>
+    </tbody>
+  </table>
+
+  <h3>La negociación</h3>
+  <p>
+    La empresa oferta un precio; el cliente acepta o contraoferta uno menor.
+    <b>Como mucho dos rondas.</b> Las ofertas caducan solas a los dos días y un
+    proceso automático las marca como rechazadas cada hora.
+  </p>
+
+  <div class="box gate">
+    <div class="h">El freno por documentos vencidos</div>
+    <p>
+      Una empresa con el permiso de transporte o los seguros caducados no puede
+      ofertar: al intentarlo no le aparece ninguna unidad seleccionable. Y si
+      aun así se llegara a aceptar una oferta suya, el servidor lo detiene por
+      segunda vez y manda el pedido a revisión del superadmin.
+    </p>
+    <p>
+      <b>Ese control avisa, pero no encierra.</b> El superadmin puede forzarlo
+      tras la advertencia. Sin esa salida, una empresa con un papel vencido
+      quedaría atrapada sin forma de desbloquearse.
+    </p>
+  </div>
+
+  <div class="box ask">
+    <div class="h">Punto a validar</div>
+    <p>
+      Dos rondas de negociación y dos días de vigencia son números fijos, no
+      configurables desde la plataforma. <b>¿Coinciden con cómo se negocia de
+      verdad en el puerto?</b> Si una negociación real necesita tres vueltas, hoy
+      obliga a publicar una solicitud nueva y se pierde el rastro de la anterior.
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 3. ACUERDO → COBRO ══════════════════════════ -->
+<div class="sec">
+  <h2><span class="num">4</span>Del acuerdo al cobro</h2>
+
+  <figure>
+    <svg viewBox="0 0 700 440" role="img" aria-label="Tras el acuerdo la empresa asigna chofer y avanza el seguimiento, pide documentos al cliente, ambos suben evidencia, el superadmin aprueba el cierre y el cliente califica">
+      <defs>
+        <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <text x="110" y="18" text-anchor="middle" class="lane-h" font-size="10">CLIENTE</text>
+      <text x="350" y="18" text-anchor="middle" class="lane-h" font-size="10" fill="#9c4a0a">SUPERADMIN</text>
+      <text x="590" y="18" text-anchor="middle" class="lane-h" font-size="10">EMPRESA</text>
+      <line x1="20" y1="26" x2="680" y2="26" stroke="#c9ced6" stroke-width="1"/>
+      <line x1="230" y1="26" x2="230" y2="430" stroke="#e6e9ee" stroke-width="1"/>
+      <line x1="470" y1="26" x2="470" y2="430" stroke="#e6e9ee" stroke-width="1"/>
+
+      <!-- Reserva activa -->
+      <rect x="150" y="38" width="400" height="30" rx="3" fill="#f2f4f7" stroke="currentColor" stroke-width="1.6"/>
+      <text x="350" y="58" text-anchor="middle" font-size="11.5" font-weight="600" font-family="Segoe UI, Arial">Reserva activa</text>
+
+      <!-- Asigna chofer -->
+      <rect x="500" y="88" width="180" height="40" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="590" y="105" text-anchor="middle" font-size="11.5" font-family="Segoe UI, Arial">Asigna chofer</text>
+      <text x="590" y="121" text-anchor="middle" font-size="10" fill="#5b6470" font-family="Segoe UI, Arial">sin él no avanza</text>
+      <path d="M550,53 L590,53 L590,84" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a3)"/>
+
+      <!-- Seguimiento -->
+      <rect x="500" y="148" width="180" height="40" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="590" y="165" text-anchor="middle" font-size="11.5" font-family="Segoe UI, Arial">Avanza el seguimiento</text>
+      <text x="590" y="181" text-anchor="middle" font-size="10" fill="#5b6470" font-family="Segoe UI, Arial">5 pasos</text>
+      <line x1="590" y1="128" x2="590" y2="144" stroke="currentColor" stroke-width="1.3" marker-end="url(#a3)"/>
+
+      <!-- Expediente -->
+      <rect x="500" y="208" width="180" height="40" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="590" y="225" text-anchor="middle" font-size="11.5" font-family="Segoe UI, Arial">Pide documentos</text>
+      <text x="590" y="241" text-anchor="middle" font-size="10" fill="#5b6470" font-family="Segoe UI, Arial">y los revisa</text>
+      <line x1="590" y1="188" x2="590" y2="204" stroke="currentColor" stroke-width="1.3" marker-end="url(#a3)"/>
+
+      <rect x="20" y="208" width="180" height="40" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="110" y="232" text-anchor="middle" font-size="11.5" font-family="Segoe UI, Arial">Sube los documentos</text>
+      <line x1="496" y1="228" x2="204" y2="228" stroke="currentColor" stroke-width="1.3" marker-end="url(#a3)"/>
+
+      <!-- Evidencias -->
+      <rect x="20" y="272" width="180" height="38" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="110" y="295" text-anchor="middle" font-size="11.5" font-family="Segoe UI, Arial">Su evidencia</text>
+      <rect x="500" y="272" width="180" height="38" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="590" y="295" text-anchor="middle" font-size="11.5" font-family="Segoe UI, Arial">Su evidencia</text>
+      <line x1="590" y1="248" x2="590" y2="268" stroke="currentColor" stroke-width="1.3" marker-end="url(#a3)"/>
+      <line x1="110" y1="248" x2="110" y2="268" stroke="currentColor" stroke-width="1.3" marker-end="url(#a3)"/>
+
+      <!-- SA aprueba -->
+      <rect x="260" y="330" width="180" height="42" rx="3" fill="none" stroke="#9c4a0a" stroke-width="1.5"/>
+      <text x="350" y="348" text-anchor="middle" font-size="11.5" fill="#9c4a0a" font-family="Segoe UI, Arial">Aprueba el cierre</text>
+      <text x="350" y="364" text-anchor="middle" font-size="10" fill="#9c4a0a" font-family="Consolas, monospace">Completada</text>
+      <path d="M110,310 L110,351 L256,351" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a3)"/>
+      <path d="M590,310 L590,351 L444,351" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a3)"/>
+
+      <!-- Califica / cobra -->
+      <rect x="20" y="392" width="180" height="32" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+      <text x="110" y="413" text-anchor="middle" font-size="11.5" font-family="Segoe UI, Arial">Califica (una vez)</text>
+      <rect x="500" y="392" width="180" height="32" rx="3" fill="none" stroke="#96211d" stroke-width="1.4"/>
+      <text x="590" y="413" text-anchor="middle" font-size="11.5" fill="#96211d" font-family="Segoe UI, Arial">Cobra</text>
+      <path d="M300,372 L110,372 L110,388" fill="none" stroke="#9c4a0a" stroke-width="1.2" marker-end="url(#a3)" color="#9c4a0a"/>
+      <path d="M400,372 L590,372 L590,388" fill="none" stroke="#9c4a0a" stroke-width="1.2" marker-end="url(#a3)" color="#9c4a0a"/>
+    </svg>
+    <figcaption>
+      <b>El superadmin vuelve a aparecer una sola vez, al final.</b> Ninguna de
+      las dos partes cierra el servicio por su cuenta: suben su evidencia y él
+      decide. Basta con que <em>una</em> suba para que la reserva quede en
+      espera —y él puede aprobar aunque falte la otra, viendo el aviso de que
+      falta—, pero la decisión es siempre suya.
+    </figcaption>
+  </figure>
+
+  <h3>Paso a paso</h3>
+
+  <div class="box">
+    <div class="h">Dónde viven los botones de una reserva</div>
+    <p>
+      Todo lo que sigue ocurre en <b>Inicio → Reservaciones</b>. Cada reserva es
+      una fila, y <b>casi todos sus botones están plegados detrás del
+      <span class="btn">▾</span> del extremo</b>: los grupos <i>Operación</i>,
+      <i>Documentos</i>, <i>Avisos</i>, <i>Pago</i> y <i>Cierre</i> no se dibujan
+      hasta desplegarla. Si un botón «no aparece», eso es lo primero que hay que
+      mirar.
+    </p>
+    <p>
+      Arriba hay pastillas de filtro —<b>Activas</b>, <b>Pendientes</b>,
+      <b>Por aprobar</b>, <b>Completadas</b>, <b>Canceladas</b>,
+      <b>Cancelación en revisión</b>—. Filtran de verdad: cuando una reserva
+      cambia de estado <b>desaparece de la lista actual</b> y hay que buscarla en
+      la pastilla nueva. No se queda en gris.
+    </p>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">12</div>
+    <div>
+      <div class="paso-who">Empresa</div>
+      <div class="paso-ruta">Reservaciones → <b>Activas</b> → <b>▾</b> → grupo <b>Operación</b></div>
+      <p>Lo primero es poner chofer: <span class="btn">👷 Asignar chofer</span>. Una vez asignado, el botón pasa a mostrar su nombre y sirve para cambiarlo.</p>
+      <p class="stop">Sin chofer no se puede avanzar del primer paso del seguimiento. El sistema lo rechaza con un aviso que nombra este botón.</p>
+    </div>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">13</div>
+    <div>
+      <div class="paso-who">Empresa</div>
+      <div class="paso-ruta">Mismo grupo <b>Operación</b> → pastilla <span class="btn">📍 Confirmado</span></div>
+      <p>Esa pastilla muestra el paso actual del viaje y, al pulsarla, abre el seguimiento: los cinco pasos con el recorrido marcado hasta donde va.</p>
+      <p>Dentro hay un único botón de avance, y <b>nombra siempre el paso siguiente</b>: <span class="btn">🚚 Marcar: En camino</span>, después <span class="btn">📦 Marcar: En carga</span>, y así hasta el último. Se pulsa una vez por paso, conforme ocurre en la realidad.</p>
+      <p>En el mismo grupo puede registrar el enlace de rastreo con <span class="btn">🛰️ GPS</span>, o sustituir el vehículo con <span class="btn">🔧 Cambiar unidad</span> si se avería.</p>
+    </div>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">14</div>
+    <div>
+      <div class="paso-who">Empresa</div>
+      <div class="paso-ruta">Grupo <b>Avisos</b></div>
+      <p>Dos avisos puntuales al cliente, que le llegan por campana y por correo:</p>
+      <p>
+        <span class="btn">📍 Confirmar lugar y hora</span>
+        <span class="btn">⏰ Avisar retraso</span>
+      </p>
+      <p>El cliente tiene el suyo en el mismo sitio: <span class="btn">⚠ Reportar cambio o problema</span>. No hay campo de texto libre entre los dos.</p>
+    </div>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">15</div>
+    <div>
+      <div class="paso-who">Empresa</div>
+      <div class="paso-ruta">Grupo <b>Documentos</b></div>
+      <p>Cuando necesita papeles del cliente, abre un expediente:</p>
+      <p>
+        <span class="btn">⚓ Solicitar · Puerto</span>
+        <span class="btn">📦 Solicitar · Vacíos</span>
+      </p>
+      <p>Al pulsarlo, el cliente recibe aviso y la pastilla cambia a <span class="btn">⚓ Puerto ⏳</span>. Esa segunda pastilla ya no pide nada: <b>abre el expediente</b>, con la lista de documentos exigidos y el estado de cada uno.</p>
+      <p>El de vacíos normalmente <b>no hace falta pedirlo</b>: se abre solo al terminar el seguimiento, si el pedido llevaba contenedor.</p>
+    </div>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">16</div>
+    <div>
+      <div class="paso-who">Cliente</div>
+      <div class="paso-ruta">Reservaciones → <b>▾</b> → grupo <b>Documentos</b> → pastilla del expediente</div>
+      <p>La pastilla abre la misma ventana, con la lista de lo que le piden. Cada renglón tiene su <span class="btn">📤 Subir</span>.</p>
+      <p>El cliente no ve ningún botón para <i>pedir</i> documentos: solo responde a lo que le soliciten.</p>
+    </div>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">17</div>
+    <div>
+      <div class="paso-who">Empresa</div>
+      <div class="paso-ruta">Misma ventana del expediente</div>
+      <p>Revisa los documentos uno por uno: <span class="btn">👁 Ver</span> para abrirlo, y después <span class="btn">✓ Aceptar</span> o <span class="btn">⚠ Pedir corrección</span>. Cuando todos los obligatorios están aceptados, el expediente queda completo.</p>
+      <p>En el de vacíos registra además el depósito y la fecha límite de devolución con <span class="btn">💾 Guardar datos de entrega</span>. <b>Esa fecha es la que dispara las demoras.</b></p>
+    </div>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">18</div>
+    <div>
+      <div class="paso-who">Empresa</div>
+      <div class="paso-ruta">Grupo <b>Cierre</b></div>
+      <p>Con el seguimiento en el último paso, sube su prueba con <span class="btn">📎 Subir evidencias</span>, confirma en <span class="btn">📤 Subir evidencias</span>, y pide el cierre con <span class="btn">✓ Completar</span>.</p>
+      <p class="stop">Antes del último paso del seguimiento el sistema lo rechaza y pide avanzar primero. No se cierra un servicio que no llegó a destino.</p>
+    </div>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">19</div>
+    <div>
+      <div class="paso-who">Cliente</div>
+      <div class="paso-ruta">Grupo <b>Cierre</b></div>
+      <p>Sube la suya con <span class="btn">📎 Subir mi evidencia</span> y confirma con <span class="btn">✓ Marcar completado</span>. Son archivos separados de los de la empresa: cada parte responde de la suya.</p>
+      <p>Cuando las dos han subido, la reserva sale de <b>Activas</b> y aparece bajo <b>Por aprobar</b>. Donde estaba el botón queda el texto <i>«⏳ Esperando aprobación»</i>, que es la confirmación de que se guardó.</p>
+    </div>
+  </div>
+
+  <div class="paso sa">
+    <div class="paso-n">20</div>
+    <div>
+      <div class="paso-who">Superadmin</div>
+      <div class="paso-ruta">Inicio → <b>Por aprobar</b> → pestaña <b>🏁 Servicios</b></div>
+      <p>Ve las dos evidencias por separado —una etiquetada como del cliente y otra como de la empresa— y resuelve con <span class="btn btn-sa">✓ Aprobar finalización</span> o <span class="btn btn-sa">✕ Rechazar</span>.</p>
+      <p>La reserva queda completada y la solicitud original, finalizada.</p>
+    </div>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">21</div>
+    <div>
+      <div class="paso-who">Cliente</div>
+      <div class="paso-ruta">Reservaciones → pastilla <b>Completadas</b> → <b>▾</b> → grupo <b>Cierre</b></div>
+      <p>Puntúa el servicio con <span class="btn">⭐ Calificar</span>. <b>Una sola vez por reserva</b>, y esa nota alimenta la calificación pública de la empresa en el catálogo.</p>
+    </div>
+  </div>
+
+  <div class="paso">
+    <div class="paso-n">22</div>
+    <div>
+      <div class="paso-who">Empresa</div>
+      <div class="paso-ruta">Inicio → <b>Cobros</b></div>
+      <p>Cuando le pagan, lo registra con <span class="btn">💰 Registrar pago</span>, indicando método y referencia. Si se equivoca, <span class="btn">↩ Revertir cobro</span> limpia los datos y devuelve la reserva a pendiente de pago.</p>
+    </div>
+  </div>
+
+  <h3>Si hay que cancelar</h3>
+
+  <div class="paso">
+    <div class="paso-n">23</div>
+    <div>
+      <div class="paso-who">Empresa o cliente</div>
+      <div class="paso-ruta">Reservaciones → <b>▾</b> → grupo <b>Cierre</b></div>
+      <p>No es el mismo botón ni el mismo camino.</p>
+      <p>La <b>empresa</b> pulsa <span class="btn">Cancelar</span> y la cancelación es inmediata: libera el recurso y la solicitud vuelve al mercado.</p>
+      <p>El <b>cliente</b> pulsa <span class="btn">Solicitar cancelación</span>, elige motivo y escribe el detalle. El botón desaparece y en su lugar queda <i>«⏳ Cancelación en revisión»</i>.</p>
+    </div>
+  </div>
+
+  <div class="paso sa">
+    <div class="paso-n">24</div>
+    <div>
+      <div class="paso-who">Superadmin</div>
+      <div class="paso-ruta">Inicio → <b>Por aprobar</b> → bloque de cancelaciones</div>
+      <p>Resuelve con <span class="btn btn-sa">✓ Aprobar cancelación</span> o <span class="btn btn-sa">✕ Rechazar</span>. Tiene delante el motivo, el detalle, y <b>el punto exacto del viaje en que se pidió</b> —congelado al solicitarla—, marcado en rojo si el servicio ya había arrancado.</p>
+    </div>
+  </div>
+
+  <h3>El seguimiento son cinco pasos, distintos por servicio</h3>
+  <p>
+    No es la misma secuencia para un camión que para un patio. Cada tipo de
+    recurso tiene la suya, con cinco pasos:
+  </p>
+
+  <figure>
+    <svg viewBox="0 0 700 200" role="img" aria-label="Cada tipo de recurso tiene su propia secuencia de cinco pasos de seguimiento">
+      <g font-family="Segoe UI, Arial" font-size="10">
+        <text x="8" y="26" font-weight="600" font-size="10.5">Camión</text>
+        <text x="8" y="70" font-weight="600" font-size="10.5">Custodio</text>
+        <text x="8" y="114" font-weight="600" font-size="10.5">Patio</text>
+        <text x="8" y="158" font-weight="600" font-size="10.5">Lavado</text>
+
+        <!-- fila camion -->
+        <rect x="78" y="12" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="130" y="27" text-anchor="middle">Confirmado</text>
+        <rect x="192" y="12" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="244" y="27" text-anchor="middle">En camino</text>
+        <rect x="306" y="12" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="358" y="27" text-anchor="middle">En carga</text>
+        <rect x="420" y="12" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="472" y="27" text-anchor="middle">En tránsito</text>
+        <rect x="534" y="12" width="104" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="586" y="27" text-anchor="middle" font-weight="600">Entregado</text>
+
+        <!-- custodio -->
+        <rect x="78" y="56" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="130" y="71" text-anchor="middle">Confirmado</text>
+        <rect x="192" y="56" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="244" y="71" text-anchor="middle">Asignado</text>
+        <rect x="306" y="56" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="358" y="71" text-anchor="middle">En ruta</text>
+        <rect x="420" y="56" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="472" y="71" text-anchor="middle">En servicio</text>
+        <rect x="534" y="56" width="104" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="586" y="71" text-anchor="middle" font-weight="600">Finalizado</text>
+
+        <!-- patio -->
+        <rect x="78" y="100" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="130" y="115" text-anchor="middle">Confirmado</text>
+        <rect x="192" y="100" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="244" y="115" text-anchor="middle">Listo</text>
+        <rect x="306" y="100" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="358" y="115" text-anchor="middle">Recibido</text>
+        <rect x="420" y="100" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="472" y="115" text-anchor="middle">En almacenaje</text>
+        <rect x="534" y="100" width="104" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="586" y="115" text-anchor="middle" font-weight="600">Liberado</text>
+
+        <!-- lavado -->
+        <rect x="78" y="144" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="130" y="159" text-anchor="middle">Confirmado</text>
+        <rect x="192" y="144" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="244" y="159" text-anchor="middle">Recibido</text>
+        <rect x="306" y="144" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="358" y="159" text-anchor="middle">En lavado</text>
+        <rect x="420" y="144" width="104" height="22" rx="2" fill="none" stroke="#c9ced6"/><text x="472" y="159" text-anchor="middle">Control</text>
+        <rect x="534" y="144" width="104" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="586" y="159" text-anchor="middle" font-weight="600">Listo</text>
+
+        <text x="358" y="190" text-anchor="middle" font-size="10.5" font-style="italic" fill="#5b6470">Llegar al último paso es lo que habilita cerrar el servicio, y lo que abre el expediente de devolución.</text>
+      </g>
+    </svg>
+    <figcaption>
+      <b>El último paso de cada secuencia es una bisagra.</b> Hasta que el
+      seguimiento llega ahí, la empresa no puede subir su evidencia de cierre.
+      Y al llegar, si el pedido llevaba contenedor, se abre solo el expediente
+      de devolución de vacíos.
+    </figcaption>
+  </figure>
+
+  <h3>Los expedientes documentales</h3>
+  <p>Hay dos, y se comportan de forma distinta:</p>
+
+  <table>
+    <thead><tr><th>Expediente</th><th>Cómo se abre</th><th>Quién lo pide</th></tr></thead>
+    <tbody>
+      <tr><td>Ingreso a puerto</td><td>A mano, cuando la empresa lo necesita</td><td>Solo la empresa</td></tr>
+      <tr><td>Devolución de vacíos</td><td><b>Solo</b>, al terminar el seguimiento</td><td>El sistema, si hubo contenedor</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    Dentro de cada expediente hay una lista de documentos. El cliente los sube,
+    la empresa los acepta o los rechaza uno por uno, y ninguno de los dos puede
+    hacer el trabajo del otro. La lista se <b>copia</b> al crear el expediente,
+    no se consulta: cambiar el catálogo maestro no reescribe lo que un
+    expediente antiguo pidió en su momento.
+  </p>
+
+  <div class="box ask">
+    <div class="h">Punto a validar</div>
+    <p>
+      El cliente no puede pedir un expediente, solo responder al que le abran.
+      <b>¿Hay casos reales donde sea el cliente quien necesite exigir un
+      documento a la empresa</b> —una carta porte, un comprobante de entrega—
+      y hoy no tenga forma de hacerlo dentro de la plataforma?
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 4. ESTADOS ══════════════════════════ -->
+<div class="sec">
+  <h2><span class="num">5</span>Los estados</h2>
+
+  <p>
+    Tres máquinas gobiernan el ciclo. Los estados que siguen son los únicos que
+    la base admite: cualquier otro se rechaza al escribirlo.
+  </p>
+
+  <h3>La solicitud</h3>
+
+  <figure>
+    <svg viewBox="0 0 700 250" role="img" aria-label="Máquina de estados del pedido, con el desvío a pendiente de acuerdo cuando la empresa tiene documentos vencidos">
+      <defs>
+        <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="Consolas, monospace" font-size="10.5">
+        <rect x="12" y="60" width="116" height="30" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        <text x="70" y="79" text-anchor="middle">pendiente_revision</text>
+
+        <rect x="164" y="60" width="90" height="30" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        <text x="209" y="79" text-anchor="middle">abierto</text>
+
+        <rect x="290" y="60" width="120" height="30" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        <text x="350" y="79" text-anchor="middle">en_negociacion</text>
+
+        <rect x="446" y="60" width="90" height="30" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <text x="491" y="79" text-anchor="middle" font-weight="600">acordado</text>
+
+        <rect x="572" y="60" width="96" height="30" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        <text x="620" y="79" text-anchor="middle">finalizado</text>
+
+        <!-- desvio -->
+        <rect x="410" y="150" width="150" height="30" rx="3" fill="none" stroke="#9c4a0a" stroke-width="1.5"/>
+        <text x="485" y="169" text-anchor="middle" fill="#9c4a0a">pendiente_acuerdo</text>
+
+        <!-- flechas principales -->
+        <line x1="132" y1="75" x2="160" y2="75" stroke="currentColor" stroke-width="1.3" marker-end="url(#a4)"/>
+        <line x1="258" y1="75" x2="286" y2="75" stroke="currentColor" stroke-width="1.3" marker-end="url(#a4)"/>
+        <line x1="414" y1="75" x2="442" y2="75" stroke="currentColor" stroke-width="1.3" marker-end="url(#a4)"/>
+        <line x1="540" y1="75" x2="568" y2="75" stroke="currentColor" stroke-width="1.3" marker-end="url(#a4)"/>
+
+        <g font-family="Segoe UI, Arial" font-size="9.5" fill="#5b6470">
+          <text x="146" y="52" text-anchor="middle">SA publica</text>
+          <text x="272" y="52" text-anchor="middle">1ª oferta</text>
+          <text x="428" y="52" text-anchor="middle">ambos</text>
+          <text x="428" y="42" text-anchor="middle">aceptan</text>
+          <text x="554" y="52" text-anchor="middle">cierre</text>
+          <text x="554" y="42" text-anchor="middle">aprobado</text>
+        </g>
+
+        <!-- desvio: baja por la derecha del bloque -->
+        <path d="M382,94 L382,165 L406,165" fill="none" stroke="#9c4a0a" stroke-width="1.4" marker-end="url(#a4)" color="#9c4a0a"/>
+        <text x="390" y="143" font-family="Segoe UI, Arial" font-size="9.5" fill="#9c4a0a">documentos vencidos</text>
+
+        <!-- retorno del superadmin: sale del borde de la caja, no de su interior -->
+        <path d="M560,165 L592,165 L592,106 L497,106 L497,94" fill="none" stroke="#9c4a0a" stroke-width="1.4" marker-end="url(#a4)" color="#9c4a0a"/>
+        <text x="600" y="140" font-family="Segoe UI, Arial" font-size="9.5" fill="#9c4a0a">SA fuerza</text>
+
+        <!-- reapertura: baja por la izquierda, sin cruzarse con el desvio -->
+        <path d="M318,94 L318,118 L209,118 L209,94" fill="none" stroke="currentColor" stroke-width="1.1" stroke-dasharray="4 3" marker-end="url(#a4)"/>
+        <text x="263" y="132" text-anchor="middle" font-family="Segoe UI, Arial" font-size="9.5" fill="#5b6470">sin ofertas vivas</text>
+
+        <text x="350" y="218" text-anchor="middle" font-family="Segoe UI, Arial" font-size="10" fill="#5b6470">Salidas laterales en cualquier momento: cancelado · rechazado · expirado</text>
+        <text x="350" y="236" text-anchor="middle" font-family="Segoe UI, Arial" font-size="10" font-style="italic" fill="#5b6470">Expira si llega la fecha de carga sin ofertas vivas, o si vence un acuerdo sin completarse.</text>
+      </g>
+    </svg>
+    <figcaption>
+      <b><code>pendiente_acuerdo</code> es un desvío, no un paso.</b> Solo se
+      entra cuando la empresa que ganó tiene documentos vencidos, y solo el
+      superadmin saca de ahí. La flecha discontinua es la vuelta al mercado:
+      ocurre cuando caducan o se rechazan todas las ofertas, y también al
+      cancelarse un acuerdo ya cerrado.
+    </figcaption>
+  </figure>
+
+  <h3>La reservación</h3>
+  <table>
+    <thead><tr><th style="width:26%">Estado</th><th>Qué significa</th></tr></thead>
+    <tbody>
+      <tr><td><code>Activa</code></td><td>El servicio está en curso. Nace aquí al cerrarse el acuerdo</td></tr>
+      <tr><td><code>PorAprobar</code></td><td>Al menos una parte subió evidencia; espera al superadmin</td></tr>
+      <tr><td><code>CancelacionSolicitada</code></td><td>El cliente pidió cancelar; espera al superadmin</td></tr>
+      <tr><td><code>Completada</code></td><td>Cerrada y aprobada</td></tr>
+      <tr><td><code>Cancelada</code></td><td>Se liberó el recurso y el pedido volvió al mercado</td></tr>
+    </tbody>
+  </table>
+
+  <div class="box gate">
+    <div class="h">No se puede reservar dos veces la misma unidad</div>
+    <p>
+      Lo impide la propia base de datos, comparando rangos de fechas: dos
+      reservas vivas no pueden solaparse sobre el mismo recurso. No depende de
+      que nadie se acuerde de comprobarlo, ni de que la pantalla lo valide.
+    </p>
+  </div>
+
+  <div class="box ask">
+    <div class="h">Punto a validar</div>
+    <p>
+      Una unidad se marca como ocupada solo si el viaje empieza hoy o antes.
+      Si empieza la semana que viene, sigue figurando como disponible —y
+      <b>nada la marca ocupada cuando esa fecha llega</b>. La doble reserva
+      está impedida igualmente, así que no hay riesgo de vender dos veces; pero
+      el catálogo muestra como libre un camión que está en ruta.
+      <b>¿Importa esa diferencia para quien consulta disponibilidad?</b>
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 5. CONTROLES ══════════════════════════ -->
+<div class="sec">
+  <h2><span class="num">6</span>Los controles</h2>
+
+  <p>
+    Ocho reglas del servidor vigilan las transiciones. No son validaciones de
+    formulario: se aplican siempre, venga la petición de donde venga, y si una
+    se incumple la operación entera se deshace.
+  </p>
+
+  <table>
+    <thead><tr><th style="width:30%">Vigila</th><th>Qué impide</th></tr></thead>
+    <tbody>
+      <tr><td>Solicitudes</td><td>Que el cliente dé por cerrado su pedido, o que la empresa lo toque fuera de la fase de negociación</td></tr>
+      <tr><td>Ofertas</td><td>Cerrar trato con documentos vencidos; aceptar la propia oferta salvo respondiendo una contraoferta</td></tr>
+      <tr><td>Reservas (alta)</td><td>Que el cliente se cree una reserva confirmada con el precio que él decida</td></tr>
+      <tr><td>Reservas (cambios)</td><td>Que el cliente toque precio, unidad o fechas; que cualquiera apruebe su propio cierre o resuelva su propia cancelación</td></tr>
+      <tr><td>Flota y operadores</td><td>Auto-aprobarse un recurso; traspasarlo a otro propietario</td></tr>
+      <tr><td>Perfiles</td><td>Cambiarse a uno mismo el rol, el estado de la cuenta o la verificación</td></tr>
+      <tr><td>Documentos del expediente</td><td>Que la empresa suba lo que sube el cliente, o el cliente revise lo que revisa la empresa</td></tr>
+      <tr><td>Carga peligrosa</td><td>Asignar un chofer sin licencia de materiales peligrosos vigente</td></tr>
+    </tbody>
+  </table>
+
+  <h3>La vigilancia de vencimientos</h3>
+  <p>
+    La plataforma vigila cuatro fechas por operador —licencia, examen médico,
+    examen toxicológico y carta de antecedentes— y tres por empresa —permiso de
+    transporte y los dos seguros—, y avisa conforme se acercan.
+  </p>
+
+  <div class="box money">
+    <div class="h">Un documento sin fecha no se vigila nunca</div>
+    <p>
+      La comparación solo alcanza a los registros que tienen fecha. Si alguien
+      carga el papel pero deja la fecha en blanco, ese documento <b>no entra
+      jamás en la revisión</b>: el archivo está, el panel dice que todo está en
+      orden, y nadie comprueba si sigue vigente.
+    </p>
+    <p>
+      Por eso el alta de operador exige ahora las cuatro fechas junto con sus
+      documentos. <b>Conviene revisar si quedan registros antiguos sin fecha</b>,
+      porque esos siguen invisibles para el control.
+    </p>
+  </div>
+
+  <h3>Cancelación: dos caminos que no conviene confundir</h3>
+
+  <figure>
+    <svg viewBox="0 0 700 190" role="img" aria-label="La empresa cancela directamente; el cliente solo puede solicitar la cancelación y la resuelve el superadmin">
+      <defs>
+        <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="Segoe UI, Arial" font-size="11">
+        <!-- empresa -->
+        <rect x="20" y="22" width="140" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        <text x="90" y="44" text-anchor="middle">EMPRESA cancela</text>
+        <line x1="164" y1="39" x2="410" y2="39" stroke="currentColor" stroke-width="1.3" marker-end="url(#a5)"/>
+        <rect x="414" y="22" width="266" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        <text x="547" y="44" text-anchor="middle">Libera el recurso y reabre el pedido</text>
+        <text x="287" y="32" text-anchor="middle" font-size="10" fill="#5b6470">directo, sin intermediarios</text>
+
+        <!-- cliente -->
+        <rect x="20" y="104" width="140" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        <text x="90" y="126" text-anchor="middle">CLIENTE solicita</text>
+        <line x1="164" y1="121" x2="256" y2="121" stroke="currentColor" stroke-width="1.3" marker-end="url(#a5)"/>
+        <rect x="260" y="104" width="150" height="34" rx="3" fill="none" stroke="#9c4a0a" stroke-width="1.5"/>
+        <text x="335" y="126" text-anchor="middle" fill="#9c4a0a">SUPERADMIN resuelve</text>
+        <line x1="414" y1="121" x2="506" y2="121" stroke="#9c4a0a" stroke-width="1.3" marker-end="url(#a5)" color="#9c4a0a"/>
+        <rect x="510" y="104" width="170" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        <text x="595" y="126" text-anchor="middle">Acepta o rechaza</text>
+
+        <!-- congelado -->
+        <path d="M90,142 L90,166 L680,166" fill="none" stroke="#96211d" stroke-width="1.2" stroke-dasharray="4 3"/>
+        <text x="385" y="182" text-anchor="middle" font-size="10.5" fill="#96211d">Al solicitar, se congela el punto exacto del viaje: eso decide quién paga qué.</text>
+      </g>
+    </svg>
+    <figcaption>
+      <b>El cliente pide; no cancela.</b> Y al pedirlo, el sistema guarda en qué
+      paso del viaje iba la operación en ese instante, para que la empresa no
+      pueda seguir avanzando el seguimiento y cambiar el escenario.
+    </figcaption>
+  </figure>
+
+  <p>
+    Cancelar un acuerdo ya cerrado invalida las ofertas y marca a quien canceló
+    como no apto para volver a ofertar sobre esa misma solicitud.
+  </p>
+
+  <div class="box ask">
+    <div class="h">Punto a validar</div>
+    <p>
+      La empresa cancela sin pedir permiso a nadie, y el cliente no. <b>¿Es esa
+      la asimetría que se quiere?</b> Hoy no hay penalización automática ni
+      registro de motivo obligatorio para la empresa que cancela un servicio ya
+      comprometido.
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 6. DINERO ══════════════════════════ -->
+<div class="sec">
+  <h2><span class="num">7</span>Dónde está el dinero</h2>
+
+  <h3>El precio y el plazo</h3>
+  <p>
+    El precio es el de la oferta aceptada y queda congelado en la reserva. El
+    plazo de pago se copia desde la solicitud en ese mismo momento: <b>si el
+    cliente cambia después sus condiciones de pago, el servicio ya pactado
+    conserva las suyas.</b>
+  </p>
+  <p>
+    El estado de cobro —pendiente, por vencer, vencido, pagado— no se guarda: se
+    calcula cada vez a partir de si está pagado y de su fecha de vencimiento.
+    Esa decisión evita el problema clásico de un proceso nocturno que falla y
+    deja media cartera mal etiquetada.
+  </p>
+
+  <h3>Las demoras</h3>
+  <p>
+    Cuando un pedido lleva contenedor, al terminar el viaje se abre solo el
+    expediente de devolución de vacíos, con un depósito y una fecha límite. A
+    partir de esa fecha corren demoras por día.
+  </p>
+
+  <div class="box money">
+    <div class="h">La plataforma avisa de las demoras, pero no las cuantifica ni las cobra</div>
+    <p>
+      El sistema calcula los días que faltan, muestra el último día sin demoras
+      y marca en rojo cuando se pasa. Ahí se detiene: <b>no hay tarifa por día,
+      no calcula importe, y las demoras no entran en el cobro del servicio.</b>
+    </p>
+    <p>
+      Es la diferencia entre avisar y gestionar. La lista de documentos del
+      expediente incluye el comprobante de pago de demoras <i>si las hay</i>, lo
+      que confirma que el cobro ocurre fuera de la plataforma.
+    </p>
+  </div>
+
+  <div class="box ask">
+    <div class="h">Punto a validar — probablemente el más importante</div>
+    <p>
+      Las demoras son, en muchas operaciones portuarias, la partida que decide
+      si un viaje fue rentable. Hoy la plataforma conoce la fecha límite, conoce
+      el día de devolución y sabe a quién reclamar, pero <b>no convierte nada de
+      eso en un importe</b>.
+    </p>
+    <p>
+      ¿Debería? Y si debe: ¿la tarifa la pone la naviera, la empresa, o se pacta
+      por servicio? De esa respuesta depende si esto es un campo más o un módulo
+      entero.
+    </p>
+  </div>
+
+  <h3>Cómo se comunican las partes</h3>
+  <p>
+    <b>No hay chat.</b> El texto libre entre cliente y empresa se retiró a
+    propósito y se sustituyó por avisos de forma fija: documentos de carga,
+    confirmación de lugar y hora, aviso de retraso y reporte de cambio.
+  </p>
+  <p>
+    No es una limitación técnica sino una decisión: un aviso con forma fija
+    queda registrado, es auditable, y no se presta a acordar por fuera cosas que
+    después nadie puede demostrar. Cada usuario puede silenciar correos por
+    tipo, pero nunca los avisos dentro de la plataforma ni los correos
+    transaccionales.
+  </p>
+
+  <div class="box ask">
+    <div class="h">Punto a validar</div>
+    <p>
+      Cuatro tipos de aviso cubren lo previsible. <b>¿Qué pasa cuando surge algo
+      que no encaja en ninguno</b> —una incidencia en carretera, un cambio de
+      contacto en destino, una negociación de última hora? Hoy esa conversación
+      se va al teléfono, y con ella el rastro.
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 7. OPORTUNIDADES ══════════════════════════ -->
+<div class="sec">
+  <h2><span class="num">8</span>Áreas de oportunidad</h2>
+
+  <p>
+    Lo que sigue está verificado contra el sistema. No son fallos abiertos ni
+    incidencias pendientes: son <b>decisiones que el sistema ya tomó</b>, o
+    huecos conocidos que se dejaron así conscientemente. Se listan para que
+    quien conoce la operación juzgue si siguen siendo la elección correcta.
+  </p>
+
+  <table>
+    <thead><tr><th style="width:30%">Qué ocurre hoy</th><th style="width:42%">Consecuencia operativa</th><th>A decidir</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>Las demoras se avisan pero no se cobran</b></td>
+        <td>La partida que más pesa en la rentabilidad queda fuera de la plataforma</td>
+        <td>¿Se incorpora tarifa e importe?</td>
+      </tr>
+      <tr>
+        <td><b>Una unidad no se marca ocupada al llegar su fecha</b></td>
+        <td>El catálogo muestra libre un camión que está en ruta. No hay riesgo de doble reserva</td>
+        <td>¿Molesta a quien consulta disponibilidad?</td>
+      </tr>
+      <tr>
+        <td><b>No se puede consultar la ficha de una unidad</b></td>
+        <td>El catálogo lista empresas, no vehículos. Las pantallas de unidad existen pero ya no son accesibles</td>
+        <td>¿Hace falta buscar por unidad?</td>
+      </tr>
+      <tr>
+        <td><b>La negociación tiene tope de dos rondas</b></td>
+        <td>Una tercera vuelta obliga a publicar otra solicitud y se pierde el hilo</td>
+        <td>¿Dos son suficientes?</td>
+      </tr>
+      <tr>
+        <td><b>Un documento sin fecha nunca se vigila</b></td>
+        <td>Puede haber registros antiguos fuera de control sin que nadie lo note</td>
+        <td>¿Se auditan los existentes?</td>
+      </tr>
+      <tr>
+        <td><b>El cliente no puede pedir documentos</b></td>
+        <td>Solo responde a lo que le pidan; no tiene forma de exigir a la empresa</td>
+        <td>¿Hay casos donde haga falta?</td>
+      </tr>
+      <tr>
+        <td><b>La empresa cancela sin autorización</b></td>
+        <td>El cliente solo puede solicitarlo; la empresa lo hace directo, sin motivo obligatorio ni penalización</td>
+        <td>¿Es la asimetría deseada?</td>
+      </tr>
+      <tr>
+        <td><b>Sin conversación libre</b></td>
+        <td>Lo imprevisto se va al teléfono y sale del registro</td>
+        <td>¿Bastan cuatro avisos fijos?</td>
+      </tr>
+      <tr>
+        <td><b>El chofer no es usuario</b></td>
+        <td>Es un dato de la empresa; no consulta ni actualiza nada desde la plataforma</td>
+        <td>¿Debería ver su viaje?</td>
+      </tr>
+      <tr>
+        <td><b>Al aprobar una cuenta solo se copian cuatro datos</b></td>
+        <td>Años de operación, flota, permiso y seguros los debe cargar la empresa; su ficha nace incompleta</td>
+        <td>¿Se piden al registrarse?</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Dos apuntes técnicos con consecuencia de negocio</h3>
+
+  <p>
+    <b>Los estados avanzan por dos vías a la vez.</b> Desde el 11 de septiembre
+    de 2026 un proceso automático revisa cada quince minutos qué solicitudes
+    expiraron y cuáles deben reabrirse. Antes eso solo ocurría cuando alguien
+    abría la pantalla de solicitudes en su navegador —es decir, podía no
+    ocurrir en todo un fin de semana. Las dos vías conviven a propósito: hacen
+    lo mismo y pueden repetirse sin daño, de modo que un fallo de una no
+    congela los estados.
+  </p>
+
+  <p>
+    <b>Parte del cierre de operaciones se coordina desde el navegador.</b> Los
+    procesos críticos —cerrar el acuerdo, cancelar, registrar evidencias,
+    avanzar el seguimiento— ya se ejecutan en el servidor de una sola vez, y por
+    tanto no pueden quedar a medias. Quedan algunos caminos de la negociación
+    que aún se encadenan desde el navegador paso a paso; si la pestaña se cierra
+    en mitad, puede quedar un estado inconsistente. <b>Está identificado y
+    acotado</b>, pero conviene saberlo al interpretar una incidencia rara.
+  </p>
+
+  <div class="box ask">
+    <div class="h">Qué se agradecería de esta revisión</div>
+    <p>
+      Más que confirmar que el flujo es correcto, interesa saber <b>dónde se
+      aparta de la operación real</b>: qué paso sobra, cuál falta, en qué punto
+      la gente acabaría saltándose la plataforma porque le resulta más rápido
+      resolverlo por teléfono. Ese es el punto por donde un sistema así se
+      abandona.
+    </p>
+  </div>
+</div>
