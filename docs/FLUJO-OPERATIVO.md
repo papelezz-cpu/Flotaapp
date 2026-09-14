@@ -552,6 +552,42 @@ escribir una fila; los guards deciden *qué transición* es legal para ti.
 | `guard_expediente_documento` | expediente_documentos | Que cada parte haga el trabajo de la otra: **solo el cliente sube**, **solo el transportista revisa** |
 | `guard_operador_hazmat` | ofertas, reservaciones | Asignar a carga peligrosa un chofer sin licencia vigente |
 
+### Una vista no tiene RLS detrás, y nace escribible
+
+`empresas_publico` es la ficha pública del transportista: una vista sobre
+`perfiles` con 15 columnas, que existe para que el Catálogo no lea `perfiles`
+entera. Corre con `security_invoker` en su valor por omisión (`false`) **a
+propósito**, porque así no aplica el RLS de `perfiles` — que solo deja ver la
+fila propia — y el catálogo puede enseñar las fichas ajenas.
+
+Eso está bien para leer. El problema es que **una vista simple sobre una sola
+tabla es auto-actualizable**: un `INSERT`/`UPDATE`/`DELETE` contra ella se
+traduce a la tabla base, y sin `security_invoker` tampoco pasa por el RLS.
+
+Y las vistas **nacen escribibles**. El esquema lleva puesto
+`ALTER DEFAULT PRIVILEGES … GRANT ALL ON TABLES TO authenticated`, y en
+PostgreSQL «TABLES» incluye las vistas. Por eso `empresas_publico` tenía
+`INSERT`, `UPDATE` y `DELETE` concedidos a `authenticated` desde que se creó:
+`20260831210000` hizo `revoke all … from anon, public` y luego
+`grant select … to authenticated`, pero el `REVOKE` nunca apuntó a
+`authenticated`, y un `GRANT SELECT` no retira lo que ya estaba dentro de
+`ALL`. Retirado el 2026-09-14 por `20260914130000_la_vista_no_se_escribe`.
+
+Mientras estuvo abierto, `guard_perfil_self_update` sí se disparaba y frenaba
+el rol, `aprobacion_cuenta` y los campos de verificación. No frenaba el resto —
+incluidas las tres `fecha_vencimiento_*` que lee `guard_oferta_update` para
+decidir si una empresa puede cerrar un trato. Y el `DELETE` no lo frenaba nada:
+**`perfiles` no tiene ninguna política `FOR DELETE`**, así que la vista era el
+único camino de borrado que existía para `authenticated`.
+
+**Consecuencia para quien cree la próxima vista:** los privilegios por omisión
+no se han tocado —cambiarlos alcanzaría también a las tablas futuras, que sí
+necesitan esos permisos porque ahí RLS es la frontera—, así que **toda vista
+nueva en `public` sigue naciendo escribible**. Crear la vista y poner
+`grant select` **no basta**: hay que retirar la escritura explícitamente. El
+bloque 2 de esa migración es idempotente y sirve de red: volver a ejecutarlo
+después de crear una vista la deja limpia.
+
 ### El rol solo se cambia por `cambiar_rol()`
 
 `guard_perfil_self_update` se dispara en **toda** actualización de `perfiles`, y
