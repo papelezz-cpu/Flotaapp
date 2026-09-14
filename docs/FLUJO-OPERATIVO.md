@@ -612,6 +612,28 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
    `cambiarTipoRecurso()`. **No hay forma de abrir una unidad por su ficha
    desde la app**; el Catálogo muestra empresas, no unidades. Las funciones
    se conservan porque `modal.js` aún invoca `filtrarRecursos()` al reservar.
+
+   **Y eso arrastra más de lo que parece** — verificado el 2026-09-14, al
+   intentar probarlo a mano:
+
+   - El modal **«Agendar unidad»** (`#modal-reserva`) solo lo abren
+     `openReserva()` y `openReservaRecurso()`, y sus únicos botones se pintan
+     dentro de esa rejilla oculta (`js/camiones.js:152`, `js/recursos.js:91`
+     y `:169`). **El modal existe y no se puede abrir.**
+   - `js/modal.js:97` es lo **único** en todo el sistema que crea una
+     reservación en `Pendiente`. Ningún INSERT de SQL la produce, y
+     `cerrar_acuerdo` las crea directamente en `Activa`.
+   - Por tanto **`Pendiente` es un estado inalcanzable hoy**, y con él muere
+     la rama `esDueno && esPendiente` de `js/reservaciones.js:428` — los
+     botones **«✓ Aceptar»** y **«✕ Rechazar»** de una reserva.
+   - Y con ella, cuatro tipos de correo que ya no puede disparar nadie:
+     `solicitud_recibida`, `nueva_reserva`, `reserva_aceptada` y
+     `reserva_rechazada`.
+
+   Nada de esto está roto: es la consecuencia de que el negocio pasara a girar
+   sobre el pedido y la oferta en vez de sobre la reserva directa. Se documenta
+   para que nadie vuelva a perder una tarde buscando el botón «Agendar», y para
+   que quien decida retirar código muerto sepa de qué tamaño es el bloque.
 7. **De las 11 RPC transaccionales, 6 se usan.** En uso:
    `cancelar_reservacion`, `solicitar_cancelacion`, `registrar_evidencias`,
    `avanzar_tracking`, `abrir_expediente` y `calificar_servicio`. Sin usar:
