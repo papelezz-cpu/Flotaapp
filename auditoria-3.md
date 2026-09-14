@@ -25,71 +25,121 @@ Todo lo estructural está leído de **`supabase/espejo/`, el volcado de producci
 
 ---
 
-# 0. Estado de resolución — 2026-09-11, misma tarde
+# 0. Estado de resolución y pruebas — cerrado el 2026-09-14
 
-Los diez hallazgos se corrigieron y se aplicaron a `portgo-pruebas` el mismo día
-de la auditoría. **Nada de esto ha llegado a producción**, y nada se ha probado
-a mano todavía.
+Los once hallazgos se corrigieron el mismo día de la auditoría y se aplicaron a
+`portgo-pruebas`. Entre el 11 y el 14 de septiembre se verificaron a mano, y esa
+verificación **encontró tres cosas que la auditoría no había visto**.
 
-| # | Hallazgo | Cómo se cerró | Dónde está |
+> **Dónde se midió esto.** Todo lo de abajo se probó en `portgo-pruebas`, cuyo
+> último sello de paridad es del **2026-09-08, veredicto `identicas`**. Desde
+> entonces pruebas lleva **seis migraciones que producción no tiene**, así que
+> **no es hoy una copia de producción**. Lo que las pruebas demuestran es que
+> los arreglos funcionan en pruebas — que es el requisito para pedir permiso de
+> promoción, no la prueba de que producción se comportará igual.
+
+## Los once, y cómo quedaron
+
+| # | Hallazgo | Cómo se cerró | Verificado |
 |---|---|---|---|
-| C1 | Relay de correo | Destinatarios separados por procedencia; los que vienen en la petición pasan por `puede_notificar()`, llamada con la identidad de quien llama | Función desplegada en pruebas |
-| C2 | Dos reservaciones | `FOR UPDATE` sobre el pedido en las dos funciones + índice único parcial | Migración aplicada |
-| A1 | Escrituras mudas | `actualizarConfirmado()` en las tres transiciones que dejan estado colgando (adopción 7 → 14) | En `dev` |
-| A2 | Precacheo inútil | `ignoreSearch` en el respaldo + los tres ficheros que faltaban en `SHELL` | En `dev` |
-| A3 | CDN sin fijar | Las tres etiquetas con `integrity`; Supabase fijado a 2.116.0 | En `dev` |
-| A4 | Éxito falso | Resultado comprobado en las tres acciones, `rol` validado, último superadmin protegido | Función desplegada en pruebas |
-| A5 | Privilegio por defecto | **No se puede aplicar**: exige ser miembro de `supabase_admin`, y ni el rol de migraciones ni el SQL Editor lo son (`ERROR 42501`, comprobado). Se sustituye por detección: `supabase/sondas/exposicion-anon.sql` | Sonda en `dev` |
-| A6 | TRUNCATE | Retirado de las 25 relaciones, preguntando al catálogo en vez de enumerar | Migración aplicada |
-| M7 | Políticas sin `TO` | `ALTER POLICY … TO authenticated` ×33 | Migración aplicada |
-| M8 | RPC del flujo viejo | Su rama `aceptar` delega en `aceptar_y_cerrar_acuerdo` | Migración aplicada |
-| M4 | Sin libro mayor | `aplicadas.tsv` + `estado-migraciones.sh`, escritos por los guiones que ya aplican | En `dev` |
+| C1 | Relay de correo | Destinatarios separados por procedencia; los de la petición pasan por `puede_notificar()`, con la identidad de quien llama | ✅ a mano |
+| C2 | Dos reservaciones | `FOR UPDATE` sobre el pedido + índice único parcial | ✅ a mano |
+| A1 | Escrituras mudas | `actualizarConfirmado()` en las tres transiciones que dejan estado colgando (7 → 14) | ✅ a mano |
+| A2 | Precacheo inútil | `ignoreSearch` en el respaldo + los tres ficheros que faltaban | ✅ a mano |
+| A3 | CDN sin fijar | Las tres etiquetas con `integrity`; Supabase fijado a 2.116.0 | ✅ a mano |
+| A4 | Éxito falso | Resultado comprobado en las tres acciones, `rol` validado, último superadmin protegido | ✅ a mano |
+| A5 | Privilegio por defecto | **No se puede aplicar** — ver abajo | ⚠️ vigilado |
+| A6 | TRUNCATE | Retirado de las 25 relaciones, preguntando al catálogo | ✅ por SQL |
+| M7 | Políticas sin `TO` | `ALTER POLICY … TO authenticated` ×33 | ✅ por SQL |
+| M8 | RPC del flujo viejo | Su rama `aceptar` delega en `aceptar_y_cerrar_acuerdo` | ✅ por SQL |
+| M4 | Sin libro mayor | `aplicadas.tsv` + `estado-migraciones.sh` | ✅ en uso |
 
-**La nota no se mueve.** Sigue siendo 61/100 porque mide lo que la auditoría
-encontró, y lo corregido vive en pruebas, sin verificación manual y sin llegar a
-producción. Moverla ahora sería afirmar como hecho lo que todavía es una
-expectativa — que es justo lo que esta auditoría reprocha en otros sitios.
+## Los tres hallazgos que solo aparecieron al ejecutar
 
-## Lo que apareció al arreglar, y la auditoría no había visto
+### N1 — Cambiar el rol de un usuario no había funcionado nunca
 
-Tres cosas que solo salieron al tocar el código:
+El más serio, y **existe en producción hoy**.
 
-1. **A3 estaba peor de lo documentado.** La ruta sin fijar servía en ese momento
-   **2.116.0**, mientras las Edge Functions fijan 2.112.3 con un comentario
-   explicando por qué hay que fijarlas. El navegador llevaba tiempo corriendo
-   una versión que nadie verificó. Se fijó a 2.116.0 —lo que ya corría— y no a
-   2.112.3: congelar lo que hay, sin cambiar de versión de paso.
+`trg_guard_perfil_self_update` se dispara en **toda** actualización de
+`perfiles`, no solo cuando alguien edita su propia fila, y su única salida era
+`is_superadmin()`, que lee `auth.uid()`. La Edge Function escribe con la clave
+de servicio, donde `auth.uid()` es NULL — así que el guard trataba al superadmin
+que edita a otro como si fuera un usuario intentando ascenderse, y lo rechazaba.
 
-2. **M8 tapaba algo más grave de lo que decía el hallazgo.** Al delegar, esas
-   dos RPC heredan comprobaciones que no tenían. La que importa: **por esa vía,
-   una empresa con el permiso SCT o los seguros vencidos cerraba el trato sin
-   que nadie lo mirara**, porque el desvío `DOCUMENTOS_VENCIDOS` solo existe en
-   `aceptar_y_cerrar_acuerdo`. Eso es un agujero de negocio, no de coherencia
-   entre clientes, y la auditoría no lo vio.
+**No se había visto porque el error se tragaba.** `gestionar-usuario` no
+comprobaba el resultado del UPDATE y devolvía `ok:true` igual: la pantalla decía
+«Usuario actualizado» y el rol seguía como estaba. Lo destapó el arreglo de A4,
+que puso la comprobación. **A4 no lo causó: lo hizo audible.**
 
-3. **El arreglo de C1, tal como se escribió primero, rompía un caso legítimo.**
-   El campo de correo al reservar viene relleno con el de la cuenta pero es
-   editable, y una empresa que usa su buzón de operaciones se habría quedado sin
-   confirmación, en silencio. Se corrigió apoyando la regla en la fila: la
-   dirección pasa si figura como contacto de una reserva de la que quien llama
-   es parte, y el propio RLS decide ese «es parte».
+Arreglado con `cambiar_rol()`, concedida solo a `service_role`, siguiendo el
+patrón de marca transaccional que el proyecto ya usa en `portgo.sync` y
+`portgo.cierre_acuerdo`. Se descartó abrir el guard a la clave de servicio: una
+línea, pero abre la pieza que decide qué transiciones son legales.
 
-## Lo que sigue abierto
+De paso se invirtió el orden de escritura en `editar` — primero el perfil,
+después las credenciales. Al revés, un rol rechazado dejaba el correo ya
+cambiado, que es exactamente lo que se observó al probarlo.
 
-- **A5 no se puede cerrar por la vía prevista.** Cambiar los privilegios por
-  defecto de `supabase_admin` exige ser miembro de ese rol, y en Supabase ni el
-  rol que aplica migraciones ni el SQL Editor lo son. Queda como riesgo
-  aceptado y **vigilado**: `supabase/sondas/exposicion-anon.sql` comprueba lo
-  que A5 pretendía evitar —una tabla legible por `anon`— y además el fallo más
-  probable, que A5 no cubría: que alguien cree una tabla y olvide activarle RLS.
-  Cerrarlo de verdad requiere soporte de Supabase.
-- **Las pruebas manuales**, que no se han hecho.
-- **Medir Realtime**, que sigue siendo la partida más grande y necesita la base
-  viva. El hallazgo dominante de la 2ª auditoría continúa sin confirmar ni
-  desmentir.
-- **La réplica de producción**, que no llegó a correr: el sello de paridad sigue
-  siendo el del 8 de septiembre y pruebas ya lleva cuatro migraciones que
-  producción no tiene.
+### N2 — `Pendiente` es un estado inalcanzable, y arrastra un bloque muerto
+
+El modal «Agendar unidad» existe y **no se puede abrir**: sus únicos botones se
+pintan dentro de `#truck-grid`, oculto con `display:none`. Y `js/modal.js:97` es
+lo **único** en todo el sistema que crea una reservación en `Pendiente`.
+
+Luego `Pendiente` no lo produce nadie, y con él mueren la rama
+`esDueno && esPendiente` —los botones «✓ Aceptar» y «✕ Rechazar» de una
+reserva— y **cuatro tipos de correo**: `solicitud_recibida`, `nueva_reserva`,
+`reserva_aceptada` y `reserva_rechazada`.
+
+No está roto: es consecuencia de que el negocio pasara a girar sobre el pedido y
+la oferta. Pero no estaba escrito, y hace perder tiempo a quien lo busque.
+Añadido al hueco conocido #6 del flujo operativo.
+
+### N3 — El documento que es fuente de verdad decía algo falso
+
+`FLUJO-OPERATIVO.md` §8 afirmaba «**ambas partes** → reserva `PorAprobar`».
+Manda `registrar_evidencias`, y dice lo contrario: **el primero que suba**,
+estando la reserva en `Activa`, la mueve. Y el superadmin **puede aprobar con
+una sola evidencia** — `aprobarFinalizacion()` nunca comprueba que estén las dos.
+
+El mismo error estaba en `CLAUDE.md`, en `reportes/flujo-plataforma.html` (tres
+sitios) y en el PDF que se genera de ahí. Los cuatro corregidos.
+
+Importa más que el dato: quien prueba el cierre a mano busca la reserva en el
+filtro `Activa` después de que la empresa cierre, y ya no está — se fue a
+`PorAprobar`. Creer al documento hacía perder el tiempo.
+
+## Lo que NO se pudo verificar, y por qué
+
+No son aprobados. Son huecos declarados:
+
+- **A5** no se puede aplicar: cambiar los privilegios por defecto de
+  `supabase_admin` exige ser miembro de ese rol, y ni el rol que aplica
+  migraciones ni el SQL Editor lo son (`ERROR 42501`). Queda como riesgo
+  aceptado y **vigilado** por `supabase/sondas/exposicion-anon.sql`, que además
+  cubre el fallo más probable que A5 no cubría: que alguien cree una tabla y
+  olvide activarle RLS. Cerrarlo de verdad requiere soporte de Supabase.
+- **La carrera de C2** no se reprodujo: exige dos aceptaciones realmente
+  simultáneas. Lo verificado es que el índice único existe y que la comprobación
+  de estado rechaza el segundo intento. El índice es la garantía real.
+- **El correo de contacto distinto al de la cuenta** (parte de C1) no es
+  alcanzable desde ninguna pantalla, por N2.
+- **La protección del último superadmin** no se probó: hay tres en el sistema, y
+  provocarla exige degradar cuentas reales del clon.
+- **Nada sobre rendimiento.** Realtime sigue sin medirse.
+
+## La nota no se mueve, y ahora por dos razones
+
+Sigue en **61/100**. Mide lo que la auditoría encontró en producción el
+2026-09-11, y **producción no ha cambiado**: ni una línea de código, ni una
+migración, ni una función. Todo vive en `dev` y en `portgo-pruebas`.
+
+Y hay una segunda razón, menos cómoda: **el 61 era generoso.** La auditoría no
+detectó N1, que es un fallo funcional vivo en producción. Una revisión apoyada
+en leer código y no en ejecutarlo dejó pasar una funcionalidad que nunca
+funcionó. Eso dice algo del método, no solo del sistema — y es la tercera vez
+que este proyecto lo comprueba.
+
 
 ---
 
