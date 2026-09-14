@@ -548,9 +548,35 @@ escribir una fila; los guards deciden *qué transición* es legal para ti.
 | `guard_reservacion_insert` | reservaciones | Que un cliente se cree una reserva ya confirmada y con precio puesto por él |
 | `guard_reservacion_update` | reservaciones | Que el cliente toque precio, unidad o fechas; que suba la evidencia de la empresa; que cualquiera de los dos apruebe su propio cierre o resuelva su propia cancelación — eso lo hace el superadmin |
 | `guard_fleet_resource_update` | flota | Auto-aprobarse un recurso; transferir la propiedad |
-| `guard_perfil_self_update` | perfiles | Cambiarse el rol, el estado de aprobación de la cuenta o los campos de verificación |
+| `guard_perfil_self_update` | perfiles | Cambiarse el rol, el estado de aprobación de la cuenta o los campos de verificación. **Se dispara en toda actualización de `perfiles`, no solo en la propia** — ver abajo |
 | `guard_expediente_documento` | expediente_documentos | Que cada parte haga el trabajo de la otra: **solo el cliente sube**, **solo el transportista revisa** |
 | `guard_operador_hazmat` | ofertas, reservaciones | Asignar a carga peligrosa un chofer sin licencia vigente |
+
+### El rol solo se cambia por `cambiar_rol()`
+
+`guard_perfil_self_update` se dispara en **toda** actualización de `perfiles`, y
+su única salida era `is_superadmin()`, que lee `auth.uid()`. La Edge Function
+`gestionar-usuario` escribe con la **clave de servicio**, donde `auth.uid()` es
+NULL — así que el guard trataba al superadmin que edita a otro como si fuera un
+usuario intentando ascenderse, y lo rechazaba con *«No autorizado: no puedes
+cambiar tu rol»*.
+
+**Cambiar el rol de un usuario no había funcionado nunca.** No se veía porque
+`gestionar-usuario` no comprobaba el resultado del UPDATE y devolvía `ok:true`
+igual: la pantalla decía «Usuario actualizado» y el rol seguía como estaba.
+Verificado a mano en pruebas el 2026-09-14.
+
+Desde entonces el rol se cambia por `cambiar_rol(p_user_id, p_rol)`, que
+enciende la marca `portgo.cambio_rol` —local a la transacción, como
+`portgo.sync` y `portgo.cierre_acuerdo`— y el guard la reconoce. Está concedida
+**solo a `service_role`**: un usuario con sesión no puede llamarla. La
+autorización sigue viviendo en la Edge Function, que verifica el JWT; lo que
+comprueba la función de base es lo que no depende de quién llame — que el rol
+sea válido y que no se quede la plataforma sin superadmin.
+
+**Orden de escritura en `editar`:** primero el perfil, después las credenciales.
+El perfil es el que puede ser rechazado, así que va delante; al revés, un rol
+rechazado dejaba el correo ya cambiado.
 
 **Todos leen `auth.uid()`**, así que siguen aplicando dentro de funciones
 `SECURITY DEFINER`. Una transición ilegal revierte la transacción entera.

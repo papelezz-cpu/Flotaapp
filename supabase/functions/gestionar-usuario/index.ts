@@ -122,29 +122,52 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // ── El perfil PRIMERO, las credenciales despues ──────────────────────
+      //
+      // Son dos sistemas distintos (postgres y auth) y no hay transaccion que
+      // los abarque, asi que uno puede fallar con el otro ya escrito. El orden
+      // decide que queda a medias cuando eso pasa.
+      //
+      // El perfil va delante porque es el que puede ser RECHAZADO: el rol lo
+      // vigila un guard y lo acota un CHECK. Si falla, no se ha tocado nada
+      // mas. Al reves —como estaba— un rol rechazado dejaba el correo ya
+      // cambiado, que es justo lo que se vio el 2026-09-14 en pruebas:
+      // "los datos de acceso se actualizaron, pero el perfil no".
+      //
+      // El cambio de rol NO va por el UPDATE normal: lo bloquea
+      // trg_guard_perfil_self_update, que se dispara en toda actualizacion de
+      // perfiles y cuya unica salida es is_superadmin() — falsa con la clave de
+      // servicio, porque auth.uid() es NULL. Va por cambiar_rol(), concedida
+      // solo a service_role. Ver 20260914120000.
+      if (rol) {
+        const { error: rolErr } = await sbAdmin.rpc('cambiar_rol', {
+          p_user_id: user_id, p_rol: rol,
+        })
+        if (rolErr) return json({ error: `No se pudo cambiar el rol: ${rolErr.message}` }, 400)
+      }
+
+      if (nombre) {
+        const { error: perfilErr } = await sbAdmin.from('perfiles')
+          .update({ nombre }).eq('user_id', user_id)
+        if (perfilErr) {
+          return json({
+            error: `No se pudo actualizar el nombre: ${perfilErr.message}`,
+            parcial: Boolean(rol),
+          }, 500)
+        }
+      }
+
       const authUpdate: Record<string, string> = {}
       if (email)    authUpdate.email    = email
       if (password) authUpdate.password = password
 
       if (Object.keys(authUpdate).length) {
         const { error: updateErr } = await sbAdmin.auth.admin.updateUserById(user_id, authUpdate)
-        if (updateErr) return json({ error: updateErr.message }, 400)
-      }
-
-      const perfilUpdate: Record<string, string> = {}
-      if (nombre) perfilUpdate.nombre = nombre
-      if (rol)    perfilUpdate.rol    = rol
-
-      if (Object.keys(perfilUpdate).length) {
-        // Sin comprobar esto, un rol rechazado por el CHECK devolvia ok:true y
-        // el superadmin veia el cambio aplicado en pantalla sin estarlo.
-        const { error: perfilErr } = await sbAdmin.from('perfiles')
-          .update(perfilUpdate).eq('user_id', user_id)
-        if (perfilErr) {
+        if (updateErr) {
           return json({
-            error: `Los datos de acceso se actualizaron, pero el perfil no: ${perfilErr.message}`,
-            parcial: Object.keys(authUpdate).length > 0,
-          }, 500)
+            error: `El perfil se actualizo, pero los datos de acceso no: ${updateErr.message}`,
+            parcial: Boolean(rol || nombre),
+          }, 400)
         }
       }
 
