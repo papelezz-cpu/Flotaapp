@@ -204,19 +204,17 @@ async function _loadArcoBadge() {
 async function _loadAprBadge() {
   const badge = document.getElementById('home-apr-badge');
   if (!badge) return;
-  const counts = await Promise.all([
-    sb.from('camiones'  ).select('id',{count:'exact',head:true}).eq('aprobacion','pendiente'),
-    sb.from('operadores').select('id',{count:'exact',head:true}).eq('aprobacion','pendiente'),
-    sb.from('custodios' ).select('id',{count:'exact',head:true}).eq('aprobacion','pendiente'),
-    sb.from('patios'    ).select('id',{count:'exact',head:true}).eq('aprobacion','pendiente'),
-    sb.from('lavados'   ).select('id',{count:'exact',head:true}).eq('aprobacion','pendiente'),
-    sb.from('pedidos'   ).select('id',{count:'exact',head:true}).eq('estado','pendiente_revision'),
-    sb.from('pedidos'   ).select('id',{count:'exact',head:true}).eq('estado','pendiente_acuerdo'),
-    sb.from('perfiles'  ).select('user_id',{count:'exact',head:true}).eq('aprobacion_cuenta','pendiente'),
-    sb.from('perfiles'  ).select('user_id',{count:'exact',head:true}).eq('perfil_docs_pendiente',true),
-    sb.from('reservaciones').select('id',{count:'exact',head:true}).eq('estado','CancelacionSolicitada'),
-  ]);
-  const total = counts.reduce((s,r) => s + (r.count||0), 0);
+  // Una sola ida y vuelta. Antes eran DIEZ COUNT en paralelo, sumados aquí:
+  // diez peticiones, diez evaluaciones de RLS y diez llamadas a is_superadmin()
+  // para producir un número — y esto se dispara con cada notificación propia
+  // del superadmin, que es quien más recibe (404 de 866 en producción, entre
+  // los tres). Ver H-09 y la migración 20260915140000.
+  //
+  // La función devuelve el desglose además del total; hoy solo se usa el total,
+  // pero está ahí para que el panel no tenga que volver a preguntar.
+  const { data: cola, error } = await sb.rpc('cola_superadmin');
+  if (error) { badge.style.display = 'none'; return; }
+  const total = cola?.total || 0;
   if (total > 0) {
     badge.textContent = total > 99 ? '99+' : total;
     badge.style.display = 'inline-block';
