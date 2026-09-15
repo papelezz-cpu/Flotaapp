@@ -61,6 +61,12 @@ Reservaciones · Mis pagos · Privacidad · Avisos.
 - Publicar solicitudes, siempre suyas y siempre en `pendiente_revision`
   (`ped_insert_own`), con fecha de carga de mañana en adelante.
 - Guardar solicitudes frecuentes como plantillas — sin las fechas, a propósito.
+  Desde el 2026-09-15 los valores viven en `plantillas_pedido.datos` (jsonb), no
+  en 49 columnas que copiaban el esquema de `pedidos`: **añadir un campo al
+  formulario ya no necesita migración**. Es el único sitio del esquema donde
+  `jsonb` está justificado — esos valores no se filtran, no se agregan y no se
+  unen con nada, solo se recuperan enteros para rellenar el formulario. Las 49
+  columnas siguen en la tabla, sin que nadie las escriba, como red para revertir.
 - Ver el Catálogo de empresas y la ficha pública de cada una.
 - Aceptar una oferta, o **contraofertar** un precio menor (máximo 2 rondas).
 - Subir los documentos que le pida un expediente de viaje.

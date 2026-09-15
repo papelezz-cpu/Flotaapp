@@ -6,8 +6,23 @@
 
 let _plantillas = [];
 
+// Lee un valor de la plantilla. Mira primero en `datos` —donde vive desde
+// 20260915130000— y cae a la columna suelta para las filas que aún no se
+// migraron. Con eso el orden de despliegue da igual: código antes o migración
+// antes, las dos formas funcionan y no hay ventana rota.
+//
+// Las 49 columnas siguen en la tabla a propósito, sin que nadie las escriba ya:
+// son la red para poder volver atrás revirtiendo solo el código.
+function _pv(p, col) {
+  const v = p?.datos?.[col];
+  return v !== undefined ? v : (p?.[col] ?? null);
+}
+
 // Campos que viajan entre el formulario y la plantilla.
-// [idDelCampo, columna, tipo] — el tipo define cómo leer/escribir el valor.
+// [idDelCampo, clave dentro de `datos`, tipo] — el tipo define cómo leer y
+// escribir el valor. Añadir un campo aquí ya NO necesita migración: antes
+// obligaba a crear la columna en plantillas_pedido además de en pedidos, y
+// olvidarlo no daba error, solo perdía el dato en silencio.
 const PLANTILLA_CAMPOS = [
   // np-tipo ya no existe en el flujo de camión: la unidad la calcula el
   // sistema. La categoría de carga se restaura aparte, en usarPlantilla().
@@ -74,24 +89,28 @@ async function guardarPlantillaDesdeFormulario() {
   if (!chk?.checked) return;
 
   const nombre = document.getElementById('np-plantilla-nombre')?.value.trim() || _nombreSugerido();
-  const fila = { cliente_id: currentUser.id, nombre };
+  // Todo lo del formulario va dentro de `datos`. Fuera quedan solo las cinco
+  // columnas que la tabla usa por su cuenta: quién es, cómo se llama, y las de
+  // ordenación por uso.
+  const datos = {};
+  const fila = { cliente_id: currentUser.id, nombre, datos };
 
   PLANTILLA_CAMPOS.forEach(([id, col, tipo]) => {
     const el = document.getElementById(id);
-    if (!el) { if (tipo === 'bool') fila[col] = false; return; }
-    if (tipo === 'bool')      fila[col] = !!el.checked;
-    else if (tipo === 'num')  fila[col] = el.value !== '' ? Number(el.value) : null;
-    else                      fila[col] = el.value?.trim() || null;
+    if (!el) { if (tipo === 'bool') datos[col] = false; return; }
+    if (tipo === 'bool')      datos[col] = !!el.checked;
+    else if (tipo === 'num')  datos[col] = el.value !== '' ? Number(el.value) : null;
+    else                      datos[col] = el.value?.trim() || null;
   });
 
   // La categoría de carga y el número de contenedores no son inputs con id
   // fijo (una es estado del módulo, el otro un radio), así que van aparte.
-  if (typeof _npCategoria !== 'undefined') fila.categoria_carga = _npCategoria;
-  fila.num_contenedores = Number(document.querySelector('input[name="np-num-cont"]:checked')?.value) || null;
+  if (typeof _npCategoria !== 'undefined') datos.categoria_carga = _npCategoria;
+  datos.num_contenedores = Number(document.querySelector('input[name="np-num-cont"]:checked')?.value) || null;
   // Se guarda la unidad que el sistema propuso, para que la plantilla siga
   // sirviendo aunque cambien las reglas de recomendación.
   if (typeof _recomendarCamion === 'function' && typeof _cargaDatosActuales === 'function') {
-    fila.tipo_camion = _npUnidadManual || _recomendarCamion(_cargaDatosActuales()).tipo || null;
+    datos.tipo_camion = _npUnidadManual || _recomendarCamion(_cargaDatosActuales()).tipo || null;
   }
 
   const { error } = await sb.from('plantillas_pedido').insert(fila);
@@ -118,7 +137,7 @@ async function usarPlantilla(id) {
   PLANTILLA_CAMPOS.forEach(([campoId, col, tipo]) => {
     const el = document.getElementById(campoId);
     if (!el) return;
-    const val = p[col];
+    const val = _pv(p, col);
     if (tipo === 'bool')      el.checked = !!val;
     else if (val === null || val === undefined) el.value = '';
     else                      el.value = val;
@@ -134,17 +153,17 @@ async function usarPlantilla(id) {
   // quizá ya ni exista.
   let tipoNoDisponible = false;
   if (typeof _npCategoria !== 'undefined') {
-    if (p.categoria_carga && NP_CARGA[p.categoria_carga]) {
-      _npCategoria = p.categoria_carga;
+    if (_pv(p,'categoria_carga') && NP_CARGA[_pv(p,'categoria_carga')]) {
+      _npCategoria = _pv(p,'categoria_carga');
     } else {
       _npCategoria = 'General';
-      tipoNoDisponible = !!p.tipo_camion && !p.categoria_carga;
+      tipoNoDisponible = !!_pv(p,'tipo_camion') && !_pv(p,'categoria_carga');
     }
     _npUnidadManual = null;
   }
 
   // Número de contenedores, que es un radio y no entra en PLANTILLA_CAMPOS.
-  const nCont = Number(p.num_contenedores) || 1;
+  const nCont = Number(_pv(p,'num_contenedores')) || 1;
   const radio = document.querySelector(`input[name="np-num-cont"][value="${nCont >= 2 ? 2 : 1}"]`);
   if (radio) radio.checked = true;
 
@@ -171,7 +190,7 @@ async function usarPlantilla(id) {
 }
 
 function _servicioDePlantilla(p) {
-  const t = p.tipo_camion || '';
+  const t = _pv(p,'tipo_camion') || '';
   if (t.startsWith('Custodio') || t === 'Supervisión remota') return 'custodio';
   if (t.startsWith('Patio') || t === 'Bodega')                return 'patio';
   if (t.startsWith('Lavado') || t === 'Desinfección' || t === 'Lavado Contenedor') return 'lavado';
@@ -212,13 +231,18 @@ function _renderPlantillas() {
     <div class="plant-titulo">⭐ Tus solicitudes frecuentes</div>
     <div class="plant-grid">
       ${_plantillas.map(p => {
-        const ruta = p.origen
-          ? `${esc(p.origen.split(',')[0])}${p.destino ? ' → ' + esc(p.destino.split(',')[0]) : ''}`
-          : esc(p.tipo_camion || '—');
+        const origen  = _pv(p, 'origen');
+        const destino = _pv(p, 'destino');
+        const unidad  = _pv(p, 'tipo_camion');
+        const peso    = _pv(p, 'peso_carga');
+        const carga   = _pv(p, 'tipo_carga');
+        const ruta = origen
+          ? `${esc(String(origen).split(',')[0])}${destino ? ' → ' + esc(String(destino).split(',')[0]) : ''}`
+          : esc(unidad || '—');
         const detalles = [
-          p.tipo_camion ? esc(p.tipo_camion) : '',
-          p.peso_carga  ? `${p.peso_carga} ton` : '',
-          p.tipo_carga  ? esc(p.tipo_carga) : '',
+          unidad ? esc(unidad) : '',
+          peso   ? `${peso} ton` : '',
+          carga  ? esc(carga) : '',
         ].filter(Boolean).join(' · ');
         return `
           <div class="plant-card">
