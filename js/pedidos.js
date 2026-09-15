@@ -1206,10 +1206,40 @@ const NP_OPCIONES = {
   },
 };
 
+// Vacía el formulario de nueva solicitud.
+//
+// Hace falta porque el modal no se destruye al cerrarse: los campos conservan
+// lo último que se escribió. Sin esto, pedir un servicio después de haber usado
+// una solicitud frecuente —o después de cerrar el modal a medias— arranca con
+// la ruta y la carga del viaje anterior ya puestas, y el cliente puede publicar
+// una solicitud equivocada sin notarlo. Reportado el 2026-09-15.
+//
+// Se recorre el modal en vez de enumerar los 71 campos: una lista escrita a
+// mano envejece en cuanto alguien añade uno, y no avisa — el campo nuevo
+// simplemente no se limpia. Misma lección que la migración A6.
+function _limpiarFormularioPedido() {
+  const modal = document.getElementById('modal-nuevo-pedido');
+  if (!modal) return;
+  modal.querySelectorAll('input, select, textarea').forEach(el => {
+    if (el.type === 'checkbox' || el.type === 'radio') el.checked = false;
+    else if (el.tagName === 'SELECT') el.selectedIndex = 0;
+    else el.value = '';
+  });
+  // El número de contenedores es un radio sin opción "ninguno": su estado de
+  // reposo es 1, no vacío.
+  const unCont = modal.querySelector('input[name="np-num-cont"][value="1"]');
+  if (unCont) unCont.checked = true;
+}
+
 function openNuevoPedido(servicio) {
   if (!currentUser.id) { showLoginOverlay(); return; }
   // Si no se especifica servicio, defaultear a camion (solo transporte disponible)
   if (!servicio || !NP_OPCIONES[servicio]) servicio = 'camion';
+
+  // Lo primero, y antes de repoblar selects o restaurar una plantilla:
+  // usarPlantilla() llama aquí y RELLENA DESPUÉS, así que limpiar en este punto
+  // no le pisa nada.
+  _limpiarFormularioPedido();
 
   const banner = document.getElementById('np-categoria-banner');
   const select = document.getElementById('np-tipo');
