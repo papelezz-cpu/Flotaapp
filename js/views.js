@@ -213,7 +213,15 @@ async function _loadAprBadge() {
   // La función devuelve el desglose además del total; hoy solo se usa el total,
   // pero está ahí para que el panel no tenga que volver a preguntar.
   const { data: cola, error } = await sb.rpc('cola_superadmin');
-  if (error) { badge.style.display = 'none'; return; }
+  if (error) {
+    // Un globo oculto es indistinguible de "no hay nada que revisar", así que
+    // un fallo aquí deja al superadmin creyendo que la cola está vacía. Sin
+    // esta traza no habría forma de saberlo: no se pone un toast porque esto
+    // se dispara con cada notificación y sería ruido constante.
+    console.error('cola_superadmin falló, el globo queda oculto:', error.message);
+    badge.style.display = 'none';
+    return;
+  }
   const total = cola?.total || 0;
   if (total > 0) {
     badge.textContent = total > 99 ? '99+' : total;
