@@ -1,5 +1,15 @@
 // ── MODAL DE DETALLE ──────────────────────────────────
 
+// Distintivo de seguro. Sale de la vigencia aprobada, no de una casilla que la
+// empresa marcaba sola: sin fecha no hay documento revisado, y con fecha pasada
+// lo hubo pero ya no vale. Tres estados, no dos.
+function _seguroBadge(etiqueta, fecha) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  if (!fecha)      return `<div class="seguro-badge no">✕ ${etiqueta} — sin acreditar</div>`;
+  if (fecha < hoy) return `<div class="seguro-badge no">⛔ ${etiqueta} — vencido</div>`;
+  return `<div class="seguro-badge ok">✓ ${etiqueta}</div>`;
+}
+
 let detalleTab    = 'unidad';
 let calYear       = new Date().getFullYear();
 let calMonth      = new Date().getMonth();
@@ -114,11 +124,11 @@ async function renderDetalleTab() {
           <div class="detalle-item"><div class="detalle-lbl">Teléfono</div>
             <div class="detalle-val">${esc(p.telefono || '—')}</div></div>
           <div class="detalle-item detalle-full"><div class="detalle-lbl">Permiso SCT</div>
-            <div class="detalle-val">📋 ${esc(p.permiso_sct || '—')}</div></div>
+            <div class="detalle-val">📋 ${p.fecha_vencimiento_permiso_sct ? esc(p.permiso_sct || 'registrado') : '—'}</div></div>
         </div>
         <div class="empresa-seguros">
-          <div class="seguro-badge ${p.seguro_rc ? 'ok' : 'no'}">${p.seguro_rc ? '✓' : '✕'} Seguro RC</div>
-          <div class="seguro-badge ${p.seguro_carga ? 'ok' : 'no'}">${p.seguro_carga ? '✓' : '✕'} Seguro de Carga</div>
+          ${_seguroBadge('Seguro RC',       p.fecha_vencimiento_seguro_rc)}
+          ${_seguroBadge('Seguro de Carga', p.fecha_vencimiento_seguro_carga)}
         </div>
       </div>`;
 

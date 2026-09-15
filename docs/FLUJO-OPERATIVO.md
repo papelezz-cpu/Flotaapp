@@ -93,8 +93,11 @@ Vigencias · Mi desempeño · Cobros · Privacidad · Avisos.
 
 - Dar de alta camiones, custodios, patios, lavados y operadores — todos nacen
   en `aprobacion = 'pendiente'`.
-- Mantener su **ficha pública** (Mis unidades → Perfil de empresa): años,
-  unidades, permiso SCT, seguros, descripción.
+- Mantener su **ficha pública** (Mis unidades → Perfil de empresa): razón
+  social, RFC, teléfono, años, unidades, descripción.
+- **Proponer** sus documentos legales — permiso SCT, seguro RC, seguro de
+  carga — cada uno con su número, su vigencia y su archivo. Los propone, no
+  los acredita: ver *Los seguros se acreditan, no se declaran*.
 - Ofertar sobre solicitudes en `abierto` o `en_negociacion`, y aceptar una
   contraoferta del cliente.
 - Asignar chofer, avanzar el seguimiento y subir evidencia de cierre.
@@ -110,6 +113,7 @@ Vigencias · Mi desempeño · Cobros · Privacidad · Avisos.
 |---|---|
 | Aprobarse sus propios recursos | `guard_fleet_resource_update` |
 | Transferir un recurso a otro propietario | `guard_fleet_resource_update` |
+| **Acreditarse sus propios seguros o su permiso SCT** — ni marcarlos, ni ponerse una vigencia | `guard_perfil_self_update` |
 | Ver solicitudes en `pendiente_revision` | `ped_select` — para ella no existen |
 | Ofertar con permiso SCT o seguros vencidos | `openHacerOferta`, y de nuevo `guard_oferta_update` |
 | Aceptar su propia oferta, salvo respondiendo una contraoferta | `guard_oferta_update` |
@@ -215,8 +219,43 @@ para aprobarla, y su tarjeta del Catálogo nacía en blanco hasta que alguien
 los tecleaba otra vez en **Mis unidades → Perfil de empresa**.
 
 **Lo que sigue siendo tarea de la empresa:** años de operación, número de
-unidades, permiso SCT, seguros y descripción. El registro no los pide, así que
-una ficha recién aprobada está incompleta por diseño, no por fallo.
+unidades, descripción, y **subir sus documentos legales**. El registro no los
+pide, así que una ficha recién aprobada está incompleta por diseño, no por
+fallo.
+
+### Los seguros se acreditan, no se declaran
+
+Hasta el 2026-09-15, la tarjeta *Perfil de empresa* hacía la misma pregunta dos
+veces con rigor distinto: arriba una **casilla** «Seguro RC» y el número de
+permiso en texto libre, abajo el bloque *Documentos legales* con archivo, fecha
+y revisión del superadmin. **El catálogo leía la de arriba.** Es decir, el chip
+`Seg. RC ✓` que veía el cliente significaba *«la empresa marcó una casilla»*, no
+*«alguien vio la póliza»*, y las dos cosas se veían idénticas.
+
+Y el camino riguroso **no premiaba**: rellenarlo no añadía ningún distintivo,
+solo podía quitártelo al vencer. Por eso las tres empresas de producción tenían
+cero fechas y cero documentos, y por eso `pendiente_acuerdo` era inalcanzable —
+`guard_oferta_update` compara `IS NOT NULL AND < current_date`, y con todo a
+NULL no dispara nunca.
+
+Desde `20260915120000_los_seguros_se_acreditan_no_se_declaran`:
+
+- **La casilla no existe.** `guardarPerfilEmpresa()` ya no envía `seguro_rc`,
+  `seguro_carga` ni `permiso_sct`, y el número de permiso vive junto a su fecha
+  y su archivo.
+- **La fuente de verdad es la fecha de vigencia**, y solo la escribe
+  `aprobarDocsEmpresa()` al promover un documento revisado. Por eso el catálogo
+  puede confiar en ella sin ver el documento: le basta `empresas_publico`.
+- **`guard_perfil_self_update` sostiene todo lo demás.** RLS deja a la empresa
+  actualizar su propia fila, así que sin ese guard bastaba una llamada al API
+  —sin pasar por ninguna pantalla— para ponerse una vigencia inventada. Bloquea
+  las seis columnas reales; las `*_pendiente` siguen abiertas, que es donde la
+  empresa propone.
+- **El booleano dice que hay documento aprobado. Que esté vigente lo dice la
+  fecha**, que cambia sola con el calendario y por eso no cabe en un booleano.
+
+> ⚠ **Ojo:** `camiones.fecha_vencimiento_permiso_sct` es otra cosa — el permiso
+> del camión, no el de la empresa. No lo toca nada de esto.
 
 ---
 

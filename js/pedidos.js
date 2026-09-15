@@ -1869,13 +1869,16 @@ async function openHacerOferta(pedidoId) {
         document.getElementById('modal-hacer-oferta').classList.add('open');
         return;
       }
-      // Advisory: docs claimed but no expiry date registered
-      const sinFecha = [];
-      if (perfil.permiso_sct  && !perfil.fecha_vencimiento_permiso_sct)  sinFecha.push('Permiso SCT');
-      if (perfil.seguro_rc    && !perfil.fecha_vencimiento_seguro_rc)    sinFecha.push('Seguro RC');
-      if (perfil.seguro_carga && !perfil.fecha_vencimiento_seguro_carga) sinFecha.push('Seguro de carga');
-      if (sinFecha.length && recursoWarnEl) {
-        recursoWarnEl.textContent = `⚠ Tu empresa declara ${sinFecha.join(', ')} pero no tiene fecha de vencimiento registrada. Registra la vigencia en tu perfil para que el cliente pueda verificarlo.`;
+      // Aviso: sin ningun documento acreditado, la ficha que ve el cliente sale
+      // vacia de distintivos. Ya no existe el caso "declarado sin fecha" —
+      // declarar era marcar una casilla, y esa casilla se retiro: ahora la
+      // vigencia solo la escribe el superadmin al aprobar el documento.
+      const sinAcreditar = [];
+      if (!perfil.fecha_vencimiento_permiso_sct)  sinAcreditar.push('Permiso SCT');
+      if (!perfil.fecha_vencimiento_seguro_rc)    sinAcreditar.push('Seguro RC');
+      if (!perfil.fecha_vencimiento_seguro_carga) sinAcreditar.push('Seguro de carga');
+      if (sinAcreditar.length && recursoWarnEl) {
+        recursoWarnEl.textContent = `⚠ Tu empresa no tiene acreditado: ${sinAcreditar.join(', ')}. Súbelos en Mis unidades → Perfil de empresa → Documentos legales; hasta que el superadmin los apruebe, tu ficha no los muestra al cliente.`;
         recursoWarnEl.style.display = 'block';
       }
     }

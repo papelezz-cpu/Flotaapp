@@ -244,15 +244,14 @@ async function renderPerfilEmpresa() {
   set('pe-telefono', p.telefono);
   set('pe-anos',     p.anos_operacion);
   set('pe-unidades', p.num_unidades);
-  set('pe-sct',       p.permiso_sct);
   set('pe-desc',      p.descripcion);
-  const rc    = document.getElementById('pe-rc');
-  const carga = document.getElementById('pe-carga');
-  if (rc)    rc.checked    = !!p.seguro_rc;
-  if (carga) carga.checked = !!p.seguro_carga;
 
-  // Mostrar fechas pendientes o aprobadas en los campos de documentos
+  // Mostrar fechas pendientes o aprobadas en los campos de documentos.
+  // permiso_sct baja aquí con su fecha y su documento: el número suelto no
+  // acredita nada, y tenerlo arriba dejaba que la ficha dijera "SCT ✓" sin que
+  // nadie hubiera visto el papel.
   const hayPend = !!p.perfil_docs_pendiente;
+  set('pe-sct', hayPend ? p.permiso_sct_pendiente : p.permiso_sct);
   set('pe-vence-sct',   hayPend ? p.fecha_vencimiento_permiso_sct_pendiente  : p.fecha_vencimiento_permiso_sct);
   set('pe-vence-rc',    hayPend ? p.fecha_vencimiento_seguro_rc_pendiente    : p.fecha_vencimiento_seguro_rc);
   set('pe-vence-carga', hayPend ? p.fecha_vencimiento_seguro_carga_pendiente : p.fecha_vencimiento_seguro_carga);
@@ -279,11 +278,12 @@ async function guardarPerfilEmpresa() {
     telefono:       document.getElementById('pe-telefono').value.trim(),
     anos_operacion: parseInt(document.getElementById('pe-anos').value)    || null,
     num_unidades:   parseInt(document.getElementById('pe-unidades').value) || null,
-    permiso_sct:    document.getElementById('pe-sct').value.trim(),
     descripcion:    document.getElementById('pe-desc').value.trim(),
-    seguro_rc:      document.getElementById('pe-rc').checked,
-    seguro_carga:   document.getElementById('pe-carga').checked,
   };
+  // permiso_sct, seguro_rc y seguro_carga NO se mandan desde aquí: dejaron de
+  // ser algo que la empresa declara y pasaron a ser consecuencia de un
+  // documento aprobado. Los escribe aprobarDocsEmpresa(), y guard_perfil_self_update
+  // rechaza que los toque nadie que no sea superadmin.
   const { error } = await sb.from('perfiles').update(payload).eq('user_id', currentUser.id);
   if (error) { showToast('Error al guardar perfil'); return; }
   showToast('✓ Perfil actualizado');
@@ -320,6 +320,7 @@ async function solicitarActualizacionDocs() {
 
   const payload = {
     perfil_docs_pendiente:                    true,
+    permiso_sct_pendiente:                    document.getElementById('pe-sct')?.value.trim() || null,
     fecha_vencimiento_permiso_sct_pendiente:  sctDate,
     fecha_vencimiento_seguro_rc_pendiente:    rcDate,
     fecha_vencimiento_seguro_carga_pendiente: cargaDate,
