@@ -93,8 +93,11 @@ Vigencias · Mi desempeño · Cobros · Privacidad · Avisos.
 
 - Dar de alta camiones, custodios, patios, lavados y operadores — todos nacen
   en `aprobacion = 'pendiente'`.
-- Mantener su **ficha pública** (Mis unidades → Perfil de empresa): años,
-  unidades, permiso SCT, seguros, descripción.
+- Mantener su **ficha pública** (Mis unidades → Perfil de empresa): razón
+  social, RFC, teléfono, años, unidades, descripción.
+- **Proponer** sus documentos legales — permiso SCT, seguro RC, seguro de
+  carga — cada uno con su número, su vigencia y su archivo. Los propone, no
+  los acredita: ver *Los seguros se acreditan, no se declaran*.
 - Ofertar sobre solicitudes en `abierto` o `en_negociacion`, y aceptar una
   contraoferta del cliente.
 - Asignar chofer, avanzar el seguimiento y subir evidencia de cierre.
@@ -110,6 +113,7 @@ Vigencias · Mi desempeño · Cobros · Privacidad · Avisos.
 |---|---|
 | Aprobarse sus propios recursos | `guard_fleet_resource_update` |
 | Transferir un recurso a otro propietario | `guard_fleet_resource_update` |
+| **Acreditarse sus propios seguros o su permiso SCT** — ni marcarlos, ni ponerse una vigencia | `guard_perfil_self_update` |
 | Ver solicitudes en `pendiente_revision` | `ped_select` — para ella no existen |
 | Ofertar con permiso SCT o seguros vencidos | `openHacerOferta`, y de nuevo `guard_oferta_update` |
 | Aceptar su propia oferta, salvo respondiendo una contraoferta | `guard_oferta_update` |
@@ -215,8 +219,43 @@ para aprobarla, y su tarjeta del Catálogo nacía en blanco hasta que alguien
 los tecleaba otra vez en **Mis unidades → Perfil de empresa**.
 
 **Lo que sigue siendo tarea de la empresa:** años de operación, número de
-unidades, permiso SCT, seguros y descripción. El registro no los pide, así que
-una ficha recién aprobada está incompleta por diseño, no por fallo.
+unidades, descripción, y **subir sus documentos legales**. El registro no los
+pide, así que una ficha recién aprobada está incompleta por diseño, no por
+fallo.
+
+### Los seguros se acreditan, no se declaran
+
+Hasta el 2026-09-15, la tarjeta *Perfil de empresa* hacía la misma pregunta dos
+veces con rigor distinto: arriba una **casilla** «Seguro RC» y el número de
+permiso en texto libre, abajo el bloque *Documentos legales* con archivo, fecha
+y revisión del superadmin. **El catálogo leía la de arriba.** Es decir, el chip
+`Seg. RC ✓` que veía el cliente significaba *«la empresa marcó una casilla»*, no
+*«alguien vio la póliza»*, y las dos cosas se veían idénticas.
+
+Y el camino riguroso **no premiaba**: rellenarlo no añadía ningún distintivo,
+solo podía quitártelo al vencer. Por eso las tres empresas de producción tenían
+cero fechas y cero documentos, y por eso `pendiente_acuerdo` era inalcanzable —
+`guard_oferta_update` compara `IS NOT NULL AND < current_date`, y con todo a
+NULL no dispara nunca.
+
+Desde `20260915120000_los_seguros_se_acreditan_no_se_declaran`:
+
+- **La casilla no existe.** `guardarPerfilEmpresa()` ya no envía `seguro_rc`,
+  `seguro_carga` ni `permiso_sct`, y el número de permiso vive junto a su fecha
+  y su archivo.
+- **La fuente de verdad es la fecha de vigencia**, y solo la escribe
+  `aprobarDocsEmpresa()` al promover un documento revisado. Por eso el catálogo
+  puede confiar en ella sin ver el documento: le basta `empresas_publico`.
+- **`guard_perfil_self_update` sostiene todo lo demás.** RLS deja a la empresa
+  actualizar su propia fila, así que sin ese guard bastaba una llamada al API
+  —sin pasar por ninguna pantalla— para ponerse una vigencia inventada. Bloquea
+  las seis columnas reales; las `*_pendiente` siguen abiertas, que es donde la
+  empresa propone.
+- **El booleano dice que hay documento aprobado. Que esté vigente lo dice la
+  fecha**, que cambia sola con el calendario y por eso no cabe en un booleano.
+
+> ⚠ **Ojo:** `camiones.fecha_vencimiento_permiso_sct` es otra cosa — el permiso
+> del camión, no el de la empresa. No lo toca nada de esto.
 
 ---
 
@@ -551,6 +590,42 @@ escribir una fila; los guards deciden *qué transición* es legal para ti.
 | `guard_perfil_self_update` | perfiles | Cambiarse el rol, el estado de aprobación de la cuenta o los campos de verificación. **Se dispara en toda actualización de `perfiles`, no solo en la propia** — ver abajo |
 | `guard_expediente_documento` | expediente_documentos | Que cada parte haga el trabajo de la otra: **solo el cliente sube**, **solo el transportista revisa** |
 | `guard_operador_hazmat` | ofertas, reservaciones | Asignar a carga peligrosa un chofer sin licencia vigente |
+
+### Una vista no tiene RLS detrás, y nace escribible
+
+`empresas_publico` es la ficha pública del transportista: una vista sobre
+`perfiles` con 15 columnas, que existe para que el Catálogo no lea `perfiles`
+entera. Corre con `security_invoker` en su valor por omisión (`false`) **a
+propósito**, porque así no aplica el RLS de `perfiles` — que solo deja ver la
+fila propia — y el catálogo puede enseñar las fichas ajenas.
+
+Eso está bien para leer. El problema es que **una vista simple sobre una sola
+tabla es auto-actualizable**: un `INSERT`/`UPDATE`/`DELETE` contra ella se
+traduce a la tabla base, y sin `security_invoker` tampoco pasa por el RLS.
+
+Y las vistas **nacen escribibles**. El esquema lleva puesto
+`ALTER DEFAULT PRIVILEGES … GRANT ALL ON TABLES TO authenticated`, y en
+PostgreSQL «TABLES» incluye las vistas. Por eso `empresas_publico` tenía
+`INSERT`, `UPDATE` y `DELETE` concedidos a `authenticated` desde que se creó:
+`20260831210000` hizo `revoke all … from anon, public` y luego
+`grant select … to authenticated`, pero el `REVOKE` nunca apuntó a
+`authenticated`, y un `GRANT SELECT` no retira lo que ya estaba dentro de
+`ALL`. Retirado el 2026-09-14 por `20260914130000_la_vista_no_se_escribe`.
+
+Mientras estuvo abierto, `guard_perfil_self_update` sí se disparaba y frenaba
+el rol, `aprobacion_cuenta` y los campos de verificación. No frenaba el resto —
+incluidas las tres `fecha_vencimiento_*` que lee `guard_oferta_update` para
+decidir si una empresa puede cerrar un trato. Y el `DELETE` no lo frenaba nada:
+**`perfiles` no tiene ninguna política `FOR DELETE`**, así que la vista era el
+único camino de borrado que existía para `authenticated`.
+
+**Consecuencia para quien cree la próxima vista:** los privilegios por omisión
+no se han tocado —cambiarlos alcanzaría también a las tablas futuras, que sí
+necesitan esos permisos porque ahí RLS es la frontera—, así que **toda vista
+nueva en `public` sigue naciendo escribible**. Crear la vista y poner
+`grant select` **no basta**: hay que retirar la escritura explícitamente. El
+bloque 2 de esa migración es idempotente y sirve de red: volver a ejecutarlo
+después de crear una vista la deja limpia.
 
 ### El rol solo se cambia por `cambiar_rol()`
 

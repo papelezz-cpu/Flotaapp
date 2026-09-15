@@ -121,21 +121,25 @@ function _empresaCardHTML(e) {
   if (e.lavados.length)   bloques += _bloqueLavado   (e.lavados);
 
   // Docs vigentes badge: every claimed doc has a non-expired date
-  const hoy      = new Date().toISOString().slice(0, 10);
-  const claimed  = [
-    e.permiso_sct  ? e.fecha_vencimiento_permiso_sct  : undefined,
-    e.seguro_rc    ? e.fecha_vencimiento_seguro_rc    : undefined,
-    e.seguro_carga ? e.fecha_vencimiento_seguro_carga : undefined,
-  ].filter(v => v !== undefined);
-  const docsAlDia = claimed.length > 0 && claimed.every(f => f && f >= hoy);
+  // El distintivo sale de la FECHA, no de una casilla. Y la fecha es prueba
+  // suficiente porque bajo el modelo actual solo la escribe aprobarDocsEmpresa()
+  // al promover un documento revisado: guard_perfil_self_update impide que la
+  // empresa la toque por su cuenta. Antes esto leia seguro_rc/permiso_sct, que
+  // la empresa se ponia sola, asi que "Seg. RC ✓" significaba "marco una
+  // casilla" y el cliente no tenia forma de distinguirlo de uno verificado.
+  const hoy       = new Date().toISOString().slice(0, 10);
+  const vigencias = [
+    ['SCT',        e.fecha_vencimiento_permiso_sct],
+    ['Seg. RC',    e.fecha_vencimiento_seguro_rc],
+    ['Seg. Carga', e.fecha_vencimiento_seguro_carga],
+  ].filter(([, f]) => !!f);
+  const docsAlDia = vigencias.length > 0 && vigencias.every(([, f]) => f >= hoy);
 
   const chips = [];
   if (e.razon_social)    chips.push(`🏢 ${esc(e.razon_social)}`);
   if (e.rfc)             chips.push(`RFC: ${esc(e.rfc)}`);
   if (e.anos_operacion)  chips.push(`${e.anos_operacion} años`);
-  if (e.permiso_sct)     chips.push('SCT ✓');
-  if (e.seguro_rc)       chips.push('Seg. RC ✓');
-  if (e.seguro_carga)    chips.push('Seg. Carga ✓');
+  for (const [etiqueta, f] of vigencias) chips.push(`${etiqueta} ${f >= hoy ? '✓' : '⛔ vencido'}`);
   if (docsAlDia)         chips.push('✅ Docs al día');
   const infoChips = chips.length
     ? `<div class="emp-info-chips">${chips.map(c => `<span class="emp-info-chip">${c}</span>`).join('')}</div>`
@@ -180,7 +184,9 @@ function _empresaCardHTML(e) {
 // lee abrirPerfilEmpresaCat(): si cambia una, cambia la otra.
 function _tieneFicha(e) {
   return !!(e.razon_social || e.rfc || e.telefono || e.descripcion ||
-            e.permiso_sct  || e.seguro_rc || e.seguro_carga ||
+            e.permiso_sct  ||
+            e.fecha_vencimiento_permiso_sct || e.fecha_vencimiento_seguro_rc ||
+            e.fecha_vencimiento_seguro_carga ||
             e.anos_operacion || e.num_unidades || e.califs?.length);
 }
 
@@ -309,11 +315,14 @@ async function abrirPerfilEmpresaCat(adminId, adminNombre) {
     p?.razon_social  && ['🏢', 'Razón social',        esc(p.razon_social)],
     p?.rfc           && ['📄', 'RFC',                  esc(p.rfc)],
     p?.telefono      && ['📞', 'Teléfono',              esc(p.telefono)],
-    p?.permiso_sct   && ['📋', 'Permiso SCT',          `${esc(p.permiso_sct)} — Vence: ${_fmtDoc(p.fecha_vencimiento_permiso_sct)}`],
+    p?.fecha_vencimiento_permiso_sct && ['📋', 'Permiso SCT',
+      `${p.permiso_sct ? esc(p.permiso_sct) + ' — ' : ''}Vence: ${_fmtDoc(p.fecha_vencimiento_permiso_sct)}`],
     p?.anos_operacion && ['⏱️', 'Años de operación',   `${p.anos_operacion} años`],
     p?.num_unidades  && ['🚛', 'Unidades en flota',    `${p.num_unidades}`],
-    p?.seguro_rc     && ['🛡️', 'Seguro RC',            _fmtDoc(p.fecha_vencimiento_seguro_rc)],
-    p?.seguro_carga  && ['📦', 'Seguro de carga',      _fmtDoc(p.fecha_vencimiento_seguro_carga)],
+    // Igual que los chips: la fila existe si hay vigencia aprobada, no si la
+    // empresa marco una casilla.
+    p?.fecha_vencimiento_seguro_rc    && ['🛡️', 'Seguro RC',       _fmtDoc(p.fecha_vencimiento_seguro_rc)],
+    p?.fecha_vencimiento_seguro_carga && ['📦', 'Seguro de carga', _fmtDoc(p.fecha_vencimiento_seguro_carga)],
   ].filter(Boolean);
 
   const recientes = (cals || []).slice(0, 3).map(c => `

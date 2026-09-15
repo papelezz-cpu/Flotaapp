@@ -20,7 +20,13 @@ export const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 //      config de producción se lee de la rama main, que es producción por definición.
 function extraerAmbiente(src) {
   const url = src.match(/'(https:\/\/[a-z0-9]+\.supabase\.co)'/)?.[1];
-  const anon = src.match(/'(eyJ[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+)'/)?.[1];
+  // Dos formatos de clave publica, y se aceptan los dos a proposito:
+  //   · eyJ… — el JWT legacy, que es lo que hubo hasta 2026-09-14
+  //   · sb_publishable_… — el sistema nuevo de Supabase
+  // Mientras una rama este en un formato y la otra en el otro, esto tiene que
+  // leer las dos o el candado exigirNoProduccion() se queda sin ambiente y
+  // falla con "No pude leer URL/anon key", que no se parece en nada a la causa.
+  const anon = src.match(/'(eyJ[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+|sb_publishable_[A-Za-z0-9_-]+)'/)?.[1];
   return url && anon ? { url, anon } : null;
 }
 

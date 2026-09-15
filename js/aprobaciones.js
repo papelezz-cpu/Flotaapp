@@ -1719,7 +1719,7 @@ function aprobarTodosAcuerdos() {
 
 async function aprobarDocsEmpresa(userId) {
   const { data: p } = await sb.from('perfiles')
-    .select('nombre, fecha_vencimiento_permiso_sct_pendiente, fecha_vencimiento_seguro_rc_pendiente, fecha_vencimiento_seguro_carga_pendiente, doc_permiso_sct_pendiente, doc_seguro_rc_pendiente, doc_seguro_carga_pendiente')
+    .select('nombre, permiso_sct_pendiente, fecha_vencimiento_permiso_sct_pendiente, fecha_vencimiento_seguro_rc_pendiente, fecha_vencimiento_seguro_carga_pendiente, doc_permiso_sct_pendiente, doc_seguro_rc_pendiente, doc_seguro_carga_pendiente')
     .eq('user_id', userId).single();
   if (!p) { showToast('Error al obtener el perfil', 'error'); return; }
 
@@ -1728,6 +1728,7 @@ async function aprobarDocsEmpresa(userId) {
     fecha_vencimiento_permiso_sct_pendiente:  null,
     fecha_vencimiento_seguro_rc_pendiente:    null,
     fecha_vencimiento_seguro_carga_pendiente: null,
+    permiso_sct_pendiente:       null,
     doc_permiso_sct_pendiente:   null,
     doc_seguro_rc_pendiente:     null,
     doc_seguro_carga_pendiente:  null,
@@ -1740,6 +1741,22 @@ async function aprobarDocsEmpresa(userId) {
   if (p.doc_permiso_sct_pendiente)  upd.doc_permiso_sct  = p.doc_permiso_sct_pendiente;
   if (p.doc_seguro_rc_pendiente)    upd.doc_seguro_rc    = p.doc_seguro_rc_pendiente;
   if (p.doc_seguro_carga_pendiente) upd.doc_seguro_carga = p.doc_seguro_carga_pendiente;
+  if (p.permiso_sct_pendiente)      upd.permiso_sct      = p.permiso_sct_pendiente;
+
+  // Aquí —y solo aquí— nacen los distintivos que ve el cliente. Antes salían
+  // de casillas que la empresa marcaba sola, así que "Seg. RC ✓" significaba
+  // "marcó una casilla" y no "alguien vio la póliza".
+  //
+  // La fuente de verdad pasa a ser doc_* + fecha_vencimiento_*. Los booleanos
+  // se mantienen sincronizados para no romper a quien ya los lea, pero ya no
+  // deciden nada por su cuenta. El SCT no necesita booleano: su evidencia es
+  // su propio documento.
+  //
+  // Y ojo con la distincion: el booleano dice que HAY documento aprobado. Que
+  // este VIGENTE lo dice la fecha, que cambia sola con el calendario y por eso
+  // no cabe en un booleano.
+  if (p.doc_seguro_rc_pendiente)    upd.seguro_rc    = true;
+  if (p.doc_seguro_carga_pendiente) upd.seguro_carga = true;
 
   const { error } = await sb.from('perfiles').update(upd).eq('user_id', userId);
   if (error) { showToast('Error al aprobar: ' + error.message, 'error'); return; }
@@ -1765,6 +1782,7 @@ function rechazarDocsEmpresa(userId, nombre) {
         fecha_vencimiento_permiso_sct_pendiente:  null,
         fecha_vencimiento_seguro_rc_pendiente:    null,
         fecha_vencimiento_seguro_carga_pendiente: null,
+        permiso_sct_pendiente:       null,
         doc_permiso_sct_pendiente:   null,
         doc_seguro_rc_pendiente:     null,
         doc_seguro_carga_pendiente:  null,

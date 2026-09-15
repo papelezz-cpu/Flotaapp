@@ -15,7 +15,7 @@
 //    (los buckets privados no se leen de otra forma). Ponla en
 //    pruebas/credenciales.local.json, que está en .gitignore:
 //
-//      "produccion": { "service_role": "eyJ..." }
+//      "produccion": { "service_role": "sb_secret_..." }   (o el "eyJ..." legacy)
 //
 //    Si no está, este guion no corre. De producción solo hace GET.
 //
@@ -42,8 +42,8 @@ if (!LLAVE_PROD || /PENDIENTE|PON-AQUI/.test(LLAVE_PROD)) {
   console.error('  pueden leer sin ella, así que sin esto no hay forma de copiar los');
   console.error('  archivos y pruebas seguirá dando 404 en cada documento.\n');
   console.error('  En pruebas/credenciales.local.json (que git nunca ve) agrega:\n');
-  console.error('    "produccion": { "service_role": "eyJ..." }\n');
-  console.error('  Supabase → proyecto de producción → Settings → API → service_role.');
+  console.error('    "produccion": { "service_role": "sb_secret_..." }\n');
+  console.error('  Supabase → proyecto de producción → Settings → API Keys → clave secreta.');
   console.error('  Este guion solo hace GET contra producción; nunca escribe ahí.\n');
   process.exit(2);
 }
