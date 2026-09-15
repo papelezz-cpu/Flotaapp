@@ -171,6 +171,14 @@ Obligan a tocarlo: un estado nuevo o retirado, un permiso que cambia de rol, un 
 2. The user tests on the `dev` URL with the same real accounts/passwords. **The user decides when testing is finished — not you, and not the fact that your own checks passed.**
 3. **Only when the user says to promote** ("pasa esto a producción" or equivalent): merge `dev` → `main`, then **immediately restore `main`'s own `js/config.js`** (`git checkout main -- js/config.js` after the merge, before committing) so production's credentials are never overwritten. Push `main` — that's what actually deploys to production.
 4. Database/Edge Function changes follow the same order and need the same explicit yes: apply to `portgo-pruebas` first, verify, and wait. Applying SQL to production is a promotion like any other, even when it creates nothing visible.
+5. **Bringing `main` back into `dev` afterwards is the same hazard in reverse, and it is worse — because it does NOT conflict.** Once step 3 resolved `js/config.js` in favour of `main`, git records that resolution: on the next `main` → `dev` merge it sees `dev`'s side as unchanged since the merge base and **silently fast-forwards that file to production's credentials**. No conflict, no warning. Verified on 2026-09-15: `dev`'s working tree came out pointing at `xnyqsewaluezkkrlyhxg` with production's publishable key, and nothing in the merge output said so.
+   Always merge with `--no-commit`, then `git checkout HEAD -- js/config.js` (HEAD is still `dev`), then verify **before** committing:
+   ```bash
+   git merge main --no-commit --no-ff
+   git checkout HEAD -- js/config.js
+   grep -rn "xnyqsewaluezkkrlyhxg" js/ app.html sw.js   # must return nothing on dev
+   ```
+   The same check in reverse (`grep xskgnudiznryhgagxadu` on `main`) belongs in step 3. A conflict is the *safe* case: it stops you. Silence is the dangerous one.
 
 > ⚠️ **`portgo-pruebas` drifts from production the moment either database is used, and assuming otherwise has already caused problems.** Verified divergences on 2026-08-27/28, eight days after a full clone: `anon` held privileges there that production had revoked (82 function grants); the Realtime publication was **empty** while production replicated six tables; and the data volume differed enough that a query plan seen in `dev` said little about production. Everything "worked" in both.
 >

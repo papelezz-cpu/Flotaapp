@@ -1,0 +1,59 @@
+# Finales de línea: LF en todas partes, sin excepciones.
+#
+# ── Por qué existe este fichero ──────────────────────────────────────────
+#
+# El 2026-09-15, la misma migración se aplicó a pruebas y a producción y dejó
+# DOS cuerpos distintos de guard_perfil_self_update(). verificar-paridad.sh lo
+# cazó: mismo nombre, mismo search_path, hash distinto.
+#
+# No lo editó nadie. Con core.autocrlf=true y sin este fichero, git entrega la
+# copia de trabajo con CRLF. La migración se aplicó a pruebas recién escrita
+# (LF) y a producción después de un cambio de rama (CRLF), y aplicar-a-*.sh usa
+# `psql -f`, que lee en binario y conserva los CRLF DENTRO del cuerpo de la
+# función. El libro mayor lo dejó por escrito:
+#
+#   pruebas     11bec696…   (LF)
+#   produccion  24a7452e…   (CRLF)
+#
+# Funcionalmente daba igual —el \r va como texto dentro del $$…$$ y PostgreSQL
+# ejecuta igual— pero el libro mayor existe precisamente para delatar que una
+# migración cambió entre una aplicación y otra. Sin esto, miente.
+#
+# ── Y lo que de verdad podía romperse ────────────────────────────────────
+#
+# 10 de los 12 guiones de supabase/ tenían CRLF. Funcionan porque se invocan
+# como `bash guion.sh`, donde el shebang no lo interpreta el kernel. Lanzados
+# como `./guion.sh`, o en Linux o macOS, fallan con un error que no menciona
+# los finales de línea por ningún lado.
+#
+# ── Qué hacer si esto se revierte ────────────────────────────────────────
+#
+# Comprobar un fichero:              file supabase/migrations/2026*.sql
+# Renormalizar el árbol entero:      git add --renormalize . && git checkout-index -f -a
+
+* text=auto eol=lf
+
+# Explícito donde más duele, para que se lea sin conocer text=auto:
+*.sql  text eol=lf
+*.sh   text eol=lf
+*.mjs  text eol=lf
+*.js   text eol=lf
+*.html text eol=lf
+*.css  text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.tsv  text eol=lf
+
+# Binarios: que git no los toque nunca.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.pdf  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.jar  binary
+*.keystore binary
