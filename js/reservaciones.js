@@ -167,20 +167,30 @@ async function renderReserv(append = false) {
     // Recopilar propietario_ids de cada tipo, luego query perfiles por separado
     const propIdMap = {};  // recurso_id → propietario_id
 
+    // Vistas *_publico y no las tablas: el cliente no es dueño de estos
+    // recursos, y la fila entera de un camión lleva VIN, motor, placas y las
+    // rutas de sus documentos. Ver H-10.
+    //
+    // No cambia lo que ve: hoy el cliente ya solo alcanza unidades aprobadas,
+    // que es justo lo que la vista filtra dentro. La rama de empresa (más
+    // abajo) SÍ sigue leyendo las tablas, a propósito — ahí el dueño las ve por
+    // camiones_owner_read sin importar el estado de aprobación, y editar una
+    // unidad la devuelve a revisión: con la vista, una reserva activa de una
+    // unidad en edición se quedaría sin nombre.
     const fetches = [];
     if (camionIds.length) fetches.push(
-      sb.from('camiones').select('id, propietario_id').in('id', camionIds)
+      sb.from('camiones_publico').select('id, propietario_id').in('id', camionIds)
         .then(({ data: d }) => (d || []).forEach(c => { propIdMap[c.id] = c.propietario_id; }))
     );
     if (custodioIds.length) fetches.push(
-      sb.from('custodios').select('id, nombre, propietario_id').in('id', custodioIds)
+      sb.from('custodios_publico').select('id, nombre, propietario_id').in('id', custodioIds)
         .then(({ data: d }) => (d || []).forEach(c => {
           propIdMap[c.id] = c.propietario_id;
           recursoNombreMap[c.id] = `👮 ${c.nombre}`;
         }))
     );
     if (patioIds.length) fetches.push(
-      sb.from('patios').select('id, nombre, propietario_id').in('id', patioIds)
+      sb.from('patios_publico').select('id, nombre, propietario_id').in('id', patioIds)
         .then(({ data: d }) => (d || []).forEach(p => {
           propIdMap[p.id] = p.propietario_id;
           recursoNombreMap[p.id] = `🏭 ${p.nombre}`;
@@ -189,7 +199,7 @@ async function renderReserv(append = false) {
     // Los lavados faltaban aquí: sus reservaciones nunca resolvían nombre ni
     // empresa y salían siempre como «—».
     if (lavadoIds.length) fetches.push(
-      sb.from('lavados').select('id, nombre, propietario_id').in('id', lavadoIds)
+      sb.from('lavados_publico').select('id, nombre, propietario_id').in('id', lavadoIds)
         .then(({ data: d }) => (d || []).forEach(l => {
           propIdMap[l.id] = l.propietario_id;
           recursoNombreMap[l.id] = `🧼 ${l.nombre}`;
