@@ -50,6 +50,32 @@ if (!orden.length) {
   process.exit(1);
 }
 
+// El error nace DENTRO del contexto del vm, que tiene su propio SyntaxError.
+// `e instanceof SyntaxError` compara contra el del host y da false siempre:
+// la primera version de esta sonda usaba instanceof y daba «sin colisiones»
+// con la colision puesta, contando el SyntaxError como un error de ejecucion
+// mas. Se comprueba por nombre, que no depende del realm.
+const esSyntaxError = e => e && e.name === 'SyntaxError';
+
+// ── Autocomprobacion ──────────────────────────────────────────────────────
+// Un detector que nunca ha fallado no ha demostrado que sepa fallar. Antes de
+// mirar los archivos de verdad, se le da una colision sintetica por el MISMO
+// camino de codigo; si no la caza, la sonda se niega a dar un veredicto en
+// vez de dar uno tranquilizador.
+{
+  const prueba = vm.createContext({});
+  let cazada = false;
+  vm.runInContext('let __colision_de_prueba = 1;', prueba, { filename: 'a.js' });
+  try {
+    vm.runInContext('let __colision_de_prueba = 2;', prueba, { filename: 'b.js' });
+  } catch (e) { cazada = esSyntaxError(e); }
+  if (!cazada) {
+    console.error(`${C.mal}${C.neg}  La sonda no detecta una colision que ella misma provoca.${C.fin}`);
+    console.error(`  No se emite veredicto: un "sin colisiones" de esta sonda no valdria nada.\n`);
+    process.exit(2);
+  }
+}
+
 const ctx = vm.createContext({ console: { log(){}, warn(){}, error(){} } });
 const colisiones = [];
 const faltan = [];
@@ -61,7 +87,7 @@ for (const rel of orden) {
   try {
     vm.runInContext(readFileSync(abs, 'utf8'), ctx, { filename: rel });
   } catch (e) {
-    if (e instanceof SyntaxError) {
+    if (esSyntaxError(e)) {
       colisiones.push({ rel, msg: e.message });
       console.log(`  ${C.mal} FALLA${C.fin}  ${rel}`);
       console.log(`          ${C.mal}SyntaxError: ${e.message}${C.fin}`);
