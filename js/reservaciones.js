@@ -31,6 +31,32 @@ const _RESERV_FILTRO_LABEL = {
 const _ESTADO_LABEL = { PorAprobar: 'Por aprobar', CancelacionSolicitada: 'Cancelación en revisión' };
 const _estadoLabel = estado => _ESTADO_LABEL[estado] || estado;
 
+// ── COLUMNAS DEL LISTADO (H-08) ───────────────────────
+//
+// `reservaciones` tiene 50 columnas y la lista se traía todas. Medido contra
+// la base el 2026-09-18, con las 20 filas: 31.429 bytes con '*' frente a
+// 16.472 con esta lista — 1,91x. La ficha del hallazgo prometía «entre 3 y 5
+// veces»; no es cierto, y conviene que el número escrito sea el medido.
+//
+// Derivada del código, no de memoria: columnas reales del esquema cruzadas
+// con los accesos `algo.columna` de reservaciones.js, cobros.js, tracking.js,
+// expedientes.js, detalle.js y aprobaciones.js. Las 18 que faltan —el
+// vocabulario de Carta Porte, los detalles de pago ya registrado y las notas
+// de resolución— no aparecen en NINGÚN fichero de js/, comprobado uno a uno.
+//
+// Vigilada por pruebas/13-sonda-columnas-listado.mjs: si alguna de las
+// omitidas empieza a usarse, falla. Olvidar una columna no da error, deja un
+// hueco en la interfaz — y un hueco no avisa.
+const RES_COLS_LISTA = [
+  'id','unidad','cliente','telefono','fecha_ini','fecha_fin','descripcion','estado',
+  'created_at','cliente_email','cliente_user_id','tracking_estado','precio_acordado',
+  'recurso_tipo','propietario_id','completado_en','calificado','pagado','evidencias',
+  'pedido_id','evidencias_cliente','finalizacion_solicitada_por','plazo_pago',
+  'fecha_vencimiento_pago','cancelacion_solicitada_en','cancelacion_motivo',
+  'cancelacion_detalle','cancelacion_tracking_estado','operador_id','operador_nombre',
+  'documentos_carga','gps_link',
+].join(',');
+
 // ── PAGINACIÓN ────────────────────────────────────────
 // Mismo patrón que renderPedidos: un bloque inicial y un botón que añade el
 // siguiente. Antes esta vista se traía la tabla ENTERA —para el superadmin,
@@ -123,7 +149,7 @@ async function renderReserv(append = false) {
     // desaparecía de esta vista aunque RLS se lo siguiera permitiendo.
     // cliente_user_id es además la columna sobre la que decide RLS.
     let qCli = sb.from('reservaciones')
-      .select('*')
+      .select(RES_COLS_LISTA)
       .eq('cliente_user_id', currentUser.id)
       .order('created_at', { ascending: false })
       .order('id',          { ascending: false })
@@ -310,7 +336,7 @@ async function renderReserv(append = false) {
   header.classList.remove('cli');
 
   let reservQuery = sb.from('reservaciones')
-    .select('*')
+    .select(RES_COLS_LISTA)
     .order('created_at', { ascending: false })
     .order('id',          { ascending: false })
     .limit(RESERV_PAGE);

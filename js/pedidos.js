@@ -95,6 +95,35 @@ function estadosParaConsulta() {
   return [...new Set([...sel, 'abierto'])];        // ver el comentario de arriba
 }
 
+// ── COLUMNAS DEL LISTADO (H-08) ───────────────────────
+//
+// `pedidos` tiene 63 columnas y la lista se paginaba con select('*'). Medido
+// contra la base el 2026-09-18, con 30 filas: 47.923 bytes con '*' frente a
+// 24.614 con esta lista. **1,95x, no «entre 3 y 5 veces» como decía la ficha
+// del hallazgo** — el recuento de columnas no es el de bytes, y las que se
+// quitan son en su mayoría numéricas y nulas.
+//
+// La lista NO está escrita de memoria: sale de cruzar las columnas reales del
+// esquema con los accesos `algo.columna` de pedidos.js, detalle.js,
+// plantillas.js, aprobaciones.js y modal.js. Olvidar una aquí no da error:
+// deja un hueco en la interfaz, y por eso lo vigila
+// pruebas/13-sonda-columnas-listado.mjs, que falla si alguna columna omitida
+// empieza a usarse.
+//
+// Las 25 que faltan son de carga fina (dimensiones, temperaturas, hazmat,
+// contenedores), contacto, y las coordenadas del mapa: ninguna se pinta en la
+// tarjeta de la lista. El modal de detalle hace su propia consulta completa,
+// así que sigue viéndolo todo.
+const PED_COLS_LISTA = [
+  'id','cliente_id','cliente_nombre','cliente_email','tipo_camion','tipo_carga',
+  'capacidad_min','origen','destino','fecha_ini','fecha_fin','descripcion',
+  'precio_cliente','estado','created_at','peso_carga','hora_carga','carga_peligrosa',
+  'requiere_seguro','requiere_factura','num_custodios','horario_servicio','zona_cobertura',
+  'num_vehiculos','tipo_vehiculos','area_necesaria','detalles_lugar','detalles_hora',
+  'oferta_pendiente_id','rechazo_nota','tipo_contenedor','plazo_pago','categoria_carga',
+  'refrigerado','num_contenedores','entra_a_puerto','fecha_arribo_puerto','patio_externo',
+].join(',');
+
 const PEDIDOS_PAGE = 30;
 // Paginación por cursor, no por OFFSET. Con OFFSET, la página N obliga a
 // Postgres a recorrer y descartar N x 30 filas antes de devolver nada: el
@@ -294,7 +323,7 @@ async function renderPedidos(append = false) {
   if (plantBox)   plantBox.style.display   = 'none';
   if (filtrosBar) filtrosBar.style.display = currentUser.id ? '' : 'none';
 
-  let pedidosQ = sb.from('pedidos').select('*')
+  let pedidosQ = sb.from('pedidos').select(PED_COLS_LISTA)
     .order('created_at', { ascending: false })
     .order('id',         { ascending: false })
     .limit(PEDIDOS_PAGE);
@@ -322,7 +351,7 @@ async function renderPedidos(append = false) {
   const esSuperAdmin = currentUser.rol === 'superadmin';
   const acordadosExtraQ = (!append && esSuperAdmin)
     ? aplicarFiltrosPedidos(
-        sb.from('pedidos').select('*').in('estado', ['acordado', 'finalizado', 'expirado']).order('created_at', { ascending: false }).limit(100))
+        sb.from('pedidos').select(PED_COLS_LISTA).in('estado', ['acordado', 'finalizado', 'expirado']).order('created_at', { ascending: false }).limit(100))
     : Promise.resolve({ data: [] });
 
   const [{ data: pedidosPage, error }, { data: acordadosSA }] = await Promise.all([pedidosQ, acordadosExtraQ]);
