@@ -41,6 +41,17 @@ if [ -z "$ENTORNO" ] || [ -z "$REF" ] || [ $# -eq 0 ]; then
   exit 2
 fi
 
+# El ref tiene que parecer un ref. Esto existe porque los dos guiones de
+# aplicacion estuvieron pasando un byte 0x01 en lugar del ref del proyecto -una
+# retrorreferencia  de sed que se interpreto al escribir el archivo- y este
+# guion lo anoto veinticuatro veces sin decir una palabra: un caracter de
+# control invisible en una columna que nadie mira hasta que la mira.
+if [ "$REF" != "desconocido" ] && ! [[ "$REF" =~ ^[a-z0-9]{8,32}$ ]]; then
+  echo "  ⚠ El ref del proyecto no parece uno: $(printf '%q' "$REF")" >&2
+  echo "    Se anota como 'desconocido'. Revisa como lo calcula quien llama." >&2
+  REF="desconocido"
+fi
+
 if [ ! -f "$LIBRO" ]; then
   {
     printf '# Libro mayor de migraciones aplicadas.\n'
