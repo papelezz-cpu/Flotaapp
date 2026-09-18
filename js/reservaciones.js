@@ -155,17 +155,28 @@ async function renderReserv(append = false) {
     }
 
     // Obtener empresa según tipo de recurso
-    const camionIds   = data.filter(r => !r.recurso_tipo || r.recurso_tipo === 'camion').map(r => r.unidad).filter(Boolean);
+    // camionIds ya no hace falta: su consulta solo daba propietario_id.
     const custodioIds = data.filter(r => r.recurso_tipo === 'custodio').map(r => r.unidad).filter(Boolean);
     const patioIds    = data.filter(r => r.recurso_tipo === 'patio').map(r => r.unidad).filter(Boolean);
     const lavadoIds   = data.filter(r => r.recurso_tipo === 'lavado').map(r => r.unidad).filter(Boolean);
 
-    const empresaMap = {};
     const recursoNombreMap = {};
-    const ownerIdMap = {};  // recurso id → propietario_id (para chat)
+    const perfMap = {};   // propietario_id → nombre de la empresa
 
-    // Recopilar propietario_ids de cada tipo, luego query perfiles por separado
-    const propIdMap = {};  // recurso_id → propietario_id
+    // H-06 (b): la empresa sale de reservaciones.propietario_id, que ya está
+    // en la fila y es sobre el que decide el RLS. Antes se llegaba a ella
+    // dando la vuelta por la tabla del recurso — hasta cuatro consultas más
+    // por render de la pantalla más usada — cuando el dato estaba delante.
+    // El propio código ya lo sabía: la línea del botón de calificar leía
+    // `ownerIdMap[r.unidad] || r.propietario_id` desde hace tiempo.
+    //
+    // Comprobado antes de sustituir (pruebas/12-sonda-propietario-reserva.mjs):
+    // en las 20 reservaciones los dos orígenes coinciden, ninguna está sin
+    // propietario_id, y ninguna unidad ha cambiado de dueño. Además arregla
+    // una: la reservación cuyo recurso ya no se alcanza salía con empresa «—».
+    //
+    // Y para una reservación pasada el dueño DE ENTONCES —el de la fila— es
+    // más correcto que el de hoy, aunque hoy no haya ningún caso.
 
     // Vistas *_publico y no las tablas: el cliente no es dueño de estos
     // recursos, y la fila entera de un camión lleva VIN, motor, placas y las
@@ -177,47 +188,35 @@ async function renderReserv(append = false) {
     // camiones_owner_read sin importar el estado de aprobación, y editar una
     // unidad la devuelve a revisión: con la vista, una reserva activa de una
     // unidad en edición se quedaría sin nombre.
+    // Ya solo se pregunta por el NOMBRE de custodios, patios y lavados. Los
+    // camiones se enseñan por su id legible (C-001), así que su consulta no
+    // aportaba nada que no estuviera en la fila: se retira entera.
     const fetches = [];
-    if (camionIds.length) fetches.push(
-      sb.from('camiones_publico').select('id, propietario_id').in('id', camionIds)
-        .then(({ data: d }) => (d || []).forEach(c => { propIdMap[c.id] = c.propietario_id; }))
-    );
     if (custodioIds.length) fetches.push(
-      sb.from('custodios_publico').select('id, nombre, propietario_id').in('id', custodioIds)
-        .then(({ data: d }) => (d || []).forEach(c => {
-          propIdMap[c.id] = c.propietario_id;
-          recursoNombreMap[c.id] = `👮 ${c.nombre}`;
-        }))
+      sb.from('custodios_publico').select('id, nombre').in('id', custodioIds)
+        .then(({ data: d }) => (d || []).forEach(c => { recursoNombreMap[c.id] = `👮 ${c.nombre}`; }))
     );
     if (patioIds.length) fetches.push(
-      sb.from('patios_publico').select('id, nombre, propietario_id').in('id', patioIds)
-        .then(({ data: d }) => (d || []).forEach(p => {
-          propIdMap[p.id] = p.propietario_id;
-          recursoNombreMap[p.id] = `🏭 ${p.nombre}`;
-        }))
+      sb.from('patios_publico').select('id, nombre').in('id', patioIds)
+        .then(({ data: d }) => (d || []).forEach(p => { recursoNombreMap[p.id] = `🏭 ${p.nombre}`; }))
     );
     // Los lavados faltaban aquí: sus reservaciones nunca resolvían nombre ni
     // empresa y salían siempre como «—».
     if (lavadoIds.length) fetches.push(
-      sb.from('lavados_publico').select('id, nombre, propietario_id').in('id', lavadoIds)
-        .then(({ data: d }) => (d || []).forEach(l => {
-          propIdMap[l.id] = l.propietario_id;
-          recursoNombreMap[l.id] = `🧼 ${l.nombre}`;
-        }))
+      sb.from('lavados_publico').select('id, nombre').in('id', lavadoIds)
+        .then(({ data: d }) => (d || []).forEach(l => { recursoNombreMap[l.id] = `🧼 ${l.nombre}`; }))
+    );
+
+    // Y la ficha de empresa ya no espera a las anteriores: los propietario_id
+    // salen de las propias reservaciones, así que esta consulta es
+    // independiente y entra en el mismo Promise.all. Antes iba detrás por
+    // fuerza, porque hasta resolver los recursos no se sabía a quién pedir.
+    const propIds = [...new Set(data.map(r => r.propietario_id).filter(Boolean))];
+    if (propIds.length) fetches.push(
+      sb.from('empresas_publico').select('user_id, nombre').in('user_id', propIds)
+        .then(({ data: d }) => (d || []).forEach(p => { perfMap[p.user_id] = p.nombre; }))
     );
     await Promise.all(fetches);
-
-    // Query directa a la ficha publica por user_id (evita problemas de RLS con joins)
-    const uniquePropIds = [...new Set(Object.values(propIdMap).filter(Boolean))];
-    if (uniquePropIds.length) {
-      const { data: perfs } = await sb.from('empresas_publico').select('user_id, nombre').in('user_id', uniquePropIds);
-      const perfMap = {};
-      (perfs || []).forEach(p => { perfMap[p.user_id] = p.nombre; });
-      Object.entries(propIdMap).forEach(([recursoId, propId]) => {
-        empresaMap[recursoId] = perfMap[propId] || '—';
-        ownerIdMap[recursoId] = propId;
-      });
-    }
 
     // Los expedientes documentales de todas las filas, en una sola consulta.
     if (typeof cargarExpedientes === 'function') await cargarExpedientes(data);
@@ -257,9 +256,9 @@ async function renderReserv(append = false) {
               : `<button class="btn-completar-reserva" style="font-size:0.7rem" onclick="abrirEvidencias('${r.id}','evidencias_cliente')">📎 Subir mi evidencia</button>`)
           : '';
       const unidadLabel = recursoNombreMap[r.unidad] || esc(r.unidad) || '—';
-      const propId = ownerIdMap[r.unidad] || r.propietario_id || '';
+      const propId = r.propietario_id || '';
       const calBtn = (r.estado === 'Completada' && !r.calificado && propId)
-        ? `<button class="btn-calificar" onclick="openCalificar('${r.id}','${propId}','${escJs(empresaMap[r.unidad]||'')}')">⭐ Calificar</button>`
+        ? `<button class="btn-calificar" onclick="openCalificar('${r.id}','${propId}','${escJs(perfMap[r.propietario_id]||'')}')">⭐ Calificar</button>`
         : '';
       // El cliente ve su estado de cobro: pagado, por cobrar o vencido.
       const pagoLbl = cobroBadgeHTML(r);
@@ -284,7 +283,7 @@ async function renderReserv(append = false) {
       <div class="reserv-item">
       <div class="reserv-row reserv-row-cli">
         <div class="reserv-id">${unidadLabel}</div>
-        <div class="reserv-empresa">${esc(empresaMap[r.unidad] || '—')}</div>
+        <div class="reserv-empresa">${esc(perfMap[r.propietario_id] || '—')}</div>
         <div>${fmtFecha(r.fecha_ini)}</div>
         <div>${fmtFecha(r.fecha_fin)}</div>
         <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
@@ -346,61 +345,41 @@ async function renderReserv(append = false) {
   }
 
   // Construir mapa de empresa y etiqueta por tipo de recurso
-  const camionIds   = [...new Set(data.filter(r => !r.recurso_tipo || r.recurso_tipo === 'camion').map(r => r.unidad).filter(Boolean))];
+  // camionIds ya no hace falta: su consulta solo daba propietario_id.
   const custodioIds = [...new Set(data.filter(r => r.recurso_tipo === 'custodio').map(r => r.unidad).filter(Boolean))];
   const patioIds    = [...new Set(data.filter(r => r.recurso_tipo === 'patio').map(r => r.unidad).filter(Boolean))];
   const lavadoIds   = [...new Set(data.filter(r => r.recurso_tipo === 'lavado').map(r => r.unidad).filter(Boolean))];
 
-  const empresaMap      = {};
-  const ownerMap        = {};
   const recursoLabelMap = {};
-  const propIdMap2      = {};  // recurso_id → propietario_id
+  const perfMap2        = {};   // propietario_id → nombre de la empresa
 
+  // H-06 (b), igual que en la rama de cliente: la empresa y el dueño salen de
+  // reservaciones.propietario_id. Aquí se siguen leyendo las TABLAS y no las
+  // vistas *_publico, a propósito: el dueño ve sus unidades aunque estén en
+  // revisión, y con la vista una reserva activa de una unidad en edición se
+  // quedaría sin nombre. Pero eso solo justifica pedir el NOMBRE — el
+  // propietario ya venía en la fila.
   const fetches = [];
-  if (camionIds.length) fetches.push(
-    sb.from('camiones').select('id, propietario_id').in('id', camionIds)
-      .then(({ data: d }) => (d || []).forEach(c => {
-        propIdMap2[c.id] = c.propietario_id;
-        ownerMap[c.id]   = c.propietario_id;
-      }))
-  );
   if (custodioIds.length) fetches.push(
-    sb.from('custodios').select('id, nombre, propietario_id').in('id', custodioIds)
-      .then(({ data: d }) => (d || []).forEach(c => {
-        propIdMap2[c.id]      = c.propietario_id;
-        ownerMap[c.id]        = c.propietario_id;
-        recursoLabelMap[c.id] = `👮 ${c.nombre}`;
-      }))
+    sb.from('custodios').select('id, nombre').in('id', custodioIds)
+      .then(({ data: d }) => (d || []).forEach(c => { recursoLabelMap[c.id] = `👮 ${c.nombre}`; }))
   );
   if (patioIds.length) fetches.push(
-    sb.from('patios').select('id, nombre, propietario_id').in('id', patioIds)
-      .then(({ data: d }) => (d || []).forEach(p => {
-        propIdMap2[p.id]      = p.propietario_id;
-        ownerMap[p.id]        = p.propietario_id;
-        recursoLabelMap[p.id] = `🏭 ${p.nombre}`;
-      }))
+    sb.from('patios').select('id, nombre').in('id', patioIds)
+      .then(({ data: d }) => (d || []).forEach(p => { recursoLabelMap[p.id] = `🏭 ${p.nombre}`; }))
   );
   // Los lavados faltaban aquí igual que en la rama de cliente.
   if (lavadoIds.length) fetches.push(
-    sb.from('lavados').select('id, nombre, propietario_id').in('id', lavadoIds)
-      .then(({ data: d }) => (d || []).forEach(l => {
-        propIdMap2[l.id]      = l.propietario_id;
-        ownerMap[l.id]        = l.propietario_id;
-        recursoLabelMap[l.id] = `🧼 ${l.nombre}`;
-      }))
+    sb.from('lavados').select('id, nombre').in('id', lavadoIds)
+      .then(({ data: d }) => (d || []).forEach(l => { recursoLabelMap[l.id] = `🧼 ${l.nombre}`; }))
+  );
+
+  const propIds2 = [...new Set(data.map(r => r.propietario_id).filter(Boolean))];
+  if (propIds2.length) fetches.push(
+    sb.from('empresas_publico').select('user_id, nombre').in('user_id', propIds2)
+      .then(({ data: d }) => (d || []).forEach(p => { perfMap2[p.user_id] = p.nombre; }))
   );
   await Promise.all(fetches);
-
-  // Query directa a la ficha publica
-  const uniquePropIds2 = [...new Set(Object.values(propIdMap2).filter(Boolean))];
-  if (uniquePropIds2.length) {
-    const { data: perfs } = await sb.from('empresas_publico').select('user_id, nombre').in('user_id', uniquePropIds2);
-    const perfMap2 = {};
-    (perfs || []).forEach(p => { perfMap2[p.user_id] = p.nombre; });
-    Object.entries(propIdMap2).forEach(([recursoId, propId]) => {
-      empresaMap[recursoId] = perfMap2[propId] || '—';
-    });
-  }
 
   // Los expedientes documentales de todas las filas, en una sola consulta.
   // renderReserv tiene DOS rutas de render —cliente y empresa/superadmin— y
@@ -425,7 +404,7 @@ async function renderReserv(append = false) {
                    : esCompletada  ? 'badge-acordado'
                    : 'badge-maint';
 
-    const esDueno = currentUser.rol === 'superadmin' || ownerMap[r.unidad] === currentUser.id || r.propietario_id === currentUser.id;
+    const esDueno = currentUser.rol === 'superadmin' || r.propietario_id === currentUser.id;
 
     // Fila compacta: solo lo decisivo a simple vista. Todo lo demás
     // (chofer, unidad, GPS, documentos, cierre) vive en el panel expandible
@@ -513,7 +492,7 @@ async function renderReserv(append = false) {
     <div class="reserv-item">
     <div class="reserv-row ${inactiva ? 'reserv-cancelada' : ''}">
       <div class="reserv-id">${unidadLabel}</div>
-      <div class="reserv-empresa">${esc(empresaMap[r.unidad] || '—')}</div>
+      <div class="reserv-empresa">${esc(perfMap2[r.propietario_id] || '—')}</div>
       <div>${esc(r.cliente)}</div>
       <div>${fmtFecha(r.fecha_ini)}</div>
       <div>${fmtFecha(r.fecha_fin)}</div>
