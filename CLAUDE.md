@@ -190,13 +190,36 @@ Obligan a tocarlo: un estado nuevo o retirado, un permiso que cambia de rol, un 
 
 ## ⚡ Deployment Checklist — DO THIS EVERY TIME
 
-The app is served from **Vercel**, same project for both branches (repo `papelezz-cpu/Flotaapp`, root served as a static site — no build step): `main` → `https://portgo-six.vercel.app`, `dev` → the branch-preview URL above. The app is `/app.html`; the landing is `/`. **`git push` to either branch auto-deploys** (usually live within ~30s). After ANY change, on whichever branch you're working on:
+The app is served from **Vercel**, same project for both branches (repo `papelezz-cpu/Flotaapp`, root served as a static site — no build step): `main` → `https://portgo-six.vercel.app`, `dev` → the branch-preview URL above. The app is `/app.html`; the landing is `/`. **`git push` to either branch auto-deploys — but not immediately, and not predictably** (see step 6). After ANY change, on whichever branch you're working on:
 
 1. **Bump the `?v=` param in `app.html`** for every JS/CSS file you changed (e.g. `js/pedidos.js?v=36` → `?v=37`). `app.html` is the application; `index.html` is the static marketing landing. If you skip this, browsers serve the old cached file and the user reports "it's not fixed".
 2. **Bump the cache version in `sw.js`**: `const CACHE = 'portgo-vXX'` → `vXX+1`. On Vercel the Service Worker actually registers (the site is at the domain root), so the cache bump genuinely matters now — unlike on the old GitHub Pages subpath where `/sw.js` 404'd.
 3. **Commit AND `git push`** — Vercel deploys on push; a local commit alone deploys nothing.
 4. Schema changes: apply to `portgo-pruebas` first, verify, and **stop there**. Applying the same migration to production requires the user's explicit yes for that specific change — see [Rule #2](#-rule-2--production-is-the-users-decision-never-yours). Edge Functions follow the same order. "It's inert" and "it passed in pruebas" are not permission.
 5. Tell the user to hard-refresh (**Ctrl+Shift+R**) if they're testing right away.
+6. **Confirm the deployment is actually live BEFORE telling the user to test, and before treating anything they report as evidence.** A push is not a deploy. On 2026-09-18 four commits pushed at 20:22–20:28 UTC did not finish deploying until **21:14–21:20 — up to 52 minutes later**, because Vercel serialises builds and they queued. All that time the `dev` branch alias kept serving the previous deployment. Three rounds of testing were spent on a build that did not contain the change, and the three explanations proposed for it (stale service worker, wrong URL, failed build) were all wrong. The wasted work was not caused by bad reasoning; it was caused by nobody reading the deployment's timestamp.
+
+   The repo is public, so this needs no token and no `vercel` CLI:
+   ```bash
+   # ¿Vercel terminó de construir la punta de la rama?
+   SHA=$(git rev-parse --short origin/dev)
+   curl -s "https://api.github.com/repos/papelezz-cpu/Flotaapp/deployments?per_page=5" \
+     | grep -E '"sha"|"created_at"'        # ¿hay un despliegue para ese sha?
+   curl -s "https://api.github.com/repos/papelezz-cpu/Flotaapp/commits/$SHA/status" \
+     | grep -E '"state"|"target_url"'      # success | pending | failure
+   ```
+   `success` on the commit status is the green light; `pending` means it is still queued and the alias is still serving the old build. The `deployments/<id>/statuses` endpoint gives the exact minute it went live, which is what settles "did the user test the new code or the old one".
+
+   **And there is a cheaper check that costs the user five seconds**, worth asking for whenever a preview result looks wrong — it reports the URL, the database, the loaded file versions and the SW cache in one paste:
+   ```js
+   console.log(JSON.stringify({ url: location.href,
+     base: (typeof sb !== 'undefined' && sb.supabaseUrl) || 'sb no definido',
+     scripts: [...document.scripts].filter(s => /reportes|views/.test(s.src)).map(s => s.src.split('/').pop())
+   }, null, 2)); caches.keys().then(k => console.log('caches:', k));
+   ```
+   If the `?v=` it prints is behind what `app.html` asks for on that branch, the deploy has not landed — stop, and do not debug the code.
+
+> ⚠️ **`portgo-pruebas` is a byte-identical copy of production, so the DATA cannot tell you which environment you are looking at.** Same rows, same names, same totals, same screens. On 2026-09-18 that made a test on the wrong build indistinguishable from a test on the right one across every number on two screens — the only cell that differed was a tie-break in a five-row ranking, and it was noticed by luck. **When something must be verified on `dev`, verify which build and which project the page actually loaded before reading a single figure**, with the console snippet in step 6. A screenshot proves nothing about which environment produced it.
 
 `vercel.json` sets the static config: `cleanUrls:false` (keeps the `.html` URLs), no-cache for `sw.js`, revalidate for HTML/manifest.
 
@@ -440,6 +463,7 @@ Deploy with `mcp__supabase__deploy_edge_function` (or `supabase functions deploy
 - **Don't gate roles with inline styles** — use the `<body>` class system.
 - **Don't use `alert()`/`confirm()`** — `showToast()` / `showConfirm()`.
 - **Don't ship without bumping `?v=` + sw.js cache + pushing** — see the deployment checklist.
+- **Don't hand the user an explanation you haven't measured.** When a result comes back wrong, the tempting move is to name the most plausible cause and act on it. On 2026-09-18 that produced three confident diagnoses in a row — stale service worker, wrong URL, Vercel never built it — each plausible, each stated as fact, each false. Every one of them sent the user to do work that led nowhere, and the real cause (a deployment still in Vercel's queue) was one HTTP request away the whole time and was never asked for. State a hypothesis as a hypothesis, and go get the measurement that separates it from the alternatives **before** the user spends anything on it. If no measurement is available, say that instead of picking the likeliest story.
 - **Don't put the service role key anywhere near client code.**
 - **Don't seed or test on `portgo-pruebas` without a fresh parity stamp** — and don't present a result measured there without saying which stamp backs it. See [Rule #3](#-rule-3--portgo-pruebas-is-a-copy-of-production-or-it-is-nothing).
 - **Don't delete anything without explicit authorization** — even under `bypassPermissions`. See [Rule #1](#-rule-1--ask-before-deleting-anything) at the top of this file.
