@@ -39,10 +39,14 @@ async function renderCatalogo() {
     { data: lavados   },
     { data: califs    },
   ] = await Promise.all([
-    sb.from('camiones'      ).select('id, tipo, estado, propietario_id').eq('aprobacion','aprobada').in('propietario_id', ids),
-    sb.from('custodios'     ).select('id, tipo, estado, propietario_id').eq('aprobacion','aprobada').in('propietario_id', ids),
-    sb.from('patios'        ).select('id, tipo, estado, propietario_id').eq('aprobacion','aprobada').in('propietario_id', ids),
-    sb.from('lavados'       ).select('id, tipos_vehiculo, tipos_lavado, estado, propietario_id').eq('aprobacion','aprobada').in('propietario_id', ids),
+    // Las vistas *_publico traen solo lo que estos bloques pintan y ya filtran
+    // aprobacion='aprobada' dentro. Pedir pocas columnas desde aquí no protegía
+    // nada —cualquiera escribe select=* a mano— y la fila entera de un camión
+    // lleva VIN, motor, placas y las rutas de sus documentos. Ver H-10.
+    sb.from('camiones_publico' ).select('id, tipo, estado, propietario_id').in('propietario_id', ids),
+    sb.from('custodios_publico').select('id, tipo, estado, propietario_id').in('propietario_id', ids),
+    sb.from('patios_publico'   ).select('id, tipo, estado, propietario_id').in('propietario_id', ids),
+    sb.from('lavados_publico'  ).select('id, tipos_vehiculo, tipos_lavado, estado, propietario_id').in('propietario_id', ids),
     sb.from('calificaciones').select('admin_id, rating, comentario, created_at').in('admin_id', ids).order('created_at', { ascending: false }),
   ]);
 

@@ -631,7 +631,38 @@ necesitan esos permisos porque ahí RLS es la frontera—, así que **toda vista
 nueva en `public` sigue naciendo escribible**. Crear la vista y poner
 `grant select` **no basta**: hay que retirar la escritura explícitamente. El
 bloque 2 de esa migración es idempotente y sirve de red: volver a ejecutarlo
-después de crear una vista la deja limpia.
+después de crear una vista la deja limpia. Y
+`supabase/sondas/escritura-en-vistas.sql` lo detecta en cualquiera de los dos
+proyectos, sin comparar bases.
+
+### La flota ajena se lee por vista, no por tabla
+
+Cuatro políticas dejaban ver la **fila entera** de cada recurso aprobado a
+cualquier usuario con sesión: `camiones_public_read` y sus tres hermanas. RLS
+decide *qué filas* ves, no *qué columnas*, así que «ver el catálogo» y «leer el
+expediente de la unidad» eran el mismo permiso.
+
+Comprobado el 2026-09-17 con una sesión de empresa normal y una sola petición:
+`select=*` sobre camiones ajenos devolvía **9 unidades con sus 48 columnas** —
+VIN, número de motor, placas, tarjeta de circulación, precio por día y las rutas
+de los documentos SCT y de seguro.
+
+Desde `20260917120000` existen `camiones_publico`, `custodios_publico`,
+`patios_publico` y `lavados_publico`, con **solo lo que el catálogo pinta** y el
+filtro `aprobacion = 'aprobada'` dentro.
+
+**Quién lee qué, y por qué no es uniforme:**
+
+| Quién | De dónde | Por qué |
+|---|---|---|
+| Catálogo (cualquiera) | vista | no es dueño; no necesita el expediente |
+| Reservaciones, rama **cliente** | vista | tampoco es dueño |
+| Reservaciones, rama **empresa/superadmin** | **tabla** | el dueño la ve por `*_owner_read` sin importar el `aprobacion`, y **editar una unidad la devuelve a revisión**: con la vista, una reserva activa de una unidad en edición se quedaría sin nombre |
+| Mis unidades, ofertar | tabla | son sus propias unidades |
+
+⚠ **Las cuatro políticas `*_public_read` siguen abiertas**: mientras estén, la
+vista es solo una forma más limpia de leer, no una frontera. Retirarlas es un
+borrado y necesita autorización explícita.
 
 ### El rol solo se cambia por `cambiar_rol()`
 

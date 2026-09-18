@@ -138,7 +138,7 @@ async function renderAdmin() {
           <div class="truck-list-item-info">
             <div class="truck-list-item-name">${c.emoji} ${c.id} — ${c.tipo}</div>
             <div class="truck-list-item-sub">
-              ${c.operador} · ${c.capacidad} ton ·
+              ${esc(c.operador || 'Sin chofer')} · ${c.capacidad ?? '—'} ton ·
               <span class="badge ${badgeClass}" style="font-size:0.68rem">${c.estado}</span>
               ${currentUser.rol === 'superadmin' ? `· <em style="color:var(--text-muted)">${empresa}</em>` : ''}
             </div>

@@ -2478,10 +2478,17 @@ async function openEmpresaPerfil(adminId, adminNombre) {
     { data: cals }
   ] = await Promise.all([
     sb.from('empresas_publico').select('descripcion, nombre').eq('user_id', adminId).maybeSingle(),
-    sb.from('camiones').select('id, estado').eq('propietario_id', adminId),
-    sb.from('custodios').select('id, estado').eq('propietario_id', adminId),
-    sb.from('patios').select('id, estado').eq('propietario_id', adminId),
-    sb.from('lavados').select('id').eq('propietario_id', adminId),
+    // Esta ficha la abre el CLIENTE desde una oferta, sobre una empresa que no
+    // es suya, así que va por las vistas *_publico como el resto de lecturas
+    // ajenas. Ver H-10.
+    //
+    // Cambia una cosa, y para mejor: la vista filtra aprobacion='aprobada', así
+    // que el superadmin deja de contar aquí las unidades pendientes. Es una
+    // ficha pública — debe enseñar lo mismo a quien la mire.
+    sb.from('camiones_publico').select('id, estado').eq('propietario_id', adminId),
+    sb.from('custodios_publico').select('id, estado').eq('propietario_id', adminId),
+    sb.from('patios_publico').select('id, estado').eq('propietario_id', adminId),
+    sb.from('lavados_publico').select('id').eq('propietario_id', adminId),
     sb.from('calificaciones').select('rating').eq('admin_id', adminId),
   ]);
 
