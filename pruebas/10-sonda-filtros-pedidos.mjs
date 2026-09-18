@@ -167,18 +167,28 @@ if (fallos === 0) {
 }
 
 // El caso que da sentido al hallazgo: filtrar despues de paginar pierde filas.
+//
+// La primera pagina tiene que pedirse CON EL ORDEN REAL de renderPedidos
+// -created_at desc, id desc-. La primera version de esta sonda reutilizaba
+// las filas ya descargadas sin ordenar, y daba "25 de 36" donde lo cierto es
+// "30 de 36". Peor: escondia los dos casos que de verdad ilustran el
+// hallazgo, Custodia y Patio, donde la pantalla decia "no hay" teniendo 4 y
+// 1. Un universo sin ordenar no es la primera pagina de nada.
 const PAG = 30;
-const porFecha = [...todos];
-let demostrado = null;
+const { data: pagina1 } = await sa.select('pedidos',
+  `select=id,tipo_camion,origen,destino,zona_cobertura&order=created_at.desc,id.desc&limit=${PAG}`);
+const perdidos = [];
 for (const tipo of TIPOS.slice(1)) {
-  const enLista   = filtroViejo(todos, tipo, '').length;
-  const enPagina1 = filtroViejo(porFecha.slice(0, PAG), tipo, '').length;
-  if (enLista > enPagina1) { demostrado = { tipo, enLista, enPagina1 }; break; }
+  const enLista   = filtroViejo(todos,      tipo, '').length;
+  const enPagina1 = filtroViejo(pagina1 || [], tipo, '').length;
+  if (enLista > enPagina1) perdidos.push({ tipo, enLista, enPagina1 });
 }
 console.log('');
-if (demostrado) {
+if (perdidos.length) {
+  const vacios = perdidos.filter(p => p.enPagina1 === 0);
   anotar('Se reproduce el defecto que H-11 describe', true,
-    `tipo=${demostrado.tipo}: ${demostrado.enLista} en la lista, ${demostrado.enPagina1} en la primera pagina de ${PAG}`);
+    perdidos.map(p => `${p.tipo} ${p.enPagina1}/${p.enLista}`).join(' · ') +
+    (vacios.length ? `  <- ${vacios.map(v => v.tipo).join(' y ')} se veian VACIOS` : ''));
 } else {
   console.log(`  ${C.am} AVISO${C.fin}  Con ${todos.length} pedidos todo cabe en la primera pagina: aqui el defecto`);
   console.log(`          ${C.dim}de H-11 no se puede reproducir. La equivalencia de arriba si vale;${C.fin}`);

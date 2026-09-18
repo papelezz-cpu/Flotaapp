@@ -110,9 +110,10 @@ Vigencias · Mi desempeño · Cobros · Privacidad · Avisos.
   Custodia · Patio · Lavado) y por **zona** (texto libre contra `origen`,
   `destino` y `zona_cobertura`). Desde el 2026-09-18 los dos filtros se
   aplican **en la consulta, no sobre la página ya descargada** — antes
-  filtraban solo las 30 filas traídas, así que pedir «Lavado» podía devolver
-  vacío habiendo lavados más abajo. Medido ese día: filtrando por «Camión»
-  había 36 solicitudes en la lista y 25 en la primera página. El grupo
+  filtraban solo las 30 filas traídas, así que pedir un tipo podía devolver
+  vacío habiendo solicitudes de ese tipo más abajo. Medido ese día, con las 41
+  solicitudes de entonces: **Custodia enseñaba 0 de 4 y Patio 0 de 1** —la
+  pantalla decía «no hay» teniendo—, y Camión 30 de 36. El grupo
   «Camión» se define **por negación** de los otros tres, no por una lista de
   tipos: el catálogo vive en la tabla `catalogos` y crece sin avisar.
 - Asignar chofer, avanzar el seguimiento y subir evidencia de cierre.
