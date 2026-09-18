@@ -172,8 +172,15 @@ if (fallos === 0) {
 // -created_at desc, id desc-. La primera version de esta sonda reutilizaba
 // las filas ya descargadas sin ordenar, y daba "25 de 36" donde lo cierto es
 // "30 de 36". Peor: escondia los dos casos que de verdad ilustran el
-// hallazgo, Custodia y Patio, donde la pantalla decia "no hay" teniendo 4 y
-// 1. Un universo sin ordenar no es la primera pagina de nada.
+// hallazgo, Custodia y Patio. Un universo sin ordenar no es la primera
+// pagina de nada.
+//
+// OJO CON QUE ROL MODELA ESTO: "la pagina de 30" es la lista de la EMPRESA.
+// El superadmin lanza ademas una consulta paralela de acuerdos con limit 100,
+// asi que con poco volumen ya se trae el historico entero y el defecto no se
+// le manifiesta — filtrar en memoria sobre lo acumulado le da lo mismo que
+// filtrar en el servidor. Decir "Custodia salia vacia" sin decir para quien
+// es afirmar de mas.
 const PAG = 30;
 const { data: pagina1 } = await sa.select('pedidos',
   `select=id,tipo_camion,origen,destino,zona_cobertura&order=created_at.desc,id.desc&limit=${PAG}`);

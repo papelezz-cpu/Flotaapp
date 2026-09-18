@@ -111,9 +111,15 @@ Vigencias · Mi desempeño · Cobros · Privacidad · Avisos.
   `destino` y `zona_cobertura`). Desde el 2026-09-18 los dos filtros se
   aplican **en la consulta, no sobre la página ya descargada** — antes
   filtraban solo las 30 filas traídas, así que pedir un tipo podía devolver
-  vacío habiendo solicitudes de ese tipo más abajo. Medido ese día, con las 41
-  solicitudes de entonces: **Custodia enseñaba 0 de 4 y Patio 0 de 1** —la
-  pantalla decía «no hay» teniendo—, y Camión 30 de 36. El grupo
+  vacío habiendo solicitudes de ese tipo más abajo.
+  **Con qué rol se nota, y con cuál no:** el superadmin lanza además una
+  consulta paralela de acuerdos con `limit 100`, así que con poco volumen ya
+  se trae el histórico entero y el defecto no se le manifiesta. Se manifiesta
+  en el rol empresa, cuya lista es solo la página de 30. Medido el 2026-09-18
+  sobre esa página: Custodia 0 de 4, Patio 0 de 1, Camión 30 de 36. La
+  equivalencia entre el filtro viejo y el nuevo sí está comprobada en 85 casos
+  (`pruebas/10-sonda-filtros-pedidos.mjs`); que el arreglo *cambie lo que se
+  ve* pide más volumen del que había ese día. El grupo
   «Camión» se define **por negación** de los otros tres, no por una lista de
   tipos: el catálogo vive en la tabla `catalogos` y crece sin avisar.
 - Asignar chofer, avanzar el seguimiento y subir evidencia de cierre.
