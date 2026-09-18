@@ -160,6 +160,37 @@ encerrado:
 identidad que los guards no cuestionan**, y por eso el trabajo de rutina no
 debe hacerse con ella.
 
+### El globo cuenta once colas, y son las que el panel lista
+
+El número rojo de «Por aprobar» sale de `cola_superadmin()` — una sola llamada
+que devuelve el desglose y el total. El panel (`renderAprobaciones()`) carga
+**once** colas, y la función cuenta **esas once**, ni una más ni una menos:
+
+| Cola | De dónde sale |
+|---|---|
+| Cuentas | `perfiles.aprobacion_cuenta = 'pendiente'` **∪** `solicitudes_cuenta.estado = 'pendiente'` |
+| Camiones · Operadores · Custodios · Patios · Lavados | `aprobacion = 'pendiente'` en cada tabla |
+| Solicitudes | `pedidos.estado = 'pendiente_revision'` |
+| Acuerdos forzados | `pedidos.estado = 'pendiente_acuerdo'` |
+| Documentos de empresa | `perfiles.perfil_docs_pendiente` |
+| **Cierres** | `reservaciones.estado = 'PorAprobar'` |
+| Cancelaciones | `reservaciones.estado = 'CancelacionSolicitada'` |
+
+**Que coincidan no es cosmética.** Un globo oculto y una cola vacía se ven
+exactamente igual, así que una cola que el globo no cuenta es una cola que
+nadie tiene motivo para ir a mirar. Hasta el 2026-09-18 los cierres en
+`PorAprobar` eran justo eso: el panel los listaba y el globo no los veía.
+
+**Las cuentas se cuentan de dos tablas a propósito.** El panel lista
+`solicitudes_cuenta`, pero contar solo eso perdería un perfil `pendiente` sin
+solicitud —el alta que se cortó a la mitad, ver §1—, y esa persona no puede
+entrar y nadie se entera. La unión no se queda corta por ningún lado, y el
+`UNION` por `user_id` evita contar dos veces el caso normal.
+
+Si se añade una cola al panel, **se añade también a la función**, o el número
+vuelve a mentir. Es lo único que hay que recordar de esta sección.
+
+
 ---
 
 ## Estados canónicos
@@ -791,6 +822,15 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
    pedido y, sobre todo, el desvío por documentos vencidos: **por esa vía una
    empresa con el permiso SCT vencido cerraba el trato sin que nadie lo
    mirara.**
+8. **`aprobarCuenta()` escribe dos tablas y solo mira el error de una.**
+   `js/aprobaciones.js` actualiza `perfiles` y `solicitudes_cuenta` en el
+   mismo `Promise.all` y comprueba únicamente el de `perfiles`. Si el segundo
+   falla, la cuenta queda aprobada y la solicitud sigue `pendiente`: el panel
+   la lista para siempre. **El globo ya no miente por esto** —desde el
+   2026-09-18 cuenta la unión de las dos tablas, ver §Superadmin— pero la
+   causa sigue ahí. No se ha dado en producción: las 7 solicitudes están
+   `aprobada` y ningún perfil quedó `pendiente`. Arreglarlo es mover la
+   pareja a una RPC o usar `actualizarConfirmado()` en las dos.
 
 ---
 
