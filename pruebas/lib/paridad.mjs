@@ -105,8 +105,20 @@ export function exigirParidad(ambientePruebas) {
 
 // Una línea para el encabezado de la corrida y para el reporte guardado: la
 // prueba tiene que llevar encima la prueba de que la base era la correcta.
+// El VEREDICTO va primero y en mayúsculas. Antes esta línea empezaba por
+// «paridad verificada …» dijera lo que dijera el sello, así que una corrida
+// sobre bases divergentes se encabezaba con una frase tranquilizadora y la
+// palabra `diverge` no aparecía por ningún lado. Los guiones que llaman a
+// exigirParidad() no lo notaban —se niegan a arrancar antes de imprimir nada—
+// pero las sondas que a propósito no exigen paridad sí lo imprimen, y son
+// justo las que corren cuando el sello está en rojo. Regla #3: si la paridad
+// falló, eso se dice EN LUGAR del resultado, no debajo.
 export function resumenParidad(sello) {
   if (!sello || sello.omitida) return 'paridad NO verificada — resultados sin valor probatorio';
-  return `paridad verificada ${sello.verificado_en} · ${sello.origen_ref} -> ${sello.destino_ref} ` +
-         `· modo ${sello.modo} · única diferencia declarada: ${sello.excepcion_declarada}`;
+  const donde = `${sello.origen_ref} -> ${sello.destino_ref} · ${sello.verificado_en} · modo ${sello.modo}`;
+  if (sello.veredicto !== 'identicas') {
+    return `paridad ${String(sello.veredicto).toUpperCase()} (${sello.diferencias} diferencias, ` +
+           `${sello.no_verificables} no verificables) · ${donde} — lo medido aquí NO describe producción`;
+  }
+  return `paridad IDENTICAS · ${donde} · única diferencia declarada: ${sello.excepcion_declarada}`;
 }

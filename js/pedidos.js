@@ -10,6 +10,65 @@ let _filtroGeo         = '';
 let _filtroEstadoCli   = 'todos';
 let _pedidosMode       = 'lista'; // 'solicitar' | 'lista'
 
+// ── FILTROS DE SOLICITUDES, EN EL SERVIDOR (H-11) ──────
+//
+// Antes esto se filtraba en JavaScript sobre lo que la paginación ya había
+// traído, y eso no filtraba la lista: filtraba la página. Con historial
+// suficiente, pedir «lavado» sobre una primera página de 30 pedidos que son
+// todos de camión devuelve vacío habiendo lavados más abajo — y el usuario
+// concluye que no hay. Es un fallo de corrección, no de eficiencia.
+//
+// Los cuatro grupos del selector salen del mismo reparto que hacía el filter:
+// tres se describen por lo que SON y «camión» por lo que NO es. No se enumera
+// una lista de tipos de camión a propósito — habría que tocar esto cada vez
+// que el catálogo crezca, y el catálogo vive en la base (tabla `catalogos`).
+//
+// `pedidos.tipo_camion` es NOT NULL con default 'Cualquiera' (verificado en el
+// esquema), así que la conjunción de negaciones no pierde filas por NULL, que
+// es el modo clásico en que una negación en SQL no equivale a su `!` en JS.
+const PED_GRUPOS_POSITIVOS = {
+  custodio: 'tipo_camion.like.Custodio*,tipo_camion.eq."Supervisión remota"',
+  patio:    'tipo_camion.like.Patio*,tipo_camion.eq."Bodega"',
+  lavado:   'tipo_camion.like.Lavado*,tipo_camion.eq."Desinfección"',
+};
+const PED_CAMION_NEGACIONES = [
+  ['like', 'Lavado%'],   ['eq', 'Desinfección'],
+  ['like', 'Custodio%'], ['eq', 'Supervisión remota'],
+  ['like', 'Patio%'],    ['eq', 'Bodega'],
+];
+
+// El término geográfico se busca como SUBCADENA LITERAL, que es lo que hacía
+// String.includes(). Sin escapar, un usuario que teclee «%» o «_» obtendría un
+// comodín de LIKE y una lista que no pidió; y una comilla rompería la
+// expresión .or() de PostgREST.
+//
+// Y son DOS capas de escapado, no una — se descubrió midiendo, no razonando:
+// con una sola, el servidor devolvía las 41 filas donde el navegador devolvía
+// 0. Dentro de un valor entrecomillado de `or=(…)`, PostgREST trata la barra
+// invertida como su propio escape y se la come, así que un `\%` le llega a
+// Postgres como `%` — otra vez comodín. Hay que escapar primero para LIKE y
+// después para PostgREST, en ese orden.
+function _pedGeoLiteral(txt) {
+  const paraLike = String(txt).replace(/[\\%_]/g, m => '\\' + m);
+  return paraLike.replace(/[\\"]/g, m => '\\' + m);
+}
+
+// Aplica los dos filtros a CUALQUIER consulta de pedidos. Se usa también en la
+// consulta paralela de acordados del superadmin: si solo se aplicara a una,
+// filtrar por «lavado» seguiría enseñando todos los acuerdos de camión.
+function aplicarFiltrosPedidos(q) {
+  if (_filtroTipo === 'camion') {
+    PED_CAMION_NEGACIONES.forEach(([op, val]) => { q = q.not('tipo_camion', op, val); });
+  } else if (PED_GRUPOS_POSITIVOS[_filtroTipo]) {
+    q = q.or(PED_GRUPOS_POSITIVOS[_filtroTipo]);
+  }
+  if (_filtroGeo) {
+    const g = _pedGeoLiteral(_filtroGeo);
+    q = q.or(`origen.ilike."%${g}%",destino.ilike."%${g}%",zona_cobertura.ilike."%${g}%"`);
+  }
+  return q;
+}
+
 const PEDIDOS_PAGE = 30;
 // Paginación por cursor, no por OFFSET. Con OFFSET, la página N obliga a
 // Postgres a recorrer y descartar N x 30 filas antes de devolver nada: el
@@ -223,10 +282,14 @@ async function renderPedidos(append = false) {
   }
   if (esCliente) pedidosQ = pedidosQ.in('estado', ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado', 'acordado', 'cancelado', 'finalizado', 'expirado']);
 
+  // H-11: los filtros de tipo y zona van aquí, no sobre lo ya descargado.
+  pedidosQ = aplicarFiltrosPedidos(pedidosQ);
+
   // Superadmin: query paralela para acordados (no están en la paginación por ser más viejos)
   const esSuperAdmin = currentUser.rol === 'superadmin';
   const acordadosExtraQ = (!append && esSuperAdmin)
-    ? sb.from('pedidos').select('*').in('estado', ['acordado', 'finalizado', 'expirado']).order('created_at', { ascending: false }).limit(100)
+    ? aplicarFiltrosPedidos(
+        sb.from('pedidos').select('*').in('estado', ['acordado', 'finalizado', 'expirado']).order('created_at', { ascending: false }).limit(100))
     : Promise.resolve({ data: [] });
 
   const [{ data: pedidosPage, error }, { data: acordadosSA }] = await Promise.all([pedidosQ, acordadosExtraQ]);
@@ -339,28 +402,11 @@ async function renderPedidos(append = false) {
   const ofertasMap   = _ofertasAccum;
   const todasOfertas = Object.values(_ofertasAccum).flat();
 
-  const _filtrar = lista => {
-    let r = lista;
-    if (_filtroTipo !== 'todos') {
-      r = r.filter(p => {
-        const t = p.tipo_camion || '';
-        if (_filtroTipo === 'camion')   return !t.startsWith('Lavado') && t !== 'Desinfección' && !t.startsWith('Custodio') && t !== 'Supervisión remota' && !t.startsWith('Patio') && t !== 'Bodega';
-        if (_filtroTipo === 'custodio') return t.startsWith('Custodio') || t === 'Supervisión remota';
-        if (_filtroTipo === 'patio')    return t.startsWith('Patio') || t === 'Bodega';
-        if (_filtroTipo === 'lavado')   return t.startsWith('Lavado') || t === 'Desinfección';
-        return true;
-      });
-    }
-    if (_filtroGeo) {
-      const geo = _filtroGeo.toLowerCase();
-      r = r.filter(p =>
-        (p.origen || '').toLowerCase().includes(geo) ||
-        (p.destino || '').toLowerCase().includes(geo) ||
-        (p.zona_cobertura || '').toLowerCase().includes(geo)
-      );
-    }
-    return r;
-  };
+  // H-11: los filtros de tipo y zona ya vienen aplicados por la consulta —
+  // ver aplicarFiltrosPedidos(). Esto se queda como identidad para no tocar
+  // las seis llamadas que lo envuelven; volver a filtrar aquí no cambiaría
+  // nada, pero repetir la regla en dos sitios es cómo se desincronizan.
+  const _filtrar = lista => lista;
 
   const _filtrarEstadoCli = lista => {
     if (_filtroEstadoCli === 'todos') return lista;
@@ -2636,8 +2682,19 @@ function filtrarPedidosEstado(est) {
   renderPedidos();
 }
 
+// El input dispara en `oninput`, o sea una vez por tecla. Mientras el filtro
+// era de memoria eso era gratis; ahora cada llamada es una consulta que además
+// reinicia el acumulado y deja la lista en esqueleto. Sin amortiguar, teclear
+// «Manzanillo» son once peticiones y once parpadeos.
+let _geoTimer = null;
 function filtrarPedidosGeo(val) {
-  _filtroGeo = val.trim();
-  renderPedidos();
+  const v = val.trim();
+  // El clear va ANTES de la salida temprana: si escribes una letra y la borras
+  // dentro de la ventana, hay un temporizador en vuelo que aplicaría la letra
+  // borrada. Volver al valor ya aplicado tiene que CANCELAR lo pendiente, no
+  // solo no programar nada nuevo.
+  clearTimeout(_geoTimer);
+  if (v === _filtroGeo) return;        // flechas, teclas muertas, espacios al final
+  _geoTimer = setTimeout(() => { _filtroGeo = v; renderPedidos(); }, 350);
 }
 

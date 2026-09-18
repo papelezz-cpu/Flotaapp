@@ -106,6 +106,15 @@ Vigencias · Mi desempeño · Cobros · Privacidad · Avisos.
   los acredita: ver *Los seguros se acreditan, no se declaran*.
 - Ofertar sobre solicitudes en `abierto` o `en_negociacion`, y aceptar una
   contraoferta del cliente.
+- Filtrar la lista de Solicitudes por **tipo de servicio** (Todos · Camión ·
+  Custodia · Patio · Lavado) y por **zona** (texto libre contra `origen`,
+  `destino` y `zona_cobertura`). Desde el 2026-09-18 los dos filtros se
+  aplican **en la consulta, no sobre la página ya descargada** — antes
+  filtraban solo las 30 filas traídas, así que pedir «Lavado» podía devolver
+  vacío habiendo lavados más abajo. Medido ese día: filtrando por «Camión»
+  había 36 solicitudes en la lista y 25 en la primera página. El grupo
+  «Camión» se define **por negación** de los otros tres, no por una lista de
+  tipos: el catálogo vive en la tabla `catalogos` y crece sin avisar.
 - Asignar chofer, avanzar el seguimiento y subir evidencia de cierre.
 - **Pedir** expedientes de documentos al cliente, y aceptarlos o rechazarlos
   uno a uno.
