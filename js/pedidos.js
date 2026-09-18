@@ -10,6 +10,120 @@ let _filtroGeo         = '';
 let _filtroEstadoCli   = 'todos';
 let _pedidosMode       = 'lista'; // 'solicitar' | 'lista'
 
+// ── FILTROS DE SOLICITUDES, EN EL SERVIDOR (H-11) ──────
+//
+// Antes esto se filtraba en JavaScript sobre lo que la paginación ya había
+// traído, y eso no filtraba la lista: filtraba la página. Con historial
+// suficiente, pedir «lavado» sobre una primera página de 30 pedidos que son
+// todos de camión devuelve vacío habiendo lavados más abajo — y el usuario
+// concluye que no hay. Es un fallo de corrección, no de eficiencia.
+//
+// Los cuatro grupos del selector salen del mismo reparto que hacía el filter:
+// tres se describen por lo que SON y «camión» por lo que NO es. No se enumera
+// una lista de tipos de camión a propósito — habría que tocar esto cada vez
+// que el catálogo crezca, y el catálogo vive en la base (tabla `catalogos`).
+//
+// `pedidos.tipo_camion` es NOT NULL con default 'Cualquiera' (verificado en el
+// esquema), así que la conjunción de negaciones no pierde filas por NULL, que
+// es el modo clásico en que una negación en SQL no equivale a su `!` en JS.
+const PED_GRUPOS_POSITIVOS = {
+  custodio: 'tipo_camion.like.Custodio*,tipo_camion.eq."Supervisión remota"',
+  patio:    'tipo_camion.like.Patio*,tipo_camion.eq."Bodega"',
+  lavado:   'tipo_camion.like.Lavado*,tipo_camion.eq."Desinfección"',
+};
+const PED_CAMION_NEGACIONES = [
+  ['like', 'Lavado%'],   ['eq', 'Desinfección'],
+  ['like', 'Custodio%'], ['eq', 'Supervisión remota'],
+  ['like', 'Patio%'],    ['eq', 'Bodega'],
+];
+
+// El término geográfico se busca como SUBCADENA LITERAL, que es lo que hacía
+// String.includes(). Sin escapar, un usuario que teclee «%» o «_» obtendría un
+// comodín de LIKE y una lista que no pidió; y una comilla rompería la
+// expresión .or() de PostgREST.
+//
+// Y son DOS capas de escapado, no una — se descubrió midiendo, no razonando:
+// con una sola, el servidor devolvía las 41 filas donde el navegador devolvía
+// 0. Dentro de un valor entrecomillado de `or=(…)`, PostgREST trata la barra
+// invertida como su propio escape y se la come, así que un `\%` le llega a
+// Postgres como `%` — otra vez comodín. Hay que escapar primero para LIKE y
+// después para PostgREST, en ese orden.
+function _pedGeoLiteral(txt) {
+  const paraLike = String(txt).replace(/[\\%_]/g, m => '\\' + m);
+  return paraLike.replace(/[\\"]/g, m => '\\' + m);
+}
+
+// Aplica los dos filtros a CUALQUIER consulta de pedidos. Se usa también en la
+// consulta paralela de acordados del superadmin: si solo se aplicara a una,
+// filtrar por «lavado» seguiría enseñando todos los acuerdos de camión.
+function aplicarFiltrosPedidos(q) {
+  if (_filtroTipo === 'camion') {
+    PED_CAMION_NEGACIONES.forEach(([op, val]) => { q = q.not('tipo_camion', op, val); });
+  } else if (PED_GRUPOS_POSITIVOS[_filtroTipo]) {
+    q = q.or(PED_GRUPOS_POSITIVOS[_filtroTipo]);
+  }
+  if (_filtroGeo) {
+    const g = _pedGeoLiteral(_filtroGeo);
+    q = q.or(`origen.ilike."%${g}%",destino.ilike."%${g}%",zona_cobertura.ilike."%${g}%"`);
+  }
+  return q;
+}
+
+// ── FILTRO DE ESTADO DEL CLIENTE ──────────────────────
+//
+// Los mismos grupos que aplica _filtrarEstadoCli, para poder pedirle a la
+// base solo los estados que la pantalla va a pintar en vez de traerse los
+// nueve y descartar ocho en el navegador.
+//
+// `abierto` se añade SIEMPRE, filtre lo que filtre. La sección «Otras
+// solicitudes activas» pinta los pedidos abiertos de OTROS clientes y usa
+// _filtrar, no _filtrarEstadoCli — o sea que el filtro de estado nunca la ha
+// tocado, a propósito. Quitar `abierto` de la consulta la vaciaría al filtrar
+// por «Cancelados», y eso no es llevar un filtro al servidor: es cambiar lo
+// que la pantalla enseña.
+const PED_ESTADOS_TODOS = ['abierto','en_negociacion','pendiente_revision','pendiente_acuerdo',
+                           'rechazado','acordado','cancelado','finalizado','expirado'];
+const PED_ESTADOS_POR_FILTRO = {
+  activo:    ['abierto','en_negociacion','pendiente_acuerdo','rechazado'],
+  revision:  ['pendiente_revision'],
+  acordado:  ['acordado','finalizado','expirado'],
+  cancelado: ['cancelado'],
+};
+function estadosParaConsulta() {
+  const sel = PED_ESTADOS_POR_FILTRO[_filtroEstadoCli];
+  if (!sel) return PED_ESTADOS_TODOS;              // 'todos', o un valor que no conozco
+  return [...new Set([...sel, 'abierto'])];        // ver el comentario de arriba
+}
+
+// ── COLUMNAS DEL LISTADO (H-08) ───────────────────────
+//
+// `pedidos` tiene 63 columnas y la lista se paginaba con select('*'). Medido
+// contra la base el 2026-09-18, con 30 filas: 47.923 bytes con '*' frente a
+// 24.614 con esta lista. **1,95x, no «entre 3 y 5 veces» como decía la ficha
+// del hallazgo** — el recuento de columnas no es el de bytes, y las que se
+// quitan son en su mayoría numéricas y nulas.
+//
+// La lista NO está escrita de memoria: sale de cruzar las columnas reales del
+// esquema con los accesos `algo.columna` de pedidos.js, detalle.js,
+// plantillas.js, aprobaciones.js y modal.js. Olvidar una aquí no da error:
+// deja un hueco en la interfaz, y por eso lo vigila
+// pruebas/13-sonda-columnas-listado.mjs, que falla si alguna columna omitida
+// empieza a usarse.
+//
+// Las 25 que faltan son de carga fina (dimensiones, temperaturas, hazmat,
+// contenedores), contacto, y las coordenadas del mapa: ninguna se pinta en la
+// tarjeta de la lista. El modal de detalle hace su propia consulta completa,
+// así que sigue viéndolo todo.
+const PED_COLS_LISTA = [
+  'id','cliente_id','cliente_nombre','cliente_email','tipo_camion','tipo_carga',
+  'capacidad_min','origen','destino','fecha_ini','fecha_fin','descripcion',
+  'precio_cliente','estado','created_at','peso_carga','hora_carga','carga_peligrosa',
+  'requiere_seguro','requiere_factura','num_custodios','horario_servicio','zona_cobertura',
+  'num_vehiculos','tipo_vehiculos','area_necesaria','detalles_lugar','detalles_hora',
+  'oferta_pendiente_id','rechazo_nota','tipo_contenedor','plazo_pago','categoria_carga',
+  'refrigerado','num_contenedores','entra_a_puerto','fecha_arribo_puerto','patio_externo',
+].join(',');
+
 const PEDIDOS_PAGE = 30;
 // Paginación por cursor, no por OFFSET. Con OFFSET, la página N obliga a
 // Postgres a recorrer y descartar N x 30 filas antes de devolver nada: el
@@ -209,7 +323,7 @@ async function renderPedidos(append = false) {
   if (plantBox)   plantBox.style.display   = 'none';
   if (filtrosBar) filtrosBar.style.display = currentUser.id ? '' : 'none';
 
-  let pedidosQ = sb.from('pedidos').select('*')
+  let pedidosQ = sb.from('pedidos').select(PED_COLS_LISTA)
     .order('created_at', { ascending: false })
     .order('id',         { ascending: false })
     .limit(PEDIDOS_PAGE);
@@ -221,12 +335,23 @@ async function renderPedidos(append = false) {
       `and(created_at.eq.${_pedidosCursor.created_at},id.lt.${_pedidosCursor.id})`
     );
   }
-  if (esCliente) pedidosQ = pedidosQ.in('estado', ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado', 'acordado', 'cancelado', 'finalizado', 'expirado']);
+  // El filtro de estado se estrecha aquí, para que la página no se gaste en
+  // filas que el navegador va a descartar. _filtrarEstadoCli SE MANTIENE
+  // abajo y no sobra: la consulta trae además los `abierto` de otros clientes
+  // para «Otras solicitudes activas», y esos hay que seguir apartándolos de
+  // las secciones propias. Con esto la página rinde más; lo que NO hace es
+  // convertir el filtro de estado en un filtro de la lista entera, y por eso
+  // no se anuncia como tal.
+  if (esCliente) pedidosQ = pedidosQ.in('estado', estadosParaConsulta());
+
+  // H-11: los filtros de tipo y zona van aquí, no sobre lo ya descargado.
+  pedidosQ = aplicarFiltrosPedidos(pedidosQ);
 
   // Superadmin: query paralela para acordados (no están en la paginación por ser más viejos)
   const esSuperAdmin = currentUser.rol === 'superadmin';
   const acordadosExtraQ = (!append && esSuperAdmin)
-    ? sb.from('pedidos').select('*').in('estado', ['acordado', 'finalizado', 'expirado']).order('created_at', { ascending: false }).limit(100)
+    ? aplicarFiltrosPedidos(
+        sb.from('pedidos').select(PED_COLS_LISTA).in('estado', ['acordado', 'finalizado', 'expirado']).order('created_at', { ascending: false }).limit(100))
     : Promise.resolve({ data: [] });
 
   const [{ data: pedidosPage, error }, { data: acordadosSA }] = await Promise.all([pedidosQ, acordadosExtraQ]);
@@ -339,28 +464,11 @@ async function renderPedidos(append = false) {
   const ofertasMap   = _ofertasAccum;
   const todasOfertas = Object.values(_ofertasAccum).flat();
 
-  const _filtrar = lista => {
-    let r = lista;
-    if (_filtroTipo !== 'todos') {
-      r = r.filter(p => {
-        const t = p.tipo_camion || '';
-        if (_filtroTipo === 'camion')   return !t.startsWith('Lavado') && t !== 'Desinfección' && !t.startsWith('Custodio') && t !== 'Supervisión remota' && !t.startsWith('Patio') && t !== 'Bodega';
-        if (_filtroTipo === 'custodio') return t.startsWith('Custodio') || t === 'Supervisión remota';
-        if (_filtroTipo === 'patio')    return t.startsWith('Patio') || t === 'Bodega';
-        if (_filtroTipo === 'lavado')   return t.startsWith('Lavado') || t === 'Desinfección';
-        return true;
-      });
-    }
-    if (_filtroGeo) {
-      const geo = _filtroGeo.toLowerCase();
-      r = r.filter(p =>
-        (p.origen || '').toLowerCase().includes(geo) ||
-        (p.destino || '').toLowerCase().includes(geo) ||
-        (p.zona_cobertura || '').toLowerCase().includes(geo)
-      );
-    }
-    return r;
-  };
+  // H-11: los filtros de tipo y zona ya vienen aplicados por la consulta —
+  // ver aplicarFiltrosPedidos(). Esto se queda como identidad para no tocar
+  // las seis llamadas que lo envuelven; volver a filtrar aquí no cambiaría
+  // nada, pero repetir la regla en dos sitios es cómo se desincronizan.
+  const _filtrar = lista => lista;
 
   const _filtrarEstadoCli = lista => {
     if (_filtroEstadoCli === 'todos') return lista;
@@ -1430,7 +1538,13 @@ async function crearPedido() {
     fecha_ini:      fechaIni       || null,
     fecha_fin:      fechaFin       || null,
     // Camión
-    origen:           esCamion ? v('np-origen')  : esPatio ? v('np-origen') : esLavado ? v('np-ubic-lav') : null,
+    // Patio lee np-ubic-pat, no np-origen. Hasta el 2026-09-18 los dos campos
+    // compartían el id `np-origen` —el del mapa en #np-group-camion y el de
+    // «Ubicación preferida» en #np-group-patio—, así que getElementById
+    // devolvía siempre el primero: un pedido de patio se habría guardado con
+    // el origen del formulario de camión, vacío, y lo tecleado se perdía sin
+    // avisar. No se notó porque los patios están apagados en la interfaz.
+    origen:           esCamion ? v('np-origen')  : esPatio ? v('np-ubic-pat') : esLavado ? v('np-ubic-lav') : null,
     destino:          esCamion ? v('np-destino') : null,
     // Punto exacto de la maniobra, si lo marcó en el mapa. La dirección escrita
     // sigue siendo la referencia humana; esto es para que el operador llegue.
@@ -2636,8 +2750,27 @@ function filtrarPedidosEstado(est) {
   renderPedidos();
 }
 
+// El input dispara en `oninput`, o sea una vez por tecla. Mientras el filtro
+// era de memoria eso era gratis; ahora cada llamada es una consulta que además
+// reinicia el acumulado y deja la lista en esqueleto. Sin amortiguar, teclear
+// «Manzanillo» son once peticiones y once parpadeos.
+// OJO con el nombre: `_geoTimer` a secas YA EXISTE en js/utils.js:168, para el
+// autocompletado de direcciones. Los scripts clásicos comparten el ámbito
+// léxico global, así que dos `let` con el mismo nombre son un SyntaxError y
+// TODO este archivo deja de ejecutarse — no solo esta función. Ocurrió el
+// 2026-09-18 y dejó la pantalla de Solicitudes muerta en el preview: se vio
+// porque `aplicarFiltrosPedidos` salía indefinida mientras `_geoTimer` existía,
+// que es imposible dentro de un mismo archivo. `node --check` no lo caza:
+// comprueba el archivo aislado, y la colisión solo existe al juntarlos.
+let _pedGeoTimer = null;
 function filtrarPedidosGeo(val) {
-  _filtroGeo = val.trim();
-  renderPedidos();
+  const v = val.trim();
+  // El clear va ANTES de la salida temprana: si escribes una letra y la borras
+  // dentro de la ventana, hay un temporizador en vuelo que aplicaría la letra
+  // borrada. Volver al valor ya aplicado tiene que CANCELAR lo pendiente, no
+  // solo no programar nada nuevo.
+  clearTimeout(_pedGeoTimer);
+  if (v === _filtroGeo) return;        // flechas, teclas muertas, espacios al final
+  _pedGeoTimer = setTimeout(() => { _filtroGeo = v; renderPedidos(); }, 350);
 }
 

@@ -37,14 +37,30 @@
 //  igualdad seguiría significando lo mismo. Aun así imprime el sello, porque
 //  al reportar algo medido en pruebas hay que decir con qué sello se midió.
 //
+//  ── Contra produccion ─────────────────────────────────────────────────────
+//
+//  PORTGO_SONDA_PRODUCCION=1 la apunta al proyecto de produccion. Es seguro y
+//  esta puesto a proposito: esta sonda NO ESCRIBE NADA. Las dos funciones son
+//  `stable` y lo demas son SELECT. No hay insert, update, delete ni rpc que
+//  mute. Por eso no lleva el candado exigirNoProduccion(), que existe para los
+//  guiones que si escriben.
+//
+//  Y hace falta: aplicar una migracion a produccion no prueba que alli haga lo
+//  mismo. Los permisos y el volumen son suyos. Una funcion puede crearse bien y
+//  negarle el paso al superadmin porque is_superadmin() se apoya en un GRANT
+//  que alli quedo de otra forma — y eso no se ve hasta que se pide.
+//
 //  Correr:  node pruebas/09-sonda-reportes.mjs
+//           PORTGO_SONDA_PRODUCCION=1 node pruebas/09-sonda-reportes.mjs
 // ══════════════════════════════════════════════════════════════════════════
-import { Sesion, leerAmbientePruebas, leerCredenciales, exigirCuentas } from './lib/api.mjs';
+import { Sesion, leerAmbientePruebas, leerCredenciales, exigirCuentas, CONFIG } from './lib/api.mjs';
 import { leerSello, resumenParidad } from './lib/paridad.mjs';
+
+const A_PRODUCCION = process.env.PORTGO_SONDA_PRODUCCION === '1';
 
 let AMB, cred;
 try {
-  AMB  = leerAmbientePruebas();
+  AMB  = A_PRODUCCION ? CONFIG : leerAmbientePruebas();
   cred = exigirCuentas(leerCredenciales(), ['superadmin', 'empresa']);
 } catch (e) { console.error(`\n${e.message}\n`); process.exit(1); }
 
@@ -70,9 +86,18 @@ const num = v => Number(v) || 0;
 const mesUTC = iso => String(iso || '').substring(0, 7);   // lo que hacía el cliente viejo
 
 console.log(`\n${C.neg}── Sonda de reportes (H-07) ──${C.fin}`);
+if (A_PRODUCCION) {
+  console.log(`   ${C.am}${C.neg}PRODUCCION${C.fin} — solo lectura: ningun insert, update, delete ni rpc que mute.`);
+}
 console.log(`   proyecto: ${AMB.url}`);
-const sello = leerSello();
-console.log(`   paridad:  ${sello ? resumenParidad(sello) : 'sin sello'}\n`);
+if (A_PRODUCCION) {
+  // El sello compara pruebas contra produccion. Midiendo EN produccion no dice
+  // nada, y ensenarlo aqui invitaria a leerlo como respaldo de este resultado.
+  console.log(`   paridad:  no aplica — se esta midiendo produccion, no pruebas\n`);
+} else {
+  const sello = leerSello();
+  console.log(`   paridad:  ${sello ? resumenParidad(sello) : 'sin sello'}\n`);
+}
 
 // ── Sesiones ──────────────────────────────────────────────────────────────
 const sa = new Sesion('superadmin', AMB);

@@ -49,6 +49,36 @@ La visibilidad se decide con clases en `<body>` (`role-admin`,
 Pero eso es cosmética: **quien decide de verdad son las políticas RLS y los
 guard triggers.** Ocultar un botón no protege nada.
 
+### Custodios, patios y lavados están apagados en la interfaz
+
+**Todo lo que este documento cuenta sobre custodios, patios y lavados describe
+un producto que hoy el usuario no puede tocar.** No está retirado del esquema
+ni de la lógica: está oculto con CSS, en un bloque de `css/base.css` rotulado
+*«Custodios / Patios / Lavados — deshabilitados temporalmente»* que aplica
+`display: none !important` a:
+
+- las píldoras de filtro de Solicitudes y de Catálogo (`[data-tipo=…]`,
+  `[data-filter=…]`),
+- los botones de alta de ese tipo de solicitud (`openNuevoPedido('custodio')`
+  y sus dos hermanos),
+- las pestañas y paneles de esos recursos en Mis unidades,
+- los modales de edición y el de rechazo de recurso,
+- las secciones del formulario de solicitud (`#np-group-custodio`, `-patio`,
+  `-lavado`).
+
+**Qué sigue vivo por debajo**, y por eso el resto del documento no se retira:
+las tablas, el RLS, los guards, las cuatro secuencias de `tracking_estado` por
+`recurso_tipo`, las colas de aprobación y los pedidos ya existentes de esos
+tipos — que **se siguen pintando** en la lista bajo «Todos», porque lo apagado
+es el filtro, no la tarjeta.
+
+**Consecuencia práctica al probar:** de las cinco píldoras de tipo, solo
+**Todos** y **Camión** son pulsables. Verificado el 2026-09-18 en el DOM del
+preview: las cinco existen, y `custodio`, `patio` y `lavado` salen con
+`offsetParent === null` y ancho 0. Un plan de pruebas que las incluya manda a
+alguien a buscar botones que no están — pasó ese mismo día, por no tener esto
+escrito aquí.
+
 ### Cliente — `rol = 'cliente'`
 
 Es quien tiene carga que mover. No posee recursos y nunca ejecuta un servicio.
@@ -106,6 +136,25 @@ Vigencias · Mi desempeño · Cobros · Privacidad · Avisos.
   los acredita: ver *Los seguros se acreditan, no se declaran*.
 - Ofertar sobre solicitudes en `abierto` o `en_negociacion`, y aceptar una
   contraoferta del cliente.
+- Filtrar la lista de Solicitudes por **tipo de servicio** —en la interfaz
+  hoy solo se ven **Todos** y **Camión**; las píldoras Custodia, Patio y
+  Lavado existen en el HTML pero están ocultas, ver *Custodios, patios y
+  lavados están apagados en la interfaz*— y por **zona** (texto libre contra
+  `origen`,
+  `destino` y `zona_cobertura`). Desde el 2026-09-18 los dos filtros se
+  aplican **en la consulta, no sobre la página ya descargada** — antes
+  filtraban solo las 30 filas traídas, así que pedir un tipo podía devolver
+  vacío habiendo solicitudes de ese tipo más abajo.
+  **Con qué rol se nota, y con cuál no:** el superadmin lanza además una
+  consulta paralela de acuerdos con `limit 100`, así que con poco volumen ya
+  se trae el histórico entero y el defecto no se le manifiesta. Se manifiesta
+  en el rol empresa, cuya lista es solo la página de 30. Medido el 2026-09-18
+  sobre esa página: Custodia 0 de 4, Patio 0 de 1, Camión 30 de 36. La
+  equivalencia entre el filtro viejo y el nuevo sí está comprobada en 85 casos
+  (`pruebas/10-sonda-filtros-pedidos.mjs`); que el arreglo *cambie lo que se
+  ve* pide más volumen del que había ese día. El grupo
+  «Camión» se define **por negación** de los otros tres, no por una lista de
+  tipos: el catálogo vive en la tabla `catalogos` y crece sin avisar.
 - Asignar chofer, avanzar el seguimiento y subir evidencia de cierre.
 - **Pedir** expedientes de documentos al cliente, y aceptarlos o rechazarlos
   uno a uno.
@@ -135,6 +184,17 @@ Control de PortGo. **No participa en la operación: la habilita y la desatasca.*
 
 **Sus pantallas:** Por aprobar · Usuarios · Solicitudes · Reportes · Catálogo ·
 Vigencias · Reservaciones · Historial · Cobros · Privacidad · Avisos.
+
+**En Solicitudes no ve las canceladas ni las rechazadas, y es deliberado.**
+La pantalla arma tres secciones —*Solicitudes activas* (`abierto`,
+`en_negociacion`, `pendiente_revision`, `pendiente_acuerdo`), *Acuerdos
+activos* (`acordado`) y *Finalizados y expirados*— y `cancelado` y `rechazado`
+no caen en ninguna. Medido el 2026-09-18: de 41 solicitudes, 15 estaban en
+esos dos estados y no se pintaban en ningún sitio, así que la pantalla
+enseñaba 26. **Decisión del 2026-09-18: se deja como está** — a un rol que
+monitorea no le aporta la cola de lo ya muerto. Queda escrito porque, sin
+esto, la próxima vez que alguien cuente las tarjetas va a creer que falta
+una sección.
 
 **Cuatro cosas pasan por él, y solo cuatro:**
 
