@@ -127,6 +127,19 @@ grant select on public.custodios_publico to authenticated;
 grant select on public.patios_publico    to authenticated;
 grant select on public.lavados_publico   to authenticated;
 
+-- service_role tambien, como empresas_publico. El `revoke all ... from public`
+-- de arriba no le quita nada —PUBLIC es el pseudo-rol, no una lista de roles—
+-- pero estas vistas nacieron sin concesion para el, y sin esto responden 403.
+--
+-- Hoy no lo usa nadie: ninguna Edge Function lee flota. Se concede igual porque
+-- dejarlo a medias hace divergir la paridad entre proyectos y obliga a razonar
+-- por que empresas_publico si lo tiene y estas cuatro no. Es lectura: la clave
+-- de servicio ya se salta RLS en las tablas de todos modos.
+grant select on public.camiones_publico  to service_role;
+grant select on public.custodios_publico to service_role;
+grant select on public.patios_publico    to service_role;
+grant select on public.lavados_publico   to service_role;
+
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- 3. Comprobacion
@@ -163,6 +176,12 @@ begin
 
     if has_table_privilege('anon', 'public.'||v, 'SELECT') then
       raise exception 'H-10: anon puede leer %. Debe hacer falta sesion.', v;
+    end if;
+
+    -- Se comprueba porque ya paso: la primera version de esta migracion no lo
+    -- concedia y las cuatro vistas respondian 403 a la clave de servicio.
+    if not has_table_privilege('service_role', 'public.'||v, 'SELECT') then
+      raise exception 'H-10: service_role no puede leer %. empresas_publico si lo tiene; esto divergiria.', v;
     end if;
 
     -- Ninguna columna del expediente
