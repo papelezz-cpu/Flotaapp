@@ -8,6 +8,34 @@
 #   Lo de aquí es fiable; la ausencia de una línea no prueba nada sobre
 #   lo anterior al 2026-09-11.
 #
+#
+# ⚠ TRES ENTRADAS DE PRODUCCIÓN SE ANOTARON A MANO el 2026-09-18, y conviene
+#   saber en qué se diferencian del resto:
+#
+#     20260917120000_flota_publica_sin_el_expediente.sql
+#     20260917130000_cierra_la_lectura_de_flota_ajena.sql
+#     20260918120000_fase1_indices_restricciones_y_permisos.sql  (en produccion
+#       Y en pruebas: allí se probó primero, y tampoco quedó registrado. Que
+#       está en pruebas lo dice la verificación de paridad del 2026-09-18,
+#       que da índices, restricciones y permisos EXECUTE idénticos a los de
+#       producción — y la réplica que borró H-10 fue ANTERIOR a la Fase 1,
+#       así que no pudo llegar por ahí. Su fecha sale de 0a32899.)
+#
+#   Las tres SÍ están aplicadas a producción —comprobado el 2026-09-18: las
+#   cuatro vistas *_publico existen allí y los guards de la Fase 1 siguen
+#   frenando— pero entraron por una vía que no pasa por aplicar-a-produccion.sh,
+#   así que el libro nunca se enteró y estado-migraciones.sh las daba por '·'.
+#   Un '·' en algo POSTERIOR al 2026-09-11 induce a error: hace creer que
+#   producción no tiene H-10.
+#
+#   El SHA256 sí es el que corrió. Los tres archivos se modificaron por última
+#   vez ANTES de su commit de promoción (dca364e, 1606f4f, 0a32899) y no han
+#   cambiado desde entonces, así que el hash de hoy es el de entonces.
+#
+#   LA FECHA ES RECONSTRUIDA, no medida: es la del commit de promoción
+#   (cc543e5 para las dos de H-10, d504eed para la Fase 1). La aplicación real
+#   ocurrió poco antes de cada uno. Las demás líneas de este archivo llevan la
+#   hora exacta en que terminó el guion; estas tres no.
 # fecha_utc	entorno	proyecto_ref	archivo	sha256
 2026-09-11T22:33:16Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260911120000_cierre_acuerdo_sin_carrera.sql	411eafa84c820e1f1782348fc6e28c53f5dffb6b0b9428242c7f392a09446cd2
 2026-09-11T22:33:16Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260911130000_permisos_cierra_anon_y_truncate.sql	93f95a4ada49a6acef050d0ffb53faddf1681bbe2b1918ba1c9b5f8f1da5e861
@@ -32,3 +60,7 @@
 2026-09-18T19:21:47Z	pruebas		supabase/migrations/20260918140000_la_vista_tampoco_se_escribe_con_la_clave_de_servicio.sql	442be9e8068305f65ef65c87271327df0525b876d9c23af052060d3eb2721564
 2026-09-18T19:25:51Z	produccion		supabase/migrations/20260918140000_la_vista_tampoco_se_escribe_con_la_clave_de_servicio.sql	442be9e8068305f65ef65c87271327df0525b876d9c23af052060d3eb2721564
 2026-09-18T19:36:44Z	pruebas		supabase/migrations/20260918130000_el_globo_cuenta_lo_que_el_panel_lista.sql	29042aa7f2f3db689d9db1cca9a1d61e9767d584ef1094ecd3f9bfe22cc7ea48
+2026-09-18T17:32:22Z	produccion	xnyqsewaluezkkrlyhxg	supabase/migrations/20260917120000_flota_publica_sin_el_expediente.sql	f3609fc9e5a7ee6f524e06bbaf5c4c77d4f977ff56d06b39d3c33f8ffeb67421
+2026-09-18T17:32:22Z	produccion	xnyqsewaluezkkrlyhxg	supabase/migrations/20260917130000_cierra_la_lectura_de_flota_ajena.sql	a76c17417d5aa5aa6c612804884390b364b91d35aaa81f36006b4cd677906b1f
+2026-09-18T17:54:15Z	produccion	xnyqsewaluezkkrlyhxg	supabase/migrations/20260918120000_fase1_indices_restricciones_y_permisos.sql	aba7f5adbc3ec1e88a4c5f646f222d7c1871ea8f66581780b2802f3879f63ff4
+2026-09-18T17:44:57Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260918120000_fase1_indices_restricciones_y_permisos.sql	aba7f5adbc3ec1e88a4c5f646f222d7c1871ea8f66581780b2802f3879f63ff4
