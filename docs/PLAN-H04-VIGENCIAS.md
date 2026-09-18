@@ -1,6 +1,6 @@
 # H-04 — Unificar «documento con vigencia» en una tabla
 
-Plan por etapas. **Nada de esto está implementado.** Escrito el 2026-09-18 con
+Plan por etapas. **La Etapa 1 está escrita y probada en banco local; no se ha aplicado a ninguna base real.** El resto no está implementado. Escrito el 2026-09-18 con
 los datos medidos ese día contra `portgo-pruebas` (sello `diverge`, 6
 diferencias — ver §Paridad).
 
@@ -81,7 +81,7 @@ seguridad, no de refactor.
 Ninguna etapa retira nada. El `DROP` de columnas es una conversación aparte y
 exige autorización explícita (Regla #1).
 
-### Etapa 1 — Crear, sin que nadie la lea
+### Etapa 1 — Crear, sin que nadie la lea  ·  **ESCRITA Y PROBADA EN BANCO LOCAL**
 
 ```sql
 create table public.vigencias (
@@ -147,29 +147,56 @@ con autorización explícita.
 
 ---
 
-## Decisiones que hacen falta antes de la Etapa 1
+## Decisiones tomadas
 
-Ninguna es técnica; las cinco son de producto o de criterio.
+El usuario las delegó el 2026-09-18 («aplícalas de acuerdo a lo que funcione
+mejor para el sistema y la base de datos»). Quedan escritas con su porqué, que
+es lo que se pierde si solo queda el código.
 
-1. **¿La tabla guarda el documento o solo la fecha?** La ficha propone
-   `archivo_path`, o sea las dos cosas. Eso absorbe también las columnas
-   `doc_*`, `imagen_*` y `foto_*` — más beneficio y más superficie.
+1. **La tabla guarda documento Y fecha.** El concepto es «documento con
+   vigencia»; separarlos conservaría la duplicación que el hallazgo denuncia.
+   `archivo_path` es nulo cuando no hay papel.
 
-2. **¿Qué pasa con las variantes `*_pendiente` de `perfiles`?** Son el flujo
-   de «la empresa propone, el superadmin acredita». ¿Se modelan como una fila
-   con `estado = 'pendiente'`, o como una segunda fila?
+2. **`*_pendiente` son dos filas**, distinguidas por `estado`, con **dos
+   índices únicos parciales**: como mucho una `vigente` y como mucho una
+   `pendiente` por documento. Un `UNIQUE(entidad, tipo)` a secas habría roto
+   lo que hoy funciona — la empresa propone una renovación **sin destruir la
+   que sigue valiendo**. Los `rechazado` no se limitan: son historial.
 
-3. **Fechas sin documento.** `operadores.fecha_examen_medico` y hermanas son
-   fechas que hoy no tienen papel asociado. ¿Filas con `archivo_path` nulo, o
-   quedan fuera del modelo?
+3. **Fechas sin papel: sí, como filas con `archivo_path` nulo**, más un
+   `CHECK` de que al menos una de las dos cosas esté. Una fila sin papel y sin
+   fecha no dice nada, y H-02 enseñó lo que cuesta un campo que existe vacío.
 
-4. **El catálogo de tipos de documento.** ¿`tipo_documento` es texto libre con
-   `CHECK`, o una fila en la tabla `catalogos` que ya existe? Lo segundo es lo
-   que haría que «añadir un documento» deje de ser una migración — que es el
-   beneficio que justifica todo esto.
+4. **`tipo_documento` sale de `catalogos`, con clave foránea de verdad.** Se
+   probó en el banco local antes de escribirlo: una columna generada con valor
+   constante (`cat_clave`) permite colgar una **FK compuesta** de
+   `catalogos(clave, valor)`, y rechaza un tipo inventado. Es más fuerte que
+   un trigger, que puede olvidarse de comprobar. Añadir un documento pasa a
+   ser un `insert` en el catálogo.
 
-5. **Custodios y patios.** ¿Se incluyen ahora, estando apagados y sin datos, o
-   se dejan para cuando se reactiven?
+5. **Custodios y patios entran en el modelo, no en el trabajo de código.**
+   Están en el `CHECK` y en el catálogo porque incluirlos no cuesta nada y
+   evita una segunda migración; sus ficheros JS no se tocan mientras sigan
+   apagados y sin datos.
+
+### Y una sexta, que no estaba en la lista y salió de leer el código
+
+**Las columnas de hoy no guardan todas lo mismo.**
+`fecha_vencimiento_seguro` es una caducidad, pero `fecha_examen_medico` es la
+fecha **del examen**: `js/vigencias.js:69-72` le suma un año en JavaScript
+para saber cuándo vence. Igual con el toxicológico y la carta de antecedentes.
+
+Meterlas todas en un `fecha_vencimiento` perdería la diferencia, y calcular la
+caducidad al copiar **hornearía la regla de negocio en los datos**: el día que
+un examen valga dos años, las filas viejas quedarían mal y nadie sabría por
+qué.
+
+Así que se guarda **lo que el usuario capturó**, en `fecha_documento`, y la
+regla vive en el catálogo (`meta->>'vigencia_meses'`; nulo = la fecha
+capturada ya es la caducidad). La caducidad efectiva la calcula
+`vigencia_vence_el(tipo, fecha)`. **Comprobado en el banco local: subir el
+examen médico de 12 a 24 meses es un `UPDATE` a una fila de catálogo, no una
+migración.** Ese es el beneficio que justifica el trabajo entero.
 
 ---
 
