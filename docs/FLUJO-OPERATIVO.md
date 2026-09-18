@@ -49,6 +49,36 @@ La visibilidad se decide con clases en `<body>` (`role-admin`,
 Pero eso es cosmética: **quien decide de verdad son las políticas RLS y los
 guard triggers.** Ocultar un botón no protege nada.
 
+### Custodios, patios y lavados están apagados en la interfaz
+
+**Todo lo que este documento cuenta sobre custodios, patios y lavados describe
+un producto que hoy el usuario no puede tocar.** No está retirado del esquema
+ni de la lógica: está oculto con CSS, en un bloque de `css/base.css` rotulado
+*«Custodios / Patios / Lavados — deshabilitados temporalmente»* que aplica
+`display: none !important` a:
+
+- las píldoras de filtro de Solicitudes y de Catálogo (`[data-tipo=…]`,
+  `[data-filter=…]`),
+- los botones de alta de ese tipo de solicitud (`openNuevoPedido('custodio')`
+  y sus dos hermanos),
+- las pestañas y paneles de esos recursos en Mis unidades,
+- los modales de edición y el de rechazo de recurso,
+- las secciones del formulario de solicitud (`#np-group-custodio`, `-patio`,
+  `-lavado`).
+
+**Qué sigue vivo por debajo**, y por eso el resto del documento no se retira:
+las tablas, el RLS, los guards, las cuatro secuencias de `tracking_estado` por
+`recurso_tipo`, las colas de aprobación y los pedidos ya existentes de esos
+tipos — que **se siguen pintando** en la lista bajo «Todos», porque lo apagado
+es el filtro, no la tarjeta.
+
+**Consecuencia práctica al probar:** de las cinco píldoras de tipo, solo
+**Todos** y **Camión** son pulsables. Verificado el 2026-09-18 en el DOM del
+preview: las cinco existen, y `custodio`, `patio` y `lavado` salen con
+`offsetParent === null` y ancho 0. Un plan de pruebas que las incluya manda a
+alguien a buscar botones que no están — pasó ese mismo día, por no tener esto
+escrito aquí.
+
 ### Cliente — `rol = 'cliente'`
 
 Es quien tiene carga que mover. No posee recursos y nunca ejecuta un servicio.
@@ -106,8 +136,11 @@ Vigencias · Mi desempeño · Cobros · Privacidad · Avisos.
   los acredita: ver *Los seguros se acreditan, no se declaran*.
 - Ofertar sobre solicitudes en `abierto` o `en_negociacion`, y aceptar una
   contraoferta del cliente.
-- Filtrar la lista de Solicitudes por **tipo de servicio** (Todos · Camión ·
-  Custodia · Patio · Lavado) y por **zona** (texto libre contra `origen`,
+- Filtrar la lista de Solicitudes por **tipo de servicio** —en la interfaz
+  hoy solo se ven **Todos** y **Camión**; las píldoras Custodia, Patio y
+  Lavado existen en el HTML pero están ocultas, ver *Custodios, patios y
+  lavados están apagados en la interfaz*— y por **zona** (texto libre contra
+  `origen`,
   `destino` y `zona_cobertura`). Desde el 2026-09-18 los dos filtros se
   aplican **en la consulta, no sobre la página ya descargada** — antes
   filtraban solo las 30 filas traídas, así que pedir un tipo podía devolver
