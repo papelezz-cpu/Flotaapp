@@ -69,6 +69,32 @@ function aplicarFiltrosPedidos(q) {
   return q;
 }
 
+// ── FILTRO DE ESTADO DEL CLIENTE ──────────────────────
+//
+// Los mismos grupos que aplica _filtrarEstadoCli, para poder pedirle a la
+// base solo los estados que la pantalla va a pintar en vez de traerse los
+// nueve y descartar ocho en el navegador.
+//
+// `abierto` se añade SIEMPRE, filtre lo que filtre. La sección «Otras
+// solicitudes activas» pinta los pedidos abiertos de OTROS clientes y usa
+// _filtrar, no _filtrarEstadoCli — o sea que el filtro de estado nunca la ha
+// tocado, a propósito. Quitar `abierto` de la consulta la vaciaría al filtrar
+// por «Cancelados», y eso no es llevar un filtro al servidor: es cambiar lo
+// que la pantalla enseña.
+const PED_ESTADOS_TODOS = ['abierto','en_negociacion','pendiente_revision','pendiente_acuerdo',
+                           'rechazado','acordado','cancelado','finalizado','expirado'];
+const PED_ESTADOS_POR_FILTRO = {
+  activo:    ['abierto','en_negociacion','pendiente_acuerdo','rechazado'],
+  revision:  ['pendiente_revision'],
+  acordado:  ['acordado','finalizado','expirado'],
+  cancelado: ['cancelado'],
+};
+function estadosParaConsulta() {
+  const sel = PED_ESTADOS_POR_FILTRO[_filtroEstadoCli];
+  if (!sel) return PED_ESTADOS_TODOS;              // 'todos', o un valor que no conozco
+  return [...new Set([...sel, 'abierto'])];        // ver el comentario de arriba
+}
+
 const PEDIDOS_PAGE = 30;
 // Paginación por cursor, no por OFFSET. Con OFFSET, la página N obliga a
 // Postgres a recorrer y descartar N x 30 filas antes de devolver nada: el
@@ -280,7 +306,14 @@ async function renderPedidos(append = false) {
       `and(created_at.eq.${_pedidosCursor.created_at},id.lt.${_pedidosCursor.id})`
     );
   }
-  if (esCliente) pedidosQ = pedidosQ.in('estado', ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado', 'acordado', 'cancelado', 'finalizado', 'expirado']);
+  // El filtro de estado se estrecha aquí, para que la página no se gaste en
+  // filas que el navegador va a descartar. _filtrarEstadoCli SE MANTIENE
+  // abajo y no sobra: la consulta trae además los `abierto` de otros clientes
+  // para «Otras solicitudes activas», y esos hay que seguir apartándolos de
+  // las secciones propias. Con esto la página rinde más; lo que NO hace es
+  // convertir el filtro de estado en un filtro de la lista entera, y por eso
+  // no se anuncia como tal.
+  if (esCliente) pedidosQ = pedidosQ.in('estado', estadosParaConsulta());
 
   // H-11: los filtros de tipo y zona van aquí, no sobre lo ya descargado.
   pedidosQ = aplicarFiltrosPedidos(pedidosQ);
@@ -1476,7 +1509,13 @@ async function crearPedido() {
     fecha_ini:      fechaIni       || null,
     fecha_fin:      fechaFin       || null,
     // Camión
-    origen:           esCamion ? v('np-origen')  : esPatio ? v('np-origen') : esLavado ? v('np-ubic-lav') : null,
+    // Patio lee np-ubic-pat, no np-origen. Hasta el 2026-09-18 los dos campos
+    // compartían el id `np-origen` —el del mapa en #np-group-camion y el de
+    // «Ubicación preferida» en #np-group-patio—, así que getElementById
+    // devolvía siempre el primero: un pedido de patio se habría guardado con
+    // el origen del formulario de camión, vacío, y lo tecleado se perdía sin
+    // avisar. No se notó porque los patios están apagados en la interfaz.
+    origen:           esCamion ? v('np-origen')  : esPatio ? v('np-ubic-pat') : esLavado ? v('np-ubic-lav') : null,
     destino:          esCamion ? v('np-destino') : null,
     // Punto exacto de la maniobra, si lo marcó en el mapa. La dirección escrita
     // sigue siendo la referencia humana; esto es para que el operador llegue.

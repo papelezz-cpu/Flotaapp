@@ -185,6 +185,17 @@ Control de PortGo. **No participa en la operación: la habilita y la desatasca.*
 **Sus pantallas:** Por aprobar · Usuarios · Solicitudes · Reportes · Catálogo ·
 Vigencias · Reservaciones · Historial · Cobros · Privacidad · Avisos.
 
+**En Solicitudes no ve las canceladas ni las rechazadas, y es deliberado.**
+La pantalla arma tres secciones —*Solicitudes activas* (`abierto`,
+`en_negociacion`, `pendiente_revision`, `pendiente_acuerdo`), *Acuerdos
+activos* (`acordado`) y *Finalizados y expirados*— y `cancelado` y `rechazado`
+no caen en ninguna. Medido el 2026-09-18: de 41 solicitudes, 15 estaban en
+esos dos estados y no se pintaban en ningún sitio, así que la pantalla
+enseñaba 26. **Decisión del 2026-09-18: se deja como está** — a un rol que
+monitorea no le aporta la cola de lo ya muerto. Queda escrito porque, sin
+esto, la próxima vez que alguien cuente las tarjetas va a creer que falta
+una sección.
+
 **Cuatro cosas pasan por él, y solo cuatro:**
 
 1. **Aprobar cuentas** — con verificación física o documental.
