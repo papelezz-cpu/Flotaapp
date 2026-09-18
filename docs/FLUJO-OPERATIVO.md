@@ -666,6 +666,28 @@ después de crear una vista la deja limpia. Y
 `supabase/sondas/escritura-en-vistas.sql` lo detecta en cualquiera de los dos
 proyectos, sin comparar bases.
 
+**Y `authenticated` no era el único rol.** El mismo `ALTER DEFAULT PRIVILEGES`
+alcanza a `service_role`, y ni el barrido de H-01 ni las migraciones de H-10 lo
+tocaron: la sonda tampoco lo miraba, porque recorría solo `anon` y
+`authenticated`. Resultado, medido el 2026-09-18 con un `PATCH` cuyo filtro no
+casa con ninguna fila: `empresas_publico` aceptaba escrituras de la clave de
+servicio en **los dos proyectos**, y las cuatro `*_publico` de flota en
+producción sí y en pruebas no — que es como salió a la luz, al fallar la
+paridad por 24 diferencias.
+
+**No concede privilegio nuevo**, y conviene decirlo para no confundir el
+tamaño: la clave de servicio ya se salta el RLS y tiene `ALL` sobre las tablas
+base, así que quien la tenga puede escribirlas de todos modos. Importa por dos
+razones más modestas: una vista declarada de solo lectura tiene que serlo para
+todos los roles, y mientras los dos proyectos no coincidan la paridad falla por
+algo conocido, que es como se acaba ignorando la paridad.
+
+**Lo que la verificación de paridad no ve:** `pg_default_acl` no es ninguna de
+sus 18 dimensiones. Una diferencia en los privilegios por omisión es invisible
+hasta que alguien crea un objeto nuevo, y entonces aparece como diferencia *de
+ese objeto*. Si una vista nueva sale con permisos distintos entre proyectos,
+mirar ahí antes que en la migración que la creó.
+
 ### La flota ajena se lee por vista, no por tabla
 
 Cuatro políticas dejaban ver la **fila entera** de cada recurso aprobado a
