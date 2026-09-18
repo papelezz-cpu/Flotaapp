@@ -1,4 +1,5 @@
--- Ninguna VISTA de public debe aceptar escrituras de anon ni de authenticated.
+-- Ninguna VISTA de public debe aceptar escrituras: ni de anon, ni de
+-- authenticated, ni de service_role.
 -- Solo lee. Si las dos consultas salen vacias, el invariante se cumple.
 --
 -- ── Por que existe ────────────────────────────────────────────────────────
@@ -86,7 +87,13 @@ SELECT c.relname AS vista,
        END AS efecto_real
   FROM pg_class c
   JOIN pg_namespace n ON n.oid = c.relnamespace
-  CROSS JOIN (VALUES ('anon'), ('authenticated')) AS g(rol)
+  -- service_role entra desde el 2026-09-18. No estaba, y por eso nadie vio
+  -- que empresas_publico llevaba escribible por la clave de servicio desde
+  -- que se creo, en los dos proyectos: el barrido de H-01 solo miro los dos
+  -- primeros roles. No concede privilegio nuevo -esa clave ya se salta el
+  -- RLS y tiene ALL sobre las tablas base- pero una vista declarada de solo
+  -- lectura tiene que serlo para todos, o la declaracion no significa nada.
+  CROSS JOIN (VALUES ('anon'), ('authenticated'), ('service_role')) AS g(rol)
  WHERE n.nspname = 'public'
    AND c.relkind IN ('v', 'm')
    AND (has_table_privilege(g.rol, c.oid, 'INSERT')

@@ -62,8 +62,8 @@ if [ "$TABLAS" -gt 0 ] && [ "$MODO" != "--completar" ]; then
   echo
   echo "⚠ La base de pruebas NO está vacía. Aplicar el esquema encima puede"
   echo "  fallar o dejarla a medias. Revisa que sea el proyecto correcto."
-  read -r -p "¿Continuar de todos modos? [s/N] " R
-  [[ "$R" =~ ^[sS]$ ]] || { echo "Cancelado."; exit 0; }
+  preguntar "¿Continuar de todos modos? [s/N] " || exit 2
+  [[ "$RESPUESTA" =~ ^[sS]$ ]] || { echo "Cancelado."; exit 0; }
 fi
 echo
 

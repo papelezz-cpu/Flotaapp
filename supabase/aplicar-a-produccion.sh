@@ -57,7 +57,8 @@ echo
 echo "  Todo esto va en UNA transacción: entra completo o no entra nada."
 echo
 
-read -r -p "  Escribe APLICAR A PRODUCCION para continuar: " OK
+preguntar "  Escribe APLICAR A PRODUCCION para continuar: " || exit 2
+OK="$RESPUESTA"
 # El acento se quita ANTES de mayusculizar: tr trabaja por bytes y a la "ó"
 # (dos bytes en UTF-8) la deja intacta, así que después ya no hay forma de
 # reconocerla. Escribir "producción" bien acentuado no puede ser el motivo de

@@ -10,6 +10,84 @@
 # Existe porque el error "no se pudo conectar" sin más detalle no ayuda a
 # nadie: casi siempre el problema es el host o el usuario, no la contraseña.
 
+# ── Preguntar sin que el búfer conteste por el usuario ──────────────────────
+#
+# Al pegar un comando de varias líneas —lo normal aquí: las variables de
+# entorno delante y continuaciones con "\"— el terminal deja el salto de línea
+# sobrante en el búfer de entrada. El primer `read` se lo come como si fuera la
+# respuesta: sale cadena vacía y el guion se cancela solo SIN dejar escribir
+# nada. Visto el 2026-09-15 en replicar-produccion-a-pruebas.sh, donde parecía
+# que la confirmación estuviera rota.
+#
+# Por eso se vacía el búfer antes de preguntar, y se lee de /dev/tty en vez de
+# la entrada estándar: así la pregunta sigue funcionando aunque el guion reciba
+# algo por una tubería.
+#
+#   preguntar "  ¿Aplicar? [s/N] "   &&  [[ "$RESPUESTA" =~ ^[sS]$ ]] || …
+#
+# La respuesta queda en la global RESPUESTA, igual que conectar_a deja CONN.
+# Devuelve 1 si no hay terminal donde preguntar, y en ese caso RESPUESTA queda
+# vacía: quien llama decide qué hacer, pero nadie debe leer eso como un sí.
+
+_preguntar_core() {
+  local prompt="$1" secreto="${2:-}"
+  RESPUESTA=""
+
+  # El terminal es /dev/tty salvo que una prueba pida otra cosa. El asiento
+  # existe porque sin consola no hay forma de ejercitar esto —y la primera
+  # versión de este ayudante pasaba `bash -n` estando rota—. Lo usa
+  # pruebas/08-sonda-preguntar.sh y nada más: si alguien se la deja puesta,
+  # avisa a gritos en vez de mandar la pregunta a otro sitio en silencio.
+  local tty="${PORTGO_TTY_PRUEBA:-/dev/tty}"
+  if [ -n "${PORTGO_TTY_PRUEBA:-}" ]; then
+    echo "  ⚠ PORTGO_TTY_PRUEBA=$tty — las preguntas NO se leen del terminal." >&2
+    echo "    Es solo para probar este ayudante. Fuera de eso, quítala." >&2
+  fi
+
+  # Se comprueba ABRIENDO, no con -r. Sin terminal de control, `test -r
+  # /dev/tty` responde que sí y la apertura falla después con "No such device
+  # or address" — un error de bash en crudo, en mitad de otra cosa, que no dice
+  # lo que pasa. Visto al correr estos guiones con la entrada redirigida.
+  if ! { : < "$tty"; } 2>/dev/null; then
+    echo >&2
+    echo "❌ No hay terminal donde preguntar. Este guion no corre sin confirmación." >&2
+    return 1
+  fi
+
+  # Lo que el pegado dejó en el búfer. Con -t 0.05, cuando no hay nada —el caso
+  # normal— esto no cuesta nada perceptible.
+  local basura
+  while read -r -t 0.05 -n 4096 basura < "$tty" 2>/dev/null; do :; done
+
+  local leido=0
+  if [ -n "$secreto" ]; then
+    # IFS= es obligatorio: sin eso, read recorta espacios al inicio y al final,
+    # y una contraseña que de verdad lleve uno se leería mal sin avisar.
+    IFS= read -r -s -p "$prompt" RESPUESTA < "$tty" || leido=1
+    echo
+  else
+    # Aquí, al revés, se deja que recorte: una confirmación tecleada con un
+    # espacio de más sigue siendo la misma confirmación.
+    read -r -p "$prompt" RESPUESTA < "$tty" || leido=1
+  fi
+
+  # read devuelve error también cuando la entrada se acaba sin salto de línea
+  # final, habiendo leído la respuesta entera. Eso vale; lo que no vale es
+  # devolver 0 con las manos vacías, que es como una confirmación ausente
+  # acabaría pareciéndose a una dada.
+  if [ "$leido" = "1" ] && [ -z "$RESPUESTA" ]; then
+    return 1
+  fi
+
+  # Pegar desde Windows arrastra un retorno de carro al final. Nunca es parte
+  # de la respuesta, así que se quita sin preguntar.
+  RESPUESTA="${RESPUESTA%$'\r'}"
+  return 0
+}
+
+preguntar()         { _preguntar_core "$1" ""; }
+preguntar_secreto() { _preguntar_core "$1" "si"; }
+
 # El panel de Supabase a veces ofrece la cadena dentro del comando completo
 #   psql "postgresql://…"
 # y con comillas. Si eso llega tal cual, psql no lo reconoce como URI: lo toma
@@ -56,7 +134,7 @@ conectar_a() {
     echo "Pega la cadena de conexión de $etiqueta."
     echo "  Supabase → proyecto → botón Connect → pestaña Session pooler → URI"
     echo "  (puerto 5432; el modo Transaction / 6543 no sirve para esto)"
-    read -r -p "Cadena: " CONN
+    preguntar "Cadena: " && CONN="$RESPUESTA"
   fi
 
   if [ -z "$CONN" ]; then
@@ -87,15 +165,11 @@ conectar_a() {
     echo
     echo "Contraseña de la base (Supabase → Settings → Database → Database password)."
     echo "No se va a ver mientras la tecleas."
-    # IFS= es obligatorio: sin eso, read recorta espacios al inicio y al final,
-    # y una contraseña que de verdad lleve uno se leería mal sin avisar.
-    IFS= read -r -s -p "Contraseña: " DBPASS
-    echo
-
-    # Pegar desde Windows suele arrastrar un retorno de carro al final. Ese
-    # nunca es parte de una contraseña, así que se quita sin preguntar.
-    DBPASS="${DBPASS%$'
-'}"
+    # preguntar_secreto no hace eco, conserva los espacios que la contraseña
+    # lleve de verdad, y le quita el retorno de carro que arrastra un pegado
+    # desde Windows.
+    preguntar_secreto "Contraseña: " || return 1
+    DBPASS="$RESPUESTA"
 
     # No se enseña la contraseña, pero sí su largo: si no coincide con lo que
     # esperas, ahí está el problema y no en el servidor.
