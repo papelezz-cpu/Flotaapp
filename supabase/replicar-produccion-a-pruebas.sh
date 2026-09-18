@@ -336,24 +336,12 @@ cat <<'AVISO'
 
 AVISO
 
-# Se vacía lo que hubiera pendiente en la entrada ANTES de preguntar, y se lee
-# del terminal en vez de la entrada estándar.
-#
-# Por qué: este guion se invoca casi siempre con las dos cadenas de conexión
-# delante y continuaciones con "\", o sea un pegado multilínea. El terminal deja
-# el salto de línea sobrante en el búfer, `read` se lo come como respuesta, sale
-# cadena vacía y el guion se cancela solo SIN dejar escribir nada. Visto el
-# 2026-09-15: parecía que la confirmación no funcionaba.
-#
-# `< /dev/tty` además hace que la pregunta siga funcionando aunque la entrada
-# estándar venga de una tubería o de un fichero.
-if [ -r /dev/tty ]; then
-  while read -r -t 0.05 -n 4096 _basura < /dev/tty 2>/dev/null; do :; done
-  read -r -p "  Escribe REEMPLAZAR PRUEBAS para continuar: " OK < /dev/tty
-else
-  echo "  ❌ No hay terminal donde preguntar. Este guion no corre sin confirmación." >&2
-  exit 2
-fi
+# El vaciado del búfer antes de preguntar vive en lib-conexion.sh: el pegado
+# multilínea con el que se invoca esto dejaba un salto de línea que `read` se
+# comía como respuesta, y el guion se cancelaba solo sin dejar escribir nada.
+preguntar "  Escribe REEMPLAZAR PRUEBAS para continuar: " || exit 2
+OK="$RESPUESTA"
+
 # Se acepta en minúsculas y con espacios de sobra. La salvaguarda es teclear la
 # frase completa a propósito; acertarle a las mayúsculas no protege de nada y
 # solo hace que una autorización real se pierda por un detalle. Un enter, una

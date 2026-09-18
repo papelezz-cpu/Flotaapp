@@ -50,8 +50,8 @@ echo "── Lo que contiene ──"
 grep -vE '^\s*(--)?\s*$' "$ARCHIVO" | grep -v '^\s*--' | sed 's/^/   /'
 echo
 
-read -r -p "  ¿Aplicar? [s/N] " R
-[[ "$R" =~ ^[sS]$ ]] || { echo "  Cancelado. No se tocó nada."; exit 0; }
+preguntar "  ¿Aplicar? [s/N] " || exit 2
+[[ "$RESPUESTA" =~ ^[sS]$ ]] || { echo "  Cancelado. No se tocó nada."; exit 0; }
 
 # CREATE INDEX CONCURRENTLY no puede correr dentro de un bloque de transacción:
 # Postgres lo rechaza con "cannot run inside a transaction block", y con
@@ -78,8 +78,8 @@ if grep -vE '^\s*--' "$ARCHIVO" | grep -qiE '\bCONCURRENTLY\b'; then
   echo "    falta: el índice se construye en milisegundos— quítalo del archivo y"
   echo "    vuelve a correr esto para recuperar la atomicidad."
   echo
-  read -r -p "  ¿Aplicar así, sin transacción? [s/N] " R2
-  [[ "$R2" =~ ^[sS]$ ]] || { echo "  Cancelado. No se tocó nada."; exit 0; }
+  preguntar "  ¿Aplicar así, sin transacción? [s/N] " || exit 2
+  [[ "$RESPUESTA" =~ ^[sS]$ ]] || { echo "  Cancelado. No se tocó nada."; exit 0; }
   echo
 fi
 

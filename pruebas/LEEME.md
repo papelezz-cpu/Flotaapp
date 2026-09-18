@@ -103,6 +103,9 @@ SQL, por eso `verificar-paridad.sh` no lo mide y la sonda sí.
 | `03-flujo-completo.mjs` | El ciclo entero: publicar, ofertar, contraofertar, acordar, seguir, cerrar, cobrar, calificar. Más 15 pruebas de lo que **no** debería poderse | Sí, solo en pruebas |
 | `04-copiar-archivos.mjs` | Baja los archivos de Storage de producción y los sube a pruebas. Sin esto, cada documento y cada evidencia da 404 | Sí, solo en pruebas |
 | `05-sonda-correo.mjs` | Pregunta a la Edge Function si la salida de correo está bloqueada. No provoca ningún envío | **No.** Solo pregunta |
+| `06-sonda-escritura-vistas.mjs` | Intenta escribir en las vistas `*_publico` con una sesión normal. Las escrituras están hechas para no tener efecto aunque pasaran: filtros que no casan con ninguna fila. Cierra H-01 | **No.** Lo intenta y espera un 403 |
+| `07-sonda-acreditacion.mjs` | Intenta declararse los seguros y el permiso SCT sin documento aprobado. Cierra H-02 | **No.** Lo intenta y espera que el guard frene |
+| `08-sonda-preguntar.sh` | Que las confirmaciones de `supabase/*.sh` esperen a que escribas, en vez de comerse el salto de línea que deja un pegado multilínea y cancelarse solas. Cierra R-06 | **No.** Ni base de datos ni red |
 
 ```bash
 node pruebas/01-diagnostico.mjs             # contra producción (solo lee)
