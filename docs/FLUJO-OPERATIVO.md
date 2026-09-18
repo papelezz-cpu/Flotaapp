@@ -563,6 +563,64 @@ plazo pactado no cambia porque el cliente edite su perfil después.
 
 ---
 
+## 11. Los dos paneles de números
+
+Dos pantallas enseñan agregados, y **desde el 2026-09-18 los calcula la base,
+no el navegador**: `reporte_kpis(p_desde, p_hasta)` para Reportes del
+superadmin, y `desempeno_empresa()` para «Mi desempeño» de la empresa. Antes
+las dos se descargaban el conjunto entero y sumaban en JavaScript.
+
+### Reportes — solo superadmin
+
+| Cifra | De dónde sale |
+|---|---|
+| Total solicitudes | `pedidos` del rango |
+| Acordadas | estado ∈ `acordado` · `finalizado` · `expirado` |
+| Abiertas | estado `abierto` |
+| Tasa de cierre | acordadas ÷ total, **redondeada en el navegador** |
+| Reservaciones · Ingreso estimado | `reservaciones` del rango; `precio_acordado` nulo suma 0 |
+| Solicitudes por mes | mapa `YYYY-MM` → pedidos |
+| Admins más activos | top 5 por reservaciones, nombre desde `empresas_publico` |
+| Servicios más solicitados | top 5 por `tipo_camion` |
+
+### Mi desempeño — la empresa que mira
+
+Ofertas enviadas y aceptadas, tasa de cierre, reservaciones y completadas,
+ingreso total, calificación promedio, e ingresos por mes de los últimos seis.
+**No tiene rango de fechas: es el historial completo de la empresa**, y por eso
+era la peor de las dos.
+
+`desempeno_empresa()` **no recibe el id de la empresa**: lo saca de
+`auth.uid()`. Con un parámetro, cualquier empresa podría pedir los ingresos de
+otra — la misma razón por la que `calificar_servicio` deriva el `admin_id` del
+propietario de la reserva.
+
+### Cosas que sorprenden si no se avisan
+
+- **El rango superior es `hasta || 'T23:59:59'`.** Una fila creada en el último
+  segundo del día no entra. Venía así del navegador y se reprodujo tal cual
+  para que los números cuadraran con los de antes; corregirlo es cambiar el
+  comportamiento, no arreglarlo.
+- **Los meses se agrupan en UTC**, porque el cliente agrupaba por
+  `created_at.substring(0, 7)` sobre la cadena ISO, que viene en UTC. En la
+  frontera del mes, una fila puede caer en el mes anterior al que dice el reloj
+  de quien mira.
+- **La tasa de cierre y la calificación media se redondean en el navegador.**
+  Las funciones devuelven conteos y sumas, no porcentajes: `Math.round` de
+  JavaScript y `round()` de PostgreSQL no coinciden en los empates.
+- **Los empates del ranking ya no dependen del orden de descarga, y eso cambia
+  qué fila sale, no solo en qué orden.** La consulta que hacía el navegador no
+  llevaba `ORDER BY`, así que un empate lo decidía el orden que devolviera
+  PostgreSQL — que no está garantizado entre dos cargas de la misma pantalla.
+  En un top 5, eso decide quién entra y quién se queda fuera: verificado el
+  2026-09-18 en pruebas, con tres tipos empatados a 3 pedidos, el cálculo
+  viejo enseñaba «Sencillo porta contenedor 40/20» y el nuevo enseña «Full».
+  Ahora se desempata por ingreso y luego por nombre: reproducible.
+- **`cancelados` se calcula y no se pinta.** Estaba así desde siempre; la
+  función lo devuelve por si la tarjeta vuelve.
+
+---
+
 ## Cómo se hablan entre ellos
 
 **No hay chat.** El texto libre entre cliente y empresa se retiró a propósito y

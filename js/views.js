@@ -238,24 +238,30 @@ async function renderMisStats() {
   if (!el || !currentUser.id) return;
   el.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Calculando tus métricas…</div>`;
 
-  const [
-    { data: ofertas },
-    { data: reservas },
-    { data: cals },
-  ] = await Promise.all([
-    sb.from('ofertas').select('id, estado, created_at').eq('admin_id', currentUser.id),
-    sb.from('reservaciones').select('id, precio_acordado, estado, created_at')
-      .eq('propietario_id', currentUser.id),
-    sb.from('calificaciones').select('rating').eq('admin_id', currentUser.id),
-  ]);
+  // Los agregados los calcula la base. Antes esto se descargaba el historial
+  // COMPLETO de ofertas, reservaciones y calificaciones de la empresa cada vez
+  // que se abría el inicio, sin rango y sin límite — y ese historial no
+  // caduca. Ver H-07 y la migración 20260918150000.
+  //
+  // La función no recibe el id: lo saca de auth.uid(), para que nadie pueda
+  // pedir el desempeño y los ingresos de otra empresa.
+  const { data: d, error } = await sb.rpc('desempeno_empresa');
 
-  const totalOfertas   = ofertas?.length || 0;
-  const aceptadas      = (ofertas || []).filter(o => o.estado === 'aceptada').length;
+  if (error || !d) {
+    // Un panel de ceros es indistinguible de una empresa que no ha trabajado.
+    console.error('desempeno_empresa falló:', error?.message || 'sin datos');
+    el.innerHTML = `<div class="empty-state"><div class="icon">❌</div>No se pudieron calcular tus métricas.</div>`;
+    return;
+  }
+
+  const totalOfertas   = d.total_ofertas;
+  const aceptadas      = d.aceptadas;
   const tasa           = totalOfertas ? Math.round((aceptadas / totalOfertas) * 100) : 0;
-  const totalReservas  = reservas?.length || 0;
-  const completadas    = (reservas || []).filter(r => r.estado === 'Completada').length;
-  const ingresoTotal   = (reservas || []).reduce((s, r) => s + (Number(r.precio_acordado) || 0), 0);
-  const avgRating      = cals?.length ? (cals.reduce((s, c) => s + c.rating, 0) / cals.length).toFixed(1) : '—';
+  const totalReservas  = d.total_reservas;
+  const completadas    = d.completadas;
+  const ingresoTotal   = Number(d.ingreso_total) || 0;
+  // Suma y cuenta, no promedio: el redondeo se hace aquí, como siempre.
+  const avgRating      = d.rating_n ? (Number(d.rating_suma) / d.rating_n).toFixed(1) : '—';
 
   // Ingresos por mes (últimos 6)
   const mesesMap = {};
@@ -265,9 +271,10 @@ async function renderMisStats() {
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     mesesMap[key] = { label: d.toLocaleString('es-MX', { month: 'short', year: '2-digit' }), ingreso: 0 };
   }
-  (reservas || []).forEach(r => {
-    const key = r.created_at?.substring(0, 7);
-    if (key && mesesMap[key]) mesesMap[key].ingreso += Number(r.precio_acordado) || 0;
+  // La ventana de seis meses se sigue eligiendo aquí; la base devuelve el
+  // mapa 'YYYY-MM' -> ingreso completo, que es una fila por mes con datos.
+  Object.entries(d.meses || {}).forEach(([key, ing]) => {
+    if (mesesMap[key]) mesesMap[key].ingreso = Number(ing) || 0;
   });
   const meses   = Object.values(mesesMap);
   const maxIng  = Math.max(...meses.map(m => m.ingreso), 1);

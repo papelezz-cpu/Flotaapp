@@ -23,31 +23,29 @@ async function renderReportes() {
   })();
   const hasta = inputHasta?.value || new Date().toISOString().split('T')[0];
 
-  const [
-    { data: pedidos   },
-    { data: reservas  },
-    { data: perfiles  },
-  ] = await Promise.all([
-    sb.from('pedidos').select('id, estado, created_at, tipo_camion, cliente_id')
-      .gte('created_at', desde).lte('created_at', hasta + 'T23:59:59'),
-    sb.from('reservaciones').select('id, precio_acordado, propietario_id, created_at, estado')
-      .gte('created_at', desde).lte('created_at', hasta + 'T23:59:59'),
-    sb.from('empresas_publico').select('user_id, nombre'),
-  ]);
+  // Los agregados los calcula la base. Antes esta pantalla se descargaba
+  // TODOS los pedidos y TODAS las reservaciones del rango —más todas las
+  // empresas, sin filtro— para pintar siete cifras: el coste crecía con el
+  // histórico y no con lo que se enseña. Ver H-07 y la migración 20260918150000.
+  const { data: kpi, error } = await sb.rpc('reporte_kpis', { p_desde: desde, p_hasta: hasta });
 
-  if (!pedidos || !reservas) {
+  if (error || !kpi) {
+    console.error('reporte_kpis falló:', error?.message || 'sin datos');
     el.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar datos.</div>`;
     return;
   }
 
   // ── Totales ────────────────────────────────────────
-  const totalPedidos   = pedidos.length;
-  const acordados      = pedidos.filter(p => ['acordado','finalizado','expirado'].includes(p.estado)).length;
-  const cancelados     = pedidos.filter(p => p.estado === 'cancelado').length;
-  const abiertos       = pedidos.filter(p => p.estado === 'abierto').length;
-  const totalReservas  = reservas.length;
-  const ingresoEst     = reservas.reduce((s, r) => s + (Number(r.precio_acordado) || 0), 0);
+  const totalPedidos   = kpi.total_pedidos;
+  const acordados      = kpi.acordados;
+  const abiertos       = kpi.abiertos;
+  const totalReservas  = kpi.total_reservas;
+  const ingresoEst     = Number(kpi.ingreso) || 0;
+  // La tasa se sigue redondeando aquí y no en SQL: Math.round y round() de
+  // PostgreSQL no coinciden en los empates, y el número tiene que ser el mismo.
   const tasaCierre     = totalPedidos ? Math.round((acordados / totalPedidos) * 100) : 0;
+  // kpi.cancelados también viene, pero ninguna tarjeta lo pinta: se calculaba
+  // aquí desde siempre y no se usaba.
 
   // ── Pedidos por mes (rango seleccionado) ──────────
   const mesesMap = {};
@@ -59,9 +57,10 @@ async function renderReportes() {
     mesesMap[key] = { label: cur.toLocaleString('es-MX', { month: 'short', year: '2-digit' }), count: 0 };
     cur.setMonth(cur.getMonth() + 1);
   }
-  pedidos.forEach(p => {
-    const key = p.created_at?.substring(0, 7);
-    if (key && mesesMap[key]) mesesMap[key].count++;
+  // El rango y las etiquetas se siguen construyendo aquí; la base solo
+  // devuelve el mapa 'YYYY-MM' -> pedidos, una entrada por mes con datos.
+  Object.entries(kpi.meses || {}).forEach(([key, n]) => {
+    if (mesesMap[key]) mesesMap[key].count = n;
   });
   const meses = Object.values(mesesMap);
   const maxCount = Math.max(...meses.map(m => m.count), 1);
@@ -79,35 +78,17 @@ async function renderReportes() {
   }).join('');
 
   // ── Top admins por reservaciones ──────────────────
-  const adminMap = {};
-  (perfiles || []).forEach(p => { adminMap[p.user_id] = p.nombre; });
-
-  const contadorAdmin = {};
-  const ingresoAdmin  = {};
-  reservas.forEach(r => {
-    const id = r.propietario_id;
-    if (!id) return;
-    contadorAdmin[id] = (contadorAdmin[id] || 0) + 1;
-    ingresoAdmin[id]  = (ingresoAdmin[id]  || 0) + (Number(r.precio_acordado) || 0);
-  });
-  const topAdmins = Object.entries(contadorAdmin)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5)
-    .map(([id, cnt]) => ({
-      nombre:  adminMap[id] || 'Empresa',
-      reservas: cnt,
-      ingreso:  ingresoAdmin[id] || 0,
-    }));
+  // Ya viene ordenado y recortado a cinco, con el nombre resuelto contra
+  // empresas_publico. El desempate es por ingreso y luego por nombre: antes lo
+  // decidía el orden de descarga, que no significaba nada.
+  const topAdmins = (kpi.top_admins || []).map(a => ({
+    nombre:   a.nombre,
+    reservas: a.reservas,
+    ingreso:  Number(a.ingreso) || 0,
+  }));
 
   // ── Tipos de servicio más solicitados ────────────
-  const tipoMap = {};
-  pedidos.forEach(p => {
-    const t = p.tipo_camion || 'Otro';
-    tipoMap[t] = (tipoMap[t] || 0) + 1;
-  });
-  const topTipos = Object.entries(tipoMap)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5);
+  const topTipos = (kpi.top_tipos || []).map(t => [t.tipo, t.n]);
 
   // ── Render ─────────────────────────────────────────
   el.innerHTML = `
