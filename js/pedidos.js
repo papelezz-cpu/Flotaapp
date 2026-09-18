@@ -2686,15 +2686,23 @@ function filtrarPedidosEstado(est) {
 // era de memoria eso era gratis; ahora cada llamada es una consulta que además
 // reinicia el acumulado y deja la lista en esqueleto. Sin amortiguar, teclear
 // «Manzanillo» son once peticiones y once parpadeos.
-let _geoTimer = null;
+// OJO con el nombre: `_geoTimer` a secas YA EXISTE en js/utils.js:168, para el
+// autocompletado de direcciones. Los scripts clásicos comparten el ámbito
+// léxico global, así que dos `let` con el mismo nombre son un SyntaxError y
+// TODO este archivo deja de ejecutarse — no solo esta función. Ocurrió el
+// 2026-09-18 y dejó la pantalla de Solicitudes muerta en el preview: se vio
+// porque `aplicarFiltrosPedidos` salía indefinida mientras `_geoTimer` existía,
+// que es imposible dentro de un mismo archivo. `node --check` no lo caza:
+// comprueba el archivo aislado, y la colisión solo existe al juntarlos.
+let _pedGeoTimer = null;
 function filtrarPedidosGeo(val) {
   const v = val.trim();
   // El clear va ANTES de la salida temprana: si escribes una letra y la borras
   // dentro de la ventana, hay un temporizador en vuelo que aplicaría la letra
   // borrada. Volver al valor ya aplicado tiene que CANCELAR lo pendiente, no
   // solo no programar nada nuevo.
-  clearTimeout(_geoTimer);
+  clearTimeout(_pedGeoTimer);
   if (v === _filtroGeo) return;        // flechas, teclas muertas, espacios al final
-  _geoTimer = setTimeout(() => { _filtroGeo = v; renderPedidos(); }, 350);
+  _pedGeoTimer = setTimeout(() => { _filtroGeo = v; renderPedidos(); }, 350);
 }
 
