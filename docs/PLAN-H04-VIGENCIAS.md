@@ -83,31 +83,42 @@ exige autorización explícita (Regla #1).
 
 ### Etapa 1 — Crear, sin que nadie la lea  ·  **ESCRITA Y PROBADA EN BANCO LOCAL**
 
-```sql
-create table public.vigencias (
-  id              uuid primary key default gen_random_uuid(),
-  entidad_tipo    text not null check (entidad_tipo in
-                    ('perfil','camion','operador','custodio','patio')),
-  entidad_id      text not null,
-  tipo_documento  text not null,
-  archivo_path    text,
-  fecha_vencimiento date,
-  estado          text,
-  subido_en       timestamptz not null default now(),
-  subido_por      uuid references auth.users(id) on delete set null,
-  unique (entidad_tipo, entidad_id, tipo_documento)
-);
-create index on public.vigencias (fecha_vencimiento)
-  where fecha_vencimiento is not null;
-```
+**Está en `supabase/migrations/20260918160000_vigencias_etapa1_crear.sql`.** Lo
+que sigue describe lo que esa migración hace; el SQL literal vive ahí y es el
+que manda. Este boceto se corrigió el mismo día porque el primero, escrito
+antes de construirla, ya no decía la verdad en tres puntos: proponía un
+`fecha_vencimiento` (ver la sexta decisión), un `UNIQUE` simple (ver la
+segunda) y un trigger donde acabó habiendo una clave foránea (la cuarta).
 
-Más: RLS con las mismas reglas que la tabla de origen de cada `entidad_tipo`,
-y **el guard equivalente a `guard_perfil_self_update` desde el primer día**,
-no después.
+- `vigencias(id, entidad_tipo, entidad_id, tipo_documento, archivo_path,
+  **fecha_documento**, estado, nota_rechazo, subido_en/por, revisado_en/por,
+  cat_clave)`.
+- **`cat_clave`** es una columna generada con valor constante
+  `'vigencia_tipo'`, y existe solo para colgar la **FK compuesta** contra
+  `catalogos(clave, valor)`. Probada en banco local: rechaza un tipo inventado.
+- Cuatro `CHECK`: la lista de entidades, la de estados, «algo que guardar»
+  (papel o fecha, no una fila vacía) y «un rechazo lleva motivo».
+- **Dos índices únicos parciales** en lugar de un `UNIQUE`: uno por
+  `estado = 'vigente'` y otro por `estado = 'pendiente'`.
+- Índices sobre `fecha_documento` —el que hoy no existe en ninguna de las cinco
+  tablas— y sobre `(entidad_tipo, entidad_id)`.
+- `vigencia_vence_el(tipo, fecha)` aplica la regla del catálogo.
+- RLS: lee el dueño o el superadmin; la empresa solo puede **insertar**
+  `pendiente` sobre entidades suyas; el superadmin, todo.
+- **El guard va en esta misma migración**, no después: `guard_vigencia_update`
+  impide que una empresa pase su propia propuesta a `vigente`, firme la
+  revisión o toque un documento ya acreditado.
+- Un bloque de comprobación al final que hace fallar la migración si falta
+  cualquiera de esas piezas, en vez de aplicarla a medias.
 
 `entidad_id` es `text` porque las PK de flota lo son y las de `perfiles` son
-`uuid`. No hay FK posible — es el mismo problema que H-06, y se sostiene con
-un trigger que resuelve la tabla según `entidad_tipo`.
+`uuid`. No hay FK posible hacia la entidad — es el mismo problema que H-06 — y
+por eso el dueño se resuelve con `vigencia_propietario()`, que consulta la
+tabla que corresponda según `entidad_tipo`.
+
+**Probada**: `pruebas/banco-local/h04-etapa1.sql`, 21 afirmaciones contra un
+Postgres local con el esquema de producción cargado sin un solo error, en
+transacción revertida. Nueve comprueban que **rechaza** lo que debe rechazar.
 
 ### Etapa 2 — Copiar
 
