@@ -67,11 +67,20 @@
 --     porque es de donde los toma el cliente. perfiles tiene 13 filas y la
 --     vista 3: usar la tabla meteria en el ranking a quien no es empresa.
 --
---   · Lo que NO se reproduce es el desempate. JavaScript ordena con un sort
---     estable, asi que dos empresas con el mismo numero de reservas salen en
---     el orden en que aparecieron en la descarga — un orden que no significa
---     nada y que cambia solo. Aqui se desempata por ingreso y luego por
---     nombre. Es determinista, que es mejor, pero es una diferencia.
+--   · Lo que NO se reproduce es el desempate, y la diferencia es mas grande de
+--     lo que parece. JavaScript ordena con un sort estable, asi que un empate
+--     lo decide el orden en que las filas llegaron en la descarga. Y esa
+--     descarga NO LLEVA ORDER BY: el orden lo elige PostgreSQL y no esta
+--     garantizado entre dos cargas de la misma pantalla.
+--
+--     Con un top 5 eso no solo reordena: cambia QUIEN SALE. Comprobado en
+--     pruebas el 2026-09-18 — tres tipos empatados a 3 pedidos peleando por el
+--     quinto puesto, el calculo viejo ensenaba «Sencillo porta contenedor
+--     40/20» y este ensena «Full». Los dos son igual de ciertos; solo uno es
+--     reproducible.
+--
+--     Aqui se desempata por ingreso y luego por nombre. Es un cambio visible y
+--     deliberado: la alternativa era conservar un orden que nadie eligio.
 --
 --   · `cancelados` se calcula en js/reportes.js:45 y no se pinta en ninguna
 --     parte. Se devuelve igual, por si la tarjeta vuelve, y queda dicho.
@@ -136,8 +145,12 @@ begin
            where created_at >= v_ini and created_at <= v_fin
            group by 1) s;
 
+  -- El ORDER BY va DENTRO del jsonb_agg, no solo en la subconsulta: una
+  -- agregacion no tiene por que respetar el orden de lo que recibe, y aqui el
+  -- orden es el resultado, no un adorno.
   select coalesce(jsonb_agg(jsonb_build_object(
-           'nombre', nombre, 'reservas', n, 'ingreso', ing)), '[]'::jsonb) into v_top
+           'nombre', nombre, 'reservas', n, 'ingreso', ing)
+           order by n desc, ing desc, nombre), '[]'::jsonb) into v_top
     from (select coalesce(e.nombre, 'Empresa') as nombre,
                  count(*) as n,
                  coalesce(sum(coalesce(r.precio_acordado, 0)), 0) as ing
@@ -149,7 +162,8 @@ begin
            order by n desc, ing desc, nombre
            limit 5) s;
 
-  select coalesce(jsonb_agg(jsonb_build_object('tipo', t, 'n', n)), '[]'::jsonb) into v_tipos
+  select coalesce(jsonb_agg(jsonb_build_object('tipo', t, 'n', n)
+           order by n desc, t), '[]'::jsonb) into v_tipos
     from (select coalesce(nullif(tipo_camion, ''), 'Otro') as t, count(*) as n
             from public.pedidos
            where created_at >= v_ini and created_at <= v_fin

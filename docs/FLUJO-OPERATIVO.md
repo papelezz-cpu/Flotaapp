@@ -608,9 +608,14 @@ propietario de la reserva.
 - **La tasa de cierre y la calificación media se redondean en el navegador.**
   Las funciones devuelven conteos y sumas, no porcentajes: `Math.round` de
   JavaScript y `round()` de PostgreSQL no coinciden en los empates.
-- **Los empates del ranking ya no dependen del orden de descarga.** Se desempata
-  por ingreso y luego por nombre. Antes ganaba quien apareciera primero en la
-  respuesta, que no significaba nada y cambiaba solo.
+- **Los empates del ranking ya no dependen del orden de descarga, y eso cambia
+  qué fila sale, no solo en qué orden.** La consulta que hacía el navegador no
+  llevaba `ORDER BY`, así que un empate lo decidía el orden que devolviera
+  PostgreSQL — que no está garantizado entre dos cargas de la misma pantalla.
+  En un top 5, eso decide quién entra y quién se queda fuera: verificado el
+  2026-09-18 en pruebas, con tres tipos empatados a 3 pedidos, el cálculo
+  viejo enseñaba «Sencillo porta contenedor 40/20» y el nuevo enseña «Full».
+  Ahora se desempata por ingreso y luego por nombre: reproducible.
 - **`cancelados` se calcula y no se pinta.** Estaba así desde siempre; la
   función lo devuelve por si la tarjeta vuelve.
 
