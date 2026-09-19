@@ -294,6 +294,33 @@ create trigger trg_guard_vigencia_update
 revoke all on table public.vigencias from anon, public;
 grant select, insert, update, delete on table public.vigencias to authenticated;
 
+-- service_role como en las otras 24 tablas. La primera versión de esta
+-- migración se lo dejó sin nada, y la paridad lo cazó: habría sido la ÚNICA
+-- tabla del esquema donde la clave de servicio no puede leer. Hoy no rompe
+-- nada porque ninguna Edge Function la toca; el día que una la toque falla
+-- sin motivo aparente. Salirse del patrón tiene que ser una decisión, y aquí
+-- no lo era.
+grant all on table public.vigencias to service_role;
+
+-- ── Y las dos funciones de TRIGGER, que es H-21 otra vez ───────────────────
+--
+-- H-21 retiró EXECUTE de las funciones que devuelven `trigger`, con un bucle
+-- sobre pg_proc. Pero fue una BARRIDA DE UNA SOLA VEZ: no cubre las que se
+-- creen después, y estas dos nacieron con EXECUTE para anon, authenticated y
+-- service_role. Lo cazó la paridad, no una revisión.
+--
+-- No es explotable —una función que devuelve trigger no se puede invocar por
+-- REST, PostgreSQL responde «can only be called as trigger»— y retirarlo no
+-- impide que el trigger dispare, porque eso no depende de EXECUTE. Se retira
+-- por lo mismo que H-21: es un permiso que nadie necesita y que obliga a
+-- razonar sobre por qué está ahí cada vez que alguien audita los grants.
+--
+-- `public` va en la lista A PROPÓSITO: quitarlo solo de anon y authenticated
+-- no retira nada, porque PostgreSQL concede a PUBLIC por omisión. Esa fue
+-- exactamente la primera pasada fallida de H-21.
+revoke all on function public.vigencias_tipo_coincide()  from public, anon, authenticated;
+revoke all on function public.guard_vigencia_update()    from public, anon, authenticated;
+
 
 -- ── 6 · Comprobación ───────────────────────────────────────────────────────
 -- Si algo de lo de arriba no quedó, la migración falla en vez de mentir.
@@ -330,6 +357,22 @@ begin
 
   if has_table_privilege('anon', 'public.vigencias', 'SELECT') then
     raise exception 'H-04: anon puede leer vigencias';
+  end if;
+
+  if not has_table_privilege('service_role', 'public.vigencias', 'SELECT') then
+    raise exception 'H-04: service_role se quedó sin privilegios sobre vigencias, a diferencia de las otras 24 tablas';
+  end if;
+
+  -- H-21: ninguna función de trigger debe conservar EXECUTE. Se comprueba
+  -- contra los tres roles MÁS public, que es lo que la primera pasada de
+  -- H-21 se dejó.
+  select string_agg(f, ', ') into v_falta from (
+    select f from unnest(array['public.vigencias_tipo_coincide()',
+                               'public.guard_vigencia_update()']) f
+     where has_function_privilege('anon',          f, 'EXECUTE')
+        or has_function_privilege('authenticated', f, 'EXECUTE')) s;
+  if v_falta is not null then
+    raise exception 'H-04/H-21: estas funciones de trigger conservan EXECUTE: %', v_falta;
   end if;
 
   if (select count(*) from public.catalogos where clave = 'vigencia_tipo') <> 17 then
