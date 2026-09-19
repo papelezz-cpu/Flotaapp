@@ -190,6 +190,37 @@ es lo que se pierde si solo queda el código.
    evita una segunda migración; sus ficheros JS no se tocan mientras sigan
    apagados y sin datos.
 
+### Séptima: las fechas de expedición se quedan fuera del modelo
+
+**Decisión del usuario, 2026-09-19: «solo nos interesa la fecha en la que
+vence el documento; para la operación no es relevante cuándo fue emitido».**
+
+Esto surgió porque al preparar la Etapa 2 apareció que dos columnas guardan
+**emisión**, no caducidad, y sí se usan:
+
+| Columna | Dónde |
+|---|---|
+| `camiones.fecha_expedicion_tc` | formulario de alta y de edición (`admin.js`), y una línea «TC expedición» que el superadmin ve al aprobar (`aprobaciones.js:688`) |
+| `operadores.fecha_expedicion` | formulario de alta de operador (`operadores.js`) |
+
+Comprobado una por una: **ninguna de las diez apariciones es una regla.** No
+hay guard, política ni filtro que dependa de ellas; se capturan y se enseñan.
+
+**Consecuencias, para que no se redescubran:**
+
+1. **No se añade `fecha_expedicion` a `vigencias`.** La tabla se queda con una
+   sola `fecha_documento`, tal como se aplicó. No hace falta una Etapa 1b.
+2. **Las dos columnas se quedan donde están** y sus pantallas siguen
+   funcionando igual. No son «documento con vigencia»: son un dato *sobre* el
+   documento.
+3. **Tampoco entran en la Etapa 6.** Cuando se plantee retirar columnas, estas
+   dos no son candidatas — se siguen leyendo y escribiendo.
+
+**Lo que esta decisión NO cambia:** los exámenes del operador siguen
+capturándose por su fecha de realización y su caducidad se deriva, como
+explica la sexta decisión. Ahí la fecha capturada es el único dato que existe;
+no hay una caducidad que guardar en su lugar.
+
 ### Y una sexta, que no estaba en la lista y salió de leer el código
 
 **Las columnas de hoy no guardan todas lo mismo.**
