@@ -40,9 +40,16 @@
 -- UPDATE a una fila de catálogo, no una migración — que es exactamente el
 -- beneficio que justifica todo este trabajo.
 --
+-- ── Sin `begin` ni `commit` en este fichero ───────────────────────────────
+--
+-- Los guiones aplicar-a-* ya envuelven todo en --single-transaction, y
+-- aplicar-a-produccion.sh aplica VARIOS archivos en una sola: "o entra el
+-- conjunto o no entra nada". Un `commit` aquí dentro cerraría esa transacción
+-- a mitad de tanda, dejando lo anterior confirmado y lo posterior fuera de la
+-- garantía. Las otras 74 migraciones de este repositorio no lo llevan; esta
+-- lo llevó por error y se vio al aplicarla, por dos WARNING de psql.
+--
 -- ============================================================================
-
-begin;
 
 -- ── 1 · El catálogo de tipos de documento ──────────────────────────────────
 --
@@ -142,6 +149,7 @@ begin
   return new;
 end $$;
 
+drop trigger if exists trg_vigencias_tipo_coincide on public.vigencias;
 create trigger trg_vigencias_tipo_coincide
   before insert or update of tipo_documento, entidad_tipo on public.vigencias
   for each row execute function public.vigencias_tipo_coincide();
@@ -234,18 +242,21 @@ grant execute on function public.vigencia_propietario(text, text) to authenticat
 
 -- Lee el dueño y el superadmin. No es público: una ruta de Storage y una
 -- caducidad son datos de la empresa, no del catálogo.
+drop policy if exists vigencias_lee_dueno_o_sa on public.vigencias;
 create policy vigencias_lee_dueno_o_sa on public.vigencias
   for select to authenticated
   using (public.is_superadmin()
       or public.vigencia_propietario(entidad_tipo, entidad_id) = auth.uid());
 
 -- La empresa PROPONE: solo filas suyas y solo en estado 'pendiente'.
+drop policy if exists vigencias_propone_el_dueno on public.vigencias;
 create policy vigencias_propone_el_dueno on public.vigencias
   for insert to authenticated
   with check (public.vigencia_propietario(entidad_tipo, entidad_id) = auth.uid()
               and estado = 'pendiente');
 
 -- El superadmin hace el resto.
+drop policy if exists vigencias_sa_todo on public.vigencias;
 create policy vigencias_sa_todo on public.vigencias
   for all to authenticated
   using (public.is_superadmin()) with check (public.is_superadmin());
@@ -273,6 +284,7 @@ begin
   return new;
 end $$;
 
+drop trigger if exists trg_guard_vigencia_update on public.vigencias;
 create trigger trg_guard_vigencia_update
   before update on public.vigencias
   for each row execute function public.guard_vigencia_update();
@@ -328,5 +340,3 @@ begin
   raise notice 'H-04 etapa 1: tabla, catálogo de 17 tipos, RLS y guard en su sitio.';
   raise notice 'H-04 etapa 1: nadie la lee todavía. Ninguna pantalla cambia.';
 end $$;
-
-commit;
