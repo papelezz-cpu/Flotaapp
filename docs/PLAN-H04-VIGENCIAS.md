@@ -120,10 +120,55 @@ tabla que corresponda según `entidad_tipo`.
 Postgres local con el esquema de producción cargado sin un solo error, en
 transacción revertida. Nueve comprueban que **rechaza** lo que debe rechazar.
 
-### Etapa 2 — Copiar
+### Etapa 2 — Copiar  ·  **APLICADA A PRUEBAS el 2026-09-21**
 
-Un `insert … select` por tabla de origen. ~44 filas. Reversible con un
+`supabase/migrations/20260921120000_vigencias_etapa2_copiar.sql`. Un
+`insert … select` por tabla de origen, re-aplicable. Reversible con un
 `delete` acotado por `entidad_tipo`.
+
+**Copió 63 filas, no las ~44 estimadas**, y la diferencia enseña algo:
+
+| | Estimado | Real |
+|---|---|---|
+| perfil | ~3 | 3 |
+| camión | ~33 | 48 |
+| operador | ~8 | 12 |
+| custodio · patio | 0 | 0 |
+
+La estimación del 18/09 contaba **filas con alguna fecha** y además redondeaba
+a la baja: las fechas eran 49, no 44. Los 14 restantes son documentos con
+**archivo pero sin vencimiento**, que aquella cuenta ni miraba. `49 + 14 = 63`.
+
+#### Lo que la tabla unificada hizo visible el primer día
+
+Medido en pruebas el 2026-09-21, tras una réplica que dio paridad
+`identicas` — las columnas de origen no las tocan estas migraciones, así que
+son los datos de producción:
+
+```
+con archivo y SIN fecha de vencimiento   14   <- nada las vigila
+con fecha y SIN archivo                  15
+en estado 'pendiente'                     0
+
+  camion/tarjeta_circulacion      5
+  camion/seguro_unidad            3
+  camion/permiso_sct_unidad       3
+  operador/licencia               1
+  operador/examen_toxicologico    1
+  operador/carta_antecedentes     1
+```
+
+**Catorce papeles que nadie vigila.** El flujo operativo ya lo advertía como
+regla —«un documento sin fecha no se vigila jamás»— pero hasta ahora nadie
+podía contar cuántos eran sin un `UNION` de cinco ramas escrito a mano. Cinco
+de ellos son tarjetas de circulación.
+
+Y quince al revés: vencimiento declarado sin papel detrás.
+
+**No es un defecto de la copia** —los trajo fielmente— ni algo que esta etapa
+deba arreglar. Es una decisión de producto pendiente: o se exige la fecha al
+subir el papel, o se asume que esos catorce no se vigilan. Queda anotado, sin
+tocar.
 
 ### Etapa 3 — Doble escritura
 
