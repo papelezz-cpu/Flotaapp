@@ -67,6 +67,7 @@ const RES_COLS_LISTA = [
 //   clave   → qué botón se resalta: chofer | avanzar | puerto | vacios | completar | cobro
 //   corto   → texto del chip en la fila
 //   detalle → frase completa dentro del panel
+//   accion  → el onclick que lleva directo a hacerlo (lo usa el chip de la fila)
 //   espera  → lo que depende del cliente (no es una acción de la empresa)
 function _trackingEnUltimoPaso(r) {
   const pasos = _getEstados(r.recurso_tipo);
@@ -74,9 +75,17 @@ function _trackingEnUltimoPaso(r) {
 }
 
 function _siguientePasoReserva(r) {
+  const ACCION = {
+    chofer:    `abrirAsignarChofer('${r.id}')`,
+    puerto:    `abrirExpediente('${r.id}','ingreso_puerto')`,
+    vacios:    `abrirExpediente('${r.id}','entrega_vacios')`,
+    avanzar:   `openTracking('${r.id}')`,
+    completar: `abrirEvidencias('${r.id}','evidencias')`,
+    cobro:     `abrirRegistrarPago('${r.id}')`,
+  };
   if (r.estado === 'Completada') {
     return r.pagado ? null : {
-      clave: 'cobro', corto: 'Registrar pago',
+      clave: 'cobro', corto: 'Registrar pago', accion: ACCION.cobro,
       detalle: 'El servicio ya se completó: registra el pago cuando lo recibas.',
     };
   }
@@ -89,7 +98,7 @@ function _siguientePasoReserva(r) {
   if (r._expVacios?.estado  === 'solicitado') pendCliente.push('Vacíos');
   const espera = pendCliente.length
     ? `Esperando que el cliente suba los documentos de ${pendCliente.join(' y ')}.` : null;
-  const paso = (clave, corto, detalle) => ({ clave, corto, detalle, espera });
+  const paso = (clave, corto, detalle) => ({ clave, corto, detalle, accion: ACCION[clave], espera });
 
   const esCamion = !r.recurso_tipo || r.recurso_tipo === 'camion';
   if (esCamion && !r.operador_nombre) {
@@ -593,7 +602,7 @@ async function renderReserv(append = false) {
       <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
         <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
         ${primaria}
-        ${(sig && detalleHTML) ? `<button class="reserv-next-chip" title="Ver qué sigue" onclick="toggleReservDetalle('${r.id}')">👉 ${esc(sig.corto)}</button>` : ''}
+        ${(sig && detalleHTML) ? `<button class="reserv-next-chip" title="Ir directo a este paso" onclick="${sig.accion}">👉 ${esc(sig.corto)}</button>` : ''}
         ${detalleHTML ? `<button id="reserv-toggle-${r.id}" class="reserv-toggle${abierta ? ' open' : ''}" aria-expanded="${abierta}" title="Más acciones" onclick="toggleReservDetalle('${r.id}')">▾</button>` : ''}
       </div>
     </div>
