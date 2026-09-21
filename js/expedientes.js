@@ -511,9 +511,12 @@ async function abrirExpedienteVaciosSiAplica(reserva) {
 }
 
 // ── Botones dentro de la fila de la reservación ─────────
-function expedienteBotonesHTML(r, soyCliente) {
+// `siguiente` ('puerto' | 'vacios' | otro): la clave de _siguientePasoReserva;
+// si coincide con la etapa, la pastilla se resalta como "lo que toca ahora".
+function expedienteBotonesHTML(r, soyCliente, siguiente) {
   const btns = [];
   const pill = (etapa, exp) => {
+    const nx = siguiente === (etapa === 'entrega_vacios' ? 'vacios' : 'puerto') ? ' reserv-next' : '';
     const cfg = EXP_ETAPAS[etapa];
     const nombre = etapa === 'entrega_vacios' ? 'Vacíos' : 'Puerto';
     if (!exp) {
@@ -529,7 +532,7 @@ function expedienteBotonesHTML(r, soyCliente) {
     let estadoCls = 'exp-pill--pend', estadoIcon = '⏳', tip = 'Pendiente de completar';
     if (completo) { estadoCls = 'exp-pill--ok'; estadoIcon = '✓'; tip = 'Expediente completo'; }
     if (dem && dem.clave !== 'ok' && !completo) { estadoCls = dem.cls; estadoIcon = '⚠'; tip = dem.label; }
-    return `<button class="exp-pill ${estadoCls}" style="font-size:0.72rem" title="${esc(tip)}"
+    return `<button class="exp-pill ${estadoCls}${nx}" style="font-size:0.72rem" title="${esc(tip)}"
               onclick="abrirExpediente('${r.id}','${etapa}')">
               ${cfg.icon} ${nombre} <span class="exp-pill-estado">${estadoIcon}</span>
             </button>`;
