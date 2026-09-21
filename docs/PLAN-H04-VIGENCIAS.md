@@ -1,8 +1,12 @@
 # H-04 — Unificar «documento con vigencia» en una tabla
 
-Plan por etapas. **La Etapa 1 está escrita y probada en banco local; no se ha aplicado a ninguna base real.** El resto no está implementado. Escrito el 2026-09-18 con
-los datos medidos ese día contra `portgo-pruebas` (sello `diverge`, 6
-diferencias — ver §Paridad).
+Plan por etapas. Escrito el 2026-09-18.
+
+**Estado al 2026-09-21: Etapas 1 y 2 aplicadas a `portgo-pruebas`**, sobre una
+réplica de ese día que dio paridad `identicas` antes de aplicarlas. La tabla
+existe y tiene 63 filas, y **nadie la lee todavía**: ninguna pantalla cambió.
+**Producción no las tiene** — llevarlas allí es una promoción aparte, con su
+propia autorización (Regla #2). Etapas 3 a 6, sin empezar.
 
 ---
 
@@ -20,6 +24,12 @@ hacen secuencial.
 ## Lo que el plan sabe, porque se midió
 
 ### Datos: la migración es diminuta
+
+> ⚠ **Esta tabla es la estimación del 18/09 y se quedó corta.** Al copiar de
+> verdad salieron **63 filas, no ~44**: contaba filas con alguna fecha,
+> redondeaba a la baja, y no miraba los documentos con archivo pero sin
+> vencimiento. Se conserva sin retocar porque es lo que se creyó al planificar;
+> los números reales están en la Etapa 2.
 
 | Tabla | Filas | Con alguna fecha | Filas que generaría |
 |---|---|---|---|
