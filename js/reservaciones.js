@@ -57,6 +57,60 @@ const RES_COLS_LISTA = [
   'documentos_carga','gps_link',
 ].join(',');
 
+// ── SIGUIENTE PASO ────────────────────────────────────
+// Le dice a la empresa qué toca ahora en una reservación, para que no tenga
+// que adivinarlo entre diez botones. Se deriva de lo que la fila ya trae
+// (chofer, seguimiento, expedientes, cobro) — no se guarda nada, igual que
+// estadoCobro. Es una guía, no un candado: lo único que se bloquea es lo que
+// el sistema ya bloqueaba (avanzar sin chofer, completar sin llegar al último
+// paso del seguimiento).
+//   clave   → qué botón se resalta: chofer | avanzar | puerto | vacios | completar | cobro
+//   corto   → texto del chip en la fila
+//   detalle → frase completa dentro del panel
+//   espera  → lo que depende del cliente (no es una acción de la empresa)
+function _trackingEnUltimoPaso(r) {
+  const pasos = _getEstados(r.recurso_tipo);
+  return (r.tracking_estado || pasos[0].key) === pasos[pasos.length - 1].key;
+}
+
+function _siguientePasoReserva(r) {
+  if (r.estado === 'Completada') {
+    return r.pagado ? null : {
+      clave: 'cobro', corto: 'Registrar pago',
+      detalle: 'El servicio ya se completó: registra el pago cuando lo recibas.',
+    };
+  }
+  if (r.estado !== 'Activa' || typeof _getEstados !== 'function') return null;
+
+  // "solicitado" = la pelota la tiene el cliente; "en_revision" = ya subió
+  // todo y le toca a la empresa aprobar o rechazar (ver expedientes.js).
+  const pendCliente = [];
+  if (r._expIngreso?.estado === 'solicitado') pendCliente.push('Puerto');
+  if (r._expVacios?.estado  === 'solicitado') pendCliente.push('Vacíos');
+  const espera = pendCliente.length
+    ? `Esperando que el cliente suba los documentos de ${pendCliente.join(' y ')}.` : null;
+  const paso = (clave, corto, detalle) => ({ clave, corto, detalle, espera });
+
+  const esCamion = !r.recurso_tipo || r.recurso_tipo === 'camion';
+  if (esCamion && !r.operador_nombre) {
+    return paso('chofer', 'Asignar chofer', 'Asigna un chofer: sin él no se puede avanzar el seguimiento del viaje.');
+  }
+  if (r._expIngreso?.estado === 'en_revision') {
+    return paso('puerto', 'Revisar docs de Puerto', 'El cliente ya subió los documentos de Puerto: revísalos y apruébalos o recházalos.');
+  }
+  if (r._expVacios?.estado === 'en_revision') {
+    return paso('vacios', 'Revisar docs de Vacíos', 'El cliente ya subió los documentos de Vacíos: revísalos y apruébalos o recházalos.');
+  }
+
+  const pasos = _getEstados(r.recurso_tipo);
+  const idx   = Math.max(0, pasos.findIndex(p => p.key === (r.tracking_estado || pasos[0].key)));
+  if (idx < pasos.length - 1) {
+    const sig = pasos[idx + 1];
+    return paso('avanzar', `Marcar: ${sig.label}`, `Cuando ocurra, marca en el seguimiento: «${sig.label}».`);
+  }
+  return paso('completar', 'Completar servicio', 'El seguimiento llegó al final: completa el servicio subiendo tu evidencia.');
+}
+
 // ── PAGINACIÓN ────────────────────────────────────────
 // Mismo patrón que renderPedidos: un bloque inicial y un botón que añade el
 // siguiente. Antes esta vista se traía la tabla ENTERA —para el superadmin,
@@ -439,6 +493,9 @@ async function renderReserv(append = false) {
     let primaria = '';
     const gruposDetalle = [];
     const grupo = (label, html) => { if (html) gruposDetalle.push({ label, html }); };
+    // Guía de "qué sigue": resalta el botón que toca (clase reserv-next).
+    const sig = esDueno ? _siguientePasoReserva(r) : null;
+    const nx  = clave => (sig?.clave === clave ? ' reserv-next' : '');
 
     if (esDueno && esPendiente) {
       primaria = `
@@ -449,11 +506,10 @@ async function renderReserv(append = false) {
       // El chofer ya no es obligatorio al ofertar: se asigna aquí, en
       // cualquier momento mientras el viaje sigue Activo. El tracking no
       // deja avanzar del primer paso sin uno asignado (ver tracking.js) —
-      // por eso, si falta, se marca en la fila y no solo adentro del panel.
+      // por eso, si falta, es lo primero que marca _siguientePasoReserva.
       const esCamion = r.recurso_tipo === 'camion' || !r.recurso_tipo;
-      const choferFalta = esCamion && !r.operador_nombre;
       const choferBtn = esCamion
-        ? `<button class="btn-edit" onclick="abrirAsignarChofer('${r.id}')" title="${r.operador_nombre ? 'Cambiar chofer' : 'Asignar chofer antes de iniciar el viaje'}">👷 ${r.operador_nombre ? esc(r.operador_nombre) : 'Asignar chofer'}</button>`
+        ? `<button class="btn-edit${nx('chofer')}" onclick="abrirAsignarChofer('${r.id}')" title="${r.operador_nombre ? 'Cambiar chofer' : 'Asignar chofer antes de iniciar el viaje'}">👷 ${r.operador_nombre ? esc(r.operador_nombre) : 'Asignar chofer'}</button>`
         : '';
       // El link se puede guardar en cualquier momento; el cliente solo lo ve
       // una vez que el tracking avanzó del primer paso (ver vista cliente).
@@ -461,18 +517,25 @@ async function renderReserv(append = false) {
       const numDocsCargaDueno = r.documentos_carga?.length || 0;
       const docsCargaBtnDueno = `<button class="btn-edit" onclick="abrirDocumentosCarga('${r.id}')" title="Ver Carta Porte y documentos que subió el cliente">📄 ${numDocsCargaDueno ? `Documentos (${numDocsCargaDueno})` : 'Documentos del cliente'}</button>`;
       const expedientePillsActiva = typeof expedienteBotonesHTML === 'function'
-        ? expedienteBotonesHTML(r, r.cliente_user_id === currentUser.id) : '';
+        ? expedienteBotonesHTML(r, r.cliente_user_id === currentUser.id, sig?.clave) : '';
+      // Completar solo se habilita al llegar al último paso del seguimiento:
+      // abrirEvidencias ya lo exigía, pero con un aviso de error DESPUÉS de
+      // pulsar. Mejor que el botón lo diga desde antes.
+      const enUltimoPaso = _trackingEnUltimoPaso(r);
+      const ultimoLabel  = _getEstados(r.recurso_tipo).slice(-1)[0].label;
+      const completarBtn = enUltimoPaso
+        ? `<button class="btn-completar-reserva${nx('completar')}" onclick="abrirEvidencias('${r.id}','evidencias')">✓ Completar</button>`
+        : `<button class="btn-completar-reserva" disabled title="${esc(`Disponible al llegar a «${ultimoLabel}» en el seguimiento`)}">✓ Completar</button>`;
 
       primaria = `
-        <button class="btn-edit" onclick="openTracking('${r.id}')" title="Ver seguimiento">📍 ${esc(trackStep)}</button>
-        ${choferFalta ? `<span class="reserv-warn-chip" title="Bloquea avanzar el seguimiento">⚠ Sin chofer</span>` : ''}`;
+        <button class="btn-edit${nx('avanzar')}" onclick="openTracking('${r.id}')" title="Ver seguimiento">📍 ${esc(trackStep)}</button>`;
       grupo('Operación', choferBtn + `<button class="btn-edit" onclick="abrirCambiarUnidad('${r.id}')" title="Reasignar a otra unidad (p. ej. si se descompuso)">🔧 Cambiar unidad</button>` + gpsBtn);
       grupo('Documentos', docsCargaBtnDueno + expedientePillsActiva);
       // Avisos al cliente sin necesidad de chat: un aviso puntual (campana +
       // correo) en vez de un mensaje libre.
       grupo('Avisos', `<button class="btn-edit" onclick="confirmarLugarHora('${r.id}')" title="Pedirle al cliente que confirme lugar y hora">📍 Confirmar lugar y hora</button>` +
         `<button class="btn-edit" onclick="avisarRetraso('${r.id}')" title="Avisar que el transporte va a llegar tarde">⏰ Avisar retraso</button>`);
-      grupo('Cierre', `<button class="btn-completar-reserva" onclick="abrirEvidencias('${r.id}','evidencias')">✓ Completar</button>` +
+      grupo('Cierre', completarBtn +
         `<button class="btn-cancelar-reserva" onclick="cancelarReserva('${r.id}','${escJs(r.unidad)}')">Cancelar</button>`);
     } else if (esDueno && esPorAprobar) {
       // El servicio se cierra cuando cliente Y empresa marcan completado (cada
@@ -495,7 +558,7 @@ async function renderReserv(append = false) {
       // Cobro: quien recibe el dinero (la empresa) o el superadmin lo registra.
       const cobroBtn = r.pagado
         ? `<button class="btn-edit" style="font-size:0.72rem" title="Revertir el cobro registrado" onclick="revertirPago('${r.id}')">↩ Revertir cobro</button>`
-        : `<button class="btn-edit" style="font-size:0.72rem;color:var(--amber);border-color:rgba(245,158,11,0.4)" onclick="abrirRegistrarPago('${r.id}')">💰 Registrar pago</button>`;
+        : `<button class="btn-edit${nx('cobro')}" style="font-size:0.72rem;color:var(--amber);border-color:rgba(245,158,11,0.4)" onclick="abrirRegistrarPago('${r.id}')">💰 Registrar pago</button>`;
       primaria = cobroBadgeHTML(r);
       grupo('Cierre', cobroBtn + evBtn);
     }
@@ -508,11 +571,16 @@ async function renderReserv(append = false) {
     }
 
     const abierta = _reservAbiertas.has(r.id);
-    const detalleHTML = gruposDetalle.map(g => `
+    const hintHTML = (sig && gruposDetalle.length) ? `
+        <div class="reserv-next-hint">
+          <span><strong>👉 Siguiente:</strong> ${esc(sig.detalle)}</span>
+          ${sig.espera ? `<span class="reserv-next-espera">⏳ ${esc(sig.espera)}</span>` : ''}
+        </div>` : '';
+    const detalleHTML = gruposDetalle.length ? hintHTML + gruposDetalle.map(g => `
         <div class="reserv-detail-group">
           <span class="reserv-detail-group-label">${g.label}</span>
           <div class="reserv-detail-group-btns">${g.html}</div>
-        </div>`).join('');
+        </div>`).join('') : '';
 
     return `
     <div class="reserv-item">
@@ -525,6 +593,7 @@ async function renderReserv(append = false) {
       <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
         <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
         ${primaria}
+        ${(sig && detalleHTML) ? `<button class="reserv-next-chip" title="Ver qué sigue" onclick="toggleReservDetalle('${r.id}')">👉 ${esc(sig.corto)}</button>` : ''}
         ${detalleHTML ? `<button id="reserv-toggle-${r.id}" class="reserv-toggle${abierta ? ' open' : ''}" aria-expanded="${abierta}" title="Más acciones" onclick="toggleReservDetalle('${r.id}')">▾</button>` : ''}
       </div>
     </div>

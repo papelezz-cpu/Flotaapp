@@ -528,6 +528,35 @@ input[type=date]::-webkit-calendar-picker-indicator { margin-left: 4px; }
   background: rgba(245,158,11,0.14); color: var(--amber); white-space: nowrap;
 }
 
+/* Guía de "qué sigue" (ver _siguientePasoReserva): un solo botón resaltado por
+   reservación, el chip de la fila que lo nombra, y la frase dentro del panel. */
+@keyframes reservNextPulse {
+  0%   { box-shadow: 0 0 0 2px var(--accent), 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 2px var(--accent), 0 0 0 9px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+.reserv-next {
+  box-shadow: 0 0 0 2px var(--accent);
+  animation: reservNextPulse 2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .reserv-next { animation: none; } }
+.reserv-next-chip {
+  font: inherit; font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 8px;
+  cursor: pointer; white-space: nowrap;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent);
+}
+.reserv-next-chip:hover { background: color-mix(in srgb, var(--accent) 24%, transparent); }
+.reserv-next-hint {
+  flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center;
+  font-size: 0.78rem; color: var(--text); padding: 8px 12px; border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.reserv-next-espera { color: var(--text-muted); }
+.btn-completar-reserva:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-completar-reserva:disabled:hover { background: rgba(34,197,94,0.15); }
+
 .reserv-detail {
   display: none; padding: 4px 20px 16px; gap: 16px; flex-wrap: wrap;
   background: rgba(78,142,247,0.03);
