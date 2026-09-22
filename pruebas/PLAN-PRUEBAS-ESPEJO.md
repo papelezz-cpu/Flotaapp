@@ -147,14 +147,17 @@ archivo** en «Adjuntar CAAT renovado».
 - el total **sigue en 68** — se actualiza, no se duplica,
 - la fila del CAAT lleva `2028-04-14` **y** un `archivo_path`.
 
-Compruébalo con detalle:
+Compruébalo con detalle. **No uses `console.table` para contar**: numera desde
+cero, así que con 53 filas el último índice que imprime es `52` y parece que
+falta una. Este comando imprime el total aparte:
 
 ```bash
 node -e "import('file:///C:/Users/Usuario/Documents/Flotaapp/pruebas/lib/api.mjs').then(async m=>{
   const A=m.leerAmbientePruebas(),c=m.leerCredenciales();
   const s=new m.Sesion('sa',A); await s.login(c.superadmin.email,c.superadmin.password);
-  const {data}=await s.select('vigencias','select=tipo_documento,fecha_documento,archivo_path&entidad_tipo=eq.camion&order=tipo_documento');
-  console.table(data);});"
+  const {data}=await s.select('vigencias','select=entidad_id,tipo_documento,fecha_documento,archivo_path&entidad_tipo=eq.camion&order=entidad_id,tipo_documento');
+  console.log('  filas de camion: '+data.length);
+  data.forEach(x=>console.log('   ',x.entidad_id.padEnd(12),x.tipo_documento.padEnd(22),String(x.fecha_documento).padEnd(12),x.archivo_path?'con archivo':'(sin archivo)'));});"
 ```
 
 Este paso es además el que prueba que **el guard corregido deja a la empresa
@@ -233,7 +236,8 @@ node -e "import('file:///C:/Users/Usuario/Documents/Flotaapp/pruebas/lib/api.mjs
   const A=m.leerAmbientePruebas(),c=m.leerCredenciales();
   const s=new m.Sesion('sa',A); await s.login(c.superadmin.email,c.superadmin.password);
   const {data}=await s.select('vigencias','select=tipo_documento,estado,fecha_documento&entidad_tipo=eq.perfil&order=tipo_documento,estado');
-  console.table(data);});"
+  console.log('  filas de perfil: '+data.length);
+  data.forEach(x=>console.log('   ',x.tipo_documento.padEnd(16),x.estado.padEnd(10),x.fecha_documento));});"
 ```
 
 ---
