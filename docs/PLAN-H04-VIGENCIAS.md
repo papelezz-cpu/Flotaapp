@@ -2,11 +2,20 @@
 
 Plan por etapas. Escrito el 2026-09-18.
 
-**Estado al 2026-09-21: Etapas 1 y 2 aplicadas a `portgo-pruebas`**, sobre una
-réplica de ese día que dio paridad `identicas` antes de aplicarlas. La tabla
-existe y tiene 63 filas, y **nadie la lee todavía**: ninguna pantalla cambió.
-**Producción no las tiene** — llevarlas allí es una promoción aparte, con su
-propia autorización (Regla #2). Etapas 3 a 6, sin empezar.
+**Estado al 2026-09-22:**
+
+| Etapa | |
+|---|---|
+| 1 · Crear | **aplicada a pruebas** |
+| 2 · Copiar | **aplicada a pruebas** — 63 filas |
+| 3 · Doble escritura | **escrita y probada en banco local**, sin aplicar |
+| 4 · Cambiar lecturas | sin empezar |
+| 5 · Guards | sin empezar |
+| 6 · Retirar columnas | fuera de este plan |
+
+La tabla existe en pruebas con 63 filas y **nadie la lee todavía**: ninguna
+pantalla ha cambiado. **Producción no tiene ninguna de las tres** — llevarlas
+allí es una promoción aparte, con su propia autorización (Regla #2).
 
 ---
 
