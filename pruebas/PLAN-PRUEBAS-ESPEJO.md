@@ -1,162 +1,219 @@
 # Ejercitar el espejo de `vigencias` en el preview de `dev`
 
-Guion para la fase de doble escritura de H-04. **Se hace a mano en el preview**,
-porque `portgo-pruebas` no tiene tráfico propio: esperar ahí no da señal, da
-silencio.
+Guion paso a paso para la fase de doble escritura de H-04, **con valores
+concretos**. Se hace a mano en el preview, porque `portgo-pruebas` no tiene
+tráfico propio: esperar ahí no da señal, da silencio.
 
-Cada paso dice **qué hacer**, **qué campo** y **qué debe pasar en el espejo**.
-Tras cada bloque se corre la sonda; si sale en rojo, se para y se mira.
+## Por qué cada fecha es distinta
+
+Todas las fechas sugeridas son **únicas**. Si el espejo mapeara un documento
+al tipo equivocado, la fecha «rara» aparecería colgada del documento que no
+es, y se vería de un vistazo. Con fechas repetidas, un error de mapeo pasa
+desapercibido.
+
+## Antes de empezar
+
+```bash
+bash supabase/aplicar-a-pruebas.sh supabase/migrations/20260922130000_vigencias_espejo_tolerante.sql
+```
+
+Sin el espejo tolerante, un fallo suyo te impediría guardar — y el propósito
+de esta tanda es justo provocar caminos que nadie ha probado.
+
+Abre el preview de `dev`, **Ctrl+Shift+R**, y confirma dónde estás:
+
+```js
+console.log(sb.supabaseUrl)   // debe decir xskgnudiznryhgagxadu
+```
+
+Y toma la foto de partida:
 
 ```bash
 node pruebas/14-sonda-espejo-vigencias.mjs
 ```
 
-> **Antes de empezar**, el espejo tolerante tiene que estar aplicado:
-> ```bash
-> bash supabase/aplicar-a-pruebas.sh supabase/migrations/20260922130000_vigencias_espejo_tolerante.sql
-> ```
-> Sin él, un fallo del espejo te impediría guardar — y el propósito de esta
-> tanda es justo provocar caminos que nadie ha probado.
-
-**URL:** el preview de `dev`. Ctrl+Shift+R primero, y comprueba que estás en
-pruebas (`sb.supabaseUrl` debe decir `xskgnudiznryhgagxadu`).
+Apunta el número de pares. Hoy son **63**.
 
 ---
 
-## 1 · Alta de camión con papeles  ·  *como empresa*
+## 1 · Alta de camión  ·  *como empresa*
 
-**Mis unidades → dar de alta un camión.** Llena, además de lo obligatorio:
+**Mis unidades → dar de alta un camión.** Pon placas reconocibles, por ejemplo
+**`ESP-001`**, y llena lo obligatorio (tipo, capacidad).
 
-| Campo en pantalla | Va a |
-|---|---|
-| Tarjeta de circulación (archivo) + su vencimiento | `tarjeta_circulacion` |
-| Seguro (archivo) + vencimiento | `seguro_unidad` |
-| Permiso SCT (archivo) + vencimiento | `permiso_sct_unidad` |
-| Verificación — vencimiento | `verificacion` |
-| Materiales peligrosos (archivo) + vencimiento | `permiso_peligrosa` |
-| CAAT (archivo) | `caat` |
+Estas son las fechas, con el nombre **exacto** de la etiqueta en pantalla:
 
-**Debe pasar:** la sonda sube de 63 a **63 + tantos documentos como hayas
-llenado**, y ninguno «falta» ni «difiere».
+| Etiqueta en pantalla | Escribe | Tipo de documento |
+|---|---|---|
+| Fecha de vencimiento TC | `2027-01-11` | `tarjeta_circulacion` |
+| Vencimiento del seguro | `2027-02-12` | `seguro_unidad` |
+| Vencimiento del permiso SCT | `2027-03-13` | `permiso_sct_unidad` |
+| Vigencia CAAT | `2027-04-14` | `caat` |
+| Vencimiento verificación vehicular | `2027-05-15` | `verificacion` |
 
-> Llena **al menos el CAAT**. Es el único cuyo archivo vive en `doc_caat`
-> mientras existe una columna gemela `imagen_caat` que nadie usa; si el alta
-> escribiera en la otra, el espejo se quedaría sin él y la sonda lo diría.
+Adjunta archivo donde el alta lo pide: **tarjeta de circulación, seguro y
+permiso SCT**. Cualquier PDF o imagen vale.
+
+> **El alta NO pide archivo para el CAAT ni para la verificación** — solo sus
+> fechas. Sus archivos se suben desde el formulario de edición, y eso se
+> prueba en el paso 2. Comprobado en `js/admin.js`, no supuesto.
+
+**Debe pasar:** la sonda sube de 63 a **68** (cinco documentos nuevos), sin
+«falta» ni «difiere».
+
+```bash
+node pruebas/14-sonda-espejo-vigencias.mjs
+```
 
 ---
 
 ## 2 · Editar ese camión  ·  *como empresa*
 
-**Mis unidades → editar el camión recién creado.** Cambia **una sola fecha**,
-por ejemplo la del seguro.
+**Mis unidades → editar el camión `ESP-001`.**
 
-**Debe pasar:** el total de la sonda **no cambia** —no se duplica nada— y la
-fila del seguro lleva la fecha nueva.
+Cambia la **Vigencia CAAT** de `2027-04-14` a **`2028-04-14`** y **adjunta un
+archivo** en «Adjuntar CAAT renovado».
 
-Este paso es el que prueba que el guard corregido deja a la empresa mantener
-sus propios papeles. Antes de la Etapa 3b esto fallaba con
-`VIGENCIA_ACREDITADA`.
+> El archivo no es opcional: hay un candado que dice *«Para renovar la vigencia
+> de CAAT debes adjuntar el documento renovado»*. Solo se salta si eres
+> superadmin. Y de paso es la única forma de escribir `doc_caat`, que es lo que
+> queremos ver llegar al espejo.
 
----
+**Debe pasar:**
+- el total **sigue en 68** — se actualiza, no se duplica,
+- la fila del CAAT lleva `2028-04-14` **y** un `archivo_path`.
 
-## 3 · Quitar un documento  ·  *como empresa*
-
-En ese mismo camión, **borra la fecha de verificación** y deja el campo vacío.
-
-**Debe pasar:** la sonda **baja en uno** y sigue sin «filas de más». Si el
-total no baja, el espejo está dejando un documento fantasma: una fila que dice
-vigilar un papel que ya no está.
-
----
-
-## 4 · Alta de operador con exámenes  ·  *como empresa*
-
-**Operadores → dar de alta.** Llena la licencia con su vencimiento y, sobre
-todo, las **tres fechas de examen**:
-
-| Campo | Va a | Ojo |
-|---|---|---|
-| Vencimiento de licencia | `licencia` | es una caducidad |
-| Examen médico | `examen_medico` | es la fecha **del examen** |
-| Examen toxicológico | `examen_toxicologico` | ídem |
-| Carta de antecedentes | `carta_antecedentes` | ídem |
-
-**Debe pasar:** la sonda sube y no marca diferencias. Y lo que de verdad se
-comprueba aquí: que el espejo guarda **la fecha que escribiste**, no una
-calculada. La caducidad se deriva después con `vigencia_vence_el()`, que le
-suma 12 meses según el catálogo.
-
-Para verlo con tus ojos, tras el alta:
+Compruébalo con detalle:
 
 ```bash
 node -e "import('file:///C:/Users/Usuario/Documents/Flotaapp/pruebas/lib/api.mjs').then(async m=>{
   const A=m.leerAmbientePruebas(),c=m.leerCredenciales();
   const s=new m.Sesion('sa',A); await s.login(c.superadmin.email,c.superadmin.password);
-  const {data}=await s.select('vigencias','select=entidad_id,tipo_documento,fecha_documento&tipo_documento=like.examen*');
+  const {data}=await s.select('vigencias','select=tipo_documento,fecha_documento,archivo_path&entidad_tipo=eq.camion&order=tipo_documento');
   console.table(data);});"
 ```
 
-La fecha que salga tiene que ser **la que tecleaste**, no un año más.
+Este paso es además el que prueba que **el guard corregido deja a la empresa
+mantener sus propios papeles**. Antes de la Etapa 3 esto fallaba con
+`VIGENCIA_ACREDITADA`.
+
+---
+
+## 3 · Quitar un documento  ·  *como superadmin*
+
+Entra **como superadmin** y edita el mismo camión: **borra la fecha de
+«Vencimiento verificación vehicular»** y deja el campo vacío.
+
+> Va como superadmin a propósito: el candado del paso 2 exige adjuntar archivo
+> al cambiar una fecha, y aquí queremos **vaciarla**. El superadmin se salta
+> ese candado — `dateChanged && !esSuperAdmin` en `js/admin.js`.
+
+**Debe pasar:** el total **baja a 67**, y sigue sin «filas de más». Si no baja,
+el espejo deja un documento fantasma: una fila que dice vigilar un papel que
+ya no está.
+
+---
+
+## 4 · Alta de operador  ·  *como empresa*
+
+**Operadores → dar de alta.** Nombre reconocible, por ejemplo **`Espejo Uno`**.
+
+| Etiqueta en pantalla | Escribe | Tipo |
+|---|---|---|
+| Vencimiento de la licencia | `2028-06-16` | `licencia` |
+| Examen médico | `2026-07-17` | `examen_medico` |
+| Examen toxicológico | `2026-08-18` | `examen_toxicologico` |
+| Carta de antecedentes | `2026-09-19` | `carta_antecedentes` |
+
+Adjunta los documentos que pida. La **fecha de expedición** de la licencia
+llénala si quieres — **no entra en el espejo a propósito**, por tu decisión del
+19 de septiembre: solo interesa cuándo vence.
+
+**Debe pasar:** la sonda sube a **71** (cuatro documentos) sin diferencias.
+
+Y lo que de verdad se comprueba aquí — que el espejo guarda **la fecha que
+tecleaste**, no una calculada:
+
+```bash
+node -e "import('file:///C:/Users/Usuario/Documents/Flotaapp/pruebas/lib/api.mjs').then(async m=>{
+  const A=m.leerAmbientePruebas(),c=m.leerCredenciales();
+  const s=new m.Sesion('sa',A); await s.login(c.superadmin.email,c.superadmin.password);
+  const {data}=await s.select('vigencias','select=tipo_documento,fecha_documento&entidad_tipo=eq.operador&order=tipo_documento');
+  for (const v of data) {
+    const {data:d}=await s.rpc('vigencia_vence_el',{p_tipo:v.tipo_documento,p_fecha:v.fecha_documento});
+    console.log(v.tipo_documento.padEnd(22), 'capturada', v.fecha_documento, '-> vence', d);
+  }});"
+```
+
+El examen médico debe decir **capturada `2026-07-17` → vence `2027-07-17`**:
+guardada tal cual, caducidad derivada. Si guardara `2027-07-17`, alguien habría
+horneado la regla en los datos.
 
 ---
 
 ## 5 · La empresa propone sus documentos  ·  *como empresa*
 
-**Mis unidades → Perfil de empresa.** Sube permiso SCT, seguro RC y seguro de
-carga con sus vencimientos, y guarda.
+**Mis unidades → Perfil de empresa.** Sube los tres documentos con sus fechas:
 
-**Debe pasar:** aparecen filas nuevas **en estado `pendiente`**, no `vigente`.
-La empresa propone; no se acredita sola.
+| Documento | Escribe |
+|---|---|
+| Permiso SCT | `2027-10-20` |
+| Seguro RC | `2027-11-21` |
+| Seguro de carga | `2027-12-22` |
 
-Para confirmarlo:
+**Debe pasar:** aparecen tres filas **en estado `pendiente`**, no `vigente`. La
+empresa propone; no se acredita sola. Total: **74**.
 
 ```bash
 node -e "import('file:///C:/Users/Usuario/Documents/Flotaapp/pruebas/lib/api.mjs').then(async m=>{
   const A=m.leerAmbientePruebas(),c=m.leerCredenciales();
   const s=new m.Sesion('sa',A); await s.login(c.superadmin.email,c.superadmin.password);
-  const {data}=await s.select('vigencias','select=entidad_tipo,tipo_documento,estado,fecha_documento&entidad_tipo=eq.perfil');
+  const {data}=await s.select('vigencias','select=tipo_documento,estado,fecha_documento&entidad_tipo=eq.perfil&order=tipo_documento,estado');
   console.table(data);});"
 ```
 
 ---
 
-## 6 · El superadmin acredita  ·  *como superadmin*  ·  **el paso clave**
+## 6 · El superadmin acredita  ·  **el paso clave**
 
-**Por aprobar → documentos de la empresa → aprobar.**
+Entra **como superadmin** → **Por aprobar** → los documentos de esa empresa →
+**aprobar**.
 
 Ese botón hace **una sola escritura** que copia las columnas `_pendiente` a las
-reales y deja las pendientes en nulo. Así que dispara el espejo en las dos
-direcciones a la vez.
+reales y deja las pendientes en nulo. Dispara el espejo en las dos direcciones
+a la vez: borra tres filas y crea tres.
 
 **Debe pasar:**
-- las filas `pendiente` de ese perfil **desaparecen**,
-- aparecen —o se actualizan— las mismas en `vigente`,
-- el total de la sonda queda igual que antes de aprobar,
-- y ninguna «de más».
+- las tres `pendiente` **desaparecen**,
+- aparecen las tres en `vigente`, con **las mismas fechas**: `2027-10-20`,
+  `2027-11-21`, `2027-12-22`,
+- el total **sigue en 74**,
+- ninguna «de más».
 
-Si quedan filas `pendiente` huérfanas, el espejo no está reflejando el
-vaciado. Es el caso que más probabilidad tenía de fallar, porque es el único
-donde una misma escritura crea una fila y borra otra.
+Repite la consulta del paso 5: debes ver tres filas, todas `vigente`.
+
+**Es el paso con más probabilidad de fallar**, porque es el único donde una
+misma escritura borra una fila y crea otra.
 
 ---
 
-## 7 · Y el que no debe poder hacerse
+## 7 · Y lo que no debe poder hacerse
 
-Como **empresa**, intenta cambiar tú mismo el estado de uno de tus documentos
-a `vigente` por el API:
+Como **empresa**, intenta acreditarte un documento por el API:
 
 ```bash
 node -e "import('file:///C:/Users/Usuario/Documents/Flotaapp/pruebas/lib/api.mjs').then(async m=>{
   const A=m.leerAmbientePruebas(),c=m.leerCredenciales();
   const s=new m.Sesion('emp',A); await s.login(c.empresa.email,c.empresa.password);
-  const {data}=await s.select('vigencias','select=id,tipo_documento,estado&estado=eq.pendiente&limit=1');
-  if(!data?.length){console.log('  no hay ninguna pendiente que probar');return;}
-  const r=await s.update('vigencias','id=eq.'+data[0].id,{estado:'vigente'});
-  console.log(r.ok? '  ✗ FALLA: se acredito sola' : '  ✓ rechazado: HTTP '+r.status+' '+(r.data?.message||''));});"
+  const {data}=await s.select('vigencias','select=id,tipo_documento,estado&entidad_tipo=eq.perfil&estado=eq.vigente&limit=1');
+  if(!data?.length){console.log('  no hay ninguna vigente de perfil que probar');return;}
+  const r=await s.update('vigencias','id=eq.'+data[0].id,{fecha_documento:'2099-01-01'});
+  console.log(r.ok? '  FALLA: la empresa movio la fecha de su documento acreditado — H-02 REABIERTO'
+                  : '  OK: rechazado, HTTP '+r.status+' '+(r.data?.message||''));});"
 ```
 
-Tiene que salir **rechazado**. Si sale «se acreditó sola», H-02 está reabierto
-por la puerta de atrás y hay que parar todo.
+Tiene que salir **rechazado**. Si sale `FALLA`, paramos todo: H-02 estaría
+reabierto por la puerta de atrás.
 
 ---
 
@@ -166,10 +223,29 @@ por la puerta de atrás y hay que parar todo.
 node pruebas/14-sonda-espejo-vigencias.mjs
 ```
 
-Verde en los tres bloques —ninguna falta, ninguna difiere, ninguna de más—
-significa que el espejo aguantó los caminos reales, no solo los del banco.
-**Ahí, y no antes, la Etapa 4 tiene una base comprobada sobre la que mover las
-lecturas.**
+**Esperado: 74 pares, 74 filas**, ninguna falta, ninguna difiere, ninguna de
+más.
 
-Si algo sale rojo, la sonda nombra entidad, documento y los dos valores. Eso
-basta para saber qué flujo lo dejó así.
+| Paso | Total tras el paso |
+|---|---|
+| Partida | 63 |
+| 1 · alta de camión | 68 |
+| 2 · editar CAAT | 68 |
+| 3 · quitar verificación | 67 |
+| 4 · alta de operador | 71 |
+| 5 · propone perfil | 74 |
+| 6 · superadmin acredita | 74 |
+
+Si algún total no cuadra, ahí está el flujo que el espejo no cubre. La sonda
+nombra entidad, documento y los dos valores.
+
+**Verde en todo significa que el espejo aguantó los caminos reales, no solo
+los del banco local.** Ahí —y no antes— la Etapa 4 tiene una base comprobada
+sobre la que mover las lecturas.
+
+## Después, si quieres dejarlo limpio
+
+Lo sembrado aquí (un camión, un operador, los documentos del perfil) queda en
+pruebas. **No hace falta borrarlo**: la siguiente réplica de producción lo
+sustituye entero. Y borrar a mano en una base es justo lo que la regla #1 pide
+no hacer por costumbre.
