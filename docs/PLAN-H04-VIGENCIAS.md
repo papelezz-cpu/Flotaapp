@@ -180,14 +180,60 @@ deba arreglar. Es una decisión de producto pendiente: o se exige la fecha al
 subir el papel, o se asume que esos catorce no se vigilan. Queda anotado, sin
 tocar.
 
-### Etapa 3 — Doble escritura
+### Etapa 3 — Doble escritura  ·  **ESCRITA Y PROBADA EN BANCO LOCAL**
 
-Todo lo que hoy escribe una `fecha_vencimiento_*` escribe además la fila de
-`vigencias`. Las lecturas siguen en las columnas viejas. **Aquí se vive un
-tiempo**: si la copia diverge, se ve sin que nadie pierda nada.
+`supabase/migrations/20260922120000_vigencias_etapa3_doble_escritura.sql`.
+Las lecturas siguen en las columnas viejas. **Aquí se vive un tiempo.**
 
-Una sonda compara las dos fuentes fila a fila y falla si difieren, igual que
-`12-sonda-propietario-reserva.mjs` hizo para H-06 (b).
+**Va en la base, no en el cliente**, y la razón es un número: los sitios que
+escriben esas columnas hoy son **128** entre `admin.js` (44), `operadores.js`
+(29) y `aprobaciones.js` (55). Duplicar la escritura ahí es tocar 128 puntos,
+y olvidar uno no da error — deja las dos fuentes divergiendo en silencio, que
+es justo lo que esta etapa existe para detectar. Además hay un escritor que el
+navegador no cubre: los clientes nativos escriben por su cuenta contra la
+misma base.
+
+Un solo trigger `vigencias_espejo()` sobre las cinco tablas, con el mapeo como
+datos y `to_jsonb(new)` para leer la columna por su nombre. Tres casos por
+par: hay dato → upsert; no hay y antes sí → **borra la fila**, para no dejar un
+documento fantasma vigilando; no hay y antes tampoco → nada.
+
+#### El guard de la Etapa 1 estaba mal, y se corrige aquí
+
+Al montar el espejo saltó `VIGENCIA_ACREDITADA` — reproducido en banco local
+antes de tocar nada. **La causa no era el espejo: era el guard.** Aplicaba la
+lección de H-02 —«solo el superadmin acredita»— a las cinco entidades por
+igual, y las reglas reales no son iguales:
+
+| | Quién puede escribir hoy la fecha |
+|---|---|
+| `perfiles` | **solo el superadmin** — `guard_perfil_self_update`, que es H-02 |
+| flota y operadores | **el dueño** — `guard_fleet_resource_update` solo impide auto-aprobarse y transferir la propiedad; editar manda el recurso a `pendiente` |
+
+Mi guard era más estricto que el sistema, así que el espejo no podía reflejar
+una escritura que la fuente sí permite. Corregido para que diga lo mismo que
+las reglas de origen. **Con eso el espejo no necesita ninguna puerta trasera**:
+hereda la autorización de la fuente, porque esa escritura ya pasó por su
+propio RLS y su propio guard.
+
+#### Probado por los dos lados
+
+`pruebas/banco-local/h04-etapa3.sql`, nueve afirmaciones: la empresa escribe
+su camión y el espejo la sigue; cambiar la fecha actualiza y no duplica;
+quitar el papel borra la fila; la empresa puede **proponer** pero no
+acreditarse sola; el superadmin acredita el perfil y la empresa no puede
+tocarlo (**H-02 no se reabre**); nadie muda un documento a otra entidad; y un
+`INSERT` también se refleja.
+
+`pruebas/14-sonda-espejo-vigencias.mjs` compara las dos fuentes par a par
+contra una base real y falla nombrando entidad, documento y los dos valores.
+Primera corrida contra pruebas: **63 pares, 63 filas, todas coinciden** — lo
+que de paso confirma, con un mapeo reimplementado aparte, que la copia de la
+Etapa 2 es fiel.
+
+**Lo que esa sonda no puede comprobar**, y por eso hacen falta las dos: que el
+trigger *dispare*. Compara estados, no eventos. Si el espejo estuviera roto
+pero nadie hubiera escrito, saldría en verde igual.
 
 ### Etapa 4 — Cambiar lecturas, fichero a fichero
 
