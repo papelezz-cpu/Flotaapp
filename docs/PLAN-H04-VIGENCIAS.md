@@ -8,7 +8,8 @@ Plan por etapas. Escrito el 2026-09-18.
 |---|---|
 | 1 · Crear | **aplicada a pruebas** |
 | 2 · Copiar | **aplicada a pruebas** — 63 filas |
-| 3 · Doble escritura | **escrita y probada en banco local**, sin aplicar |
+| 3 · Doble escritura | **aplicada a pruebas** — espejo vivo |
+| 3b · Espejo tolerante | **escrita y probada**, sin aplicar |
 | 4 · Cambiar lecturas | sin empezar |
 | 5 · Guards | sin empezar |
 | 6 · Retirar columnas | fuera de este plan |
@@ -243,6 +244,32 @@ Etapa 2 es fiel.
 **Lo que esa sonda no puede comprobar**, y por eso hacen falta las dos: que el
 trigger *dispare*. Compara estados, no eventos. Si el espejo estuviera roto
 pero nadie hubiera escrito, saldría en verde igual.
+
+### Etapa 3b — El espejo deja de tumbar la escritura de origen
+
+`supabase/migrations/20260922130000_vigencias_espejo_tolerante.sql`.
+
+La Etapa 3 lo dejó en «todo o nada»: trigger `AFTER` en la misma transacción,
+así que un fallo del espejo tumba la escritura de origen. Medido rompiéndolo a
+propósito:
+
+```
+La escritura de origen FALLO por culpa del espejo: VIGENCIA_TIPO_AJENO
+```
+
+**Ese precio lo paga la operación, no la integridad.** Mientras nadie lea
+`vigencias`, un fallo del espejo no le quita un dato a ninguna pantalla, pero
+sí le impide a una empresa guardar su camión. Se cambia «romper la operación»
+por «divergir y que una sonda lo diga».
+
+Cada documento va en su propio bloque, así que un tipo que falle no se lleva
+por delante a los otros cinco de la misma unidad. Comprobado: con el espejo
+roto para `seguro_unidad`, la escritura sobrevivió **y** `verificacion` se
+reflejó igual.
+
+> ⚠ **La Etapa 4 tiene que devolverlo a estricto.** Cuando las lecturas se
+> muevan, una fuente sin espejo deja de ser una divergencia anotada y pasa a
+> ser un dato que falta en pantalla.
 
 ### Etapa 4 — Cambiar lecturas, fichero a fichero
 
