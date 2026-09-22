@@ -307,6 +307,68 @@ nombra entidad, documento y los dos valores.
 los del banco local.** Ahí —y no antes— la Etapa 4 tiene una base comprobada
 sobre la que mover las lecturas.
 
+## Si lo dejas a medias y sigues otro día
+
+**Sí se puede.** Lo sembrado se queda en pruebas y los totales siguen donde los
+dejaste. La sonda del espejo **no exige sello de paridad fresco** —solo lo
+imprime—, así que corre igual al día siguiente. Las que sí se niegan a arrancar
+con el sello viejo son `01-diagnostico`, `02-sembrar` y `03-flujo-completo`, y
+este guion no usa ninguna.
+
+### Para saber dónde te quedaste
+
+En la terminal:
+
+```bash
+node -e "import('file:///C:/Users/Usuario/Documents/Flotaapp/pruebas/lib/api.mjs').then(async m=>{
+  const A=m.leerAmbientePruebas(),c=m.leerCredenciales();
+  const s=new m.Sesion('sa',A); await s.login(c.superadmin.email,c.superadmin.password);
+  const {data:v,ok}=await s.select('vigencias','select=entidad_tipo,tipo_documento,estado,fecha_documento,archivo_path&limit=500');
+  if(!ok){console.log('  no se pudo leer vigencias');return;}
+  const F=['2027-10-20','2027-11-21','2027-12-22'];
+  const cam=v.filter(x=>x.entidad_tipo==='camion'), op=v.filter(x=>x.entidad_tipo==='operador');
+  const mio=v.filter(x=>x.entidad_tipo==='perfil'&&F.includes(x.fecha_documento));
+  const caat=cam.find(x=>x.tipo_documento==='caat'&&x.fecha_documento==='2028-04-14');
+  const alta=cam.some(x=>x.fecha_documento==='2027-01-11');
+  const di=(b,t)=>console.log('  '+(b?'[hecho]  ':'[falta]  ')+t);
+  console.log('
+  total de filas en vigencias: '+v.length+'
+');
+  di(alta, 'paso 1 - alta del camion con las cinco fechas');
+  di(!!caat && !!caat.archivo_path, 'paso 2 - CAAT renovado a 2028-04-14 y con archivo');
+  di(alta && !cam.some(x=>x.tipo_documento==='verificacion'&&x.fecha_documento==='2027-05-15'), 'paso 3 - verificacion vaciada');
+  di(op.some(x=>x.fecha_documento==='2026-07-17'), 'paso 4 - alta del operador con el examen medico');
+  di(mio.length>0, 'paso 5 - los tres documentos de perfil del guion');
+  di(mio.length>0 && mio.every(x=>x.estado==='vigente'), 'paso 6 - y ya estan acreditados');
+  console.log('');});"
+```
+
+Reconoce cada paso **por las fechas concretas de este guion**, no por la mera
+presencia de filas: pruebas ya trae tres documentos de perfil copiados de
+producción, y contarlos daría por hechos los pasos 5 y 6 sin haberlos hecho.
+
+### Lo único que rompe la continuidad
+
+**Que alguien replique producción a pruebas.** La réplica hace
+`DROP SCHEMA public CASCADE`, así que se lleva por delante **las cuatro
+migraciones de H-04 y todo lo que hayas sembrado**. Si pasa, hay que empezar de
+cero:
+
+```bash
+bash supabase/aplicar-a-pruebas.sh supabase/migrations/20260918160000_vigencias_etapa1_crear.sql
+bash supabase/aplicar-a-pruebas.sh supabase/migrations/20260921120000_vigencias_etapa2_copiar.sql
+bash supabase/aplicar-a-pruebas.sh supabase/migrations/20260922120000_vigencias_etapa3_doble_escritura.sql
+bash supabase/aplicar-a-pruebas.sh supabase/migrations/20260922130000_vigencias_espejo_tolerante.sql
+```
+
+Y el total de partida vuelve a ser 63 — aunque puede variar si producción
+cambió, así que **vuelve a apuntarlo** en vez de dar por buenos los números de
+la tabla.
+
+Lo otro que puede descolocarte es que alguien despliegue cambios de interfaz
+que muevan los formularios. Si una etiqueta del guion ya no está donde dice,
+avisa antes de improvisar: probablemente el guion haya que corregirlo.
+
 ## Después, si quieres dejarlo limpio
 
 Lo sembrado aquí (un camión, un operador, los documentos del perfil) queda en
