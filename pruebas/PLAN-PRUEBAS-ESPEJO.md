@@ -4,6 +4,19 @@ Guion paso a paso para la fase de doble escritura de H-04, **con valores
 concretos**. Se hace a mano en el preview, porque `portgo-pruebas` no tiene
 tráfico propio: esperar ahí no da señal, da silencio.
 
+## Cómo leer este guion
+
+Hay dos sitios donde se escribe, y conviene no confundirlos:
+
+| El bloque dice | Va en |
+|---|---|
+| ```bash``` | **la terminal** (Git Bash), dentro de `~/Documents/Flotaapp` |
+| ```js``` | **la consola del navegador**: F12 → pestaña Console |
+| sin etiqueta | **no se ejecuta**: es una URL o un ejemplo de lo que vas a ver |
+
+Lo que se hace **en la aplicación** —rellenar formularios, pulsar botones— va
+descrito en texto, no en bloques de código.
+
 ## Por qué cada fecha es distinta
 
 Todas las fechas sugeridas son **únicas**. Si el espejo mapeara un documento
@@ -20,19 +33,70 @@ bash supabase/aplicar-a-pruebas.sh supabase/migrations/20260922130000_vigencias_
 Sin el espejo tolerante, un fallo suyo te impediría guardar — y el propósito
 de esta tanda es justo provocar caminos que nadie ha probado.
 
-Abre el preview de `dev`, **Ctrl+Shift+R**, y confirma dónde estás:
+### a) En el navegador — abre el preview y confirma que NO es producción
 
-```js
-console.log(sb.supabaseUrl)   // debe decir xskgnudiznryhgagxadu
+Entra a:
+
+```
+https://portgo-git-dev-salvador-s-projects13.vercel.app/app.html
 ```
 
-Y toma la foto de partida:
+Pulsa **Ctrl+Shift+R** (recarga forzada, para no quedarte con una versión
+vieja en cache).
+
+Ahora abre la consola del navegador: **tecla F12** → pestaña **Console**.
+Pega esto y pulsa Enter:
+
+```js
+sb.supabaseUrl
+```
+
+**Tiene que responder `"https://xskgnudiznryhgagxadu.supabase.co"`.**
+
+Si responde `xnyqsewaluezkkrlyhxg`, **estás en producción y no debes seguir**:
+las dos aplicaciones se ven idénticas y tienen los mismos datos, así que la
+pantalla no te lo va a decir. Esta línea es la única forma de saberlo.
+
+> Si Firefox contesta *«Scripts may not be pasted…»*, escribe `allow pasting`
+> y Enter. Solo la primera vez.
+
+### b) En la terminal — apunta el número de partida
+
+Esto **no** va en el navegador. Va en tu terminal (Git Bash), dentro de la
+carpeta del proyecto:
 
 ```bash
+cd ~/Documents/Flotaapp
 node pruebas/14-sonda-espejo-vigencias.mjs
 ```
 
-Apunta el número de pares. Hoy son **63**.
+Vas a ver algo así:
+
+```
+── Sonda del espejo de vigencias (H-04 etapa 3) ──
+   proyecto: https://xskgnudiznryhgagxadu.supabase.co
+   paridad:  paridad DIVERGE (66 diferencias, ...)
+
+   pares con dato en el origen: 63   ·   filas en vigencias: 63
+                                ▲▲
+                     este número es el que hay que apuntar
+
+     OK    Ninguna fila del origen falta en el espejo
+     OK    Ninguna fila difiere en archivo o fecha
+     OK    El espejo no tiene filas de más
+```
+
+**Apunta ese número: hoy son 63.** Es contra el que vas a comparar después de
+cada paso.
+
+Dos cosas de esa salida que conviene entender antes de asustarse:
+
+- **Los dos números tienen que ser iguales.** «Pares con dato en el origen» es
+  lo que hay en las columnas viejas; «filas en vigencias» es lo que hay en la
+  tabla nueva. Que coincidan es justamente lo que se está comprobando.
+- **`paridad DIVERGE` es lo esperado, no un problema.** Pruebas se separa de
+  producción precisamente porque tiene las migraciones de H-04, que producción
+  no tiene. Lo que importa aquí son las tres líneas de `OK`.
 
 ---
 
