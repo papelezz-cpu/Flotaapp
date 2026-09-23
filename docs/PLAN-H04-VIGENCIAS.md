@@ -476,6 +476,37 @@ los tres casos que importan cubiertos: fecha nula (no pinta nada), fecha vencida
 operadores. El superadmin ve además los que no son suyos, que es la política
 `is_superadmin()` funcionando sobre la tabla nueva.
 
+#### 4.5 — `pedidos.js`  ·  **HECHO el 2026-09-23**
+
+Cuatro bloques, los cuatro lecturas de consumo dentro de `openHacerOferta()` y
+del envío de la oferta:
+
+1. **Bloqueo por documentos de empresa vencidos** — las tres vigencias de
+   perfil, ahora desde `vigencias` en estado `vigente`. Una propuesta pendiente
+   no desbloquea nada, que es lo que se quiere.
+2. **Las cinco caducidades de la unidad** que alimentan `opt.dataset.vence*` y
+   el aviso «Esta unidad tiene documentos vencidos» — una sola consulta para
+   todas las unidades del select.
+3. **Filtro de choferes con licencia HAZMAT vigente**, con el filtro de fecha
+   bajado a la base.
+4. **La última línea de defensa al enviar la oferta**, que comprueba la licencia
+   del chofer elegido.
+
+Medido contra pruebas comparando los dos caminos. Lo que hace válida la
+comprobación del bloque 2: el camión `T-629F701C` tiene **las cinco fechas
+distintas entre sí**, así que confundir un tipo con otro
+(`seguro_unidad` ↔ `permiso_sct_unidad`, por ejemplo) habría saltado. Coinciden
+las cinco en su sitio.
+
+Y como `expirados` salía vacío por los dos lados —que no prueba nada—, esa rama
+se ejercitó con fechas simuladas, sin tocar datos:
+
+| Si hoy fuera | Viejo | Nuevo |
+|---|---|---|
+| 2027-11-01 | Permiso SCT | Permiso SCT |
+| 2027-12-01 | + Seguro RC | + Seguro RC |
+| 2028-01-01 | + Seguro de carga | + Seguro de carga |
+
 ##### La decisión que delimita el resto de la Etapa 4
 
 **Decisión del usuario, 2026-09-23: una lectura que rellena un formulario de
