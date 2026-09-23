@@ -27,7 +27,7 @@ console.log(JSON.stringify({ base: sb.supabaseUrl,
 }, null, 2))
 ```
 
-Debe decir `xskgnudiznryhgagxadu`, **`vigencias.js?v=5`** y
+Debe decir `xskgnudiznryhgagxadu`, **`vigencias.js?v=6`** y
 **`aprobaciones.js?v=45`**. Si alguna versión es menor, no sigas: estás viendo
 el fichero viejo.
 
@@ -43,7 +43,15 @@ En la portada, la tarjeta **Vigencias** debe llevar el número **3**.
 
 > Son **recursos** afectados, no documentos: la camioneta de Champi tiene cinco
 > papeles vencidos y cuenta como uno. Los tres son la camioneta de Champi, el
-> operador Mauricio Ortega y el Rabón de Salvador.
+> operador Mauricio Ortega y el Rabón de Salvador. **Por eso el globo dice 3 y
+> el panel lista 8 documentos: no son la misma cuenta.**
+
+> ⚠ **Este globo estuvo roto desde que se creó el panel, y se arregló el
+> 2026-09-23 al probar este paso** (`vigencias.js?v=6`). `.hc-badge` nace con
+> `display:none` en el CSS, y `actualizarBadgeVigencias()` era el único de los
+> seis globos de la portada que escribía el número **sin tocar `display`**: el
+> "3" estaba dentro del elemento y no se veía. Si pruebas con `?v=5` o anterior,
+> el globo seguirá sin aparecer y no es un fallo nuevo.
 
 ### b) Dentro del panel — vencidos y próximos
 

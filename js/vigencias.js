@@ -326,8 +326,16 @@ async function actualizarBadgeVigencias() {
       if (vivas[v.entidad_tipo]?.has(v.entidad_id)) afectados.add(`${v.entidad_tipo}|${v.entidad_id}`);
     });
 
+    // `.hc-badge` nace con `display:none` en el CSS, así que escribir solo el
+    // texto deja el número dentro y el globo invisible. Los otros cinco badges
+    // de la portada sí tocan `display`; este no lo hacía desde que se creó el
+    // panel, así que nunca se vio. Encontrado probando la Etapa 4 el 2026-09-23:
+    // la consulta daba 3 y el elemento contenía "3".
     const badge = document.getElementById('home-vig-badge');
-    if (badge) badge.textContent = afectados.size > 0 ? afectados.size : '';
+    if (badge) {
+      badge.textContent = afectados.size > 0 ? afectados.size : '';
+      badge.style.display = afectados.size > 0 ? 'inline-block' : 'none';
+    }
   } catch (_) {}
 }
 
