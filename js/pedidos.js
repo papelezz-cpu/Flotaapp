@@ -2002,31 +2002,29 @@ async function openHacerOferta(pedidoId) {
     const { data: vigPerfil } = await sb.from('vigencias')
       .select('tipo_documento, fecha_documento')
       .eq('entidad_tipo', 'perfil').eq('entidad_id', currentUser.id).eq('estado', 'vigente');
-    {
-      const acreditado = new Map((vigPerfil || []).map(v => [v.tipo_documento, v.fecha_documento]));
-      const DOCS_EMPRESA = [
-        ['permiso_sct',  'Permiso SCT'],
-        ['seguro_rc',    'Seguro RC'],
-        ['seguro_carga', 'Seguro de carga'],
-      ];
-      const expirados = DOCS_EMPRESA
-        .filter(([t]) => acreditado.get(t) && acreditado.get(t) < hoy).map(([, l]) => l);
-      if (expirados.length) {
-        select.innerHTML = '<option value="">—</option>';
-        if (warn) { warn.textContent = `⛔ No puedes hacer ofertas — documentos de empresa vencidos: ${expirados.join(', ')}. Actualiza tus vigencias para continuar.`; warn.style.display = 'block'; }
-        if (btnEnv) btnEnv.disabled = true;
-        document.getElementById('modal-hacer-oferta').classList.add('open');
-        return;
-      }
-      // Aviso: sin ningun documento acreditado, la ficha que ve el cliente sale
-      // vacia de distintivos. Ya no existe el caso "declarado sin fecha" —
-      // declarar era marcar una casilla, y esa casilla se retiro: ahora la
-      // vigencia solo la escribe el superadmin al aprobar el documento.
-      const sinAcreditar = DOCS_EMPRESA.filter(([t]) => !acreditado.get(t)).map(([, l]) => l);
-      if (sinAcreditar.length && recursoWarnEl) {
-        recursoWarnEl.textContent = `⚠ Tu empresa no tiene acreditado: ${sinAcreditar.join(', ')}. Súbelos en Mis unidades → Perfil de empresa → Documentos legales; hasta que el superadmin los apruebe, tu ficha no los muestra al cliente.`;
-        recursoWarnEl.style.display = 'block';
-      }
+    const acreditado = new Map((vigPerfil || []).map(v => [v.tipo_documento, v.fecha_documento]));
+    const DOCS_EMPRESA = [
+      ['permiso_sct',  'Permiso SCT'],
+      ['seguro_rc',    'Seguro RC'],
+      ['seguro_carga', 'Seguro de carga'],
+    ];
+    const expirados = DOCS_EMPRESA
+      .filter(([t]) => acreditado.get(t) && acreditado.get(t) < hoy).map(([, l]) => l);
+    if (expirados.length) {
+      select.innerHTML = '<option value="">—</option>';
+      if (warn) { warn.textContent = `⛔ No puedes hacer ofertas — documentos de empresa vencidos: ${expirados.join(', ')}. Actualiza tus vigencias para continuar.`; warn.style.display = 'block'; }
+      if (btnEnv) btnEnv.disabled = true;
+      document.getElementById('modal-hacer-oferta').classList.add('open');
+      return;
+    }
+    // Aviso: sin ningun documento acreditado, la ficha que ve el cliente sale
+    // vacia de distintivos. Ya no existe el caso "declarado sin fecha" —
+    // declarar era marcar una casilla, y esa casilla se retiro: ahora la
+    // vigencia solo la escribe el superadmin al aprobar el documento.
+    const sinAcreditar = DOCS_EMPRESA.filter(([t]) => !acreditado.get(t)).map(([, l]) => l);
+    if (sinAcreditar.length && recursoWarnEl) {
+      recursoWarnEl.textContent = `⚠ Tu empresa no tiene acreditado: ${sinAcreditar.join(', ')}. Súbelos en Mis unidades → Perfil de empresa → Documentos legales; hasta que el superadmin los apruebe, tu ficha no los muestra al cliente.`;
+      recursoWarnEl.style.display = 'block';
     }
   }
 
