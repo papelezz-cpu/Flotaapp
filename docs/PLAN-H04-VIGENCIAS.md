@@ -507,6 +507,37 @@ se ejercitó con fechas simuladas, sin tocar datos:
 | 2027-12-01 | + Seguro RC | + Seguro RC |
 | 2028-01-01 | + Seguro de carga | + Seguro de carga |
 
+#### 4.6 — Probado en el preview  ·  **TODO EN VERDE el 2026-09-23**
+
+Guion en [pruebas/PLAN-PRUEBAS-ETAPA4.md](../pruebas/PLAN-PRUEBAS-ETAPA4.md),
+corrido entero contra el preview de `dev` (commit `35339fb`), **cinco pasos,
+todos pasan**: catálogo y ficha del proveedor como cliente, tarjetas de operador,
+asignar chofer, y hacer oferta sobre un pedido Hazmat/Torton creado para la
+ocasión.
+
+**Por qué hacía falta, y no era trámite.** Las equivalencias viejo-contra-nuevo
+se habían medido **reimplementando la lógica en Node**, no ejecutando el código
+escrito. Eso prueba que las consultas devuelven lo mismo, pero no que el fichero
+corra: una variable fuera de alcance o un argumento mal pasado no da error de
+compilación y solo aparece al abrir la pantalla. Preparando el guion ya apareció
+un resto de ese tipo (un bloque de llaves huérfano en `pedidos.js`, inocuo, pero
+invisible para la medición).
+
+El pedido de prueba quedó en `19250cf1` — **abierto**, Torton, carga peligrosa,
+de Mario Silva, sin oferta enviada. Es dato sembrado; la siguiente réplica de
+producción lo sustituye.
+
+##### Un hallazgo de la prueba, ya corregido
+
+Al editar un operador no había forma evidente de salir sin guardar: el botón
+decía **«Limpiar»** también en modo edición, y desde fuera no se sabía si borraba
+algo del operador (no borraba nada). El código ya distinguía el modo —renombraba
+el botón principal— pero dejaba el de al lado con la etiqueta del alta. Ahora
+dice **«Cancelar edición»** mientras se edita y vuelve a «Limpiar» al salir.
+
+No es parte de H-04; salió de recorrer el flujo con ojos de usuario, que es lo
+que una medición no hace.
+
 ##### La decisión que delimita el resto de la Etapa 4
 
 **Decisión del usuario, 2026-09-23: una lectura que rellena un formulario de
