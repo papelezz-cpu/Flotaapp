@@ -166,18 +166,66 @@ mantener sus propios papeles**. Antes de la Etapa 3 esto fallaba con
 
 ---
 
-## 3 · Quitar un documento  ·  *como superadmin*
+## 3 · Borrar una unidad  ·  *como empresa*
 
-Entra **como superadmin** y edita el mismo camión: **borra la fecha de
-«Vencimiento verificación vehicular»** y deja el campo vacío.
+> **Este paso cambió el 2026-09-22.** Decía «entra como superadmin y vacía la
+> fecha de verificación vehicular», y **no se puede hacer**. Dos razones, las
+> dos comprobadas en el código:
+>
+> - El superadmin **no tiene acceso a «Mis unidades»** — su lista de accesos
+>   ([js/views.js:93-104](../js/views.js)) no incluye esa pantalla ni
+>   «Operadores», y `editarCamion()` solo se llama desde la tarjeta de esa
+>   lista ([js/admin.js:147](../js/admin.js)). No hay ruta.
+> - La empresa sí llega al formulario, pero **no puede vaciar una fecha**: el
+>   candado de [js/admin.js:534](../js/admin.js) exige adjuntar documento en
+>   cuanto la fecha cambia, y borrarla cuenta como cambio.
+>
+> Resultado: **ningún rol puede vaciar la fecha de un documento de camión
+> desde la interfaz.** Lo que sí vacía filas del espejo es el paso 6 (cuando
+> el superadmin acredita, las columnas `_pendiente` se limpian) — así que ese
+> camino no se queda sin probar, solo se prueba más adelante.
 
-> Va como superadmin a propósito: el candado del paso 2 exige adjuntar archivo
-> al cambiar una fecha, y aquí queremos **vaciarla**. El superadmin se salta
-> ese candado — `dateChanged && !esSuperAdmin` en `js/admin.js`.
+En su lugar este paso prueba **el borrado de la unidad entera**, que es lo que
+el espejo aprendió a seguir en la Etapa 3c y antes no seguía.
 
-**Debe pasar:** el total **baja a 67**, y sigue sin «filas de más». Si no baja,
-el espejo deja un documento fantasma: una fila que dice vigilar un papel que
-ya no está.
+**Antes de empezar, aplica la etapa 3c a pruebas** (solo una vez):
+
+```bash
+bash supabase/aplicar-a-pruebas.sh supabase/migrations/20260922140000_vigencias_espejo_borrado.sql
+```
+
+Debe imprimir `fantasmas barridos: 0` y `los 5 triggers escuchan INSERT,
+UPDATE y DELETE`.
+
+### a) En la aplicación
+
+**Mis unidades → dar de alta**, una unidad desechable:
+
+| Campo | Valor |
+|---|---|
+| ID / número económico | `ESP-BORRAR` |
+| Tipo | el mismo que usaste en `ESP-001` |
+| Vencimiento verificación vehicular | `2029-01-09` |
+
+Guárdala. Luego, en su tarjeta, pulsa **🗑** y confirma.
+
+### b) En la terminal
+
+```bash
+node pruebas/14-sonda-espejo-vigencias.mjs
+```
+
+**Debe pasar:**
+- al dar de alta, el total sube a **69** y aparece una fila
+  `camion|ESP-BORRAR|verificacion`,
+- al borrarla, el total vuelve a **68** y esa fila **desaparece**,
+- y sobre todo: **«El espejo no tiene filas de más» sigue en OK**. Si la fila
+  sobrevive al borrado, la sonda la cantará ahí — es un documento que dice
+  vigilar un camión que ya no existe.
+
+Sin la Etapa 3c aplicada este paso falla, y ese es justo el punto: el hueco
+era real. Comprobado en banco local con
+[pruebas/banco-local/h04-etapa3c.sql](banco-local/h04-etapa3c.sql), bloque 3.
 
 ---
 
@@ -196,7 +244,7 @@ Adjunta los documentos que pida. La **fecha de expedición** de la licencia
 llénala si quieres — **no entra en el espejo a propósito**, por tu decisión del
 19 de septiembre: solo interesa cuándo vence.
 
-**Debe pasar:** la sonda sube a **71** (cuatro documentos) sin diferencias.
+**Debe pasar:** la sonda sube a **72** (cuatro documentos) sin diferencias.
 
 Y lo que de verdad se comprueba aquí — que el espejo guarda **la fecha que
 tecleaste**, no una calculada:
@@ -229,7 +277,7 @@ horneado la regla en los datos.
 | Seguro de carga | `2027-12-22` |
 
 **Debe pasar:** aparecen tres filas **en estado `pendiente`**, no `vigente`. La
-empresa propone; no se acredita sola. Total: **74**.
+empresa propone; no se acredita sola. Total: **75**.
 
 ```bash
 node -e "import('file:///C:/Users/Usuario/Documents/Flotaapp/pruebas/lib/api.mjs').then(async m=>{
@@ -255,7 +303,7 @@ a la vez: borra tres filas y crea tres.
 - las tres `pendiente` **desaparecen**,
 - aparecen las tres en `vigente`, con **las mismas fechas**: `2027-10-20`,
   `2027-11-21`, `2027-12-22`,
-- el total **sigue en 74**,
+- el total **sigue en 75**,
 - ninguna «de más».
 
 Repite la consulta del paso 5: debes ver tres filas, todas `vigente`.
@@ -291,7 +339,7 @@ reabierto por la puerta de atrás.
 node pruebas/14-sonda-espejo-vigencias.mjs
 ```
 
-**Esperado: 74 pares, 74 filas**, ninguna falta, ninguna difiere, ninguna de
+**Esperado: 75 pares, 75 filas**, ninguna falta, ninguna difiere, ninguna de
 más.
 
 | Paso | Total tras el paso |
@@ -299,10 +347,10 @@ más.
 | Partida | 63 |
 | 1 · alta de camión | 68 |
 | 2 · editar CAAT | 68 |
-| 3 · quitar verificación | 67 |
-| 4 · alta de operador | 71 |
-| 5 · propone perfil | 74 |
-| 6 · superadmin acredita | 74 |
+| 3 · alta y borrado de `ESP-BORRAR` | 68 (sube a 69 y vuelve) |
+| 4 · alta de operador | 72 |
+| 5 · propone perfil | 75 |
+| 6 · superadmin acredita | 75 |
 
 Si algún total no cuadra, ahí está el flujo que el espejo no cubre. La sonda
 nombra entidad, documento y los dos valores.
@@ -327,7 +375,7 @@ En la terminal:
 node -e "import('file:///C:/Users/Usuario/Documents/Flotaapp/pruebas/lib/api.mjs').then(async m=>{
   const A=m.leerAmbientePruebas(),c=m.leerCredenciales();
   const s=new m.Sesion('sa',A); await s.login(c.superadmin.email,c.superadmin.password);
-  const {data:v,ok}=await s.select('vigencias','select=entidad_tipo,tipo_documento,estado,fecha_documento,archivo_path&limit=500');
+  const {data:v,ok}=await s.select('vigencias','select=entidad_tipo,entidad_id,tipo_documento,estado,fecha_documento,archivo_path&limit=500');
   if(!ok){console.log('  no se pudo leer vigencias');return;}
   const F=['2027-10-20','2027-11-21','2027-12-22'];
   const cam=v.filter(x=>x.entidad_tipo==='camion'), op=v.filter(x=>x.entidad_tipo==='operador');
@@ -340,7 +388,7 @@ node -e "import('file:///C:/Users/Usuario/Documents/Flotaapp/pruebas/lib/api.mjs
 ');
   di(alta, 'paso 1 - alta del camion con las cinco fechas');
   di(!!caat && !!caat.archivo_path, 'paso 2 - CAAT renovado a 2028-04-14 y con archivo');
-  di(alta && !cam.some(x=>x.tipo_documento==='verificacion'&&x.fecha_documento==='2027-05-15'), 'paso 3 - verificacion vaciada');
+  di(alta && !cam.some(x=>x.entidad_id==='ESP-BORRAR'), 'paso 3 - ESP-BORRAR dado de alta y borrado (si nunca lo diste de alta esto sale hecho: mira el total)');
   di(op.some(x=>x.fecha_documento==='2026-07-17'), 'paso 4 - alta del operador con el examen medico');
   di(mio.length>0, 'paso 5 - los tres documentos de perfil del guion');
   di(mio.length>0 && mio.every(x=>x.estado==='vigente'), 'paso 6 - y ya estan acreditados');
@@ -351,10 +399,16 @@ Reconoce cada paso **por las fechas concretas de este guion**, no por la mera
 presencia de filas: pruebas ya trae tres documentos de perfil copiados de
 producción, y contarlos daría por hechos los pasos 5 y 6 sin haberlos hecho.
 
+**El paso 3 es el único que no se puede distinguir así**, porque termina
+borrando su propio rastro: «no hay filas de `ESP-BORRAR`» es lo mismo antes de
+empezarlo que después de acabarlo. Si no te acuerdas, míralo por el total — si
+va por 68 y los pasos 1 y 2 salen hechos, o no lo has hecho o lo has hecho
+entero, y repetirlo no cuesta nada ni deja residuo.
+
 ### Lo único que rompe la continuidad
 
 **Que alguien replique producción a pruebas.** La réplica hace
-`DROP SCHEMA public CASCADE`, así que se lleva por delante **las cuatro
+`DROP SCHEMA public CASCADE`, así que se lleva por delante **las cinco
 migraciones de H-04 y todo lo que hayas sembrado**. Si pasa, hay que empezar de
 cero:
 
@@ -363,6 +417,7 @@ bash supabase/aplicar-a-pruebas.sh supabase/migrations/20260918160000_vigencias_
 bash supabase/aplicar-a-pruebas.sh supabase/migrations/20260921120000_vigencias_etapa2_copiar.sql
 bash supabase/aplicar-a-pruebas.sh supabase/migrations/20260922120000_vigencias_etapa3_doble_escritura.sql
 bash supabase/aplicar-a-pruebas.sh supabase/migrations/20260922130000_vigencias_espejo_tolerante.sql
+bash supabase/aplicar-a-pruebas.sh supabase/migrations/20260922140000_vigencias_espejo_borrado.sql
 ```
 
 Y el total de partida vuelve a ser 63 — aunque puede variar si producción

@@ -10,6 +10,7 @@ Plan por etapas. Escrito el 2026-09-18.
 | 2 · Copiar | **aplicada a pruebas** — 63 filas |
 | 3 · Doble escritura | **aplicada a pruebas** — espejo vivo |
 | 3b · Espejo tolerante | **escrita y probada**, sin aplicar |
+| 3c · El espejo sigue los borrados | **escrita y probada en banco local**, sin aplicar |
 | 4 · Cambiar lecturas | sin empezar |
 | 5 · Guards | sin empezar |
 | 6 · Retirar columnas | fuera de este plan |
@@ -270,6 +271,57 @@ reflejó igual.
 > ⚠ **La Etapa 4 tiene que devolverlo a estricto.** Cuando las lecturas se
 > muevan, una fuente sin espejo deja de ser una divergencia anotada y pasa a
 > ser un dato que falta en pantalla.
+
+### Etapa 3c — El espejo se entera de los borrados  ·  **PROBADA EN BANCO LOCAL**
+
+`supabase/migrations/20260922140000_vigencias_espejo_borrado.sql`.
+
+La Etapa 3 colgó el espejo de `after insert or update`. **Faltaba `delete`**, y
+las cinco tablas de origen se borran de verdad desde el cliente:
+[js/admin.js:840](../js/admin.js) (`eliminarUnidad`),
+[js/admin.js:668](../js/admin.js) (`eliminarMiRecurso`),
+[js/admin.js:1249](../js/admin.js) y [:1400](../js/admin.js)
+(custodios, patios), [js/operadores.js:500](../js/operadores.js), y `perfiles`
+en cascada al borrar el usuario de auth.
+
+`vigencias.entidad_id` es `text` y polimórfico — apunta a cinco tablas con PK
+distinta —, así que **no puede tener clave foránea** y no hay
+`on delete cascade` que lo salve. Las únicas FK de la tabla son a `auth.users`
+y al catálogo.
+
+**Por qué no se vio antes, que es la parte que importa.** La sonda 14 sí caza
+estos fantasmas: los cuenta como «filas de más». Pero nadie había borrado nada
+desde la Etapa 2, así que salía verde. *Un verde no prueba que el caso esté
+cubierto; prueba que el caso no ha ocurrido.*
+
+Qué hace: `vigencias_espejo()` aprende `TG_OP = 'DELETE'` (lee OLD, borra las
+filas de esa entidad **de cualquier estado**, también un `rechazado` que el
+mapeo nunca escribe); los cinco triggers pasan a
+`after insert or update or delete` con `create or replace trigger`, sin tirar
+nada; y un barrido limpia las huérfanas que ya hubiera.
+
+Sigue siendo **tolerante**: si el borrado del espejo falla, avisa y el borrado
+de origen continúa.
+
+Medido en banco local rehecho desde el volcado de producción
+([pruebas/banco-local/h04-etapa3c.sql](../pruebas/banco-local/h04-etapa3c.sql)),
+cinco bloques en verde:
+
+- borrar un camión barre sus 4 filas (incluida la `rechazado`) y **no toca** las
+  de otro camión,
+- lo mismo para operador, custodio, patio y perfil,
+- **con el trigger devuelto a `insert or update`, el fantasma se queda** — el
+  hueco era real y la prueba sabe verlo,
+- con el espejo roto a propósito, el camión se borra igual (el trato de 3b
+  sigue en pie para el borrado),
+- y el barrido de la migración encuentra las dos huérfanas que esa corrida
+  dejó.
+
+Y desde un banco limpio hasta 3b, con un fantasma real sembrado, la migración
+imprimió `fantasmas barridos: 1`.
+
+> ⚠ **La Etapa 4 sigue teniendo que devolver el espejo a estricto.** 3c no
+> cambia ese pendiente.
 
 ### Etapa 4 — Cambiar lecturas, fichero a fichero
 
