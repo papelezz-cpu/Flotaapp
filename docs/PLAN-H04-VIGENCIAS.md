@@ -381,6 +381,23 @@ rehecho con las cinco migraciones anteriores:
 Y se comprobó que la prueba **sabe fallar**: restaurada la vista vieja, el
 segundo bloque la caza nombrando el valor que devolvió.
 
+##### El conteo de este plan incluye falsos positivos (medido el 2026-09-23)
+
+La tabla de «apariciones» de más arriba salió de buscar `fecha_vencimiento*`,
+y ese prefijo caza también **`fecha_vencimiento_pago`**, que es cuándo vence el
+**cobro** de una reservación y no tiene nada que ver con un documento. Contadas
+las ocurrencias por fichero, separando una cosa de la otra:
+
+| Fichero | de documento | de cobro |
+|---|---|---|
+| `cobros.js` | **0** | 3 |
+| `reservaciones.js` | 3 | 6 |
+| `aprobaciones.js` | 85 | 1 |
+| el resto | todas | 0 |
+
+**`cobros.js` no entra en la Etapa 4**: no lee ninguna vigencia. Queda tachado
+del orden, no pendiente.
+
 ##### Lo que el banco local no podía probar, medido en pruebas
 
 En el banco todo corre como `postgres`, que se salta RLS. La pregunta que
@@ -404,6 +421,47 @@ obtiene **0 filas**, y por `camiones_publico` obtiene **las 5** de flota ajena.
 
 Y el espejo estricto **no bloquea la operación normal**: escritura real de una
 empresa sobre un camión con sus cinco fechas, HTTP 200 y el espejo intacto.
+
+#### 4.2 — `detalle.js` y `cobros.js`  ·  **NADA QUE HACER, comprobado**
+
+Los dos ficheros del segundo paso se resolvieron solos, cada uno por su motivo:
+
+- **`detalle.js` ya quedó migrado en 4.1.** Lee `empresas_publico` con
+  `select('*')` ([js/detalle.js:40](../js/detalle.js) y
+  [:109](../js/detalle.js)), así que sus tres apariciones toman las fechas de
+  `vigencias` desde la misma migración. Medido como cliente contra pruebas: 15
+  columnas y las tres fechas correctas por esa ruta exacta.
+- **`cobros.js` nunca perteneció a este plan** — ver los falsos positivos de
+  arriba. Sus tres apariciones son `fecha_vencimiento_pago`.
+
+Siguiente de verdad: `reservaciones.js`, con **3** apariciones reales (no 7).
+
+#### 4.3 — `reservaciones.js`  ·  **HECHO el 2026-09-23**
+
+Una sola lectura real, en `abrirAsignarChofer()`: cuando la carga es peligrosa,
+la lista de choferes se filtra por licencia HAZMAT vigente. Pasa de leer
+`operadores.fecha_vencimiento_licencia_peligrosa` a consultar `vigencias`.
+
+Dos detalles que se comprobaron antes de tocarlo:
+
+- **La fecha es la caducidad, no una fecha de la que derivarla.**
+  `licencia_peligrosa` tiene `vigencia_meses: null` en el catálogo, así que la
+  comparación directa se mantiene y no hace falta `vigencia_vence_el()`.
+- **El filtro se baja a la base** (`.gte('fecha_documento', today())`), que es
+  donde ahora sí hay índice. Y solo se consulta si la carga es peligrosa.
+
+Medido contra pruebas, comparando el camino viejo y el nuevo **en las dos
+direcciones**, porque la primera comparación salió vacía por los dos lados y eso
+no prueba nada:
+
+| Estado de la licencia | Camino viejo | Camino nuevo |
+|---|---|---|
+| vigente (2028-03-15) | sale el chofer | sale el chofer |
+| vencida (2020-01-01) | no sale | no sale |
+
+Para poder medirlo se le puso licencia HAZMAT al operador de pruebas
+`OP-B54E541A` («Espejo Uno»), que queda vigente hasta 2028-03-15. Es dato
+sembrado, como el resto del guion manual.
 
 ### Etapa 5 — Los guards
 

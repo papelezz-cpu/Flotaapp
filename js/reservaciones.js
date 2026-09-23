@@ -1069,12 +1069,23 @@ async function abrirAsignarChofer(reservaId) {
   }
 
   const { data: opsRaw } = await sb.from('operadores')
-    .select('id, nombre, primer_apellido, fecha_vencimiento_licencia_peligrosa')
+    .select('id, nombre, primer_apellido')
     .eq('propietario_id', currentUser.id).eq('aprobacion', 'aprobada');
-  const hoy = today();
-  const ops = esCargaPeligrosa
-    ? (opsRaw || []).filter(o => o.fecha_vencimiento_licencia_peligrosa && o.fecha_vencimiento_licencia_peligrosa >= hoy)
-    : (opsRaw || []);
+
+  // H-04: la licencia HAZMAT se lee de `vigencias`, no de la columna del
+  // operador. Su fecha ES la caducidad (vigencia_meses null en el catálogo),
+  // así que el filtro va en la base y se apoya en el índice de fecha_documento.
+  let ops = opsRaw || [];
+  if (esCargaPeligrosa) {
+    const { data: licencias } = await sb.from('vigencias')
+      .select('entidad_id')
+      .eq('entidad_tipo', 'operador')
+      .eq('tipo_documento', 'licencia_peligrosa')
+      .eq('estado', 'vigente')
+      .gte('fecha_documento', today());
+    const conLicencia = new Set((licencias || []).map(v => v.entidad_id));
+    ops = ops.filter(o => conLicencia.has(o.id));
+  }
 
   const sel = document.getElementById('ac-operador');
   sel.innerHTML = ops.length
