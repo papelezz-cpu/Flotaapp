@@ -538,6 +538,107 @@ dice **«Cancelar edición»** mientras se edita y vuelve a «Limpiar» al salir
 No es parte de H-04; salió de recorrer el flujo con ojos de usuario, que es lo
 que una medición no hace.
 
+#### 4.7 — `vigencias.js`  ·  **HECHO el 2026-09-23**
+
+`supabase/migrations/20260923130000_vigencias_vista_caducidad.sql` +
+`js/vigencias.js`.
+
+##### La promesa del plan era falsa, y conviene que quede escrito
+
+Este documento decía: «las diez consultas de `js/vigencias.js` colapsan en una.
+Ese es el premio». **No se puede**, y no por falta de ganas: por dos razones que
+solo aparecen leyendo el código, no contando `grep`.
+
+1. **El panel pinta nombres, no ids.** «Torton (T-001)», el nombre completo del
+   chofer, la empresa dueña. `vigencias` solo guarda `entidad_tipo` +
+   `entidad_id`, así que las cinco tablas se siguen consultando — para los
+   nombres, no para las fechas.
+2. **«Documentos sin fecha» se deriva de una AUSENCIA.** Un documento que nunca
+   se subió **no tiene fila**: el `CHECK` de la tabla exige archivo o fecha. Para
+   decir «a este camión le falta la tarjeta» hay que saber que el camión existe y
+   que la tarjeta es obligatoria — y **«obligatorio» no está en el catálogo**:
+   vive en el JS, y no es uniforme (el CAAT no lo es; la licencia SEDENA solo si
+   el custodio porta arma).
+
+Quedan **7 consultas** donde había 5 (+1 a la vista, +1 al catálogo). El premio
+no era el número.
+
+##### Lo que sí se ganó: dos copias de la regla de negocio, muertas
+
+- En el panel, el `setFullYear(+1)` repetido tres veces, uno por examen.
+- En el badge, esto:
+
+  ```js
+  anioAtras = hoy - (365 - DIAS_ALERTA)   // «vence al año», a mano
+  .or(`fecha_examen_medico.lte.${anioAtrasStr}, …`)
+  ```
+
+  Es la regla del catálogo reescrita en JavaScript **con 365 en vez de «12
+  meses»**. El día que un examen valga dos años, el catálogo lo diría y el badge
+  habría seguido contando con 365 sin que nada fallara. Eso es exactamente la
+  duplicación que H-04 existe para quitar, y estaba en el sitio donde menos se
+  ve: un número en un globo.
+
+La etiqueta «(1 año)» también sale ahora del catálogo (`(2 años)`, `(18 meses)`…
+según lo que diga), así que no puede quedarse mintiendo.
+
+##### La vista, y por qué su `security_invoker` va al contrario
+
+`vigencias_caducidad` = `vigencias` + `vence_el`, calculado por
+`vigencia_vence_el()`. Existe porque una función no se puede usar para filtrar
+desde PostgREST, y el badge necesita `.lte('vence_el', limite)`.
+
+**Va con `security_invoker = true`, al revés que `empresas_publico`.** Ahí el
+`false` es deliberado: enseña unos campos públicos de filas que la RLS tapa
+(medido: una empresa lee `camiones` directo y obtiene 0 filas de flota ajena, y
+por `camiones_publico` obtiene las 5). **Aquí sería una fuga**: el panel de
+vigencias es privado, cada empresa ve lo suyo. Probado rompiéndolo a propósito
+—vista recreada sin la cláusula— y la prueba lo cazó: *«FALLA GRAVE: la empresa
+ve 1 documentos de OTRA empresa por la vista»*.
+
+##### Y un fallo que la migración cazó a sí misma
+
+El primer intento de aplicarla **falló en su propio bloque de comprobación**: la
+vista nacía **aceptando INSERT, UPDATE y DELETE** de cualquiera con sesión.
+
+Causa: el `pg_default_acl` de este proyecto concede `arwdDxtm` —todo— a
+`authenticated` sobre cada relación nueva, así que **toda vista nace escribible**
+y un `grant select` no lo deshace. Es H-01 otra vez, el agujero que
+`empresas_publico` tuvo durante meses y que documentó 20260914130000. Resuelto
+con el `revoke insert, update, delete, maintain` explícito.
+
+> Esto refuerza el pendiente de **comparar `pg_default_acl`** que sigue abierto
+> del audit original: mientras ese ACL siga así, cada objeto nuevo nace abierto y
+> solo lo salva que alguien se acuerde de revocar.
+
+##### Medido contra pruebas
+
+Comparando el panel y el badge por los dos caminos, con el sello de paridad en
+`diverge` (esperado, por las migraciones de H-04):
+
+| | Empresa | Superadmin |
+|---|---|---|
+| panel: vencidos/próximos | 0 = 0 | **8 = 8** |
+| panel: sin fecha | **12 = 12** | **29 = 29** |
+| badge: recursos afectados | 0 = 0 | **3 = 3** |
+
+**Los 8 afectados son todos de caducidad directa**, así que esa comparación no
+ejercita la derivación. Se comprobó aparte: los **12** documentos de caducidad
+derivada que existen en pruebas dan el mismo `vence_el` que el `setFullYear(+1)`
+del código viejo, incluidos los 2 que están en nulo.
+
+##### Una diferencia real de un día, en el 29 de febrero
+
+Los dos métodos no son idénticos, y esto es mejor saberlo que descubrirlo:
+
+| Fecha capturada | JS viejo (`setFullYear`) | Vista (`+ 12 meses`) |
+|---|---|---|
+| 2028-02-29 | 2029-**03-01** | 2029-**02-28** |
+
+JavaScript se desborda a marzo; Postgres ajusta al fin de mes. **La de Postgres
+es la defendible** para una caducidad. Ninguna fecha en pruebas cae en 29 de
+febrero, así que hoy no cambia nada.
+
 ##### La decisión que delimita el resto de la Etapa 4
 
 **Decisión del usuario, 2026-09-23: una lectura que rellena un formulario de

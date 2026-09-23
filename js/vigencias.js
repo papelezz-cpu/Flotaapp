@@ -18,11 +18,20 @@ async function renderVigencias() {
   const esSA = currentUser.rol === 'superadmin';
   const uid  = currentUser.id;
 
-  let camQ  = sb.from('camiones').select('id, tipo, propietario_id, propietario:perfiles(nombre), vigencia_caat, fecha_vencimiento_tc, fecha_vencimiento_seguro, fecha_vencimiento_permiso_sct, fecha_vencimiento_verificacion').in('aprobacion', ['aprobada', 'pendiente']);
-  let opQ   = sb.from('operadores').select('id, nombre, primer_apellido, propietario_id, propietario:perfiles(nombre), fecha_vencimiento, fecha_examen_medico, fecha_examen_toxicologico, fecha_carta_antecedentes').in('aprobacion', ['aprobada', 'pendiente']);
-  let cusQ  = sb.from('custodios').select('id, nombre, propietario_id, propietario:perfiles(nombre), fecha_vencimiento_cert, porta_arma, fecha_vencimiento_licencia_sedena').in('aprobacion', ['aprobada', 'pendiente']);
-  let patQ  = sb.from('patios').select('id, nombre, propietario_id, propietario:perfiles(nombre), fecha_vencimiento_permiso').in('aprobacion', ['aprobada', 'pendiente']);
-  let perfQ = sb.from('perfiles').select('user_id, nombre, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga').eq('rol', 'admin');
+  // H-04: las cinco tablas se siguen consultando, pero SIN columnas de fecha.
+  // Siguen haciendo falta por dos motivos que `vigencias` no puede cubrir:
+  //   · los nombres que pinta el panel («Torton (T-001)», el nombre del chofer,
+  //     la empresa dueña) — `vigencias` solo guarda entidad_tipo + entidad_id;
+  //   · el universo de entidades, que es lo que permite decir «a este camión le
+  //     falta la tarjeta». Un documento que nunca se subió NO tiene fila (el
+  //     CHECK de la tabla exige archivo o fecha), así que una ausencia no se
+  //     puede consultar: hay que saber qué entidades existen y cuáles de sus
+  //     documentos son obligatorios, y eso último no está en el catálogo.
+  let camQ  = sb.from('camiones').select('id, tipo, propietario_id, propietario:perfiles(nombre)').in('aprobacion', ['aprobada', 'pendiente']);
+  let opQ   = sb.from('operadores').select('id, nombre, primer_apellido, propietario_id, propietario:perfiles(nombre)').in('aprobacion', ['aprobada', 'pendiente']);
+  let cusQ  = sb.from('custodios').select('id, nombre, propietario_id, propietario:perfiles(nombre), porta_arma').in('aprobacion', ['aprobada', 'pendiente']);
+  let patQ  = sb.from('patios').select('id, nombre, propietario_id, propietario:perfiles(nombre)').in('aprobacion', ['aprobada', 'pendiente']);
+  let perfQ = sb.from('perfiles').select('user_id, nombre').eq('rol', 'admin');
 
   if (!esSA) {
     camQ  = camQ.eq('propietario_id', uid);
@@ -32,16 +41,49 @@ async function renderVigencias() {
     perfQ = perfQ.eq('user_id', uid);
   }
 
-  const [{ data: camiones }, { data: operadores }, { data: custodios }, { data: patios }, { data: perfiles }] =
-    await Promise.all([camQ, opQ, cusQ, patQ, perfQ]);
+  // Las fechas, todas de golpe. `vigencias_caducidad` trae `vence_el` ya
+  // calculado con la regla del catálogo, así que aquí desaparece el «súmale un
+  // año» que antes se hacía a mano para los tres exámenes. Solo `vigente`: una
+  // propuesta pendiente no es un documento acreditado que vigilar.
+  // La RLS de la vista es la de la tabla (security_invoker=true), así que una
+  // empresa recibe lo suyo y el superadmin todo, sin filtrar aquí.
+  const vigQ = sb.from('vigencias_caducidad')
+    .select('entidad_tipo, entidad_id, tipo_documento, fecha_documento, vence_el')
+    .eq('estado', 'vigente');
+  // El catálogo, para la etiqueta: es quien sabe que un examen dura 12 meses.
+  const catQ = sb.from('catalogos').select('valor, meta').eq('clave', 'vigencia_tipo');
+
+  const [{ data: camiones }, { data: operadores }, { data: custodios }, { data: patios },
+         { data: perfiles }, { data: vigs }, { data: cat }] =
+    await Promise.all([camQ, opQ, cusQ, patQ, perfQ, vigQ, catQ]);
+
+  const _mesesDe = new Map((cat || []).map(c => [c.valor, c.meta?.vigencia_meses ?? null]));
+  // Sufijo de la etiqueta. Antes decía «(1 año)» fijo; ahora sale del catálogo,
+  // así que subir un examen a 24 meses no deja la etiqueta mintiendo.
+  const _sufijo = (tipoDoc) => {
+    const m = _mesesDe.get(tipoDoc);
+    if (!m) return '';
+    if (m % 12 === 0) { const a = m / 12; return ` (${a} año${a !== 1 ? 's' : ''})`; }
+    return ` (${m} meses)`;
+  };
+
+  const _vig = new Map();
+  (vigs || []).forEach(v => _vig.set(`${v.entidad_tipo}|${v.entidad_id}|${v.tipo_documento}`, v));
 
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   const items = [];
   const sinFecha = []; // recursos con fecha requerida pero no registrada
 
-  const _add = (empId, empNombre, tipo, nombre, docLabel, fecha, requerido = false) => {
+  // `entTipo`/`entId` localizan la fila en el espejo; `tipoDoc` es la clave del
+  // catálogo. `docLabel` sigue siendo texto de interfaz y no se toca.
+  const _add = (empId, empNombre, tipo, nombre, docLabel, entTipo, entId, tipoDoc, requerido = false) => {
+    const fila  = _vig.get(`${entTipo}|${entId}|${tipoDoc}`);
+    const fecha = fila?.vence_el || null;
     if (!fecha) {
+      // Sin fila, o con fila que solo tiene archivo y ninguna fecha: en los dos
+      // casos no hay nada que vigilar. Son los «14 documentos con archivo pero
+      // sin vencimiento» que la Etapa 2 hizo visibles.
       if (requerido) sinFecha.push({ empId, empNombre, tipo, nombre, docLabel });
       return;
     }
@@ -49,63 +91,49 @@ async function renderVigencias() {
     const dias = Math.ceil((d - hoy) / 86400000);
     const estado = dias < 0 ? 'vencido' : dias <= DIAS_ALERTA ? 'proximo' : 'vigente';
     if (estado === 'vigente') return;
-    items.push({ empId, empNombre, tipo, nombre, docLabel, fecha, dias, estado });
+    // El sufijo solo acompaña a la fila que SÍ tiene caducidad: en la lista de
+    // «sin fecha» no hay periodo que anunciar, y así era antes.
+    items.push({ empId, empNombre, tipo, nombre, docLabel: docLabel + _sufijo(tipoDoc), fecha, dias, estado });
   };
 
   (camiones || []).forEach(c => {
     const emp = c.propietario?.nombre || c.propietario_id;
     const nom = `${c.tipo} (${c.id})`;
-    _add(c.propietario_id, emp, 'Camión', nom, 'Tarjeta de Circulación',  c.fecha_vencimiento_tc,            true);
-    _add(c.propietario_id, emp, 'Camión', nom, 'Seguro',                  c.fecha_vencimiento_seguro,         true);
-    _add(c.propietario_id, emp, 'Camión', nom, 'Permiso SCT',             c.fecha_vencimiento_permiso_sct,    true);
-    _add(c.propietario_id, emp, 'Camión', nom, 'CAAT',                    c.vigencia_caat,                    false);
-    _add(c.propietario_id, emp, 'Camión', nom, 'Verificación vehicular',  c.fecha_vencimiento_verificacion,   false);
+    _add(c.propietario_id, emp, 'Camión', nom, 'Tarjeta de Circulación', 'camion', c.id, 'tarjeta_circulacion', true);
+    _add(c.propietario_id, emp, 'Camión', nom, 'Seguro',                 'camion', c.id, 'seguro_unidad',       true);
+    _add(c.propietario_id, emp, 'Camión', nom, 'Permiso SCT',            'camion', c.id, 'permiso_sct_unidad',  true);
+    _add(c.propietario_id, emp, 'Camión', nom, 'CAAT',                   'camion', c.id, 'caat',                false);
+    _add(c.propietario_id, emp, 'Camión', nom, 'Verificación vehicular', 'camion', c.id, 'verificacion',        false);
   });
 
   (operadores || []).forEach(o => {
     const emp = o.propietario?.nombre || o.propietario_id;
     const nom = [o.nombre, o.primer_apellido].filter(Boolean).join(' ') || o.id;
-    _add(o.propietario_id, emp, 'Operador', nom, 'Licencia de conducir', o.fecha_vencimiento, true);
-    if (o.fecha_examen_medico) {
-      const dEx = new Date(o.fecha_examen_medico + 'T00:00:00');
-      dEx.setFullYear(dEx.getFullYear() + 1);
-      _add(o.propietario_id, emp, 'Operador', nom, 'Examen médico (1 año)', dEx.toISOString().slice(0, 10));
-    } else {
-      sinFecha.push({ empId: o.propietario_id, empNombre: emp, tipo: 'Operador', nombre: nom, docLabel: 'Examen médico' });
-    }
-    if (o.fecha_examen_toxicologico) {
-      const dTox = new Date(o.fecha_examen_toxicologico + 'T00:00:00');
-      dTox.setFullYear(dTox.getFullYear() + 1);
-      _add(o.propietario_id, emp, 'Operador', nom, 'Examen toxicológico (1 año)', dTox.toISOString().slice(0, 10));
-    } else {
-      sinFecha.push({ empId: o.propietario_id, empNombre: emp, tipo: 'Operador', nombre: nom, docLabel: 'Examen toxicológico' });
-    }
-    if (o.fecha_carta_antecedentes) {
-      const dAnt = new Date(o.fecha_carta_antecedentes + 'T00:00:00');
-      dAnt.setFullYear(dAnt.getFullYear() + 1);
-      _add(o.propietario_id, emp, 'Operador', nom, 'Carta de no antecedentes (1 año)', dAnt.toISOString().slice(0, 10));
-    } else {
-      sinFecha.push({ empId: o.propietario_id, empNombre: emp, tipo: 'Operador', nombre: nom, docLabel: 'Carta de antecedentes' });
-    }
+    // Los tres exámenes ya no necesitan trato aparte: su caducidad la calcula
+    // la vista con la regla del catálogo, no este fichero sumando un año.
+    _add(o.propietario_id, emp, 'Operador', nom, 'Licencia de conducir',     'operador', o.id, 'licencia',            true);
+    _add(o.propietario_id, emp, 'Operador', nom, 'Examen médico',            'operador', o.id, 'examen_medico',       true);
+    _add(o.propietario_id, emp, 'Operador', nom, 'Examen toxicológico',      'operador', o.id, 'examen_toxicologico', true);
+    _add(o.propietario_id, emp, 'Operador', nom, 'Carta de no antecedentes', 'operador', o.id, 'carta_antecedentes',  true);
   });
 
   (custodios || []).forEach(c => {
     const emp = c.propietario?.nombre || c.propietario_id;
-    _add(c.propietario_id, emp, 'Custodio', esc(c.nombre || c.id), 'Certificación', c.fecha_vencimiento_cert, true);
+    _add(c.propietario_id, emp, 'Custodio', esc(c.nombre || c.id), 'Certificación', 'custodio', c.id, 'certificacion', true);
     if (c.porta_arma) {
-      _add(c.propietario_id, emp, 'Custodio', esc(c.nombre || c.id), 'Licencia SEDENA (portación de arma)', c.fecha_vencimiento_licencia_sedena, true);
+      _add(c.propietario_id, emp, 'Custodio', esc(c.nombre || c.id), 'Licencia SEDENA (portación de arma)', 'custodio', c.id, 'licencia_sedena', true);
     }
   });
 
   (patios || []).forEach(p => {
     const emp = p.propietario?.nombre || p.propietario_id;
-    _add(p.propietario_id, emp, 'Patio', esc(p.nombre || p.id), 'Permiso operativo', p.fecha_vencimiento_permiso, true);
+    _add(p.propietario_id, emp, 'Patio', esc(p.nombre || p.id), 'Permiso operativo', 'patio', p.id, 'permiso_patio', true);
   });
 
   (perfiles || []).forEach(p => {
-    _add(p.user_id, p.nombre, 'Empresa', p.nombre, 'Permiso SCT',      p.fecha_vencimiento_permiso_sct);
-    _add(p.user_id, p.nombre, 'Empresa', p.nombre, 'Seguro RC',         p.fecha_vencimiento_seguro_rc);
-    _add(p.user_id, p.nombre, 'Empresa', p.nombre, 'Seguro de carga',   p.fecha_vencimiento_seguro_carga);
+    _add(p.user_id, p.nombre, 'Empresa', p.nombre, 'Permiso SCT',     'perfil', p.user_id, 'permiso_sct');
+    _add(p.user_id, p.nombre, 'Empresa', p.nombre, 'Seguro RC',       'perfil', p.user_id, 'seguro_rc');
+    _add(p.user_id, p.nombre, 'Empresa', p.nombre, 'Seguro de carga', 'perfil', p.user_id, 'seguro_carga');
   });
 
   if (!items.length && !sinFecha.length) {
@@ -247,63 +275,59 @@ async function actualizarBadgeVigencias() {
   const limite = new Date(hoy);
   limite.setDate(limite.getDate() + DIAS_ALERTA);
   const limiStr = limite.toISOString().slice(0, 10);
-  // Para docs con vigencia virtual de 1 año (examen médico, tox, antecedentes)
-  // Expirado en 30 días si: exam_date + 365 <= hoy + 30 → exam_date <= hoy - 335
-  const anioAtras = new Date(hoy);
-  anioAtras.setDate(anioAtras.getDate() - (365 - DIAS_ALERTA));
-  const anioAtrasStr = anioAtras.toISOString().slice(0, 10);
   const uid = currentUser.id;
 
+  // H-04: aquí vivía la regla del catálogo copiada a mano —
+  //   anioAtras = hoy - (365 - DIAS_ALERTA)
+  // para simular que un examen vence al año. Con `vence_el` en la vista, el
+  // filtro es uno solo y el «12 meses» lo sigue diciendo el catálogo: si un día
+  // vale 24, esto no hay que tocarlo. Antes, con 365 escrito aquí, el badge
+  // habría seguido contando mal sin que nada fallara.
   const _f = (q, tabla) => {
     if (esSA) return q;
     return tabla === 'perfiles' ? q.eq('user_id', uid) : q.eq('propietario_id', uid);
   };
 
   try {
-    // Empresa query: admin ve sólo la suya; SA ve todas las empresas admin
-  let empQ;
-  if (esAdmin) {
-    empQ = sb.from('perfiles').select('user_id', { count: 'exact', head: true })
-      .eq('user_id', uid)
-      .or(`fecha_vencimiento_permiso_sct.lte.${limiStr},fecha_vencimiento_seguro_rc.lte.${limiStr},fecha_vencimiento_seguro_carga.lte.${limiStr}`);
-  } else if (esSA) {
-    empQ = sb.from('perfiles').select('user_id', { count: 'exact', head: true })
-      .eq('rol', 'admin')
-      .or(`fecha_vencimiento_permiso_sct.lte.${limiStr},fecha_vencimiento_seguro_rc.lte.${limiStr},fecha_vencimiento_seguro_carga.lte.${limiStr}`);
-  } else {
-    empQ = Promise.resolve({ count: 0 });
-  }
+    // Los documentos afectados, de una sola consulta. La vista ya aplica la RLS
+    // por usuario, así que la empresa recibe los suyos y el superadmin todos.
+    const vigQ = sb.from('vigencias_caducidad')
+      .select('entidad_tipo, entidad_id')
+      .eq('estado', 'vigente')
+      .lte('vence_el', limiStr);
 
-  const [camData, opData, cusData, { count: cPat }, empData] = await Promise.all([
-      // Camiones: único por id con cualquier doc vencido/próximo (solo aprobados/pendientes)
-      _f(sb.from('camiones').select('id')
-        .in('aprobacion', ['aprobada', 'pendiente'])
-        .or(`vigencia_caat.lte.${limiStr},fecha_vencimiento_tc.lte.${limiStr},fecha_vencimiento_seguro.lte.${limiStr},fecha_vencimiento_permiso_sct.lte.${limiStr},fecha_vencimiento_verificacion.lte.${limiStr}`)
-        .not('id', 'is', null), 'camiones'),
-      // Operadores: licencia, médico (1yr virtual), tox (1yr virtual), antecedentes (1yr virtual)
-      _f(sb.from('operadores').select('id')
-        .in('aprobacion', ['aprobada', 'pendiente'])
-        .or(`fecha_vencimiento.lte.${limiStr},fecha_examen_medico.lte.${anioAtrasStr},fecha_examen_toxicologico.lte.${anioAtrasStr},fecha_carta_antecedentes.lte.${anioAtrasStr}`)
-        .not('id', 'is', null), 'operadores'),
-      // Custodios: único por id — certificación o licencia SEDENA
-      _f(sb.from('custodios').select('id')
-        .in('aprobacion', ['aprobada', 'pendiente'])
-        .or(`fecha_vencimiento_cert.lte.${limiStr},fecha_vencimiento_licencia_sedena.lte.${limiStr}`)
-        .not('id', 'is', null), 'custodios'),
-      // Patios
-      _f(sb.from('patios').select('id', { count: 'exact', head: true })
-        .in('aprobacion', ['aprobada', 'pendiente'])
-        .lte('fecha_vencimiento_permiso', limiStr).not('fecha_vencimiento_permiso', 'is', null), 'patios'),
-      empQ,
-    ]);
+    // Y las entidades que cuentan. `vigencias` no sabe de `aprobacion`, y el
+    // badge nunca ha contado los recursos rechazados: sin esta intersección,
+    // los papeles de un camión rechazado empezarían a inflar el globo.
+    const [{ data: vigs }, { data: cams }, { data: ops }, { data: cuss }, { data: pats }, { data: perfs }] =
+      await Promise.all([
+        vigQ,
+        _f(sb.from('camiones').select('id').in('aprobacion', ['aprobada', 'pendiente']), 'camiones'),
+        _f(sb.from('operadores').select('id').in('aprobacion', ['aprobada', 'pendiente']), 'operadores'),
+        _f(sb.from('custodios').select('id').in('aprobacion', ['aprobada', 'pendiente']), 'custodios'),
+        _f(sb.from('patios').select('id').in('aprobacion', ['aprobada', 'pendiente']), 'patios'),
+        esAdmin || esSA
+          ? _f(sb.from('perfiles').select('user_id').eq('rol', 'admin'), 'perfiles')
+          : Promise.resolve({ data: [] }),
+      ]);
 
-    const camUniq = new Set((camData.data || []).map(c => c.id)).size;
-    const opUniq  = new Set((opData.data  || []).map(o => o.id)).size;
-    const cusUniq = new Set((cusData.data || []).map(c => c.id)).size;
-    const total   = camUniq + opUniq + cusUniq + (cPat || 0) + (empData.count || 0);
+    const vivas = {
+      camion:   new Set((cams  || []).map(x => x.id)),
+      operador: new Set((ops   || []).map(x => x.id)),
+      custodio: new Set((cuss  || []).map(x => x.id)),
+      patio:    new Set((pats  || []).map(x => x.id)),
+      perfil:   new Set((perfs || []).map(x => x.user_id)),
+    };
+
+    // Se cuentan RECURSOS afectados, no documentos: un camión con tres papeles
+    // vencidos es uno, como antes.
+    const afectados = new Set();
+    (vigs || []).forEach(v => {
+      if (vivas[v.entidad_tipo]?.has(v.entidad_id)) afectados.add(`${v.entidad_tipo}|${v.entidad_id}`);
+    });
 
     const badge = document.getElementById('home-vig-badge');
-    if (badge) badge.textContent = total > 0 ? total : '';
+    if (badge) badge.textContent = afectados.size > 0 ? afectados.size : '';
   } catch (_) {}
 }
 
