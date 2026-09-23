@@ -100,7 +100,23 @@ Esto comprueba la decisión del 2026-09-23: **el formulario sigue leyendo las
 columnas del operador**, que es donde escribe. Si salieran vacíos, se habría
 migrado de más.
 
-**No guardes nada.** Cierra el formulario.
+### Cómo salir sin guardar
+
+**No guardes nada.** Para salir se pulsa **«Limpiar»** — sí, ese botón; no hay
+ninguno que diga «Cancelar».
+
+**Limpiar es el cancelar, aunque no lo parezca.** Llama a
+`closeAgregarOperador()` ([js/operadores.js:274](../js/operadores.js)), que
+abandona la edición (`_operadorEditId = null`), vacía el formulario y devuelve el
+botón principal a «Enviar a aprobación». **No guarda nada, no borra nada del
+operador y no toca la base.** El operador se queda exactamente como estaba.
+
+> La etiqueta confunde porque está escrita para el modo *alta*, donde «Limpiar»
+> sí describe lo que hace. En modo edición el código **ya sabe** que está
+> editando —renombra el botón principal a «✏ Guardar cambios y enviar a
+> aprobación» ([js/operadores.js:183](../js/operadores.js))— pero al de al lado
+> le deja la etiqueta del otro modo. Anotado el 2026-09-23 durante esta prueba;
+> queda como propuesta, no se tocó.
 
 ---
 
