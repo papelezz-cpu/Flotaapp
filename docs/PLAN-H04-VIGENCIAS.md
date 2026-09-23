@@ -11,7 +11,7 @@ Plan por etapas. Escrito el 2026-09-18.
 | 3 · Doble escritura | **aplicada a pruebas** — espejo vivo |
 | 3b · Espejo tolerante | **aplicada a pruebas** |
 | 3c · El espejo sigue los borrados | **aplicada a pruebas**, y ejercitada a mano en el preview de `dev` |
-| 4 · Cambiar lecturas | **en marcha** — `catalogo.js` hecho (1 de 8) |
+| 4 · Cambiar lecturas | **completa** — falta probarla en el preview |
 | 5 · Guards | sin empezar |
 | 6 · Retirar columnas | fuera de este plan |
 
@@ -638,6 +638,65 @@ Los dos métodos no son idénticos, y esto es mejor saberlo que descubrirlo:
 JavaScript se desborda a marzo; Postgres ajusta al fin de mes. **La de Postgres
 es la defendible** para una caducidad. Ninguna fecha en pruebas cae en 29 de
 febrero, así que hoy no cambia nada.
+
+#### 4.8 — `aprobaciones.js`  ·  **HECHO el 2026-09-23**  ·  cierra la Etapa 4
+
+De sus ~48 líneas con coincidencia, se migraron **tres cosas** y se dejaron las
+demás, aplicando la decisión de los formularios:
+
+**Migrado (lecturas de consumo):**
+
+1. **`empresaComplianceMap`** — el aviso de «esta empresa tiene documentos
+   vencidos» en la cola de acuerdos.
+2. **`aprobarAcuerdo()`** — la misma comprobación al aprobar, que es la que de
+   verdad frena.
+3. **Las tarjetas de aprobación** de camión, operador, custodio y patio.
+
+**No migrado, y por qué:**
+
+- **El panel de documentos de empresa** (`docsEmpresa`, que enseña actual vs
+  propuesto): es leer-para-escribir. `aprobarDocsEmpresa()` promueve esas mismas
+  columnas `_pendiente` a las reales, así que lee de donde escribe.
+- **Los mapas de etiquetas de `_diffHtml`**: no son vigencias, son los nombres
+  de campo del diff contra `snapshot_anterior`.
+- **`fecha_vencimiento_pago`**: es un cobro.
+
+##### La cuarta copia de la regla del año
+
+En `_venceAnual()` vivía otra vez el `setFullYear(+1)`, y `_vence()` estaba
+**duplicada cuatro veces**, una por tarjeta. Las cinco desaparecen en una sola
+`_aprFilaVigencia()`, y con ella la lista de «cuáles son anuales»: ahora **lo
+decide el dato** — si la fecha capturada difiere de `vence_el`, se pinta
+«capturada → vence», y si no, solo la fecha.
+
+Recuento de la regla del año en el proyecto: estaba en `vigencias.js` (panel),
+en `vigencias.js` (badge, como `365 - DIAS_ALERTA`) y en `aprobaciones.js`
+(`_venceAnual`). **Ya no está en ninguno.**
+
+##### Medido contra pruebas
+
+- Compliance de empresa: coincide en las **3** empresas.
+- Tarjetas: **no había ningún recurso pendiente de aprobación**, así que la
+  comparación filtrada por `aprobacion = 'pendiente'` salía vacía y no probaba
+  nada. Se repitió contra **todos** los recursos, que es la misma lógica:
+  **98 celdas comparadas, 53 con fecha, 0 diferencias** — camiones, operadores
+  (incluidos los tres documentos de caducidad derivada), custodios y patios.
+
+##### Y otro `ReferenceError` que la medición no habría cazado
+
+Al quitar la consulta a `perfiles` de `aprobarAcuerdo()`, la línea del mensaje
+de confirmación seguía usando `ep.nombre`. `node --check` pasa, la comparación
+de consultas pasa, y el fallo solo habría salido al pulsar «Aprobar acuerdo»
+sobre una empresa con documentos vencidos. Es el segundo de esta etapa (el
+primero fue un bloque de llaves huérfano en `pedidos.js`) y la razón por la que
+el guion del preview no es trámite. El nombre pasa a salir de
+`oferta.admin_nombre`, que ya era el respaldo.
+
+##### Un cambio visible, a propósito
+
+Las etiquetas del operador dejan de decir «Examen médico **(1 año)**». La
+tarjeta ya muestra «08/08/2026 → vence 08/08/2027», que dice lo mismo y no puede
+quedarse mintiendo si el catálogo cambia.
 
 ##### La decisión que delimita el resto de la Etapa 4
 
