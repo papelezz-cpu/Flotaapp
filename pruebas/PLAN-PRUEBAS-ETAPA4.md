@@ -30,7 +30,7 @@ console.log(JSON.stringify({ base: sb.supabaseUrl,
 
 Tiene que decir `xskgnudiznryhgagxadu` (si dice `xnyqsewaluezkkrlyhxg` **estás en
 producción, para**), y las versiones tienen que ser **`pedidos.js?v=81`**,
-**`operadores.js?v=16`** y **`reservaciones.js?v=57`**. Si alguna es menor, el
+**`operadores.js?v=17`** y **`reservaciones.js?v=57`**. Si alguna es menor, el
 despliegue no ha llegado a tu navegador: vuelve a forzar recarga y no sigas.
 
 ---
@@ -102,21 +102,20 @@ migrado de más.
 
 ### Cómo salir sin guardar
 
-**No guardes nada.** Para salir se pulsa **«Limpiar»** — sí, ese botón; no hay
-ninguno que diga «Cancelar».
+**No guardes nada.** Pulsa **«Cancelar edición»**, el botón que está al lado de
+«✏ Guardar cambios y enviar a aprobación».
 
-**Limpiar es el cancelar, aunque no lo parezca.** Llama a
-`closeAgregarOperador()` ([js/operadores.js:274](../js/operadores.js)), que
-abandona la edición (`_operadorEditId = null`), vacía el formulario y devuelve el
-botón principal a «Enviar a aprobación». **No guarda nada, no borra nada del
-operador y no toca la base.** El operador se queda exactamente como estaba.
+Abandona la edición, vacía el formulario y **no guarda nada, no borra nada del
+operador y no toca la base**: el operador se queda exactamente como estaba.
 
-> La etiqueta confunde porque está escrita para el modo *alta*, donde «Limpiar»
-> sí describe lo que hace. En modo edición el código **ya sabe** que está
-> editando —renombra el botón principal a «✏ Guardar cambios y enviar a
-> aprobación» ([js/operadores.js:183](../js/operadores.js))— pero al de al lado
-> le deja la etiqueta del otro modo. Anotado el 2026-09-23 durante esta prueba;
-> queda como propuesta, no se tocó.
+> **Ese botón decía «Limpiar» hasta el 2026-09-23**, y se cambió a raíz de esta
+> misma prueba. La etiqueta estaba escrita para el modo *alta* —donde sí
+> describe lo que hace— y el código renombraba solo el botón principal al entrar
+> en edición, dejando el de al lado con la etiqueta del otro modo. Ahora se
+> renombran los dos, y al salir vuelve a decir «Limpiar».
+>
+> **Compruébalo de paso:** tras pulsarlo, el botón de la izquierda tiene que
+> volver a decir «Enviar a aprobación» y el de la derecha «Limpiar».
 
 ---
 

@@ -236,6 +236,12 @@ async function editarOperadorRechazado(id) {
   const btn = document.querySelector('#admin-content-operador .btn-add');
   if (btn) btn.textContent = 'Guardar correcciones y reenviar';
 
+  // El de al lado dice «Limpiar», que describe el alta y no la edición: aquí
+  // lo que hace es abandonarla. Se renombra por las dos puertas de entrada,
+  // porque editarOperadorAprobado() pasa por esta función.
+  const btnCancelar = document.querySelector('#admin-content-operador .btn-cancel');
+  if (btnCancelar) btnCancelar.textContent = 'Cancelar edición';
+
   // Scroll al formulario
   document.querySelector('#admin-content-operador .admin-card')
     ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -276,6 +282,8 @@ function closeAgregarOperador() {
   _prefillNumTrabajador();
   const btn = document.querySelector('#admin-content-operador .btn-add');
   if (btn) btn.textContent = 'Enviar a aprobación';
+  const btnCancelar = document.querySelector('#admin-content-operador .btn-cancel');
+  if (btnCancelar) btnCancelar.textContent = 'Limpiar';
   document.getElementById('admin-operadores-list')
     ?.closest('.admin-card')
     ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
