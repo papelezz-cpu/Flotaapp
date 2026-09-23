@@ -324,8 +324,11 @@ node -e "import('file:///C:/Users/Usuario/Documents/Flotaapp/pruebas/lib/api.mjs
   const {data}=await s.select('vigencias','select=id,tipo_documento,estado&entidad_tipo=eq.perfil&estado=eq.vigente&limit=1');
   if(!data?.length){console.log('  no hay ninguna vigente de perfil que probar');return;}
   const r=await s.update('vigencias','id=eq.'+data[0].id,{fecha_documento:'2099-01-01'});
-  console.log(r.ok? '  FALLA: la empresa movio la fecha de su documento acreditado — H-02 REABIERTO'
-                  : '  OK: rechazado, HTTP '+r.status+' '+(r.data?.message||''));});"
+  // r.ok solo dice que hubo HTTP 200 — con RLS eso pasa aun con 0 filas
+  // afectadas (ver CLAUDE.md, actualizarConfirmado). Hay que mirar r.data.
+  const cambio = r.ok && Array.isArray(r.data) && r.data.length > 0;
+  console.log(cambio ? '  FALLA: la empresa movio la fecha de su documento acreditado — H-02 REABIERTO'
+                  : '  OK: rechazado (0 filas afectadas), HTTP '+r.status+' '+(r.data?.message||''));});"
 ```
 
 Tiene que salir **rechazado**. Si sale `FALLA`, paramos todo: H-02 estaría

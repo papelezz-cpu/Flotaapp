@@ -2,22 +2,34 @@
 
 Plan por etapas. Escrito el 2026-09-18.
 
-**Estado al 2026-09-22:**
+**Estado al 2026-09-23:**
 
 | Etapa | |
 |---|---|
 | 1 · Crear | **aplicada a pruebas** |
 | 2 · Copiar | **aplicada a pruebas** — 63 filas |
 | 3 · Doble escritura | **aplicada a pruebas** — espejo vivo |
-| 3b · Espejo tolerante | **escrita y probada**, sin aplicar |
-| 3c · El espejo sigue los borrados | **escrita y probada en banco local**, sin aplicar |
-| 4 · Cambiar lecturas | sin empezar |
+| 3b · Espejo tolerante | **aplicada a pruebas** |
+| 3c · El espejo sigue los borrados | **aplicada a pruebas**, y ejercitada a mano en el preview de `dev` |
+| 4 · Cambiar lecturas | **en marcha** — `catalogo.js` hecho (1 de 8) |
 | 5 · Guards | sin empezar |
 | 6 · Retirar columnas | fuera de este plan |
 
-La tabla existe en pruebas con 63 filas y **nadie la lee todavía**: ninguna
-pantalla ha cambiado. **Producción no tiene ninguna de las tres** — llevarlas
-allí es una promoción aparte, con su propia autorización (Regla #2).
+**Producción no tiene ninguna** — llevarlas allí es una promoción aparte, con
+su propia autorización (Regla #2).
+
+El guion manual `pruebas/PLAN-PRUEBAS-ESPEJO.md` se corrió entero el
+2026-09-23 contra el preview de `dev`: siete pasos, espejo en verde (72 pares
+= 72 filas). Dos cosas que dejó por escrito y conviene no redescubrir:
+
+- **El total no llegó a 75 y está bien.** La tabla de totales del guion asume
+  una empresa sin documentos acreditados previos; la cuenta usada ya traía los
+  tres del clon de producción, así que el paso 6 los **actualizó en el sitio**
+  en vez de crear filas nuevas (+3 de la propuesta, −3 al acreditarla).
+- **El paso 7 daba un falso positivo.** Comprobaba `r.ok` del PATCH, y con RLS
+  eso sale verdadero aun con 0 filas afectadas — la trampa que CLAUDE.md
+  advierte para `actualizarConfirmado`. Corregido para mirar las filas
+  devueltas; con la comprobación buena, H-02 sigue cerrado.
 
 ---
 
@@ -331,6 +343,67 @@ En este orden, de menos a más superficie: `catalogo.js` (11) → `detalle.js` y
 `aprobaciones.js` (48).
 
 Las diez consultas de `js/vigencias.js` colapsan en una. Ese es el premio.
+
+#### 4.1 — `catalogo.js`  ·  **APLICADA A PRUEBAS el 2026-09-23**
+
+`supabase/migrations/20260923120000_vigencias_etapa4_catalogo_y_estricto.sql`.
+
+**Se tocaron cero líneas de `catalogo.js`, y no es un atajo.** Las 11
+apariciones que contó este plan no leen `perfiles`: pasan por la vista
+`empresas_publico`. Mover la lectura es repuntar la vista — misma columna,
+mismo nombre, mismo orden — y el JS recibe exactamente la misma forma de dato.
+El bloque de comprobación de la migración falla si la forma de la vista cambia,
+justo porque hay ficheros que no se tocaron y siguen pidiendo esas columnas por
+su nombre.
+
+Las tres fechas (`permiso_sct`, `seguro_rc`, `seguro_carga`) salen ahora de la
+fila **`vigente`** de `vigencias`. El número de permiso (`permiso_sct`, texto)
+no se movió: nunca entró al espejo.
+
+**Y aquí el espejo vuelve a ESTRICTO**, que era el recordatorio pendiente desde
+3b y 3c. A partir de esta migración una pantalla pública depende de `vigencias`,
+así que un reflejo que falle tumba la escritura de origen en vez de dejar una
+divergencia anotada.
+
+Probado en `pruebas/banco-local/h04-etapa4.sql`, cinco bloques, desde un banco
+rehecho con las cinco migraciones anteriores:
+
+- el superadmin acredita y el catálogo ve las tres fechas,
+- **la prueba decisiva**: se borra la fila del espejo sin tocar `perfiles`, y la
+  vista pasa a decir `NULL` — si siguiera leyendo `perfiles` seguiría enseñando
+  la fecha, y esta etapa sería decorativa,
+- una fila `pendiente` **no** asoma en el catálogo (H-02 por el lado de la
+  lectura),
+- con el espejo roto a propósito, la escritura de origen **falla entera** y no
+  queda a medias — exactamente lo contrario de lo que probaba la 3b,
+- `anon` sigue sin poder leer la vista y `authenticated` sí.
+
+Y se comprobó que la prueba **sabe fallar**: restaurada la vista vieja, el
+segundo bloque la caza nombrando el valor que devolvió.
+
+##### Lo que el banco local no podía probar, medido en pruebas
+
+En el banco todo corre como `postgres`, que se salta RLS. La pregunta que
+quedaba viva era la de verdad importante: **un cliente cualquiera no es dueño
+de esos documentos, y la RLS de `vigencias` solo deja leer al dueño y al
+superadmin.** Si la vista no se saltara eso, los distintivos desaparecerían
+justo para quien debe verlos.
+
+Medido el 2026-09-23 con la cuenta de cliente `Mario Silva` (rol `cliente`, no
+dueño), contra pruebas:
+
+| | Resultado |
+|---|---|
+| Tabla `vigencias`, lectura directa | **0 filas** — la RLS le tapa lo ajeno |
+| Vista `empresas_publico` | **3 empresas**, con las tres fechas de la acreditada |
+
+Las dos a la vez es lo que se buscaba: el dato sigue protegido en la tabla y el
+distintivo público llega igual. El mecanismo (`security_invoker = false`) se
+midió además en la vista gemela: la misma sesión lee `camiones` directo y
+obtiene **0 filas**, y por `camiones_publico` obtiene **las 5** de flota ajena.
+
+Y el espejo estricto **no bloquea la operación normal**: escritura real de una
+empresa sobre un camión con sus cinco fechas, HTTP 200 y el espejo intacto.
 
 ### Etapa 5 — Los guards
 

@@ -379,6 +379,26 @@ Consecuencia: un documento sin fecha no se vigila jamás. El papel está, nadie
 comprueba si sigue vigente, y el panel dice que todo está en orden. Por eso el
 alta de operador exige las cuatro fechas junto con sus documentos.
 
+#### El catálogo público ya lee la tabla `vigencias` (H-04, 2026-09-23)
+
+El distintivo que el cliente ve en el catálogo de proveedores («SCT ✓»,
+«Seg. RC ⛔ vencido», «✅ Docs al día») sale de la vista `empresas_publico`, y
+desde la Etapa 4 esa vista toma las tres fechas de la **fila `vigente` de
+`vigencias`**, no de las columnas de `perfiles`. Consecuencias de negocio:
+
+- **Una propuesta no acredita.** Solo cuenta la fila en estado `vigente`; una
+  en `pendiente` —lo que la empresa sube desde *Perfil de empresa → Enviar
+  documentos para aprobación*— no pinta ningún distintivo hasta que el
+  superadmin la acredita. Es la misma regla de H-02, ahora sostenida también
+  del lado de la lectura.
+- **El espejo de `vigencias` volvió a ser estricto.** Si el reflejo de un
+  documento falla, la escritura de origen falla entera y el usuario ve el
+  error: guardar un camión, dar de alta un operador o acreditar un perfil se
+  cae en vez de guardarse a medias. Durante las Etapas 3b y 3c era al revés
+  —se guardaba y la divergencia quedaba anotada—, y se cambió porque ya hay
+  una pantalla que depende de esa tabla: un fallo callado sería un distintivo
+  mal mostrado a un cliente.
+
 ### Una fecha de vigencia de camión no se puede vaciar desde la interfaz
 
 Verificado el 2026-09-22 leyendo el código, después de que un guion de pruebas
