@@ -463,6 +463,51 @@ Para poder medirlo se le puso licencia HAZMAT al operador de pruebas
 `OP-B54E541A` («Espejo Uno»), que queda vigente hasta 2028-03-15. Es dato
 sembrado, como el resto del guion manual.
 
+#### 4.4 — `operadores.js`  ·  **HECHO el 2026-09-23**
+
+De sus 15 líneas con coincidencia, solo **una** era lectura de consumo: la
+tarjeta que pinta «Licencia vence: … ⚠ vence en N días». Esa pasa a `vigencias`
+(`tipo_documento = 'licencia'`), con un `Map` por `entidad_id` construido en
+`renderAdminOperadores()` y pasado a `_operadorCardHTML(op, venceLicencia)`.
+
+Comparados los dos caminos contra pruebas, como empresa y como superadmin, con
+los tres casos que importan cubiertos: fecha nula (no pinta nada), fecha vencida
+(`OP-001`, 2026-08-08 → «⚠ vencida») y fechas futuras. Coinciden los 4
+operadores. El superadmin ve además los que no son suyos, que es la política
+`is_superadmin()` funcionando sobre la tabla nueva.
+
+##### La decisión que delimita el resto de la Etapa 4
+
+**Decisión del usuario, 2026-09-23: una lectura que rellena un formulario de
+edición NO se migra; se queda leyendo la columna donde ese formulario escribe.**
+
+El caso es `editarOperadorAprobado()`, que lee `op.fecha_examen_medico` para
+poner el valor en el campo y al guardar reescribe **esa misma columna**. Leer de
+`vigencias` y escribir en `operadores` sería leer de A para escribir en B: un
+viaje de ida y vuelta que solo puede introducir desajuste, y que además haría
+que cualquier divergencia del espejo se viera como un campo que «cambia solo» al
+abrir el formulario.
+
+Es coherente con lo ya decidido en la Etapa 3: **las escrituras no se mueven al
+cliente**, se quedan en las columnas viejas y el espejo las refleja.
+
+**Consecuencia para lo que queda** — clasificadas las apariciones por uso:
+
+| Fichero | líneas | payload de escritura | rellenan formulario | lecturas a migrar |
+|---|---|---|---|---|
+| `admin.js` | 36 | 19 | 20 | prácticamente ninguna |
+| `aprobaciones.js` | 48 | 13 | — | ~35 |
+| `pedidos.js` | 16 | 0 | 0 | 16 |
+| `vigencias.js` | 29 | 0 | 0 | 29 |
+
+**`admin.js` deja de ser el fichero grande de esta etapa**: casi todo lo suyo es
+escritura o relleno de formulario. El trabajo de verdad está en `vigencias.js`,
+`aprobaciones.js` y `pedidos.js`.
+
+**Lo que esta decisión NO cambia:** retirar las columnas viejas (Etapa 6) seguirá
+exigiendo mover también las escrituras. Ya era así antes de esta decisión, y
+sigue estando fuera de este plan.
+
 ### Etapa 5 — Los guards
 
 `guard_oferta_update` pasa a leer `vigencias`. **Con su propia prueba de que
