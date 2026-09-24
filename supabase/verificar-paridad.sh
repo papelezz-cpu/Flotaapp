@@ -186,12 +186,23 @@ dim acl_por_defecto <<'SQL'
 -- operador y la dimensión se reportaría como no_verificable. Es literalmente el
 -- mismo tropiezo que esta script ya documenta para `tgenabled`, unas líneas más
 -- arriba — se volvió a pisar al escribir esta dimensión.
+-- Solo las de `FOR ROLE postgres`, y la razón importa: son las que gobiernan
+-- los objetos que crean NUESTRAS migraciones, que corren como ese rol. Las de
+-- `supabase_admin` (el panel de Supabase) no se comparan porque **no se pueden
+-- igualar**: en Supabase `postgres` no es superusuario y no puede fijar los
+-- privilegios por omisión de otro rol de plataforma. Compararlas dejaría este
+-- sello en `diverge` para siempre, y un candado que nunca puede abrirse es un
+-- candado que la gente aprende a ignorar.
+--
+-- Para verlas todas, que es lo que hay que hacer si se sospecha de algo creado
+-- desde el panel:  bash supabase/ver-privilegios-por-omision.sh <proyecto>
 select coalesce(pg_get_userbyid(d.defaclrole), '?')||'|'||
        coalesce(nsp.nspname, '(todos)')||'|'||
        d.defaclobjtype::text||'|'||
        d.defaclacl::text
   from pg_default_acl d
-  left join pg_namespace nsp on nsp.oid = d.defaclnamespace;
+  left join pg_namespace nsp on nsp.oid = d.defaclnamespace
+ where d.defaclrole = 'postgres'::regrole;
 SQL
 
 dim extensiones <<'SQL'

@@ -134,7 +134,16 @@ conectar_a() {
     echo "Pega la cadena de conexión de $etiqueta."
     echo "  Supabase → proyecto → botón Connect → pestaña Session pooler → URI"
     echo "  (puerto 5432; el modo Transaction / 6543 no sirve para esto)"
-    preguntar "Cadena: " && CONN="$RESPUESTA"
+    # SIN ECO, y esto se pisó el 2026-09-24: la cadena CONTIENE la contraseña,
+    # y se pedía con `preguntar` a secas. Resultado: quedaba escrita en pantalla,
+    # sobrevivía en el scrollback y viajaba entera en cualquier copia de la
+    # salida — que es exactamente lo que estos guiones dicen evitar al no
+    # aceptarla como argumento. La contraseña suelta (más abajo) sí se pedía
+    # oculta desde el principio; esta vía, que es la que los guiones
+    # recomiendan, no. No se ve lo que se teclea: es lo correcto aquí.
+    echo "  (no se verá lo que pegues: la cadena lleva la contraseña dentro)"
+    preguntar_secreto "Cadena: " && CONN="$RESPUESTA"
+    echo
   fi
 
   if [ -z "$CONN" ]; then

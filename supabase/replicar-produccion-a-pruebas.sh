@@ -627,6 +627,48 @@ PORTGO_DB_URL_PROD="$PROD" PORTGO_DB_URL_PRUEBAS="$PRUE" bash "$AQUI/alinear-per
   | sed 's/^/   /' || echo "   ⚠ la alineación de permisos terminó con error"
 echo
 
+# ── 4b. Privilegios POR OMISIÓN ───────────────────────────────────────────
+# El paso 4 alinea los permisos de las funciones que EXISTEN. Esto arregla la
+# causa: lo que les pasará a los objetos que todavía no existen.
+#
+# Medido el 2026-09-24 con la dimensión nueva del verificador: pruebas tenía
+# `pg_default_acl` **vacío** para public y producción tenía seis filas. Con la
+# misma migración aplicada a los dos proyectos, las cinco funciones de H-04 y la
+# vista vigencias_caducidad salieron con `service_role` en producción y sin él en
+# pruebas. No lo dio la migración —no menciona service_role— lo dio el esquema.
+# Es el mismo síntoma que R-07 anotó el 2026-09-18 con reporte_kpis(), y el paso
+# 4 no lo cubre porque solo alinea lo que ya estaba cuando se replicó.
+#
+# Se fijan solo las de `FOR ROLE postgres`: son las que gobiernan lo que crean
+# las migraciones, que corren como ese rol. Las de `supabase_admin` NO se pueden
+# fijar —postgres no es superusuario en Supabase y no puede tocar los
+# privilegios por omisión de otro rol de plataforma—, así que esa diferencia se
+# queda y por eso el verificador tampoco la compara.
+#
+# Idempotente: ejecutarlo dos veces deja lo mismo.
+echo "── 4b/6 · Privilegios por omisión ──"
+if q "$PRUE" -q -v ON_ERROR_STOP=1 <<'SQL' >/dev/null 2>&1
+alter default privileges for role postgres in schema public grant all on tables    to authenticated;
+alter default privileges for role postgres in schema public grant all on tables    to service_role;
+alter default privileges for role postgres in schema public grant all on sequences to anon;
+alter default privileges for role postgres in schema public grant all on sequences to authenticated;
+alter default privileges for role postgres in schema public grant all on sequences to service_role;
+alter default privileges for role postgres in schema public grant all on functions to anon;
+alter default privileges for role postgres in schema public grant all on functions to authenticated;
+alter default privileges for role postgres in schema public grant all on functions to service_role;
+SQL
+then
+  echo "   ✓ los privilegios por omisión de postgres quedan como en producción"
+  echo "     (un objeto nuevo nacerá con los mismos permisos en las dos bases)"
+else
+  echo "   ⚠ no se pudieron fijar. La verificación lo dirá en la dimensión"
+  echo "     acl_por_defecto; sin esto, cada objeto nuevo divergirá."
+fi
+echo "   Nota: las de supabase_admin no se tocan —postgres no puede— así que un"
+echo "   objeto creado DESDE EL PANEL sigue naciendo distinto. Para verlas:"
+echo "     bash supabase/ver-privilegios-por-omision.sh pruebas"
+echo
+
 # ── 5. Extensiones (se informa, no se toca) ───────────────────────────────
 echo "── 5/6 · Extensiones ──"
 q "$PRUE" -Atq -c "
