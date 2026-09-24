@@ -1909,9 +1909,15 @@ async function confirmarDetallesServicio() {
 
   let mensajeFinal;
   if (res?.resultado === 'pendiente_docs') {
-    // La empresa tiene documentos vencidos: la RPC dejó el pedido esperando y
-    // ya avisó a los superadmins. El único caso que sigue pasando por ellos.
-    mensajeFinal = '✓ Acuerdo aceptado — la empresa tiene documentos vencidos, un administrador lo revisará antes de confirmar.';
+    // Hay documentos vencidos: la RPC dejó el pedido esperando y ya avisó a los
+    // superadmins. El único caso que sigue pasando por ellos.
+    //
+    // El motivo lo trae la RPC desde el guard, y desde el 2026-09-24 puede ser
+    // la empresa O el permiso hazmat de la unidad. Antes este texto decía «la
+    // empresa» fijo, y con la regla nueva mentiría la mitad de las veces.
+    mensajeFinal = res.motivo
+      ? `✓ Acuerdo aceptado — ${res.motivo}. Un administrador lo revisará antes de confirmar.`
+      : '✓ Acuerdo aceptado — hay documentos vencidos, un administrador lo revisará antes de confirmar.';
   } else {
     mensajeFinal = '✓ Acuerdo cerrado — ya tienes una reservación activa';
     if (res?.reserva_id && typeof _crearExpedienteAuto === 'function') {
@@ -2099,8 +2105,8 @@ async function openHacerOferta(pedidoId) {
       ? `⚠ No tienes camiones de tipo "${tipo}" disponibles. Solo puedes ofertar con la unidad del tipo solicitado.`
       : '⚠ No tienes camiones disponibles. Verifica el estado de tus unidades en el panel Admin.';
 
-    // H-04: las cinco caducidades de la unidad salen de `vigencias`, en una
-    // consulta para todas las unidades del select.
+    // H-04: las caducidades de la unidad salen de `vigencias`, en una consulta
+    // para todas las unidades del select.
     const vencePorCamion = {};
     if (recursos.length) {
       const { data: vigCam } = await sb.from('vigencias')
@@ -2113,10 +2119,29 @@ async function openHacerOferta(pedidoId) {
       });
     }
 
+    // Carga peligrosa: desde el 2026-09-24 `guard_oferta_update` RECHAZA cerrar
+    // el trato si la unidad no tiene permiso de materiales peligrosos vigente,
+    // y ahí un permiso ausente cuenta igual que uno vencido. Se filtra aquí por
+    // el mismo motivo que ya se filtraba el chofer: ofertar con una unidad que
+    // el guard va a rechazar es gastar una oferta y descubrirlo al cerrar.
+    if (esCargaPeligrosa) {
+      const hoyHaz = today();
+      const conPermiso = recursos.filter(c => {
+        const f = (vencePorCamion[c.id] || {}).permiso_peligrosa;
+        return f && f >= hoyHaz;
+      });
+      if (!conPermiso.length && recursos.length) {
+        sinRecursosMsg = '⚠ Este pedido es de carga peligrosa y ninguna de tus unidades del tipo solicitado tiene permiso de materiales peligrosos vigente. Actualízalo en Mis unidades para poder ofertar.';
+      }
+      recursos = conPermiso;
+    }
+
     const CAMION_EMOJI = { Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️' };
     select.innerHTML = recursos.length
       ? `<option value="">— Selecciona un camión —</option>`
-      : `<option value="">Sin camiones disponibles</option>`;
+      : esCargaPeligrosa
+        ? `<option value="">Sin camiones con permiso hazmat vigente</option>`
+        : `<option value="">Sin camiones disponibles</option>`;
     recursos.forEach(c => {
       const vig = vencePorCamion[c.id] || {};
       const opt = document.createElement('option');
@@ -2127,6 +2152,7 @@ async function openHacerOferta(pedidoId) {
       opt.dataset.venceSct       = vig.permiso_sct_unidad  || '';
       opt.dataset.venceCaat      = vig.caat                || '';
       opt.dataset.venceVerif     = vig.verificacion        || '';
+      opt.dataset.vencePeligrosa = vig.permiso_peligrosa   || '';
       opt.textContent = `${CAMION_EMOJI[c.tipo] || '🚛'} ${c.id} — ${c.tipo} (${c.capacidad} ton)`;
       select.appendChild(opt);
     });
@@ -2191,6 +2217,11 @@ async function openHacerOferta(pedidoId) {
         if (selOpt?.dataset.venceSct    && selOpt.dataset.venceSct    < hoy) vencidos.push('Permiso SCT');
         if (selOpt?.dataset.venceCaat   && selOpt.dataset.venceCaat   < hoy) vencidos.push('CAAT');
         if (selOpt?.dataset.venceVerif  && selOpt.dataset.venceVerif  < hoy) vencidos.push('Verificación vehicular');
+        // Solo se nombra en los pedidos de carga peligrosa, que son los únicos
+        // donde el guard lo mira. En los demás, un permiso hazmat caducado no
+        // afecta al trato y mencionarlo sería alarmar por nada.
+        if (esCargaPeligrosa && selOpt?.dataset.vencePeligrosa
+            && selOpt.dataset.vencePeligrosa < hoy) vencidos.push('Permiso de materiales peligrosos');
         recursoWarn.textContent = vencidos.length
           ? `⚠ Esta unidad tiene documentos vencidos: ${vencidos.join(', ')}. El cliente podría rechazar la oferta.`
           : '';

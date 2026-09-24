@@ -1115,12 +1115,22 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
     inexistente contando igual que uno vencido
     (`20260924150000_hazmat_del_camion_frena_el_trato.sql`).
 
-    **Lo que sigue pendiente de este hueco** es que el documento se *vea*:
-    añadir `permiso_peligrosa` al bloque de camiones de `js/vigencias.js` y a
-    las cinco caducidades que alimentan el aviso de «esta unidad tiene
-    documentos vencidos» al ofertar. Hasta que eso entre, el permiso frena el
-    trato pero **no aparece en ninguna pantalla**, así que la empresa descubre
-    el problema al cerrarlo y no antes.
+    **Y CERRADO DEL TODO el mismo día**, con las cuatro pantallas:
+
+    - **Panel de Vigencias**: `permiso_peligrosa` se lista, y es obligatorio
+      **solo en las unidades que declaran mover carga peligrosa** — en las demás
+      no tenerlo no es un hueco, y listarlo sería ruido en 10 de 13.
+    - **Al ofertar**: si el pedido es de carga peligrosa, el desplegable **filtra
+      las unidades sin permiso vigente**, igual que ya filtraba los choferes sin
+      licencia HAZMAT. Medido el 2026-09-24 en pruebas: para el pedido hazmat
+      sembrado, el select pasó de ofrecer 2 Tortons a ofrecer 0, porque ninguno
+      tiene permiso. Es la regla funcionando: el guard habría rechazado el trato
+      igual al cerrarlo, y así se sabe antes de gastar la oferta.
+    - **Al aprobar el acuerdo**: el superadmin ve el permiso de la unidad en la
+      lista de documentos vencidos. Sin eso forzaba a ciegas — el pedido llegaba
+      a su cola por un motivo que su pantalla no nombraba.
+    - **El mensaje al cliente** usa el `motivo` que devuelve la RPC en vez de
+      decir «la empresa» fijo.
 
 ---
 
