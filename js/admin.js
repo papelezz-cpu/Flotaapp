@@ -298,6 +298,24 @@ async function solicitarActualizacionDocs() {
     showToast('Ingresa al menos una fecha de vencimiento', 'error'); return;
   }
 
+  // Y cada papel con la suya. La comprobación de arriba pide «al menos una»,
+  // así que hasta el 2026-09-24 se podía adjuntar el seguro RC con la fecha del
+  // permiso SCT puesta y el RC quedaba sin vigilar: `js/vigencias.js` filtra por
+  // fecha y un documento sin ella no aparece nunca en el panel.
+  //
+  // Decisión del usuario, 2026-09-24: exigir la fecha al subir el papel.
+  const _paresPerfil = [
+    { fileEl:'pe-doc-sct',   fecha:sctDate,   label:'el permiso SCT' },
+    { fileEl:'pe-doc-rc',    fecha:rcDate,    label:'el seguro RC' },
+    { fileEl:'pe-doc-carga', fecha:cargaDate, label:'el seguro de carga' },
+  ];
+  for (const p of _paresPerfil) {
+    if (document.getElementById(p.fileEl)?.files?.[0] && !p.fecha) {
+      showToast(`Adjuntaste ${p.label} pero falta su fecha de vencimiento. Sin ella el documento no se vigila en Vigencias.`, 'error');
+      return;
+    }
+  }
+
   const _done = _btnLoading('btn-solicitar-docs');
   const uid = currentUser.id;
   const ts  = Date.now();
@@ -522,9 +540,27 @@ async function guardarEdicion() {
     { dateEl:'editar-vence-verificacion', fileEl:'editar-doc-verificacion', dateCol:'fecha_vencimiento_verificacion', docCol:'doc_verificacion', label:'verificación vehicular' },
   ];
 
+  // La regla va en las dos direcciones, y hasta el 2026-09-24 solo iba en una.
+  //
+  //   fecha sin papel  -> ya se bloqueaba: no se acredita una vigencia sin
+  //                       enseñar el documento renovado.
+  //   papel sin fecha  -> NO se bloqueaba, y es el caso que deja el control
+  //                       sin vigilar: `js/vigencias.js` filtra por fecha, así
+  //                       que un documento sin ella no aparece jamás en el
+  //                       panel. El papel está, nadie comprueba si sigue
+  //                       vigente, y el panel dice que todo está en orden.
+  //
+  // Decisión del usuario, 2026-09-24: exigir la fecha al subir el papel. En
+  // producción había 14 documentos así; esto evita que el número crezca (los que
+  // ya existen no se pueden rellenar inventando fechas).
   for (const v of vigDocs) {
     const file        = document.getElementById(v.fileEl)?.files?.[0];
-    const dateChanged = (g(v.dateEl) || '') !== (anterior?.[v.dateCol] || '');
+    const fechaAhora  = g(v.dateEl) || '';
+    const dateChanged = fechaAhora !== (anterior?.[v.dateCol] || '');
+    if (file && !fechaAhora) {
+      showToast(`Adjuntaste el documento de ${v.label} pero falta su fecha de vencimiento. Sin ella no se vigila en Vigencias.`, 'error');
+      return;
+    }
     if (file) {
       const ext  = file.name.split('.').pop();
       const path = `${propietarioId}/${id}/${v.docCol}_${Date.now()}.${ext}`;
@@ -901,6 +937,31 @@ async function agregarCamion() {
   }
   if (esHazmat && !g('admin-vence-peligrosa')) {
     _done(); showToast('Indica la fecha de vencimiento del permiso de carga peligrosa', 'error'); return;
+  }
+
+  // Un papel sin su fecha no se vigila jamás: `js/vigencias.js` filtra por
+  // fecha, así que el documento queda cargado, nadie comprueba si sigue vigente
+  // y el panel dice que todo está en orden. El alta exigía los tres documentos
+  // y ninguna de sus fechas, y de ahí salieron los 14 documentos sin vencimiento
+  // que la Etapa 2 de H-04 hizo visibles.
+  //
+  // Decisión del usuario, 2026-09-24: exigir la fecha al subir el papel.
+  //
+  // El CAAT y la verificación no entran: el alta pide sus fechas y NO su
+  // archivo, así que aquí no hay par que emparejar (sus documentos se suben
+  // desde el formulario de edición, que sí valida los dos sentidos).
+  const _paresAlta = [
+    { fileEl:'admin-doc-tc',        dateEl:'admin-vence-tc',          label:'la tarjeta de circulación' },
+    { fileEl:'admin-doc-seguro',    dateEl:'admin-vence-seguro',      label:'la póliza de seguro' },
+    { fileEl:'admin-doc-sct',       dateEl:'admin-vence-permiso-sct', label:'el permiso SCT' },
+    { fileEl:'admin-doc-peligrosa', dateEl:'admin-vence-peligrosa',   label:'el permiso de materiales peligrosos' },
+  ];
+  for (const p of _paresAlta) {
+    if (document.getElementById(p.fileEl)?.files?.[0] && !g(p.dateEl)) {
+      _done();
+      showToast(`Falta la fecha de vencimiento de ${p.label}. Sin ella el documento no se vigila en Vigencias.`, 'error');
+      return;
+    }
   }
 
   const prefijos = {

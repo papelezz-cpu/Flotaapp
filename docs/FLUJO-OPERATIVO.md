@@ -389,8 +389,30 @@ superadmin lo compare.
 **Un campo nulo no entra nunca en esa comparación.**
 
 Consecuencia: un documento sin fecha no se vigila jamás. El papel está, nadie
-comprueba si sigue vigente, y el panel dice que todo está en orden. Por eso el
-alta de operador exige las cuatro fechas junto con sus documentos.
+comprueba si sigue vigente, y el panel dice que todo está en orden.
+
+#### Todo papel se sube con su fecha (decisión del usuario, 2026-09-24)
+
+La regla ya iba en un sentido —**no se acredita una vigencia sin enseñar el
+documento**, el candado de [js/admin.js:534](../js/admin.js)— y ahora va en los
+dos: **adjuntar un papel sin su fecha de vencimiento queda rechazado**, en los
+cinco sitios donde se podía:
+
+| Formulario | Qué exigía antes | Qué exige ahora |
+|---|---|---|
+| Alta de camión | los papeles de TC, SCT y seguro; **ninguna de sus fechas** | la fecha de cada papel que se adjunte |
+| Edición de camión | fecha ⇒ papel | y también papel ⇒ fecha |
+| Perfil de empresa | «al menos una fecha» de las tres | la fecha de cada documento que se adjunte |
+| Alta de operador | las cuatro fechas | y también la de la licencia hazmat, si se adjunta |
+
+De ahí salían los **14 documentos con papel y sin vencimiento** que la Etapa 2
+de H-04 hizo visibles: el alta de camión pedía tres documentos obligatorios y
+ninguna de sus fechas.
+
+> ⚠ **Esto no arregla los 14 que ya existen.** No se pueden rellenar inventando
+> fechas: es el dato que después alguien mira para decidir si una unidad puede
+> trabajar. Siguen ahí hasta que alguien los complete con el papel delante. La
+> regla nueva evita que el número crezca.
 
 #### El catálogo público ya lee la tabla `vigencias` (H-04, 2026-09-23)
 
