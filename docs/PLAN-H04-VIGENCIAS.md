@@ -11,7 +11,7 @@ Plan por etapas. Escrito el 2026-09-18.
 | 3 · Doble escritura | **aplicada a pruebas** — espejo vivo |
 | 3b · Espejo tolerante | **aplicada a pruebas** |
 | 3c · El espejo sigue los borrados | **aplicada a pruebas**, y ejercitada a mano en el preview de `dev` |
-| 4 · Cambiar lecturas | **completa** — falta probarla en el preview |
+| 4 · Cambiar lecturas | **completa y probada en el preview** |
 | 5 · Guards | sin empezar |
 | 6 · Retirar columnas | fuera de este plan |
 
@@ -697,6 +697,43 @@ el guion del preview no es trámite. El nombre pasa a salir de
 Las etiquetas del operador dejan de decir «Examen médico **(1 año)**». La
 tarjeta ya muestra «08/08/2026 → vence 08/08/2027», que dice lo mismo y no puede
 quedarse mintiendo si el catálogo cambia.
+
+#### 4.9 — Probado en el preview  ·  **TODO EN VERDE el 2026-09-24**
+
+[pruebas/PLAN-PRUEBAS-ETAPA4-B.md](../pruebas/PLAN-PRUEBAS-ETAPA4-B.md), los tres
+pasos ejecutables. Los números que el panel pintó coinciden con los calculados,
+uno por uno:
+
+| | Esperado | Visto |
+|---|---|---|
+| Globo del superadmin | 3 | 3 |
+| Champi | 6 vencidos | 6 |
+| Salvador Corona Silva | 2 próximos | 2 |
+| Sin fecha (Champi / Omar / sin nombre) | 10 / 12 / 7 | igual |
+| Empresa: vencidos y próximos | ninguno | ninguno |
+| Empresa: sin fecha | 12 | 12 |
+
+**Y la confirmación que más valía:** la empresa **no ve** los 6 documentos
+vencidos de Champi ni los 2 de Salvador. Es la fuga que `security_invoker = true`
+impide, probada aquí con datos reales y con los dos roles — no solo en el banco.
+
+##### Dos fallos que salieron de ejecutar, no de medir
+
+1. **El globo de Vigencias no se veía, y llevaba así desde que se creó el
+   panel.** `.hc-badge` nace con `display:none` en el CSS, y
+   `actualizarBadgeVigencias()` era **el único de los seis globos de la portada**
+   que escribía el número sin tocar `display`. La consola lo zanjó en un paso:
+   `textoActual: "3"` con el elemento presente y la consulta devolviendo los 3
+   recursos correctos — el dato estaba bien y el número estaba dentro del
+   elemento, invisible. **No era regresión de esta etapa**: el único commit que
+   había tocado ese globo es el que creó el panel. Arreglado en `?v=6`.
+2. **Los recursos sin propietario**, que el panel agrupa bajo una empresa sin
+   nombre. Resultó no ser cosmético: ver el hueco 9 de
+   [FLUJO-OPERATIVO.md](FLUJO-OPERATIVO.md).
+
+Con los dos anteriores (el bloque huérfano en `pedidos.js` y el `ep.nombre` en
+`aprobaciones.js`), esta etapa deja **cuatro fallos que ninguna comparación de
+consultas podía ver**. Es el argumento entero a favor de ejecutar el guion.
 
 ##### La decisión que delimita el resto de la Etapa 4
 
