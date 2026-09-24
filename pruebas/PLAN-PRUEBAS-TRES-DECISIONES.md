@@ -120,11 +120,21 @@ la mayoría de los tratos del sistema.
 **Esta es la parte que solo se puede probar a mano.** Cuatro formularios, y en
 todos el resultado esperado es **un rechazo con mensaje**, sin guardar nada.
 
+**Dónde está todo esto.** Entra como **empresa** y pulsa la tarjeta **Mis
+unidades** («Gestiona tu flota de camiones») en la portada. Esa pantalla tiene
+las pestañas de recursos y, dentro de la de camiones, **dos cosas en la misma
+página**: arriba la tarjeta **➕ Agregar unidad** (el alta, paso *a*) y más abajo
+la lista de tus unidades con su botón **✏ Editar** (paso *b*). El **Perfil de
+empresa** (paso *c*) es otra tarjeta de esa misma pantalla, con el encabezado
+**🏢 Perfil de empresa** y un **▼ Editar** a la derecha que hay que pulsar para
+desplegarla. Los **Operadores** (paso *d*) son otra tarjeta de la portada.
+
 ### a) Alta de camión
 
-**Mis unidades → dar de alta.** Llena lo obligatorio (tipo, capacidad, placas),
-adjunta las fotos que pida y **la Tarjeta de Circulación**, pero **deja vacía su
-fecha de vencimiento**. Guarda.
+**Mis unidades → tarjeta ➕ Agregar unidad.** Llena lo obligatorio (tipo,
+capacidad, placas), adjunta las fotos que pida y **la Tarjeta de Circulación**,
+pero **deja vacío el campo «Fecha de vencimiento TC»**. Pulsa
+**➕ Enviar a aprobación**.
 
 **Debe pasar:**
 
@@ -139,8 +149,13 @@ fecha de vencimiento**. Guarda.
 
 ### b) Edición de camión
 
-Edita un camión que tenga **algún campo de fecha vacío** —por ejemplo la
-verificación vehicular— y **adjunta ese documento dejando la fecha en blanco**.
+Usa **`R-A330E825`**, **`S-965A48AE`** o **`T-46BC79F9`**: medido el 2026-09-24,
+esos tres tienen **las cinco fechas vacías**, así que cualquiera sirve. *(No uses
+`T-629F701C`: ese las tiene todas puestas y no dispararía nada.)*
+
+**Mis unidades → ✏ Editar** en uno de esos tres → en «Vencimiento verificación
+vehicular» **deja la fecha vacía** y **adjunta el documento** de verificación.
+Guarda.
 
 **Debe pasar:**
 
@@ -153,9 +168,15 @@ verificación vehicular— y **adjunta ese documento dejando la fecha en blanco*
 
 ### c) Perfil de empresa
 
-**Mis unidades → Perfil de empresa → Documentos legales.** Adjunta **el
-documento del Seguro RC** y **deja su fecha vacía**, pero pon una fecha en el
-Permiso SCT. Pulsa **Enviar documentos para aprobación**.
+**Mis unidades → tarjeta 🏢 Perfil de empresa → ▼ Editar** para desplegarla →
+baja hasta **📋 Documentos legales**. Adjunta **el documento del Seguro RC**
+dejando **vacío** su campo «Seguro RC — vencimiento», y pon una fecha cualquiera
+en «Permiso SCT — vencimiento» (hace falta al menos una para pasar la validación
+vieja). Pulsa **📤 Enviar documentos para aprobación**.
+
+> **No pulses «💾 Guardar perfil»**: ese botón es de los datos generales y no
+> toca los documentos. El que importa está más abajo, después de los campos de
+> fecha.
 
 **Debe pasar:**
 
@@ -167,8 +188,11 @@ Permiso SCT. Pulsa **Enviar documentos para aprobación**.
 
 ### d) Alta de operador
 
-**Operadores → dar de alta.** Llena las cuatro fechas que ya exigía, y además
-**adjunta la licencia de materiales peligrosos dejando su fecha vacía**.
+**Portada → tarjeta Operadores** («Personal de conducción») → el formulario de
+alta está arriba de la lista. Llena nombre y las **cuatro fechas** que ya
+exigía —examen médico, toxicológico, carta de antecedentes y vencimiento de
+licencia—, y además **adjunta la licencia de materiales peligrosos dejando vacío
+su campo de fecha**. Pulsa **Enviar a aprobación**.
 
 **Debe pasar:**
 
