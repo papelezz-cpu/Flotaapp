@@ -211,7 +211,7 @@ async function renderVigencias() {
       for (const [empId, grupo] of Object.entries(sinFechaPorEmp)) {
         const uid_safe = empId.replace(/[^a-z0-9]/gi, '');
         html += `
-          <div class="vig-empresa-card" style="opacity:0.75">
+          <div class="vig-empresa-card">
             <div class="vig-empresa-header" onclick="toggleVigEmpresa('sf-${uid_safe}')">
               <div class="vig-empresa-name">🏢 ${esc(grupo.nombre)}</div>
               <div class="vig-empresa-badges"><span class="vig-badge" style="background:var(--bg-muted);color:var(--text-muted)">📋 ${grupo.items.length} sin fecha</span></div>
@@ -219,12 +219,12 @@ async function renderVigencias() {
             </div>
             <div class="vig-empresa-items" id="vig-items-sf-${uid_safe}" style="display:none">
               ${grupo.items.map(sf => `
-                <div class="vig-item" style="border-left:3px solid var(--text-muted)">
+                <div class="vig-item vig-item--sinfecha">
                   <div class="vig-item-left">
                     <div class="vig-item-nombre">${_VIG_EMOJI[sf.tipo] || '📄'} ${esc(sf.nombre)}</div>
                     <div class="vig-item-doc">${esc(sf.tipo)} · ${esc(sf.docLabel)}</div>
                   </div>
-                  <div class="vig-item-right"><div class="vig-item-dias" style="color:var(--text-muted)">Sin fecha</div></div>
+                  <div class="vig-item-right"><div class="vig-item-dias vig-item-dias--sinfecha">Sin fecha</div></div>
                 </div>`).join('')}
             </div>
           </div>`;
@@ -232,12 +232,12 @@ async function renderVigencias() {
     } else {
       html += `<div class="vig-seccion-title" style="margin-top:${items.length ? '28px' : '0'};color:var(--text-muted)">⚠ Documentos sin fecha registrada (${sinFecha.length})</div>`;
       html += sinFecha.map(sf => `
-        <div class="vig-item" style="border-left:3px solid var(--text-muted)">
+        <div class="vig-item vig-item--sinfecha">
           <div class="vig-item-left">
             <div class="vig-item-nombre">${_VIG_EMOJI[sf.tipo] || '📄'} ${esc(sf.nombre)}</div>
             <div class="vig-item-doc">${esc(sf.tipo)} · ${esc(sf.docLabel)}</div>
           </div>
-          <div class="vig-item-right"><div class="vig-item-dias" style="color:var(--text-muted)">Sin fecha</div></div>
+          <div class="vig-item-right"><div class="vig-item-dias vig-item-dias--sinfecha">Sin fecha</div></div>
         </div>`).join('');
     }
   }
