@@ -173,6 +173,7 @@ Vigencias · Mi desempeño · Cobros · Privacidad · Avisos.
 | Ofertar con permiso SCT o seguros vencidos | `openHacerOferta`, y de nuevo `guard_oferta_update` |
 | Aceptar su propia oferta, salvo respondiendo una contraoferta | `guard_oferta_update` |
 | Asignar a carga peligrosa un chofer sin licencia vigente | `guard_operador_hazmat` |
+| **Cerrar un trato de carga peligrosa con una unidad sin permiso hazmat vigente** | `guard_oferta_update` — y aquí «sin permiso» cuenta igual que «vencido» |
 | Avanzar el seguimiento de un camión sin chofer asignado | La interfaz, en el primer paso |
 | Subir evidencia antes del último paso del seguimiento | La interfaz |
 | Aprobar el cierre de su propio servicio | `guard_reservacion_update` |
@@ -532,12 +533,24 @@ tres escrituras sueltas y la pestaña podía cerrarse entre una y otra. La regla
 históricas, no porque el flujo actual las genere.
 
 **La excepción son los documentos vencidos.** `guard_oferta_update` bloquea la
-aceptación con `DOCUMENTOS_VENCIDOS` si la empresa que emitió la oferta tiene
-vencido el permiso SCT, el seguro RC o el seguro de carga. **Desde H-04 etapa 5
-eso se mide sobre la tabla `vigencias`, en estado `vigente`**: una renovación
-que la empresa haya subido y el superadmin no haya acreditado **no desbloquea
-nada**. Y un documento con papel pero sin fecha sigue sin bloquear, porque sigue
-sin vigilarse. Entonces:
+aceptación con `DOCUMENTOS_VENCIDOS` en **dos casos**:
+
+1. **La empresa** que emitió la oferta tiene vencido el permiso SCT, el seguro
+   RC o el seguro de carga. **Desde H-04 etapa 5 eso se mide sobre la tabla
+   `vigencias`, en estado `vigente`**: una renovación que la empresa haya subido
+   y el superadmin no haya acreditado **no desbloquea nada**. Un documento con
+   papel pero sin fecha sigue sin bloquear, porque sigue sin vigilarse.
+2. **El pedido es de carga peligrosa y la unidad ofertada no tiene permiso de
+   materiales peligrosos vigente** (desde el 2026-09-24,
+   `20260924150000_hazmat_del_camion_frena_el_trato.sql`). Aquí la regla es
+   **más estricta a propósito: un permiso que no existe bloquea igual que uno
+   vencido**, porque el alta ya lo exige y solo le alcanza a unidades
+   heredadas. Solo se aplica si el recurso ofertado es de verdad un camión —
+   `ofertas.camion_id` puede guardar un custodio o un patio, y sin esa
+   comprobación un servicio de custodia para carga peligrosa quedaría bloqueado
+   sin motivo.
+
+En los dos casos, entonces:
 
 ```
 → pedido 'pendiente_acuerdo', aviso al superadmin
@@ -546,6 +559,12 @@ sin vigilarse. Entonces:
 
 Ese control **avisa pero no encierra**: sin la salida del superadmin, una
 empresa con un papel vencido quedaría atrapada sin forma de desbloquearse.
+
+**Y el aviso dice cuál de los dos casos fue.** La RPC copia el motivo que trae
+el guard —sin el prefijo técnico— al mensaje que reciben los superadmins y al
+`motivo` que devuelve al cliente. Antes decía «pero la empresa tiene documentos
+vencidos», fijo: con la regla del camión eso habría mandado al superadmin a
+revisar los papeles equivocados la mitad de las veces.
 
 ### La unidad ocupada
 
@@ -801,7 +820,7 @@ escribir una fila; los guards deciden *qué transición* es legal para ti.
 | Guard | Sobre | Qué impide |
 |---|---|---|
 | `guard_pedido_update` | pedidos | Que un cliente marque `acordado`/`rechazado` sin pasar por el flujo; que un admin toque un pedido fuera de negociación |
-| `guard_oferta_update` | ofertas | Aceptar con documentos vencidos; aceptar la oferta propia salvo respondiendo una contraoferta |
+| `guard_oferta_update` | ofertas | Aceptar con documentos de empresa vencidos; **aceptar un pedido de carga peligrosa con una unidad sin permiso hazmat vigente**; aceptar la oferta propia salvo respondiendo una contraoferta |
 | `guard_reservacion_insert` | reservaciones | Que un cliente se cree una reserva ya confirmada y con precio puesto por él |
 | `guard_reservacion_update` | reservaciones | Que el cliente toque precio, unidad o fechas; que suba la evidencia de la empresa; que cualquiera de los dos apruebe su propio cierre o resuelva su propia cancelación — eso lo hace el superadmin |
 | `guard_fleet_resource_update` | flota | Auto-aprobarse un recurso; transferir la propiedad |
@@ -1090,11 +1109,18 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
     ignora, que es el mismo patrón que el hueco 6 describe para las fechas
     nulas.
 
-    Arreglarlo es pequeño: añadir `permiso_peligrosa` al bloque de camiones de
-    `js/vigencias.js` y a las cinco caducidades que alimentan el aviso de
-    unidad. **No se hizo**, porque decidir si un permiso hazmat vencido debe
-    frenar un trato —como frena el de la empresa— es una decisión de producto,
-    no un arreglo.
+    **CERRADO EN PARTE el 2026-09-24.** Decisión del usuario: *«se debe frenar
+    el trato»*. `guard_oferta_update` ya bloquea aceptar un pedido de carga
+    peligrosa cuando la unidad ofertada no tiene permiso vigente, con un permiso
+    inexistente contando igual que uno vencido
+    (`20260924150000_hazmat_del_camion_frena_el_trato.sql`).
+
+    **Lo que sigue pendiente de este hueco** es que el documento se *vea*:
+    añadir `permiso_peligrosa` al bloque de camiones de `js/vigencias.js` y a
+    las cinco caducidades que alimentan el aviso de «esta unidad tiene
+    documentos vencidos» al ofertar. Hasta que eso entre, el permiso frena el
+    trato pero **no aparece en ninguna pantalla**, así que la empresa descubre
+    el problema al cerrarlo y no antes.
 
 ---
 
