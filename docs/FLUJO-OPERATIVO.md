@@ -487,6 +487,41 @@ Consecuencia práctica: **una solicitud con fecha pasada no se puede crear desde
 la app**, ni siquiera para probar. Hay que crearla con la fecha más temprana
 que admita y retrasarla luego por SQL, apartando `trg_guard_pedido_update`.
 
+### Lo que el cliente ve en «Solicitudes», y qué filtra el filtro
+
+La pantalla del cliente son **cuatro secciones**, en este orden, y salen de
+`renderPedidos()` en [js/pedidos.js](../js/pedidos.js):
+
+| Sección | Qué lleva |
+|---|---|
+| Mis negociaciones | las propias en `en_negociacion` o `pendiente_acuerdo` — las que piden que el cliente haga algo |
+| Mis solicitudes | el resto de las propias activas: `abierto`, `pendiente_revision`, `rechazado` |
+| Otras solicitudes activas | los `abierto` **de otros clientes**, en modo lectura (`'publico'`) |
+| Historial | las propias en `acordado`, `cancelado`, `finalizado`, `expirado` |
+
+**El cliente ve las solicitudes abiertas de los demás clientes, a propósito.**
+No es una fuga: `ped_select` deja leer todo pedido en `abierto` a cualquier
+autenticado, y la sección existe para que el cliente vea qué se está moviendo.
+Se pinta con la plantilla `'publico'`, que no entra en ninguna de las ramas de
+botones de `pedidoCardHTML()` —así que la tarjeta no lleva ninguna acción— y
+además **oculta el conteo de ofertas**: la etiqueta dice `Abierta` a secas, no
+«N ofertas». Es deliberado: `of_select` solo enseña a cada uno sus propias
+ofertas, así que el número ahí daría siempre cero y decir «Sin ofertas aún» en
+una solicitud que tiene cinco no es ocultar, es mentir.
+
+**Las pastillas de estado filtran solo lo propio** (`PED_ESTADOS_POR_FILTRO`).
+«Otras solicitudes activas» no se filtra por estado — todas están en `abierto`,
+así que filtrar por «Cancelados» la vaciaría — pero sí respeta los filtros de
+tipo y zona.
+
+**«Cargar más» trae más de lo propio, no de lo ajeno.** Decisión del usuario del
+2026-09-24: «Otras solicitudes activas» se queda en las 30 más recientes y no
+crece al paginar; es la sección exploratoria. Hasta ese día las dos secciones
+compartían una sola consulta que añadía `abierto` siempre, y por eso al filtrar
+por «Cancelados» la página de 30 se llenaba con los abiertos de los demás
+clientes y los cancelados propios no aparecían. Son dos consultas desde
+entonces.
+
 ### Categorías de carga
 
 Deciden qué campos pide el formulario, y de eso dependen cosas más abajo:
