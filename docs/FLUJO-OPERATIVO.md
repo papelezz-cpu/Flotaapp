@@ -1043,6 +1043,61 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
    estorba. **Decidir qué hacer con ellos es un pendiente de producto**:
    asignarles dueño, o aceptar que son datos de demostración. No se toca nada
    sin decidirlo.
+10. **Un operador al que le falte una fecha no se puede editar.** Desde el
+    2026-09-10 (`64ceb7c`) el formulario exige **las cuatro fechas** —examen
+    médico, toxicológico, carta de antecedentes y vencimiento de licencia—
+    antes de guardar: *«Falta la fecha del examen toxicológico. Sin ella el
+    documento no se vigila en Vigencias»* ([js/operadores.js:367](../js/operadores.js)).
+
+    La validación protege el control de vigencias, y el hueco 6 de arriba
+    explica por qué hacía falta. Pero **bloquea de paso cualquier corrección**:
+    un operador dado de alta antes de esa fecha, o al que le falte un dato, no
+    admite ni arreglarle un teléfono o un apellido mal escrito sin rellenarle
+    antes lo que falte. Comprobado en producción el 2026-09-24 con «Ernesto
+    Preciado Soto», que no tiene fecha de examen toxicológico.
+
+    **Rellenar una fecha inventada para desbloquear el formulario no es una
+    salida**: es precisamente el dato que después alguien mira para decidir si
+    ese chofer puede trabajar.
+11. **Hay DOS formularios de edición de camión, y el normal expone menos
+    campos.** No es que a uno se le olvide algo: son formularios distintos.
+
+    - *Mis unidades → ✏ Editar* (`editarCamion()`) abre el modal `editar-*`.
+    - Editar una unidad **rechazada** (`editarCamionRechazado()`) rellena el
+      formulario de **alta** completo, con sus 32 campos.
+
+    Lo que solo se puede corregir **si la unidad fue rechazada**: color, año del
+    modelo, versión, las cuatro fotos, y **el permiso de materiales peligrosos
+    con su fecha**. Al revés, el modal normal tiene dos que el alta no: operador
+    asignado y precio por día.
+
+    Consecuencia práctica: una unidad aprobada con el color mal puesto se queda
+    así para siempre, y su permiso hazmat no se puede renovar por el camino
+    normal. Verificado el 2026-09-24 comparando los campos que rellena cada
+    función.
+12. **El permiso de materiales peligrosos del camión se exige y nadie lo lee.**
+    `admin.js:902` lo hace obligatorio al dar de alta una unidad hazmat, se
+    guarda en `doc_permiso_peligrosa` / `fecha_vencimiento_permiso_peligrosa`, y
+    el espejo de H-04 lo refleja a `vigencias` como `permiso_peligrosa`.
+
+    **Y ahí muere.** Verificado el 2026-09-24 con `grep`: las únicas apariciones
+    en todo el cliente son de escritura. No lo lista el panel de Vigencias —su
+    bloque de camiones vigila tarjeta de circulación, seguro, permiso SCT, CAAT
+    y verificación, no este—, no lo mira el aviso de «esta unidad tiene
+    documentos vencidos» al ofertar, y no lo consulta ningún guard.
+
+    **El contraste es lo que lo hace grave:** para carga peligrosa el sistema
+    **sí** exige que el chofer tenga licencia HAZMAT vigente —filtra el
+    desplegable y lo vuelve a comprobar al enviar la oferta— pero **no** mira si
+    el camión tiene su permiso en regla. Se pide el papel al alta y después se
+    ignora, que es el mismo patrón que el hueco 6 describe para las fechas
+    nulas.
+
+    Arreglarlo es pequeño: añadir `permiso_peligrosa` al bloque de camiones de
+    `js/vigencias.js` y a las cinco caducidades que alimentan el aviso de
+    unidad. **No se hizo**, porque decidir si un permiso hazmat vencido debe
+    frenar un trato —como frena el de la empresa— es una decisión de producto,
+    no un arreglo.
 
 ---
 
