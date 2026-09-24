@@ -2,21 +2,46 @@
 
 Plan por etapas. Escrito el 2026-09-18.
 
-**Estado al 2026-09-23:**
+**Estado al 2026-09-24: H-04 está COMPLETO EN PRODUCCIÓN.**
 
-| Etapa | |
+| Etapa | pruebas | producción |
+|---|---|---|
+| 1 · Crear | ✓ | ✓ |
+| 2 · Copiar | ✓ 63 filas | ✓ 63 filas |
+| 3 · Doble escritura | ✓ | ✓ |
+| 3b · Espejo tolerante | ✓ | **no**, y a propósito |
+| 3c · El espejo sigue los borrados | **no** | **no** |
+| 4 · Cambiar lecturas (+ espejo estricto, + vista de caducidad) | ✓ | ✓ |
+| 5 · Guards | ✓ | ✓ |
+| 6 · Retirar columnas | fuera de este plan | |
+
+**Las dos que producción no tiene, y por qué:**
+
+- **3b (tolerante)** no se aplicó porque la Etapa 4 reemplaza la función entera.
+  Medido en dos bancos locales: el estado final es idéntico con o sin ella, misma
+  función (mismo md5) y mismos triggers. Un paso menos ejecutado contra
+  producción.
+- **3c** quedó subsumida por la 4 en cuanto a triggers, y **su función es
+  «tolerante CON borrado»** — o sea, es la **marcha atrás** del espejo estricto.
+  Aplicarla es lo que hay que hacer si un fallo del espejo empieza a tumbar
+  guardados de usuario.
+
+**Las dos marchas atrás, escritas y probadas:**
+
+| Para revertir | Aplicar |
 |---|---|
-| 1 · Crear | **aplicada a pruebas** |
-| 2 · Copiar | **aplicada a pruebas** — 63 filas |
-| 3 · Doble escritura | **aplicada a pruebas** — espejo vivo |
-| 3b · Espejo tolerante | **aplicada a pruebas** |
-| 3c · El espejo sigue los borrados | **aplicada a pruebas**, y ejercitada a mano en el preview de `dev` |
-| 4 · Cambiar lecturas | **completa y probada en el preview** |
-| 5 · Guards | sin empezar |
-| 6 · Retirar columnas | fuera de este plan |
+| El espejo estricto | `20260922140000_vigencias_espejo_borrado.sql` |
+| El guard de la Etapa 5 | `20260924130000_REVERTIR_etapa5_guard_oferta.sql` |
 
-**Producción no tiene ninguna** — llevarlas allí es una promoción aparte, con
-su propia autorización (Regla #2).
+**Qué se verificó en producción al promover:** 63 filas copiadas, 3 perfiles sin
+divergencia en el catálogo, 49 caducidades coherentes con el catálogo, y 3
+empresas sin cambio de veredicto en el guard. Además, con el código todavía
+viejo, el catálogo se veía idéntico — el corte se comprobó antes de desplegar
+nada. Y el espejo estricto se ejercitó guardando un camión real.
+
+El guion manual `pruebas/PLAN-PRUEBAS-ESPEJO.md` se corrió entero el
+2026-09-23 contra el preview de `dev`: siete pasos, espejo en verde (72 pares
+= 72 filas). Dos cosas que dejó por escrito y conviene no redescubrir:
 
 El guion manual `pruebas/PLAN-PRUEBAS-ESPEJO.md` se corrió entero el
 2026-09-23 contra el preview de `dev`: siete pasos, espejo en verde (72 pares
