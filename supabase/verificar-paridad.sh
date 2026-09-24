@@ -163,6 +163,48 @@ select c.relname||'|'||r||'|'||pr||'|'||has_table_privilege(r, c.oid, pr)
  where c.relkind in ('r','v','p');
 SQL
 
+dim acl_por_defecto <<'SQL'
+-- Los privilegios que se conceden SOLOS a cada objeto nuevo de `public`.
+--
+-- Por qué está aquí: las dos dimensiones de arriba comparan los permisos de lo
+-- que YA existe. Esta compara lo que les va a pasar a los objetos que todavía
+-- no existen, y de ahí salieron dos agujeros reales:
+--   · H-01: `empresas_publico` aceptó INSERT/UPDATE/DELETE de cualquiera con
+--     sesión durante meses, sin que nadie lo concediera.
+--   · H-04 etapa 4.7: la vista `vigencias_caducidad` nació escribible otra vez.
+--     Lo cazó su propio bloque de comprobación, no una revisión.
+--
+-- En producción (2026-09-24) esto concede, para objetos creados por `postgres`:
+-- ALL sobre TABLAS a authenticated y service_role, y ALL sobre FUNCIONES
+-- también a `anon` — que en una función SECURITY DEFINER es escalada de
+-- privilegios, o sea H-21. Y lo creado por `supabase_admin` (el panel) añade
+-- `anon` también a las TABLAS.
+--
+-- Mientras estos ACL sigan así, cada objeto nuevo nace abierto y lo único que
+-- lo salva es que alguien se acuerde de revocar en la misma migración.
+-- `defaclobjtype` es de tipo "char", no text: sin el cast el `||` no encuentra
+-- operador y la dimensión se reportaría como no_verificable. Es literalmente el
+-- mismo tropiezo que esta script ya documenta para `tgenabled`, unas líneas más
+-- arriba — se volvió a pisar al escribir esta dimensión.
+-- Solo las de `FOR ROLE postgres`, y la razón importa: son las que gobiernan
+-- los objetos que crean NUESTRAS migraciones, que corren como ese rol. Las de
+-- `supabase_admin` (el panel de Supabase) no se comparan porque **no se pueden
+-- igualar**: en Supabase `postgres` no es superusuario y no puede fijar los
+-- privilegios por omisión de otro rol de plataforma. Compararlas dejaría este
+-- sello en `diverge` para siempre, y un candado que nunca puede abrirse es un
+-- candado que la gente aprende a ignorar.
+--
+-- Para verlas todas, que es lo que hay que hacer si se sospecha de algo creado
+-- desde el panel:  bash supabase/ver-privilegios-por-omision.sh <proyecto>
+select coalesce(pg_get_userbyid(d.defaclrole), '?')||'|'||
+       coalesce(nsp.nspname, '(todos)')||'|'||
+       d.defaclobjtype::text||'|'||
+       d.defaclacl::text
+  from pg_default_acl d
+  left join pg_namespace nsp on nsp.oid = d.defaclnamespace
+ where d.defaclrole = 'postgres'::regrole;
+SQL
+
 dim extensiones <<'SQL'
 select e.extname||'|'||e.extversion||'|'||n.nspname
   from pg_extension e join pg_namespace n on n.oid = e.extnamespace;

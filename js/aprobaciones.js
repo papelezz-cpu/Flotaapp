@@ -1353,13 +1353,35 @@ async function aprobarAcuerdo(pedidoId) {
     ['seguro_carga', 'Seguro de carga'],
   ].filter(([t]) => venceDoc[t] && venceDoc[t] < hoy).map(([, l]) => l);
 
+  // Y el permiso hazmat de la unidad, que desde el 2026-09-24 también frena el
+  // trato. Sin esto el superadmin forzaría a ciegas: el pedido llega a su cola
+  // por un motivo que su pantalla no nombraba. Aquí «sin permiso» cuenta igual
+  // que «vencido», como en el guard.
+  if (ped.carga_peligrosa && oferta.camion_id) {
+    const { data: esCamion } = await sb.from('camiones')
+      .select('id').eq('id', oferta.camion_id).maybeSingle();
+    if (esCamion) {
+      const { data: vigHaz } = await sb.from('vigencias_caducidad')
+        .select('vence_el')
+        .eq('entidad_tipo', 'camion').eq('entidad_id', oferta.camion_id)
+        .eq('tipo_documento', 'permiso_peligrosa').eq('estado', 'vigente')
+        .maybeSingle();
+      if (!vigHaz?.vence_el || vigHaz.vence_el < hoy) {
+        docsVencidos.push(`Permiso de materiales peligrosos de la unidad ${oferta.camion_id}`);
+      }
+    }
+  }
+
   const ejecutar = () => _ejecutarAprobarAcuerdo(ped, oferta);
 
   if (docsVencidos.length) {
     showConfirm(
+      // «Hay», no «la empresa tiene»: desde el 2026-09-24 la lista puede incluir
+      // el permiso hazmat de la UNIDAD, y decir que es de la empresa mandaría a
+      // revisar los papeles equivocados.
       // El nombre sale de la oferta, que lo lleva denormalizado: era el respaldo
       // de antes y evita una consulta a `perfiles` solo para un texto.
-      `⚠️ La empresa "${esc(oferta.admin_nombre || '')}" tiene documentos vencidos: ${docsVencidos.join(', ')}. ¿Aprobar el acuerdo de todas formas?`,
+      `⚠️ Hay documentos vencidos en el acuerdo con "${esc(oferta.admin_nombre || '')}": ${docsVencidos.join(', ')}. ¿Aprobarlo de todas formas?`,
       ejecutar,
       { danger: true, confirmLabel: 'Aprobar igualmente', cancelLabel: 'Cancelar' }
     );

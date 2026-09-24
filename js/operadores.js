@@ -368,6 +368,21 @@ async function agregarOperador() {
     restore(); return;
   }
 
+  // La licencia de materiales peligrosos es el quinto par y no entraba en la
+  // lista de arriba, porque no es obligatoria: un chofer puede no tenerla. Pero
+  // si se adjunta el papel, la fecha sí lo es.
+  //
+  // Aquí el fallo era menos peligroso que en los otros: el filtro de choferes
+  // para carga peligrosa exige `fecha_documento >= hoy`, así que una licencia
+  // sin fecha nunca calificaba y el chofer simplemente no aparecía — fallaba
+  // cerrado. Aun así el papel quedaba sin vigilar. Decisión del usuario,
+  // 2026-09-24: exigir la fecha al subir el papel.
+  if (document.getElementById('op-doc-peligrosa')?.files?.[0]
+      && !document.getElementById('op-vence-peligrosa')?.value) {
+    showToast('Adjuntaste la licencia de materiales peligrosos pero falta su fecha de vencimiento. Sin ella el documento no se vigila en Vigencias.', 'error');
+    restore(); return;
+  }
+
   const isEdit = !!_operadorEditId;
   const id = isEdit ? _operadorEditId : _autoIdOperador();
 

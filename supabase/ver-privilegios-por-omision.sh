@@ -4,10 +4,16 @@
 #
 # ── Por qué existe ──────────────────────────────────────────────────────────
 #
-# `pg_default_acl` NO es ninguna de las 18 dimensiones que compara
-# verificar-paridad.sh. R-07 lo dejó anotado el 2026-09-18: una diferencia en
-# los privilegios por omisión es invisible hasta que alguien crea un objeto
-# nuevo, y entonces se manifiesta como diferencia *de ese objeto*.
+# R-07 lo dejó anotado el 2026-09-18: una diferencia en los privilegios por
+# omisión es invisible hasta que alguien crea un objeto nuevo, y entonces se
+# manifiesta como diferencia *de ese objeto*.
+#
+# ⚠ **Desde el 2026-09-24 `pg_default_acl` SÍ es una dimensión de
+#   verificar-paridad.sh** (`acl_por_defecto`, la 19ª). Antes no lo era, y este
+#   guion existía porque era la única forma de mirarlo. Sigue siendo útil para
+#   LEER una sola base y entender qué concede —la salida es legible, la del
+#   verificador es un diff— pero **la comparación ya no depende de que alguien
+#   se acuerde de correrlo dos veces**.
 #
 # Ocurrió esa misma noche. Al aplicar 20260918150000 a los dos proyectos, las
 # dos funciones nuevas salieron con EXECUTE para service_role en producción y

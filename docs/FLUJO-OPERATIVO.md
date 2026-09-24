@@ -173,6 +173,7 @@ Vigencias · Mi desempeño · Cobros · Privacidad · Avisos.
 | Ofertar con permiso SCT o seguros vencidos | `openHacerOferta`, y de nuevo `guard_oferta_update` |
 | Aceptar su propia oferta, salvo respondiendo una contraoferta | `guard_oferta_update` |
 | Asignar a carga peligrosa un chofer sin licencia vigente | `guard_operador_hazmat` |
+| **Cerrar un trato de carga peligrosa con una unidad sin permiso hazmat vigente** | `guard_oferta_update` — y aquí «sin permiso» cuenta igual que «vencido» |
 | Avanzar el seguimiento de un camión sin chofer asignado | La interfaz, en el primer paso |
 | Subir evidencia antes del último paso del seguimiento | La interfaz |
 | Aprobar el cierre de su propio servicio | `guard_reservacion_update` |
@@ -365,6 +366,18 @@ hasta que el superadmin los aprueba.
 superadmin cambie `aprobacion` a algo distinto de `pendiente`, y que nadie
 transfiera `propietario_id`. Todo lo demás lo puede editar el dueño.
 
+**Todo recurso tiene dueño, y es obligatorio.** Desde el 2026-09-24
+`propietario_id` es `NOT NULL` en las cinco tablas de flota
+(`20260924140000_recursos_con_dueno_obligatorio.sql`). Antes admitía nulos y
+había siete recursos sin dueño —era el hueco 9, ahora cerrado—; los siete se
+asignaron a **Omar Silva Preciado** por decisión del usuario ese mismo día.
+
+Por qué importa más de lo que parece: `vigencia_propietario()` devuelve `NULL`
+para un recurso sin dueño, y la política `vigencia_propietario(...) = auth.uid()`
+compara contra `NULL`, que **nunca da verdadero**. Un recurso huérfano tenía sus
+documentos visibles solo para el superadmin y **ninguna empresa podía
+renovarlos**.
+
 Editar un recurso aprobado lo devuelve a revisión: `es_edicion`,
 `campos_editados` y `snapshot_anterior` guardan qué cambió para que el
 superadmin lo compare.
@@ -376,8 +389,30 @@ superadmin lo compare.
 **Un campo nulo no entra nunca en esa comparación.**
 
 Consecuencia: un documento sin fecha no se vigila jamás. El papel está, nadie
-comprueba si sigue vigente, y el panel dice que todo está en orden. Por eso el
-alta de operador exige las cuatro fechas junto con sus documentos.
+comprueba si sigue vigente, y el panel dice que todo está en orden.
+
+#### Todo papel se sube con su fecha (decisión del usuario, 2026-09-24)
+
+La regla ya iba en un sentido —**no se acredita una vigencia sin enseñar el
+documento**, el candado de [js/admin.js:534](../js/admin.js)— y ahora va en los
+dos: **adjuntar un papel sin su fecha de vencimiento queda rechazado**, en los
+cinco sitios donde se podía:
+
+| Formulario | Qué exigía antes | Qué exige ahora |
+|---|---|---|
+| Alta de camión | los papeles de TC, SCT y seguro; **ninguna de sus fechas** | la fecha de cada papel que se adjunte |
+| Edición de camión | fecha ⇒ papel | y también papel ⇒ fecha |
+| Perfil de empresa | «al menos una fecha» de las tres | la fecha de cada documento que se adjunte |
+| Alta de operador | las cuatro fechas | y también la de la licencia hazmat, si se adjunta |
+
+De ahí salían los **14 documentos con papel y sin vencimiento** que la Etapa 2
+de H-04 hizo visibles: el alta de camión pedía tres documentos obligatorios y
+ninguna de sus fechas.
+
+> ⚠ **Esto no arregla los 14 que ya existen.** No se pueden rellenar inventando
+> fechas: es el dato que después alguien mira para decidir si una unidad puede
+> trabajar. Siguen ahí hasta que alguien los complete con el papel delante. La
+> regla nueva evita que el número crezca.
 
 #### El catálogo público ya lee la tabla `vigencias` (H-04, 2026-09-23)
 
@@ -520,8 +555,24 @@ tres escrituras sueltas y la pestaña podía cerrarse entre una y otra. La regla
 históricas, no porque el flujo actual las genere.
 
 **La excepción son los documentos vencidos.** `guard_oferta_update` bloquea la
-aceptación con `DOCUMENTOS_VENCIDOS` si la empresa que emitió la oferta tiene
-vencido el permiso SCT, el seguro RC o el seguro de carga. Entonces:
+aceptación con `DOCUMENTOS_VENCIDOS` en **dos casos**:
+
+1. **La empresa** que emitió la oferta tiene vencido el permiso SCT, el seguro
+   RC o el seguro de carga. **Desde H-04 etapa 5 eso se mide sobre la tabla
+   `vigencias`, en estado `vigente`**: una renovación que la empresa haya subido
+   y el superadmin no haya acreditado **no desbloquea nada**. Un documento con
+   papel pero sin fecha sigue sin bloquear, porque sigue sin vigilarse.
+2. **El pedido es de carga peligrosa y la unidad ofertada no tiene permiso de
+   materiales peligrosos vigente** (desde el 2026-09-24,
+   `20260924150000_hazmat_del_camion_frena_el_trato.sql`). Aquí la regla es
+   **más estricta a propósito: un permiso que no existe bloquea igual que uno
+   vencido**, porque el alta ya lo exige y solo le alcanza a unidades
+   heredadas. Solo se aplica si el recurso ofertado es de verdad un camión —
+   `ofertas.camion_id` puede guardar un custodio o un patio, y sin esa
+   comprobación un servicio de custodia para carga peligrosa quedaría bloqueado
+   sin motivo.
+
+En los dos casos, entonces:
 
 ```
 → pedido 'pendiente_acuerdo', aviso al superadmin
@@ -530,6 +581,12 @@ vencido el permiso SCT, el seguro RC o el seguro de carga. Entonces:
 
 Ese control **avisa pero no encierra**: sin la salida del superadmin, una
 empresa con un papel vencido quedaría atrapada sin forma de desbloquearse.
+
+**Y el aviso dice cuál de los dos casos fue.** La RPC copia el motivo que trae
+el guard —sin el prefijo técnico— al mensaje que reciben los superadmins y al
+`motivo` que devuelve al cliente. Antes decía «pero la empresa tiene documentos
+vencidos», fijo: con la regla del camión eso habría mandado al superadmin a
+revisar los papeles equivocados la mitad de las veces.
 
 ### La unidad ocupada
 
@@ -785,7 +842,7 @@ escribir una fila; los guards deciden *qué transición* es legal para ti.
 | Guard | Sobre | Qué impide |
 |---|---|---|
 | `guard_pedido_update` | pedidos | Que un cliente marque `acordado`/`rechazado` sin pasar por el flujo; que un admin toque un pedido fuera de negociación |
-| `guard_oferta_update` | ofertas | Aceptar con documentos vencidos; aceptar la oferta propia salvo respondiendo una contraoferta |
+| `guard_oferta_update` | ofertas | Aceptar con documentos de empresa vencidos; **aceptar un pedido de carga peligrosa con una unidad sin permiso hazmat vigente**; aceptar la oferta propia salvo respondiendo una contraoferta |
 | `guard_reservacion_insert` | reservaciones | Que un cliente se cree una reserva ya confirmada y con precio puesto por él |
 | `guard_reservacion_update` | reservaciones | Que el cliente toque precio, unidad o fechas; que suba la evidencia de la empresa; que cualquiera de los dos apruebe su propio cierre o resuelva su propia cancelación — eso lo hace el superadmin |
 | `guard_fleet_resource_update` | flota | Auto-aprobarse un recurso; transferir la propiedad |
@@ -1018,27 +1075,98 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
    causa sigue ahí. No se ha dado en producción: las 7 solicitudes están
    `aprobada` y ningún perfil quedó `pendiente`. Arreglarlo es mover la
    pareja a una RPC o usar `actualizarConfirmado()` en las dos.
-9. **Hay recursos sin propietario, y nadie más que el superadmin puede
-   tocarlos.** `propietario_id` es **nullable en las cinco tablas de flota**
-   (verificado en el esquema el 2026-09-23), y en producción hay **7 recursos
-   con propietario nulo**: los custodios `CUS-001`, `CUS-002`, `CUS-003`,
-   `CUS-006` y los patios `PAT-001`, `PAT-002`, `PAT-005`, todos `aprobada`.
+9. ~~**Hay recursos sin propietario.**~~ **CERRADO el 2026-09-24.** Eran 7 —los
+   custodios `CUS-001/002/003/006` y los patios `PAT-001/002/005`—, y el
+   problema no era cosmético: `vigencia_propietario()` devolvía `NULL`, la
+   política comparaba contra `NULL` y **ninguna empresa podía renovar sus
+   documentos**. Se asignaron a Omar Silva Preciado y `propietario_id` pasó a
+   ser `NOT NULL` en las cinco tablas. Ver *Alta de recursos*.
+10. **Un operador al que le falte una fecha no se puede editar.** Desde el
+    2026-09-10 (`64ceb7c`) el formulario exige **las cuatro fechas** —examen
+    médico, toxicológico, carta de antecedentes y vencimiento de licencia—
+    antes de guardar: *«Falta la fecha del examen toxicológico. Sin ella el
+    documento no se vigila en Vigencias»* ([js/operadores.js:367](../js/operadores.js)).
 
-   No es solo cosmético. `vigencia_propietario()` devuelve `NULL` para ellos, y
-   la política `vigencia_propietario(...) = auth.uid()` compara contra `NULL`,
-   que **nunca da verdadero**. Consecuencia: sus documentos solo los ve el
-   superadmin —por `is_superadmin()`— y **ninguna empresa puede renovarlos**,
-   porque ninguna es su dueña. Lo mismo vale para el `propietario_id` de los
-   guards de flota.
+    La validación protege el control de vigencias, y el hueco 6 de arriba
+    explica por qué hacía falta. Pero **bloquea de paso cualquier corrección**:
+    un operador dado de alta antes de esa fecha, o al que le falte un dato, no
+    admite ni arreglarle un teléfono o un apellido mal escrito sin rellenarle
+    antes lo que falte. Comprobado en producción el 2026-09-24 con «Ernesto
+    Preciado Soto», que no tiene fecha de examen toxicológico.
 
-   En el panel de Vigencias esos 7 documentos se agrupan bajo una empresa **sin
-   nombre**, porque `propietario?.nombre || propietario_id` se queda en nulo.
-   Se ve raro y es correcto: no hay empresa que poner.
+    **Rellenar una fecha inventada para desbloquear el formulario no es una
+    salida**: es precisamente el dato que después alguien mira para decidir si
+    ese chofer puede trabajar.
+11. **Hay DOS formularios de edición de camión, y el normal expone menos
+    campos.** No es que a uno se le olvide algo: son formularios distintos.
 
-   Custodios y patios son servicios apagados en la interfaz, así que hoy no
-   estorba. **Decidir qué hacer con ellos es un pendiente de producto**:
-   asignarles dueño, o aceptar que son datos de demostración. No se toca nada
-   sin decidirlo.
+    - *Mis unidades → ✏ Editar* (`editarCamion()`) abre el modal `editar-*`.
+    - Editar una unidad **rechazada** (`editarCamionRechazado()`) rellena el
+      formulario de **alta** completo, con sus 32 campos.
+
+    Lo que solo se puede corregir **si la unidad fue rechazada**: color, año del
+    modelo, versión, las cuatro fotos, y **el permiso de materiales peligrosos
+    con su fecha**. Al revés, el modal normal tiene dos que el alta no: operador
+    asignado y precio por día.
+
+    Consecuencia práctica: una unidad aprobada con el color mal puesto se queda
+    así para siempre, y su permiso hazmat no se puede renovar por el camino
+    normal. Verificado el 2026-09-24 comparando los campos que rellena cada
+    función.
+12. **El permiso de materiales peligrosos del camión se exige y nadie lo lee.**
+    `admin.js:902` lo hace obligatorio al dar de alta una unidad hazmat, se
+    guarda en `doc_permiso_peligrosa` / `fecha_vencimiento_permiso_peligrosa`, y
+    el espejo de H-04 lo refleja a `vigencias` como `permiso_peligrosa`.
+
+    **Y ahí muere.** Verificado el 2026-09-24 con `grep`: las únicas apariciones
+    en todo el cliente son de escritura. No lo lista el panel de Vigencias —su
+    bloque de camiones vigila tarjeta de circulación, seguro, permiso SCT, CAAT
+    y verificación, no este—, no lo mira el aviso de «esta unidad tiene
+    documentos vencidos» al ofertar, y no lo consulta ningún guard.
+
+    **El contraste es lo que lo hace grave:** para carga peligrosa el sistema
+    **sí** exige que el chofer tenga licencia HAZMAT vigente —filtra el
+    desplegable y lo vuelve a comprobar al enviar la oferta— pero **no** mira si
+    el camión tiene su permiso en regla. Se pide el papel al alta y después se
+    ignora, que es el mismo patrón que el hueco 6 describe para las fechas
+    nulas.
+
+    **CERRADO EN PARTE el 2026-09-24.** Decisión del usuario: *«se debe frenar
+    el trato»*. `guard_oferta_update` ya bloquea aceptar un pedido de carga
+    peligrosa cuando la unidad ofertada no tiene permiso vigente, con un permiso
+    inexistente contando igual que uno vencido
+    (`20260924150000_hazmat_del_camion_frena_el_trato.sql`).
+
+    **Y CERRADO DEL TODO el mismo día**, con las cuatro pantallas:
+
+    - **Panel de Vigencias**: `permiso_peligrosa` se lista, y es obligatorio
+      **solo en las unidades que declaran mover carga peligrosa** — en las demás
+      no tenerlo no es un hueco, y listarlo sería ruido en 10 de 13.
+    - **Al ofertar**: si el pedido es de carga peligrosa, el desplegable **filtra
+      las unidades sin permiso vigente**, igual que ya filtraba los choferes sin
+      licencia HAZMAT. Medido el 2026-09-24 en pruebas: para el pedido hazmat
+      sembrado, el select pasó de ofrecer 2 Tortons a ofrecer 0, porque ninguno
+      tiene permiso. Es la regla funcionando: el guard habría rechazado el trato
+      igual al cerrarlo, y así se sabe antes de gastar la oferta.
+    - **Al aprobar el acuerdo**: el superadmin ve el permiso de la unidad en la
+      lista de documentos vencidos. Sin eso forzaba a ciegas — el pedido llegaba
+      a su cola por un motivo que su pantalla no nombraba.
+    - **El mensaje al cliente** usa el `motivo` que devuelve la RPC en vez de
+      decir «la empresa» fijo.
+
+13. **El alta de flota del cliente nativo apunta a RPC que producción no tiene.**
+    `android/.../FlotaRepository.kt` llama a `guardar_camion` y `alta_operador`
+    (no hace `INSERT` directo), y **ninguna de las dos existe en producción**:
+    verificado el 2026-09-24 contra el volcado. Las define
+    `20260812120000_alta_flota.sql`, que nunca se aplicó allí.
+
+    Consecuencia: el lado empresa del móvil no puede dar de alta una unidad ni
+    un chofer en producción, aunque el contrato lo prometa
+    ([CONTRATO-MOVIL.md](CONTRATO-MOVIL.md), §6: *Flota (camiones/operadores) —
+    empresa ✓*). Salió al medir si el `NOT NULL` de `propietario_id` podía
+    romper ese camino: no puede, porque el camino no existe — y si algún día se
+    aplica esa migración, su cabecera dice que **fuerza**
+    `propietario_id = auth.uid()`, así que será compatible.
 
 ---
 

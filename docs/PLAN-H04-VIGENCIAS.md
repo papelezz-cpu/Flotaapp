@@ -2,21 +2,46 @@
 
 Plan por etapas. Escrito el 2026-09-18.
 
-**Estado al 2026-09-23:**
+**Estado al 2026-09-24: H-04 está COMPLETO EN PRODUCCIÓN.**
 
-| Etapa | |
+| Etapa | pruebas | producción |
+|---|---|---|
+| 1 · Crear | ✓ | ✓ |
+| 2 · Copiar | ✓ 63 filas | ✓ 63 filas |
+| 3 · Doble escritura | ✓ | ✓ |
+| 3b · Espejo tolerante | ✓ | **no**, y a propósito |
+| 3c · El espejo sigue los borrados | **no** | **no** |
+| 4 · Cambiar lecturas (+ espejo estricto, + vista de caducidad) | ✓ | ✓ |
+| 5 · Guards | ✓ | ✓ |
+| 6 · Retirar columnas | fuera de este plan | |
+
+**Las dos que producción no tiene, y por qué:**
+
+- **3b (tolerante)** no se aplicó porque la Etapa 4 reemplaza la función entera.
+  Medido en dos bancos locales: el estado final es idéntico con o sin ella, misma
+  función (mismo md5) y mismos triggers. Un paso menos ejecutado contra
+  producción.
+- **3c** quedó subsumida por la 4 en cuanto a triggers, y **su función es
+  «tolerante CON borrado»** — o sea, es la **marcha atrás** del espejo estricto.
+  Aplicarla es lo que hay que hacer si un fallo del espejo empieza a tumbar
+  guardados de usuario.
+
+**Las dos marchas atrás, escritas y probadas:**
+
+| Para revertir | Aplicar |
 |---|---|
-| 1 · Crear | **aplicada a pruebas** |
-| 2 · Copiar | **aplicada a pruebas** — 63 filas |
-| 3 · Doble escritura | **aplicada a pruebas** — espejo vivo |
-| 3b · Espejo tolerante | **aplicada a pruebas** |
-| 3c · El espejo sigue los borrados | **aplicada a pruebas**, y ejercitada a mano en el preview de `dev` |
-| 4 · Cambiar lecturas | **completa y probada en el preview** |
-| 5 · Guards | sin empezar |
-| 6 · Retirar columnas | fuera de este plan |
+| El espejo estricto | `20260922140000_vigencias_espejo_borrado.sql` |
+| El guard de la Etapa 5 | `20260924130000_REVERTIR_etapa5_guard_oferta.sql` |
 
-**Producción no tiene ninguna** — llevarlas allí es una promoción aparte, con
-su propia autorización (Regla #2).
+**Qué se verificó en producción al promover:** 63 filas copiadas, 3 perfiles sin
+divergencia en el catálogo, 49 caducidades coherentes con el catálogo, y 3
+empresas sin cambio de veredicto en el guard. Además, con el código todavía
+viejo, el catálogo se veía idéntico — el corte se comprobó antes de desplegar
+nada. Y el espejo estricto se ejercitó guardando un camión real.
+
+El guion manual `pruebas/PLAN-PRUEBAS-ESPEJO.md` se corrió entero el
+2026-09-23 contra el preview de `dev`: siete pasos, espejo en verde (72 pares
+= 72 filas). Dos cosas que dejó por escrito y conviene no redescubrir:
 
 El guion manual `pruebas/PLAN-PRUEBAS-ESPEJO.md` se corrió entero el
 2026-09-23 contra el preview de `dev`: siete pasos, espejo en verde (72 pares
@@ -767,11 +792,59 @@ escritura o relleno de formulario. El trabajo de verdad está en `vigencias.js`,
 exigiendo mover también las escrituras. Ya era así antes de esta decisión, y
 sigue estando fuera de este plan.
 
-### Etapa 5 — Los guards
+### Etapa 5 — Los guards  ·  **ESCRITA Y PROBADA EN BANCO LOCAL el 2026-09-24**
 
-`guard_oferta_update` pasa a leer `vigencias`. **Con su propia prueba de que
-sigue frenando**, por las dos direcciones: que una empresa con papel vencido
-no pueda cerrar, y que una al día sí.
+`supabase/migrations/20260924120000_vigencias_etapa5_guard_oferta.sql`.
+**Una sola función, y ningún cambio de código:** las lecturas del cliente ya se
+movieron en la Etapa 4, así que aquí no hay `?v=` que subir.
+
+`guard_oferta_update` deja de leer las tres columnas de `perfiles` y lee
+`vigencias` en estado `vigente`.
+
+#### El cuerpo se copió de la definición VIVA, no de la última migración
+
+Y no coincidían. `pg_get_functiondef` sobre el volcado de producción tiene un
+**retorno temprano por orfandad** —oferta cuyo titular ya no existe— que añadió
+`20260827190000_desbloquea_el_borrado_de_cuenta.sql`, y que **ninguna de las dos
+migraciones que definen la función contiene**. Escribir esta etapa partiendo del
+fichero anterior habría borrado ese retorno sin que nada fallara, y el borrado de
+cuenta habría vuelto a quedar bloqueado. El bloque de comprobación ahora exige
+que siga ahí, junto con la salida del superadmin y las reglas de quién acepta
+qué.
+
+#### El texto del error no se puede tocar
+
+`aceptar_y_cerrar_acuerdo` hace `IF SQLERRM LIKE 'DOCUMENTOS_VENCIDOS%'`
+(20260903120000) para mandar el pedido a `pendiente_acuerdo` en vez de reventar.
+Cambiar una letra convierte un aviso manejado en un error crudo en pantalla. La
+comprobación compara el mensaje completo.
+
+#### Por qué SECURITY DEFINER pasa a ser imprescindible
+
+Antes el guard leía `perfiles`, que cualquier autenticado puede leer. Ahora lee
+`vigencias`, cuya RLS solo deja al dueño y al superadmin — y **quien acepta la
+oferta es el cliente**, que no es ninguno de los dos. Sin SECURITY DEFINER el
+`EXISTS` no vería ninguna fila y el guard **dejaría pasar todo**: fallaría
+abierto, en silencio. Ya lo era; lo que cambia es que ahora de eso depende que
+frene. Por eso la prueba acepta como cliente y no como superadmin.
+
+#### Probado en `pruebas/banco-local/h04-etapa5.sql`, seis bloques
+
+- con el SCT vencido, **frena**;
+- el mensaje es exactamente el que la RPC espera;
+- **la prueba decisiva**: se borra la fila del espejo dejando `perfiles`
+  caducado, y el guard **deja pasar** — si leyera `perfiles` seguiría frenando y
+  esta etapa no habría movido nada;
+- con los papeles al día, **deja pasar** (la dirección que nadie prueba: un
+  guard que frena siempre no es un guard);
+- un papel sin fecha **no bloquea**, igual que antes — sigue siendo el hueco de
+  los 14 documentos que nadie vigila;
+- el superadmin **conserva la salida**, sin la cual una empresa con un papel
+  caducado quedaría atrapada.
+
+Y se comprobó que la prueba **sabe fallar**: con el guard viejo restaurado, los
+bloques 1 y 2 **pasan igual** —por sí solos no detectan nada— y el tercero lo
+caza nombrando la causa.
 
 ### Etapa 6 — Retirar columnas
 

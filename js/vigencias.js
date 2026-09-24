@@ -27,7 +27,10 @@ async function renderVigencias() {
   //     CHECK de la tabla exige archivo o fecha), así que una ausencia no se
   //     puede consultar: hay que saber qué entidades existen y cuáles de sus
   //     documentos son obligatorios, y eso último no está en el catálogo.
-  let camQ  = sb.from('camiones').select('id, tipo, propietario_id, propietario:perfiles(nombre)').in('aprobacion', ['aprobada', 'pendiente']);
+  // `tipo_carga` viene solo para decidir si el permiso de materiales peligrosos
+  // es obligatorio en esa unidad: en un camión que no mueve hazmat, no tenerlo
+  // no es un hueco, y listarlo como «sin fecha» sería ruido en 10 de 13.
+  let camQ  = sb.from('camiones').select('id, tipo, tipo_carga, propietario_id, propietario:perfiles(nombre)').in('aprobacion', ['aprobada', 'pendiente']);
   let opQ   = sb.from('operadores').select('id, nombre, primer_apellido, propietario_id, propietario:perfiles(nombre)').in('aprobacion', ['aprobada', 'pendiente']);
   let cusQ  = sb.from('custodios').select('id, nombre, propietario_id, propietario:perfiles(nombre), porta_arma').in('aprobacion', ['aprobada', 'pendiente']);
   let patQ  = sb.from('patios').select('id, nombre, propietario_id, propietario:perfiles(nombre)').in('aprobacion', ['aprobada', 'pendiente']);
@@ -104,6 +107,14 @@ async function renderVigencias() {
     _add(c.propietario_id, emp, 'Camión', nom, 'Permiso SCT',            'camion', c.id, 'permiso_sct_unidad',  true);
     _add(c.propietario_id, emp, 'Camión', nom, 'CAAT',                   'camion', c.id, 'caat',                false);
     _add(c.propietario_id, emp, 'Camión', nom, 'Verificación vehicular', 'camion', c.id, 'verificacion',        false);
+    // Desde el 2026-09-24 este permiso FRENA el trato de un pedido de carga
+    // peligrosa (guard_oferta_update). Antes no lo listaba nadie: se exigía al
+    // alta y después se ignoraba. Obligatorio solo en las unidades que declaran
+    // mover carga peligrosa, que son las únicas donde el guard lo mira.
+    const esHazmat = (c.tipo_carga || []).some(t => t === 'Peligroso' || t === 'HAZMAT');
+    if (esHazmat) {
+      _add(c.propietario_id, emp, 'Camión', nom, 'Permiso de materiales peligrosos', 'camion', c.id, 'permiso_peligrosa', true);
+    }
   });
 
   (operadores || []).forEach(o => {
