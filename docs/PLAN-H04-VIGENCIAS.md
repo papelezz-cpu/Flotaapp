@@ -767,11 +767,59 @@ escritura o relleno de formulario. El trabajo de verdad está en `vigencias.js`,
 exigiendo mover también las escrituras. Ya era así antes de esta decisión, y
 sigue estando fuera de este plan.
 
-### Etapa 5 — Los guards
+### Etapa 5 — Los guards  ·  **ESCRITA Y PROBADA EN BANCO LOCAL el 2026-09-24**
 
-`guard_oferta_update` pasa a leer `vigencias`. **Con su propia prueba de que
-sigue frenando**, por las dos direcciones: que una empresa con papel vencido
-no pueda cerrar, y que una al día sí.
+`supabase/migrations/20260924120000_vigencias_etapa5_guard_oferta.sql`.
+**Una sola función, y ningún cambio de código:** las lecturas del cliente ya se
+movieron en la Etapa 4, así que aquí no hay `?v=` que subir.
+
+`guard_oferta_update` deja de leer las tres columnas de `perfiles` y lee
+`vigencias` en estado `vigente`.
+
+#### El cuerpo se copió de la definición VIVA, no de la última migración
+
+Y no coincidían. `pg_get_functiondef` sobre el volcado de producción tiene un
+**retorno temprano por orfandad** —oferta cuyo titular ya no existe— que añadió
+`20260827190000_desbloquea_el_borrado_de_cuenta.sql`, y que **ninguna de las dos
+migraciones que definen la función contiene**. Escribir esta etapa partiendo del
+fichero anterior habría borrado ese retorno sin que nada fallara, y el borrado de
+cuenta habría vuelto a quedar bloqueado. El bloque de comprobación ahora exige
+que siga ahí, junto con la salida del superadmin y las reglas de quién acepta
+qué.
+
+#### El texto del error no se puede tocar
+
+`aceptar_y_cerrar_acuerdo` hace `IF SQLERRM LIKE 'DOCUMENTOS_VENCIDOS%'`
+(20260903120000) para mandar el pedido a `pendiente_acuerdo` en vez de reventar.
+Cambiar una letra convierte un aviso manejado en un error crudo en pantalla. La
+comprobación compara el mensaje completo.
+
+#### Por qué SECURITY DEFINER pasa a ser imprescindible
+
+Antes el guard leía `perfiles`, que cualquier autenticado puede leer. Ahora lee
+`vigencias`, cuya RLS solo deja al dueño y al superadmin — y **quien acepta la
+oferta es el cliente**, que no es ninguno de los dos. Sin SECURITY DEFINER el
+`EXISTS` no vería ninguna fila y el guard **dejaría pasar todo**: fallaría
+abierto, en silencio. Ya lo era; lo que cambia es que ahora de eso depende que
+frene. Por eso la prueba acepta como cliente y no como superadmin.
+
+#### Probado en `pruebas/banco-local/h04-etapa5.sql`, seis bloques
+
+- con el SCT vencido, **frena**;
+- el mensaje es exactamente el que la RPC espera;
+- **la prueba decisiva**: se borra la fila del espejo dejando `perfiles`
+  caducado, y el guard **deja pasar** — si leyera `perfiles` seguiría frenando y
+  esta etapa no habría movido nada;
+- con los papeles al día, **deja pasar** (la dirección que nadie prueba: un
+  guard que frena siempre no es un guard);
+- un papel sin fecha **no bloquea**, igual que antes — sigue siendo el hueco de
+  los 14 documentos que nadie vigila;
+- el superadmin **conserva la salida**, sin la cual una empresa con un papel
+  caducado quedaría atrapada.
+
+Y se comprobó que la prueba **sabe fallar**: con el guard viejo restaurado, los
+bloques 1 y 2 **pasan igual** —por sí solos no detectan nada— y el tercero lo
+caza nombrando la causa.
 
 ### Etapa 6 — Retirar columnas
 

@@ -521,7 +521,11 @@ históricas, no porque el flujo actual las genere.
 
 **La excepción son los documentos vencidos.** `guard_oferta_update` bloquea la
 aceptación con `DOCUMENTOS_VENCIDOS` si la empresa que emitió la oferta tiene
-vencido el permiso SCT, el seguro RC o el seguro de carga. Entonces:
+vencido el permiso SCT, el seguro RC o el seguro de carga. **Desde H-04 etapa 5
+eso se mide sobre la tabla `vigencias`, en estado `vigente`**: una renovación
+que la empresa haya subido y el superadmin no haya acreditado **no desbloquea
+nada**. Y un documento con papel pero sin fecha sigue sin bloquear, porque sigue
+sin vigilarse. Entonces:
 
 ```
 → pedido 'pendiente_acuerdo', aviso al superadmin
