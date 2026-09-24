@@ -91,7 +91,9 @@ node pruebas/05-sonda-correo.mjs      # ④ and again, because ② is what puts 
 
 **What the replication can and cannot knock down.** It is a `psql` script: it drops and rebuilds `public`, `auth.users`, Storage metadata, storage policies and cron jobs from production — **including anything applied to pruebas that production does not have** (so a migration under test gets erased; apply it *after* replicating, never before). It **cannot** touch the email block or the Auth settings: `CORREO_SALIDA` is an Edge Function secret and `mailer_autoconfirm` is a panel setting, neither lives in Postgres. Every mention of `CORREO_SALIDA` inside that script is an `echo`, never SQL. What *can* knock the block down is redeploying `enviar-notificacion` to pruebas with the secret unset — and nothing warns about that except probe ④.
 
-`supabase/verificar-paridad.sh` (also run automatically at the end of the replication) compares **18 dimensions**: columns, constraints, indexes, RLS flags, policies, triggers, function bodies and `search_path`, EXECUTE and table grants per role, extensions, the Realtime publication, pg_cron jobs, buckets, storage policies, exact row counts, auth users (id, email, password hash), Storage objects, and a **content hash of every table**. It writes the verdict to `supabase/espejo/paridad.json`.
+`supabase/verificar-paridad.sh` (also run automatically at the end of the replication) compares **19 dimensions**: columns, constraints, indexes, RLS flags, policies, triggers, function bodies and `search_path`, EXECUTE and table grants per role, **default privileges (`pg_default_acl`)**, extensions, the Realtime publication, pg_cron jobs, buckets, storage policies, exact row counts, auth users (id, email, password hash), Storage objects, and a **content hash of every table**. It writes the verdict to `supabase/espejo/paridad.json`.
+
+> The default-privileges dimension exists because the other two permission dimensions compare what *already* exists, and the hazard is what happens to objects that don't exist yet. In production (measured 2026-09-24) every new object created by `postgres` in `public` is granted ALL on TABLES to `authenticated` and `service_role`, and ALL on FUNCTIONS to **`anon`** as well — which on a `SECURITY DEFINER` function is privilege escalation (H-21). Objects created by `supabase_admin` (the Supabase dashboard) add `anon` to TABLES too. **So every new table, view and function is born open, and the only thing that closes it is someone remembering to `revoke` in the same migration.** That is how H-01 happened (`empresas_publico` accepted writes from any logged-in user for months) and it nearly happened again with `vigencias_caducidad` — caught by that migration's own verification block, not by review.
 
 `pruebas/lib/paridad.mjs` reads that stamp: `02-sembrar.mjs`, `03-flujo-completo.mjs` and `01-diagnostico.mjs --pruebas` **refuse to start** if it is missing, older than 6 hours, from a different project, or says the databases diverge. Do not route around that check. `PORTGO_SIN_PARIDAD=1` exists for debugging the scripts themselves and stamps the report as worthless — it is never the answer to a failing verification.
 
@@ -270,7 +272,7 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
     ├── replicar-produccion-a-pruebas.sh  # Rule #3: rebuilds portgo-pruebas as an exact
     │                       #   copy of production. Reads prod, writes only pruebas,
     │                       #   asks before destroying anything
-    ├── verificar-paridad.sh     # Compares the two databases across 18 dimensions and
+    ├── verificar-paridad.sh     # Compares the two databases across 19 dimensions and
     │                       #   writes the stamp the test scripts require. Read-only
     ├── alinear-permisos-pruebas.sh  # Function grants only — a subset of the above
     └── aplicar-migraciones.sh   # Applies migrations via psql against PRODUCTION (asks for
