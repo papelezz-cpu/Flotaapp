@@ -365,6 +365,18 @@ hasta que el superadmin los aprueba.
 superadmin cambie `aprobacion` a algo distinto de `pendiente`, y que nadie
 transfiera `propietario_id`. Todo lo demás lo puede editar el dueño.
 
+**Todo recurso tiene dueño, y es obligatorio.** Desde el 2026-09-24
+`propietario_id` es `NOT NULL` en las cinco tablas de flota
+(`20260924140000_recursos_con_dueno_obligatorio.sql`). Antes admitía nulos y
+había siete recursos sin dueño —era el hueco 9, ahora cerrado—; los siete se
+asignaron a **Omar Silva Preciado** por decisión del usuario ese mismo día.
+
+Por qué importa más de lo que parece: `vigencia_propietario()` devuelve `NULL`
+para un recurso sin dueño, y la política `vigencia_propietario(...) = auth.uid()`
+compara contra `NULL`, que **nunca da verdadero**. Un recurso huérfano tenía sus
+documentos visibles solo para el superadmin y **ninguna empresa podía
+renovarlos**.
+
 Editar un recurso aprobado lo devuelve a revisión: `es_edicion`,
 `campos_editados` y `snapshot_anterior` guardan qué cambió para que el
 superadmin lo compare.
@@ -1022,27 +1034,12 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
    causa sigue ahí. No se ha dado en producción: las 7 solicitudes están
    `aprobada` y ningún perfil quedó `pendiente`. Arreglarlo es mover la
    pareja a una RPC o usar `actualizarConfirmado()` en las dos.
-9. **Hay recursos sin propietario, y nadie más que el superadmin puede
-   tocarlos.** `propietario_id` es **nullable en las cinco tablas de flota**
-   (verificado en el esquema el 2026-09-23), y en producción hay **7 recursos
-   con propietario nulo**: los custodios `CUS-001`, `CUS-002`, `CUS-003`,
-   `CUS-006` y los patios `PAT-001`, `PAT-002`, `PAT-005`, todos `aprobada`.
-
-   No es solo cosmético. `vigencia_propietario()` devuelve `NULL` para ellos, y
-   la política `vigencia_propietario(...) = auth.uid()` compara contra `NULL`,
-   que **nunca da verdadero**. Consecuencia: sus documentos solo los ve el
-   superadmin —por `is_superadmin()`— y **ninguna empresa puede renovarlos**,
-   porque ninguna es su dueña. Lo mismo vale para el `propietario_id` de los
-   guards de flota.
-
-   En el panel de Vigencias esos 7 documentos se agrupan bajo una empresa **sin
-   nombre**, porque `propietario?.nombre || propietario_id` se queda en nulo.
-   Se ve raro y es correcto: no hay empresa que poner.
-
-   Custodios y patios son servicios apagados en la interfaz, así que hoy no
-   estorba. **Decidir qué hacer con ellos es un pendiente de producto**:
-   asignarles dueño, o aceptar que son datos de demostración. No se toca nada
-   sin decidirlo.
+9. ~~**Hay recursos sin propietario.**~~ **CERRADO el 2026-09-24.** Eran 7 —los
+   custodios `CUS-001/002/003/006` y los patios `PAT-001/002/005`—, y el
+   problema no era cosmético: `vigencia_propietario()` devolvía `NULL`, la
+   política comparaba contra `NULL` y **ninguna empresa podía renovar sus
+   documentos**. Se asignaron a Omar Silva Preciado y `propietario_id` pasó a
+   ser `NOT NULL` en las cinco tablas. Ver *Alta de recursos*.
 10. **Un operador al que le falte una fecha no se puede editar.** Desde el
     2026-09-10 (`64ceb7c`) el formulario exige **las cuatro fechas** —examen
     médico, toxicológico, carta de antecedentes y vencimiento de licencia—
