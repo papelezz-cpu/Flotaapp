@@ -72,8 +72,24 @@ de fechas se habría vuelto más estricta de lo que debe.
 
 ## 2 · Ofertar en un pedido de carga peligrosa  ·  *como empresa*
 
-Entra como **empresa** (`omar_silvap@hotmail.com`) → **Solicitudes** → el pedido
-Hazmat/Torton que se sembró el 2026-09-23 → **💼 Hacer oferta**.
+Entra como **empresa** (`omar_silvap@hotmail.com`) → **Solicitudes**.
+
+**Cuál es la fila, por lo que se ve en pantalla** (identificarla por «la que se
+sembró el 2026-09-23» no servía: esa fecha no aparece en la lista):
+
+| Dato | Valor |
+|---|---|
+| Cliente | **Mario Silva** |
+| Ruta | **Manzanillo, Colima** → **San Isidro Mazatepec, Tala, Jalisco** |
+| Fecha de inicio | **28/09/2026** |
+| Tipo | Torton |
+
+> ⚠ **Hay otra fila que confunde, y ya pasó:** Omar tiene una oferta **aceptada**
+> en un pedido distinto —un «Sencillo porta contenedor 40/20», en estado
+> `acordado`— que se muestra con etiqueta de aceptado y **sin** botón de ofertar.
+> No es esa. La de esta prueba es la de Manzanillo → Tala del 28 de septiembre.
+
+Pulsa **💼 Hacer oferta** en esa.
 
 **Debe pasar:** el desplegable de camión sale **vacío**, con el texto
 **«Sin camiones con permiso hazmat vigente»**, y arriba el aviso:
