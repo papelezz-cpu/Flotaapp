@@ -1154,6 +1154,20 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
     - **El mensaje al cliente** usa el `motivo` que devuelve la RPC en vez de
       decir «la empresa» fijo.
 
+13. **El alta de flota del cliente nativo apunta a RPC que producción no tiene.**
+    `android/.../FlotaRepository.kt` llama a `guardar_camion` y `alta_operador`
+    (no hace `INSERT` directo), y **ninguna de las dos existe en producción**:
+    verificado el 2026-09-24 contra el volcado. Las define
+    `20260812120000_alta_flota.sql`, que nunca se aplicó allí.
+
+    Consecuencia: el lado empresa del móvil no puede dar de alta una unidad ni
+    un chofer en producción, aunque el contrato lo prometa
+    ([CONTRATO-MOVIL.md](CONTRATO-MOVIL.md), §6: *Flota (camiones/operadores) —
+    empresa ✓*). Salió al medir si el `NOT NULL` de `propietario_id` podía
+    romper ese camino: no puede, porque el camino no existe — y si algún día se
+    aplica esa migración, su cabecera dice que **fuerza**
+    `propietario_id = auth.uid()`, así que será compatible.
+
 ---
 
 ## Cómo mantener este documento
