@@ -436,13 +436,23 @@ Shared pattern: `propietario_id`, `estado` (`disponible`|`ocupado`|`no_disponibl
 
 All `SECURITY DEFINER` with pinned `search_path`, not callable via REST.
 
-### Business RPCs — atomic, and currently **unused by the web client**
+### Business RPCs — atomic, and **6 of the 11 are now in use**
 
 `supabase/migrations/20260810120000_rpc_transacciones.sql` defines 11 functions that push the multi-step flows into single Postgres transactions: `enviar_oferta`, `responder_oferta`, `responder_contraoferta`, `cancelar_reservacion`, `solicitar_cancelacion`, `registrar_evidencias`, `avanzar_tracking`, `abrir_expediente`, `calificar_servicio`, `enviar_mensaje`, `recomendar_unidad`. Each re-verifies the caller (`SECURITY DEFINER` skips RLS on SELECT/UPDATE, so authorship is checked by hand) and the guard triggers still apply.
 
-**`grep -rn "sb.rpc(" js/` returns nothing — the browser still orchestrates every one of these step by step, without atomicity.** `cancelarReserva()` (js/reservaciones.js) is 7 chained writes; if the tab closes halfway the unit stays `ocupado` and the pedido hangs — migration `20260728120000` exists because that already happened once.
+> ⚠ **This section used to say `grep -rn "sb.rpc(" js/` returns nothing and that `cancelarReserva()` was 7 chained writes. Both were false by 2026-09-24**, when they were re-measured. Believing them would send you to "fix" atomicity that is already there. The same claim survived correct-but-stale in `docs/FLUJO-OPERATIVO.md` (hueco 7 has the right count) while this file — the one always in context — kept the old text.
 
-When fixing anything in these flows, prefer moving the call to the RPC over patching the client sequence. The native iOS/Android clients are expected to use the RPCs (see `docs/CONTRATO-MOVIL.md`), so logic left in JS will diverge across the three clients.
+Measured 2026-09-24 with `grep -rhoE "sb\.rpc\('[a-z_]+'" js/`:
+
+| In use by the PWA | Still not called |
+|---|---|
+| `abrir_expediente`, `avanzar_tracking`, `calificar_servicio`, `cancelar_reservacion`, `registrar_evidencias`, `solicitar_cancelacion` | `enviar_oferta`, `responder_oferta`, `responder_contraoferta`, `enviar_mensaje`, `recomendar_unidad` |
+
+**`cancelarReserva()` (js/reservaciones.js) now calls `cancelar_reservacion`** — one transaction instead of the 7 chained writes, and it also frees `lavados`, which the old client code skipped. Migration `20260728120000` exists because the half-finished case happened for real before that.
+
+The PWA also calls RPCs from later migrations, which this list predates: **`aceptar_y_cerrar_acuerdo`** (`20260903120000`) is the whole client-accepts-offer path — it accepts, rejects the rival offers, creates the reservación and occupies the resource in one transaction, and it is what turns the guard's `DOCUMENTOS_VENCIDOS` into `resultado: 'pendiente_docs'` instead of a raw error. Plus `notificar_superadmins`, `cola_superadmin`, `reporte_kpis`, `desempeno_empresa` and `ids_superadmins`.
+
+**The five offer/message flows are the ones still orchestrated step by step in the browser.** When fixing anything there, prefer moving the call to the RPC over patching the client sequence. The native iOS/Android clients are expected to use the RPCs (see `docs/CONTRATO-MOVIL.md`), so logic left in JS will diverge across the three clients.
 
 The PWA has no chat feature — free-text messaging between cliente/empresa was removed in favor of fixed request buttons that fire a `notificaciones` row (e.g. `solicitarDocumentosCarga()`, `confirmarLugarHora()`, `avisarRetraso()`, `_enviarReporteCambio()` in `js/reservaciones.js`). The `mensajes` table, its RLS policies, and the `enviar_mensaje` RPC (with its server-side phone-number block) are left in place but unused by the web client — they exist for the native iOS/Android contract (see `docs/CONTRATO-MOVIL.md`), which is a separate client from this PWA.
 
