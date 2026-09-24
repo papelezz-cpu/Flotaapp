@@ -1997,34 +1997,34 @@ async function openHacerOferta(pedidoId) {
   // ── Verificar documentos legales de empresa (bloqueo por vencimiento) ──
   if (currentUser.rol === 'admin') {
     const hoy = new Date().toISOString().slice(0, 10);
-    const { data: perfil } = await sb.from('perfiles')
-      .select('permiso_sct, seguro_rc, seguro_carga, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga')
-      .eq('user_id', currentUser.id)
-      .single();
-    if (perfil) {
-      const expirados = [];
-      if (perfil.fecha_vencimiento_permiso_sct  && perfil.fecha_vencimiento_permiso_sct  < hoy) expirados.push('Permiso SCT');
-      if (perfil.fecha_vencimiento_seguro_rc    && perfil.fecha_vencimiento_seguro_rc    < hoy) expirados.push('Seguro RC');
-      if (perfil.fecha_vencimiento_seguro_carga && perfil.fecha_vencimiento_seguro_carga < hoy) expirados.push('Seguro de carga');
-      if (expirados.length) {
-        select.innerHTML = '<option value="">—</option>';
-        if (warn) { warn.textContent = `⛔ No puedes hacer ofertas — documentos de empresa vencidos: ${expirados.join(', ')}. Actualiza tus vigencias para continuar.`; warn.style.display = 'block'; }
-        if (btnEnv) btnEnv.disabled = true;
-        document.getElementById('modal-hacer-oferta').classList.add('open');
-        return;
-      }
-      // Aviso: sin ningun documento acreditado, la ficha que ve el cliente sale
-      // vacia de distintivos. Ya no existe el caso "declarado sin fecha" —
-      // declarar era marcar una casilla, y esa casilla se retiro: ahora la
-      // vigencia solo la escribe el superadmin al aprobar el documento.
-      const sinAcreditar = [];
-      if (!perfil.fecha_vencimiento_permiso_sct)  sinAcreditar.push('Permiso SCT');
-      if (!perfil.fecha_vencimiento_seguro_rc)    sinAcreditar.push('Seguro RC');
-      if (!perfil.fecha_vencimiento_seguro_carga) sinAcreditar.push('Seguro de carga');
-      if (sinAcreditar.length && recursoWarnEl) {
-        recursoWarnEl.textContent = `⚠ Tu empresa no tiene acreditado: ${sinAcreditar.join(', ')}. Súbelos en Mis unidades → Perfil de empresa → Documentos legales; hasta que el superadmin los apruebe, tu ficha no los muestra al cliente.`;
-        recursoWarnEl.style.display = 'block';
-      }
+    // H-04: las tres vigencias de empresa se leen de `vigencias`, en estado
+    // 'vigente' — una propuesta pendiente no acredita nada.
+    const { data: vigPerfil } = await sb.from('vigencias')
+      .select('tipo_documento, fecha_documento')
+      .eq('entidad_tipo', 'perfil').eq('entidad_id', currentUser.id).eq('estado', 'vigente');
+    const acreditado = new Map((vigPerfil || []).map(v => [v.tipo_documento, v.fecha_documento]));
+    const DOCS_EMPRESA = [
+      ['permiso_sct',  'Permiso SCT'],
+      ['seguro_rc',    'Seguro RC'],
+      ['seguro_carga', 'Seguro de carga'],
+    ];
+    const expirados = DOCS_EMPRESA
+      .filter(([t]) => acreditado.get(t) && acreditado.get(t) < hoy).map(([, l]) => l);
+    if (expirados.length) {
+      select.innerHTML = '<option value="">—</option>';
+      if (warn) { warn.textContent = `⛔ No puedes hacer ofertas — documentos de empresa vencidos: ${expirados.join(', ')}. Actualiza tus vigencias para continuar.`; warn.style.display = 'block'; }
+      if (btnEnv) btnEnv.disabled = true;
+      document.getElementById('modal-hacer-oferta').classList.add('open');
+      return;
+    }
+    // Aviso: sin ningun documento acreditado, la ficha que ve el cliente sale
+    // vacia de distintivos. Ya no existe el caso "declarado sin fecha" —
+    // declarar era marcar una casilla, y esa casilla se retiro: ahora la
+    // vigencia solo la escribe el superadmin al aprobar el documento.
+    const sinAcreditar = DOCS_EMPRESA.filter(([t]) => !acreditado.get(t)).map(([, l]) => l);
+    if (sinAcreditar.length && recursoWarnEl) {
+      recursoWarnEl.textContent = `⚠ Tu empresa no tiene acreditado: ${sinAcreditar.join(', ')}. Súbelos en Mis unidades → Perfil de empresa → Documentos legales; hasta que el superadmin los apruebe, tu ficha no los muestra al cliente.`;
+      recursoWarnEl.style.display = 'block';
     }
   }
 
@@ -2099,19 +2099,34 @@ async function openHacerOferta(pedidoId) {
       ? `⚠ No tienes camiones de tipo "${tipo}" disponibles. Solo puedes ofertar con la unidad del tipo solicitado.`
       : '⚠ No tienes camiones disponibles. Verifica el estado de tus unidades en el panel Admin.';
 
+    // H-04: las cinco caducidades de la unidad salen de `vigencias`, en una
+    // consulta para todas las unidades del select.
+    const vencePorCamion = {};
+    if (recursos.length) {
+      const { data: vigCam } = await sb.from('vigencias')
+        .select('entidad_id, tipo_documento, fecha_documento')
+        .eq('entidad_tipo', 'camion').eq('estado', 'vigente')
+        .in('entidad_id', recursos.map(c => c.id));
+      (vigCam || []).forEach(v => {
+        if (!vencePorCamion[v.entidad_id]) vencePorCamion[v.entidad_id] = {};
+        vencePorCamion[v.entidad_id][v.tipo_documento] = v.fecha_documento;
+      });
+    }
+
     const CAMION_EMOJI = { Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️' };
     select.innerHTML = recursos.length
       ? `<option value="">— Selecciona un camión —</option>`
       : `<option value="">Sin camiones disponibles</option>`;
     recursos.forEach(c => {
+      const vig = vencePorCamion[c.id] || {};
       const opt = document.createElement('option');
       opt.value                  = c.id;
       opt.dataset.operador       = c.operador || '';
-      opt.dataset.venceTc        = c.fecha_vencimiento_tc                || '';
-      opt.dataset.venceSeguro    = c.fecha_vencimiento_seguro            || '';
-      opt.dataset.venceSct       = c.fecha_vencimiento_permiso_sct       || '';
-      opt.dataset.venceCaat      = c.vigencia_caat                       || '';
-      opt.dataset.venceVerif     = c.fecha_vencimiento_verificacion      || '';
+      opt.dataset.venceTc        = vig.tarjeta_circulacion || '';
+      opt.dataset.venceSeguro    = vig.seguro_unidad       || '';
+      opt.dataset.venceSct       = vig.permiso_sct_unidad  || '';
+      opt.dataset.venceCaat      = vig.caat                || '';
+      opt.dataset.venceVerif     = vig.verificacion        || '';
       opt.textContent = `${CAMION_EMOJI[c.tipo] || '🚛'} ${c.id} — ${c.tipo} (${c.capacidad} ton)`;
       select.appendChild(opt);
     });
@@ -2120,16 +2135,22 @@ async function openHacerOferta(pedidoId) {
     const opRow = document.getElementById('ho-op-row');
     const opSel = document.getElementById('ho-operador');
     if (opRow && opSel && !esLavadoOf) {
-      let opQ = sb.from('operadores').select('id, nombre, primer_apellido, fecha_vencimiento_licencia_peligrosa').eq('aprobacion', 'aprobada');
+      let opQ = sb.from('operadores').select('id, nombre, primer_apellido').eq('aprobacion', 'aprobada');
       if (currentUser.rol !== 'superadmin') opQ = opQ.eq('propietario_id', currentUser.id);
       const { data: operadoresRaw } = await opQ;
 
       // Carga peligrosa: solo choferes con licencia HAZMAT vigente pueden
-      // asignarse — no basta con tener la unidad certificada.
-      const hoy = today();
-      const operadoresData = esCargaPeligrosa
-        ? (operadoresRaw || []).filter(op => op.fecha_vencimiento_licencia_peligrosa && op.fecha_vencimiento_licencia_peligrosa >= hoy)
-        : (operadoresRaw || []);
+      // asignarse — no basta con tener la unidad certificada. H-04: la licencia
+      // se lee de `vigencias` y el filtro de fecha va en la base.
+      let operadoresData = operadoresRaw || [];
+      if (esCargaPeligrosa) {
+        const { data: licencias } = await sb.from('vigencias')
+          .select('entidad_id')
+          .eq('entidad_tipo', 'operador').eq('tipo_documento', 'licencia_peligrosa')
+          .eq('estado', 'vigente').gte('fecha_documento', today());
+        const conLicencia = new Set((licencias || []).map(v => v.entidad_id));
+        operadoresData = operadoresData.filter(op => conLicencia.has(op.id));
+      }
 
       opSel.innerHTML = operadoresData.length
         ? `<option value="">— Selecciona un chofer —</option>`
@@ -2268,10 +2289,13 @@ async function _enviarOfertaCore() {
   // Carga peligrosa: última línea de defensa, por si el select se llenó con
   // datos obsoletos (el filtro real ya vive en openHacerOferta).
   if (operador && pedParaValidar?.carga_peligrosa) {
-    const { data: opSel2 } = await sb.from('operadores')
-      .select('fecha_vencimiento_licencia_peligrosa').eq('id', operador).single();
-    const hoy = today();
-    if (!opSel2?.fecha_vencimiento_licencia_peligrosa || opSel2.fecha_vencimiento_licencia_peligrosa < hoy) {
+    const { data: licVigente } = await sb.from('vigencias')
+      .select('id')
+      .eq('entidad_tipo', 'operador').eq('entidad_id', operador)
+      .eq('tipo_documento', 'licencia_peligrosa').eq('estado', 'vigente')
+      .gte('fecha_documento', today())
+      .maybeSingle();
+    if (!licVigente) {
       showToast('El chofer seleccionado no tiene licencia de materiales peligrosos vigente.', 'error');
       return;
     }

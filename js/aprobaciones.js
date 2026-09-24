@@ -86,6 +86,34 @@ async function renderAprobaciones() {
     sb.from('reservaciones').select('*').eq('estado', 'CancelacionSolicitada').order('cancelacion_solicitada_en'),
   ]);
 
+  // H-04: las caducidades de todo lo que está por aprobar, de una consulta.
+  // El espejo refleja la fila del recurso pase lo que pase con su `aprobacion`,
+  // así que un recurso `pendiente` ya tiene aquí lo que propuso su dueño — que
+  // es justo lo que el superadmin necesita ver para decidir.
+  _aprVigencias = new Map();
+  {
+    const porTipo = [
+      ['camion',   (camiones  || []).map(x => x.id)],
+      ['operador', (operadores|| []).map(x => x.id)],
+      ['custodio', (custodios || []).map(x => x.id)],
+      ['patio',    (patios    || []).map(x => x.id)],
+    ].filter(([, ids]) => ids.length);
+    if (porTipo.length) {
+      const { data: vigs } = await sb.from('vigencias_caducidad')
+        .select('entidad_tipo, entidad_id, tipo_documento, fecha_documento, vence_el')
+        .eq('estado', 'vigente')
+        .in('entidad_id', porTipo.flatMap(([, ids]) => ids));
+      // El filtro va por id; se comprueba también el tipo al indexar, porque un
+      // id de camión y uno de patio podrían coincidir en teoría.
+      const tiposPedidos = new Set(porTipo.map(([t]) => t));
+      (vigs || []).forEach(v => {
+        if (tiposPedidos.has(v.entidad_tipo)) {
+          _aprVigencias.set(`${v.entidad_tipo}|${v.entidad_id}|${v.tipo_documento}`, v);
+        }
+      });
+    }
+  }
+
   // Nombre de empresa para finalizaciones y cancelaciones pendientes
   const finEmpresaMap = {};
   const _conPropietario = [...(finalizaciones || []), ...(cancelaciones || [])];
@@ -115,15 +143,24 @@ async function renderAprobaciones() {
       acuerdos.map(p => p.oferta_pendiente_id && ofertasMap[p.oferta_pendiente_id]?.admin_id).filter(Boolean)
     )];
     if (adminIds.length) {
-      const { data: perfilesEmp } = await sb.from('perfiles')
-        .select('user_id, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga')
-        .in('user_id', adminIds);
-      (perfilesEmp || []).forEach(p => {
-        const exp = [];
-        if (p.fecha_vencimiento_permiso_sct  && p.fecha_vencimiento_permiso_sct  < _hoyAcu) exp.push('SCT');
-        if (p.fecha_vencimiento_seguro_rc    && p.fecha_vencimiento_seguro_rc    < _hoyAcu) exp.push('RC');
-        if (p.fecha_vencimiento_seguro_carga && p.fecha_vencimiento_seguro_carga < _hoyAcu) exp.push('Carga');
-        empresaComplianceMap[p.user_id] = exp;
+      // H-04: los documentos acreditados de la empresa se leen de `vigencias`.
+      // Solo 'vigente': una propuesta pendiente de revisión no acredita nada.
+      const { data: vigEmp } = await sb.from('vigencias_caducidad')
+        .select('entidad_id, tipo_documento, vence_el')
+        .eq('entidad_tipo', 'perfil').eq('estado', 'vigente')
+        .in('entidad_id', adminIds);
+      // El orden de las etiquetas lo fija esta lista, no el de las filas: antes
+      // salía siempre «SCT, RC, Carga» y así se queda.
+      const DOCS_EMPRESA = [['permiso_sct', 'SCT'], ['seguro_rc', 'RC'], ['seguro_carga', 'Carga']];
+      const vencePorEmp = {};
+      (vigEmp || []).forEach(v => {
+        if (!vencePorEmp[v.entidad_id]) vencePorEmp[v.entidad_id] = {};
+        vencePorEmp[v.entidad_id][v.tipo_documento] = v.vence_el;
+      });
+      adminIds.forEach(id => {
+        const f = vencePorEmp[id] || {};
+        empresaComplianceMap[id] = DOCS_EMPRESA
+          .filter(([t]) => f[t] && f[t] < _hoyAcu).map(([, etiqueta]) => etiqueta);
       });
     }
   }
@@ -623,6 +660,28 @@ function filtrarEmpresasApr() {
   });
 }
 
+// H-04: las caducidades que pintan las tarjetas de aprobación salen de
+// `vigencias_caducidad`, no de las columnas del recurso. Se cargan una vez en
+// renderAprobaciones() —las tarjetas son síncronas— y se leen desde aquí. El
+// patrón de variable de módulo es el que ya usa el resto del proyecto.
+let _aprVigencias = new Map();   // `tipo|id|documento` -> { fecha_documento, vence_el }
+
+// Una sola función donde antes había `_vence` y `_venceAnual` repetidos en
+// cuatro tarjetas. Que un documento derive su caducidad (el examen que vence a
+// los 12 meses) lo decide EL DATO —capturada distinta de vence_el—, no una
+// lista de cuáles son anuales escrita a mano.
+function _aprFilaVigencia(entTipo, entId, tipoDoc, label, hoy) {
+  const v = _aprVigencias.get(`${entTipo}|${entId}|${tipoDoc}`);
+  if (!v?.vence_el) {
+    return `<div class="apr-op-row"><span>${label}</span><strong style="color:var(--text-muted)">— Sin fecha</strong></div>`;
+  }
+  const vencido = v.vence_el < hoy;
+  const texto = v.fecha_documento && v.fecha_documento !== v.vence_el
+    ? `${fmtFecha(v.fecha_documento)} → vence ${fmtFecha(v.vence_el)}`
+    : fmtFecha(v.vence_el);
+  return `<div class="apr-op-row"><span>${label}</span><strong style="color:${vencido ? 'var(--danger)' : 'inherit'}">${texto}${vencido ? ' ⛔' : ''}</strong></div>`;
+}
+
 function _renderEmpresaItems(emp) {
   let html = '';
   const secciones = [
@@ -642,12 +701,6 @@ function _renderEmpresaItems(emp) {
 
 function _renderCamionCard(c) {
   const hoy = new Date().toISOString().slice(0, 10);
-  const _vence = (fecha, label) => {
-    if (!fecha) return `<div class="apr-op-row"><span>${label}</span><strong style="color:var(--text-muted)">— Sin fecha</strong></div>`;
-    const vencido = fecha < hoy;
-    const color   = vencido ? 'var(--danger)' : 'inherit';
-    return `<div class="apr-op-row"><span>${label}</span><strong style="color:${color}">${fmtFecha(fecha)}${vencido ? ' ⛔' : ''}</strong></div>`;
-  };
   const campos = `
     <div class="apr-op-detalle">
       <div class="apr-op-section-title">Vehículo</div>
@@ -668,11 +721,11 @@ function _renderCamionCard(c) {
       </div>
       <div class="apr-op-section-title">Vigencias de documentos</div>
       <div class="apr-op-grid">
-        ${_vence(c.fecha_vencimiento_tc,           'Tarjeta de circulación')}
-        ${_vence(c.fecha_vencimiento_seguro,        'Seguro')}
-        ${_vence(c.fecha_vencimiento_permiso_sct,   'Permiso SCT')}
-        ${_vence(c.vigencia_caat,                   'CAAT')}
-        ${_vence(c.fecha_vencimiento_verificacion,  'Verificación vehicular')}
+        ${_aprFilaVigencia('camion', c.id, 'tarjeta_circulacion', 'Tarjeta de circulación', hoy)}
+        ${_aprFilaVigencia('camion', c.id, 'seguro_unidad',        'Seguro',                 hoy)}
+        ${_aprFilaVigencia('camion', c.id, 'permiso_sct_unidad',   'Permiso SCT',            hoy)}
+        ${_aprFilaVigencia('camion', c.id, 'caat',                 'CAAT',                   hoy)}
+        ${_aprFilaVigencia('camion', c.id, 'verificacion',         'Verificación vehicular', hoy)}
       </div>
       <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
         ${c.imagen_tc  ? `<a href="#" onclick="verArchivoPublico('${escJs(c.imagen_tc)}')"  class="btn-edit" style="font-size:0.75rem">🪪 TC</a>` : ''}
@@ -722,19 +775,6 @@ function _renderOperadorCard(op) {
     ? `<img src="${esc(op.foto_operador)}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--border)" alt="foto">`
     : `<div style="width:48px;height:48px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700">${(op.nombre||'?')[0].toUpperCase()}</div>`;
 
-  const _vence = (fecha, label) => {
-    if (!fecha) return `<div class="apr-op-row"><span>${label}</span><strong style="color:var(--text-muted)">— Sin fecha</strong></div>`;
-    const vencido = fecha < hoy;
-    return `<div class="apr-op-row"><span>${label}</span><strong style="color:${vencido ? 'var(--danger)' : 'inherit'}">${fmtFecha(fecha)}${vencido ? ' ⛔' : ''}</strong></div>`;
-  };
-  const _venceAnual = (fechaExamen, label) => {
-    if (!fechaExamen) return `<div class="apr-op-row"><span>${label}</span><strong style="color:var(--text-muted)">— Sin fecha</strong></div>`;
-    const d = new Date(fechaExamen + 'T00:00:00');
-    d.setFullYear(d.getFullYear() + 1);
-    const expStr  = d.toISOString().slice(0, 10);
-    const vencido = expStr < hoy;
-    return `<div class="apr-op-row"><span>${label}</span><strong style="color:${vencido ? 'var(--danger)' : 'inherit'}">${fmtFecha(fechaExamen)} → vence ${fmtFecha(expStr)}${vencido ? ' ⛔' : ''}</strong></div>`;
-  };
 
   const diffHtml = _diffHtml(op, {
     nombre:'Nombre', primer_apellido:'Primer apellido', segundo_apellido:'Segundo apellido',
@@ -765,10 +805,10 @@ function _renderOperadorCard(op) {
         </div>
         <div class="apr-op-section-title">Vigencias</div>
         <div class="apr-op-grid">
-          ${_vence(op.fecha_vencimiento, 'Licencia de conducir')}
-          ${_venceAnual(op.fecha_examen_medico, 'Examen médico (1 año)')}
-          ${_venceAnual(op.fecha_examen_toxicologico, 'Examen toxicológico (1 año)')}
-          ${_venceAnual(op.fecha_carta_antecedentes, 'Carta antecedentes (1 año)')}
+          ${_aprFilaVigencia('operador', op.id, 'licencia',            'Licencia de conducir', hoy)}
+          ${_aprFilaVigencia('operador', op.id, 'examen_medico',       'Examen médico',        hoy)}
+          ${_aprFilaVigencia('operador', op.id, 'examen_toxicologico', 'Examen toxicológico',  hoy)}
+          ${_aprFilaVigencia('operador', op.id, 'carta_antecedentes',  'Carta antecedentes',   hoy)}
         </div>
         <div class="apr-op-section-title" style="margin-top:10px">Documentos</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
@@ -788,11 +828,6 @@ function _renderOperadorCard(op) {
 
 function _renderCustodioCard(c) {
   const hoy = new Date().toISOString().slice(0, 10);
-  const _vence = (fecha, label) => {
-    if (!fecha) return `<div class="apr-op-row"><span>${label}</span><strong style="color:var(--text-muted)">— Sin fecha</strong></div>`;
-    const vencido = fecha < hoy;
-    return `<div class="apr-op-row"><span>${label}</span><strong style="color:${vencido ? 'var(--danger)' : 'inherit'}">${fmtFecha(fecha)}${vencido ? ' ⛔' : ''}</strong></div>`;
-  };
   const diffHtml = _diffHtml(c, {
     nombre:'Nombre', tipo:'Tipo', descripcion:'Descripción',
     disponibilidad:'Disponibilidad', precio_dia:'Precio/día', certificaciones:'Certificaciones',
@@ -812,8 +847,8 @@ function _renderCustodioCard(c) {
       <div class="apr-op-detalle">
         <div class="apr-op-section-title">Vigencias</div>
         <div class="apr-op-grid">
-          ${_vence(c.fecha_vencimiento_cert, 'Certificación')}
-          ${c.porta_arma ? _vence(c.fecha_vencimiento_licencia_sedena, 'Licencia SEDENA') : ''}
+          ${_aprFilaVigencia('custodio', c.id, 'certificacion', 'Certificación', hoy)}
+          ${c.porta_arma ? _aprFilaVigencia('custodio', c.id, 'licencia_sedena', 'Licencia SEDENA', hoy) : ''}
           ${c.porta_arma && c.num_licencia_sedena ? `<div class="apr-op-row"><span>Núm. lic. SEDENA</span><strong>${esc(c.num_licencia_sedena)}</strong></div>` : ''}
         </div>
         ${c.doc_licencia_sedena ? `<a href="${esc(c.doc_licencia_sedena)}" target="_blank" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Licencia SEDENA</a>` : ''}
@@ -828,11 +863,6 @@ function _renderCustodioCard(c) {
 
 function _renderPatioCard(p) {
   const hoy = new Date().toISOString().slice(0, 10);
-  const _vence = (fecha, label) => {
-    if (!fecha) return `<div class="apr-op-row"><span>${label}</span><strong style="color:var(--text-muted)">— Sin fecha</strong></div>`;
-    const vencido = fecha < hoy;
-    return `<div class="apr-op-row"><span>${label}</span><strong style="color:${vencido ? 'var(--danger)' : 'inherit'}">${fmtFecha(fecha)}${vencido ? ' ⛔' : ''}</strong></div>`;
-  };
   const diffHtml = _diffHtml(p, {
     nombre:'Nombre', tipo:'Tipo', ubicacion:'Ubicación',
     area_m2:'Área (m²)', capacidad_vehiculos:'Capacidad (veh.)',
@@ -851,7 +881,7 @@ function _renderPatioCard(p) {
       ${diffHtml}
       <div class="apr-op-detalle">
         <div class="apr-op-grid">
-          ${_vence(p.fecha_vencimiento_permiso, 'Permiso operativo')}
+          ${_aprFilaVigencia('patio', p.id, 'permiso_patio', 'Permiso operativo', hoy)}
         </div>
         ${p.doc_permiso ? (p.doc_permiso.startsWith('http')
           ? `<a href="${esc(p.doc_permiso)}" target="_blank" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Ver permiso operativo</a>`
@@ -1308,24 +1338,28 @@ async function aprobarAcuerdo(pedidoId) {
   const { data: oferta } = await sb.from('ofertas').select('*').eq('id', ped.oferta_pendiente_id).single();
   if (!oferta) { showToast('Error: oferta no encontrada', 'error'); return; }
 
-  // Verificar documentos de empresa del proveedor
+  // Verificar documentos de empresa del proveedor. H-04: acreditados = las
+  // filas 'vigente' de `vigencias`; una propuesta pendiente no cuenta.
   const hoy = new Date().toISOString().slice(0, 10);
-  const { data: ep } = await sb.from('perfiles')
-    .select('nombre, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga')
-    .eq('user_id', oferta.admin_id).single();
+  const { data: vigEmp } = await sb.from('vigencias_caducidad')
+    .select('tipo_documento, vence_el')
+    .eq('entidad_tipo', 'perfil').eq('entidad_id', oferta.admin_id).eq('estado', 'vigente');
 
-  const docsVencidos = [];
-  if (ep) {
-    if (ep.fecha_vencimiento_permiso_sct  && ep.fecha_vencimiento_permiso_sct  < hoy) docsVencidos.push('Permiso SCT');
-    if (ep.fecha_vencimiento_seguro_rc    && ep.fecha_vencimiento_seguro_rc    < hoy) docsVencidos.push('Seguro RC');
-    if (ep.fecha_vencimiento_seguro_carga && ep.fecha_vencimiento_seguro_carga < hoy) docsVencidos.push('Seguro de carga');
-  }
+  const venceDoc = {};
+  (vigEmp || []).forEach(v => { venceDoc[v.tipo_documento] = v.vence_el; });
+  const docsVencidos = [
+    ['permiso_sct',  'Permiso SCT'],
+    ['seguro_rc',    'Seguro RC'],
+    ['seguro_carga', 'Seguro de carga'],
+  ].filter(([t]) => venceDoc[t] && venceDoc[t] < hoy).map(([, l]) => l);
 
   const ejecutar = () => _ejecutarAprobarAcuerdo(ped, oferta);
 
   if (docsVencidos.length) {
     showConfirm(
-      `⚠️ La empresa "${esc(ep.nombre || oferta.admin_nombre)}" tiene documentos vencidos: ${docsVencidos.join(', ')}. ¿Aprobar el acuerdo de todas formas?`,
+      // El nombre sale de la oferta, que lo lleva denormalizado: era el respaldo
+      // de antes y evita una consulta a `perfiles` solo para un texto.
+      `⚠️ La empresa "${esc(oferta.admin_nombre || '')}" tiene documentos vencidos: ${docsVencidos.join(', ')}. ¿Aprobar el acuerdo de todas formas?`,
       ejecutar,
       { danger: true, confirmLabel: 'Aprobar igualmente', cancelLabel: 'Cancelar' }
     );

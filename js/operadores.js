@@ -76,10 +76,19 @@ async function renderAdminOperadores() {
     return q;
   };
 
-  const [{ data: aprobados, error }, { data: rechazados }] = await Promise.all([
+  // H-04: la caducidad que pinta la tarjeta sale de `vigencias`. El formulario
+  // de edición sigue leyendo la columna del operador, que es donde escribe.
+  const vigQ = sb.from('vigencias')
+    .select('entidad_id, fecha_documento')
+    .eq('entidad_tipo', 'operador').eq('tipo_documento', 'licencia').eq('estado', 'vigente');
+
+  const [{ data: aprobados, error }, { data: rechazados }, { data: licencias }] = await Promise.all([
     baseQ().eq('aprobacion', 'aprobada'),
     baseQ().eq('aprobacion', 'rechazada'),
+    vigQ,
   ]);
+
+  const venceLicencia = new Map((licencias || []).map(v => [v.entidad_id, v.fecha_documento]));
 
   if (error) {
     container.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar operadores.</div>`;
@@ -95,7 +104,7 @@ async function renderAdminOperadores() {
   }
 
   if (aprobados?.length) {
-    html += aprobados.map(op => _operadorCardHTML(op)).join('');
+    html += aprobados.map(op => _operadorCardHTML(op, venceLicencia.get(op.id))).join('');
     _poblarSelectOperadores(aprobados);
   } else if (!rechazados?.length) {
     html = `<div class="empty-state"><div class="icon">👷</div>Sin operadores registrados.<br><small style="color:var(--text-muted)">Completa el formulario y envía a aprobación.</small></div>`;
@@ -105,7 +114,7 @@ async function renderAdminOperadores() {
   _prefillNumTrabajador();
 }
 
-function _operadorCardHTML(op) {
+function _operadorCardHTML(op, venceLicencia) {
   const nombre = [op.nombre, op.primer_apellido, op.segundo_apellido].filter(Boolean).join(' ');
   const foto   = op.foto_operador
     ? `<img src="${esc(op.foto_operador)}" class="op-foto-img" alt="foto operador">`
@@ -115,11 +124,11 @@ function _operadorCardHTML(op) {
     ? `<div class="op-sub">🪪 ${esc(op.num_licencia)}${op.clase_licencia ? ' · Clase ' + esc(op.clase_licencia) : ''}${op.tipo_licencia ? ' · ' + esc(op.tipo_licencia) : ''}</div>`
     : '';
   let vence = '';
-  if (op.fecha_vencimiento) {
-    const dias = Math.ceil((new Date(op.fecha_vencimiento) - new Date()) / 86400000);
+  if (venceLicencia) {
+    const dias = Math.ceil((new Date(venceLicencia) - new Date()) / 86400000);
     const color = dias < 0 ? 'var(--danger)' : dias <= 30 ? 'var(--warning, #d97706)' : 'var(--text-muted)';
     const aviso = dias < 0 ? ' ⚠ vencida' : dias <= 30 ? ` ⚠ vence en ${dias} día${dias !== 1 ? 's' : ''}` : '';
-    vence = `<div class="op-sub" style="color:${color}">Licencia vence: ${fmtFecha(op.fecha_vencimiento)}${aviso}</div>`;
+    vence = `<div class="op-sub" style="color:${color}">Licencia vence: ${fmtFecha(venceLicencia)}${aviso}</div>`;
   }
   const licFotoBtn = op.foto_licencia
     ? `<button class="btn-edit" style="font-size:0.7rem" onclick="window.open('${escJs(op.foto_licencia)}','_blank')">🪪 Ver licencia</button>`
@@ -227,6 +236,12 @@ async function editarOperadorRechazado(id) {
   const btn = document.querySelector('#admin-content-operador .btn-add');
   if (btn) btn.textContent = 'Guardar correcciones y reenviar';
 
+  // El de al lado dice «Limpiar», que describe el alta y no la edición: aquí
+  // lo que hace es abandonarla. Se renombra por las dos puertas de entrada,
+  // porque editarOperadorAprobado() pasa por esta función.
+  const btnCancelar = document.querySelector('#admin-content-operador .btn-cancel');
+  if (btnCancelar) btnCancelar.textContent = 'Cancelar edición';
+
   // Scroll al formulario
   document.querySelector('#admin-content-operador .admin-card')
     ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -267,6 +282,8 @@ function closeAgregarOperador() {
   _prefillNumTrabajador();
   const btn = document.querySelector('#admin-content-operador .btn-add');
   if (btn) btn.textContent = 'Enviar a aprobación';
+  const btnCancelar = document.querySelector('#admin-content-operador .btn-cancel');
+  if (btnCancelar) btnCancelar.textContent = 'Limpiar';
   document.getElementById('admin-operadores-list')
     ?.closest('.admin-card')
     ?.scrollIntoView({ behavior: 'smooth', block: 'start' });

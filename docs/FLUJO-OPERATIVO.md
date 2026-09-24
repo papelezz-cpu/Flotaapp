@@ -379,6 +379,53 @@ Consecuencia: un documento sin fecha no se vigila jamás. El papel está, nadie
 comprueba si sigue vigente, y el panel dice que todo está en orden. Por eso el
 alta de operador exige las cuatro fechas junto con sus documentos.
 
+#### El catálogo público ya lee la tabla `vigencias` (H-04, 2026-09-23)
+
+El distintivo que el cliente ve en el catálogo de proveedores («SCT ✓»,
+«Seg. RC ⛔ vencido», «✅ Docs al día») sale de la vista `empresas_publico`, y
+desde la Etapa 4 esa vista toma las tres fechas de la **fila `vigente` de
+`vigencias`**, no de las columnas de `perfiles`. Consecuencias de negocio:
+
+- **Una propuesta no acredita.** Solo cuenta la fila en estado `vigente`; una
+  en `pendiente` —lo que la empresa sube desde *Perfil de empresa → Enviar
+  documentos para aprobación*— no pinta ningún distintivo hasta que el
+  superadmin la acredita. Es la misma regla de H-02, ahora sostenida también
+  del lado de la lectura.
+- **El espejo de `vigencias` volvió a ser estricto.** Si el reflejo de un
+  documento falla, la escritura de origen falla entera y el usuario ve el
+  error: guardar un camión, dar de alta un operador o acreditar un perfil se
+  cae en vez de guardarse a medias. Durante las Etapas 3b y 3c era al revés
+  —se guardaba y la divergencia quedaba anotada—, y se cambió porque ya hay
+  una pantalla que depende de esa tabla: un fallo callado sería un distintivo
+  mal mostrado a un cliente.
+
+### Una fecha de vigencia de camión no se puede vaciar desde la interfaz
+
+Verificado el 2026-09-22 leyendo el código, después de que un guion de pruebas
+pidiera hacerlo y resultara imposible para todos los roles:
+
+- **La empresa** llega al formulario (*Mis unidades → ✏ Editar*), pero el
+  candado de [js/admin.js:534](../js/admin.js) le exige adjuntar el documento
+  renovado *en cuanto la fecha cambia* — y borrarla cuenta como cambio. El
+  mensaje es «Para renovar la vigencia de … debes adjuntar el documento
+  renovado», que describe la renovación y no el borrado, pero corta los dos.
+- **El superadmin** se salta ese candado (`dateChanged && !esSuperAdmin`), pero
+  **no tiene ruta al formulario**: su lista de accesos en
+  [js/views.js:93-104](../js/views.js) no incluye «Mis unidades» ni
+  «Operadores», y `editarCamion()` solo se llama desde la tarjeta de esa lista
+  ([js/admin.js:147](../js/admin.js)). El código de `renderAdmin()` sí prevé
+  que el superadmin vea toda la flota ([js/admin.js:118-120](../js/admin.js)),
+  y `.admin-only` sí es visible para `role-superadmin`
+  ([css/base.css:80-82](../css/base.css)) — lo que falta es la puerta.
+
+Consecuencia práctica: una fecha equivocada se puede **cambiar** (adjuntando
+algo), nunca **quitar**. Lo más cercano a quitarla es borrar la unidad entera
+([js/admin.js:836](../js/admin.js)), que sí es un `DELETE` de verdad.
+
+No está decidido si esto es un hueco o el comportamiento querido — un
+documento acreditado que desaparece sin dejar rastro tampoco es deseable. Se
+anota aquí para que la siguiente sesión no lo descubra otra vez desde cero.
+
 ---
 
 ## 3. Solicitud de servicio
@@ -971,6 +1018,27 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
    causa sigue ahí. No se ha dado en producción: las 7 solicitudes están
    `aprobada` y ningún perfil quedó `pendiente`. Arreglarlo es mover la
    pareja a una RPC o usar `actualizarConfirmado()` en las dos.
+9. **Hay recursos sin propietario, y nadie más que el superadmin puede
+   tocarlos.** `propietario_id` es **nullable en las cinco tablas de flota**
+   (verificado en el esquema el 2026-09-23), y en producción hay **7 recursos
+   con propietario nulo**: los custodios `CUS-001`, `CUS-002`, `CUS-003`,
+   `CUS-006` y los patios `PAT-001`, `PAT-002`, `PAT-005`, todos `aprobada`.
+
+   No es solo cosmético. `vigencia_propietario()` devuelve `NULL` para ellos, y
+   la política `vigencia_propietario(...) = auth.uid()` compara contra `NULL`,
+   que **nunca da verdadero**. Consecuencia: sus documentos solo los ve el
+   superadmin —por `is_superadmin()`— y **ninguna empresa puede renovarlos**,
+   porque ninguna es su dueña. Lo mismo vale para el `propietario_id` de los
+   guards de flota.
+
+   En el panel de Vigencias esos 7 documentos se agrupan bajo una empresa **sin
+   nombre**, porque `propietario?.nombre || propietario_id` se queda en nulo.
+   Se ve raro y es correcto: no hay empresa que poner.
+
+   Custodios y patios son servicios apagados en la interfaz, así que hoy no
+   estorba. **Decidir qué hacer con ellos es un pendiente de producto**:
+   asignarles dueño, o aceptar que son datos de demostración. No se toca nada
+   sin decidirlo.
 
 ---
 

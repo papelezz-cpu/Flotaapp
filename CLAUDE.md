@@ -77,13 +77,19 @@ The only permitted difference is **outgoing email, which is blocked in pruebas**
 ### The procedure, every time
 
 ```bash
-PORTGO_DB_URL_PROD="postgresql://…xnyqsewaluezkkrlyhxg…" \
-PORTGO_DB_URL_PRUEBAS="postgresql://…xskgnudiznryhgagxadu…" \
-bash supabase/replicar-produccion-a-pruebas.sh   # production is READ-ONLY throughout
+node pruebas/05-sonda-correo.mjs      # ① FIRST, as a precondition — see below
 
-node pruebas/04-copiar-archivos.mjs   # Storage bytes: without them every document 404s
-node pruebas/05-sonda-correo.mjs      # proves email is still blocked, without sending one
+bash supabase/replicar-produccion-a-pruebas.sh   # ② production is READ-ONLY throughout
+                                                 #   (asks for both connection strings by
+                                                 #   keyboard, so they stay out of history)
+
+node pruebas/04-copiar-archivos.mjs   # ③ Storage bytes: without them every document 404s
+node pruebas/05-sonda-correo.mjs      # ④ and again, because ② is what puts real addresses in
 ```
+
+**The email probe runs FIRST, not last, and this list used to say otherwise.** The replication script's own warning is the one that's right: *«el correo de pruebas debe estar bloqueado YA. En cuanto esta réplica termine, pruebas va a tener las direcciones REALES de los clientes»*. Checking the block **after** filling pruebas with real addresses is checking it too late — if it were open, it would already be open with real data inside. **If ① fails, stop there**: it is the only check in this list whose failure has a consequence outside the system, an email to an actual customer.
+
+**What the replication can and cannot knock down.** It is a `psql` script: it drops and rebuilds `public`, `auth.users`, Storage metadata, storage policies and cron jobs from production — **including anything applied to pruebas that production does not have** (so a migration under test gets erased; apply it *after* replicating, never before). It **cannot** touch the email block or the Auth settings: `CORREO_SALIDA` is an Edge Function secret and `mailer_autoconfirm` is a panel setting, neither lives in Postgres. Every mention of `CORREO_SALIDA` inside that script is an `echo`, never SQL. What *can* knock the block down is redeploying `enviar-notificacion` to pruebas with the secret unset — and nothing warns about that except probe ④.
 
 `supabase/verificar-paridad.sh` (also run automatically at the end of the replication) compares **18 dimensions**: columns, constraints, indexes, RLS flags, policies, triggers, function bodies and `search_path`, EXECUTE and table grants per role, extensions, the Realtime publication, pg_cron jobs, buckets, storage policies, exact row counts, auth users (id, email, password hash), Storage objects, and a **content hash of every table**. It writes the verdict to `supabase/espejo/paridad.json`.
 
