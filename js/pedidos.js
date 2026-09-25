@@ -2541,6 +2541,18 @@ async function responderContra(accion) {
 
 // ── CERRAR ACUERDO → CREAR RESERVACIÓN ────────────────
 
+// ⚠ CODIGO MUERTO desde el 2026-09-25: NADIE la llama.
+//
+// Su unico llamador era `_ejecutarAprobarAcuerdo()` (js/aprobaciones.js), que
+// ahora usa la RPC `cerrar_acuerdo()` — una transaccion en vez de estas seis
+// escrituras encadenadas. Se cambio porque esta version se rompio de verdad:
+// al fallar el INSERT de la reservacion, el pedido se quedaba en `acordado`
+// SIN reservacion, porque marca el pedido ANTES de insertar y el `catch` del
+// llamador no deshacia nada.
+//
+// Se conserva sin borrar a proposito, no por olvido: retirarla es una decision
+// aparte. Si alguien vuelve a necesitar cerrar un acuerdo desde el navegador,
+// la respuesta es la RPC, no esto.
 async function cerrarAcuerdo(oferta, pedido) {
   // Obtener las otras ofertas activas ANTES de rechazarlas (para notificar)
   const { data: otrasOfertas } = await sb.from('ofertas')

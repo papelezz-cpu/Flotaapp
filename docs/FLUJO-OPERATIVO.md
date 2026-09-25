@@ -1260,6 +1260,29 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
    pedido y, sobre todo, el desvío por documentos vencidos: **por esa vía una
    empresa con el permiso SCT vencido cerraba el trato sin que nadie lo
    mirara.**
+
+   **Actualizado el 2026-09-25: la aprobación del superadmin también usa una RPC.**
+   `_ejecutarAprobarAcuerdo()` llamaba a `cerrarAcuerdo()`, la función JS de seis
+   escrituras encadenadas, y **se rompió de verdad ese día**: al fallar el INSERT de
+   la reservación por un solape, el pedido se quedó en `acordado` SIN reservación
+   —marca el pedido antes de insertar y el `catch` no deshacía nada— y la pantalla
+   lo enseñaba como cerrado. Ahora llama a `cerrar_acuerdo()`, que hace lo mismo en
+   una transacción y además notifica a las partes.
+
+   Tres cosas que hubo que cuidar al cambiarlo, por si se toca otra vez:
+
+   - **Avisos duplicados.** La RPC ya inserta el par «acuerdo cerrado»; el par que
+     `_ejecutarAprobarAcuerdo()` insertaba a mano se retiró, o las dos partes
+     recibían dos campanas por el mismo acuerdo.
+   - **Los expedientes.** `_crearExpedienteAuto()` es una llamada de cliente y la
+     RPC no la hace; se conserva después, con el id que devuelve la RPC.
+   - **El NULL silencioso.** Si el pedido no llega en `pendiente_acuerdo`,
+     `cerrar_acuerdo()` devuelve NULL sin crear nada y sin error. Se comprueba el
+     id que vuelve; es el defecto que estuvo 22 horas en producción.
+
+   `cerrarAcuerdo()` (js/pedidos.js) queda **sin llamadores** y marcada como código
+   muerto. No se borra: es una decisión aparte.
+
 8. **`aprobarCuenta()` escribe dos tablas y solo mira el error de una.**
    `js/aprobaciones.js` actualiza `perfiles` y `solicitudes_cuenta` en el
    mismo `Promise.all` y comprueba únicamente el de `perfiles`. Si el segundo
