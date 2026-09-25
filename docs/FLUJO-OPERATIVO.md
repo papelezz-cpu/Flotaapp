@@ -629,16 +629,28 @@ revisar los papeles equivocados la mitad de las veces.
 viaje que empieza la semana que viene deja la unidad `disponible`, y eso es
 correcto: hoy está libre.
 
-La doble reserva **no depende de ese campo**, y la impiden **dos capas que
-tienen que mirar lo mismo**:
+La doble reserva **no depende de ese campo**, y la impiden **TRES capas que
+tienen que mirar lo mismo**. Que sean tres es el dato que se pierde: al arreglar
+H-06 se encontraron las dos de la base, y la tercera —la del navegador, la única
+que el usuario ve de verdad— apareció después, escribiendo el guión de pruebas.
 
 | Capa | Qué es | Quién la ve |
 |---|---|---|
-| `check_reservacion_disponibilidad()` | trigger `BEFORE INSERT OR UPDATE` | es la que **lanza `RECURSO_NO_DISPONIBLE`**, el mensaje que llega al usuario |
+| [js/modal.js](../js/modal.js) | consulta previa en el navegador, antes de insertar | **la primera que salta** en la reserva directa: «Este recurso ya está reservado del X al Y. Elige otras fechas.» |
+| `check_reservacion_disponibilidad()` | trigger `BEFORE INSERT OR UPDATE` | la que **lanza `RECURSO_NO_DISPONIBLE`** — en el cierre de acuerdo el cliente lee «❌ Ese recurso ya tiene una reserva en esas fechas…» |
 | `reservaciones_sin_solape` | `EXCLUDE` con GiST, activo solo para `Pendiente` y `Activa` | nadie, salvo en una carrera: dos inserciones simultáneas que ambas pasan el trigger |
 
-Las dos comparan **`recurso_tipo` Y `unidad`** más el solape de fechas (desde el
-2026-09-25, H-06). Antes comparaban solo `unidad`, y como `unidad` es un `text`
+> **Las tres no vigilan el mismo conjunto de estados, y eso sigue abierto.** Las
+> dos de la base solo miran `Pendiente` y `Activa`; la del navegador usa
+> `estado <> 'Cancelada'`, así que bloquea además sobre `PorAprobar`,
+> `CancelacionSolicitada` y `Completada`. Puede ser deliberado —rechaza de más,
+> no de menos— y alinearlo abriría reservas que hoy se rechazan, que es otra
+> decisión. Queda anotado, sin tocar.
+
+Las tres comparan **`recurso_tipo` Y `unidad`** más el solape de fechas (desde el
+2026-09-25, H-06). En el navegador el tipo se lee con la **misma expresión** que
+usa el insert (`currentRecurso?.tipo_recurso || 'camion'`): si difirieran, el
+aviso hablaría de un recurso distinto del que se va a guardar. Antes comparaban solo `unidad`, y como `unidad` es un `text`
 que guarda el id de un camión, un custodio, un patio o un lavado según
 `recurso_tipo`, **un patio y un camión que compartieran cadena de id se
 estorbaban**: reservar uno daba `RECURSO_NO_DISPONIBLE` sobre el otro, que estaba
@@ -646,10 +658,12 @@ libre. Hoy no ocurría —medido en el volcado del 2026-09-21: ninguna colisión
 id entre las cinco tablas, y ninguna `unidad` usada con más de un
 `recurso_tipo`— pero nada en el esquema lo impedía.
 
-**El orden importa al arreglar esto.** El trigger es `BEFORE`, así que salta antes
-de que la restricción se evalúe: tocar solo la restricción —que es lo que pedía
-la ficha de H-06— habría dejado el falso positivo igual de visible y con
-apariencia de arreglado. Y al revés: un `EXCLUDE` mal escrito puede pasar meses
+**El orden importa al arreglar esto, y es contraintuitivo: la capa más profunda es
+la que menos se ve.** El navegador salta primero, el trigger es `BEFORE` y salta
+antes de que la restricción se evalúe, y la restricción no la ve nadie salvo en
+una carrera. Tocar solo la restricción —que es lo que pedía la ficha de H-06—
+habría dejado el falso positivo igual de visible y con apariencia de arreglado,
+porque las dos capas de delante lo habrían seguido produciendo. Y al revés: un `EXCLUDE` mal escrito puede pasar meses
 sin dar la cara porque el trigger lo tapa, por eso la comprobación de la
 migración **apaga el trigger** y repite la prueba contra la restricción sola.
 
