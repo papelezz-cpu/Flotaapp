@@ -555,6 +555,31 @@ vacía el desplegable y desactiva el botón. Es la primera de dos capas.
 
 ## 5. Cierre del acuerdo
 
+> ⚠ **`cerrar_acuerdo()` exige que el pedido llegue en `pendiente_acuerdo` con su
+> `oferta_pendiente_id` puesto, y si no, NO HACE NADA Y NO AVISA.** Tiene una salida
+> temprana que devuelve la reservación ya existente —o `NULL` si no hay ninguna— sin
+> crear nada. Existe por idempotencia (migración `20260827190000`, el caso de la
+> oferta huérfana) y está bien; el peligro es llamarla sin cumplir la precondición.
+>
+> Quien la cumple es el **Paso 2** de `aceptar_y_cerrar_acuerdo()`, un `UPDATE` que
+> marca el pedido inmediatamente antes de llamarla. **Ese bloque se perdió el
+> 2026-09-24** al reescribir la función para el permiso de materiales peligrosos, y
+> durante 22 horas en producción **aceptar una oferta no creó ninguna reservación**
+> mientras la interfaz decía que sí. Lo devuelve
+> `20260925140000_URGENTE_devuelve_el_paso2_del_cierre.sql`.
+>
+> **Lo que lo tapó, y por qué se vio justo ese día:** la regla (c) de
+> `sincronizar_estados_pedidos()` —«pedido en negociación con una oferta aceptada →
+> `pendiente_acuerdo`»— recoge el destrozo, así que el acuerdo acaba cerrándose pero
+> **con el superadmin de por medio en cada trato**. Hasta el 2026-09-25 esa regla
+> también corría en el navegador al dibujar la lista, o sea al instante; al dejarla
+> solo en el cron (hueco 4) la espera pasó a 15 minutos y el síntoma se hizo
+> visible. El cambio del render no causó el fallo: le quitó la venda.
+>
+> **Si hay que reescribir esta función, se deriva de `pg_get_functiondef`, no se
+> teclea** — y su comprobación tiene que **cerrar un acuerdo de verdad**, no
+> afirmar cosas sobre el texto con `prosrc LIKE`, que es lo que dejó pasar esto.
+
 **Cuando las dos partes aceptan, la reserva se crea. El superadmin no
 interviene.** Decidido el 2026-09-09.
 

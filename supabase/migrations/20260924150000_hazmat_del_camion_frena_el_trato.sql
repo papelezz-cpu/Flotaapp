@@ -1,4 +1,19 @@
 -- ============================================================================
+-- ⚠⚠⚠ ESTA MIGRACIÓN SALIÓ CON UN DEFECTO. NO LA REAPLIQUES SOLA. ⚠⚠⚠
+--
+-- Al reescribir el cuerpo de `aceptar_y_cerrar_acuerdo()` se perdió el bloque
+-- «Paso 2» —el `UPDATE pedidos SET estado='pendiente_acuerdo', oferta_pendiente_id`
+-- que va justo antes de `cerrar_acuerdo()`—. Sin él, `cerrar_acuerdo()` se va por
+-- su salida temprana y **no crea la reservación, sin dar error**: la RPC devuelve
+-- `{resultado:'cerrado', reserva_id:null}` y la interfaz dice que todo fue bien.
+--
+-- Roto en producción del 2026-09-24T23:06Z al 2026-09-25. Lo arregla
+-- `20260925140000_URGENTE_devuelve_el_paso2_del_cierre.sql`, que hay que aplicar
+-- **siempre después** de esta si esta se vuelve a correr.
+--
+-- La regla del permiso de materiales peligrosos que añade sí es correcta; lo que
+-- falló fue teclear el cuerpo en vez de derivarlo de `pg_get_functiondef`.
+-- ============================================================================
 -- El permiso hazmat del CAMIÓN frena el trato  (hueco 12 de FLUJO-OPERATIVO.md)
 -- ============================================================================
 --
