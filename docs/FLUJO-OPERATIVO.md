@@ -1032,6 +1032,31 @@ escribir una fila; los guards deciden *qué transición* es legal para ti.
 | `guard_expediente_documento` | expediente_documentos | Que cada parte haga el trabajo de la otra: **solo el cliente sube**, **solo el transportista revisa** |
 | `guard_operador_hazmat` | ofertas, reservaciones | Asignar a carga peligrosa un chofer sin licencia vigente |
 
+**Y uno que no es un guard, pero comparte el mismo `BEFORE UPDATE`:**
+`trg_updated_at` → `set_updated_at()`, en las diez tablas con flujo de estados
+(pedidos, ofertas, reservaciones, perfiles, las cuatro de flota, operadores y
+expedientes). Sella `updated_at` **solo si la fila cambió de verdad**
+(`NEW IS DISTINCT FROM OLD`), para que un reenvío de payload idéntico —que este
+cliente hace— no suba la fila en ninguna cola.
+
+> **El nombre importa y no es decorativo.** El orden de disparo de los `BEFORE` es
+> **alfabético**, y este tiene que correr **después** de los `trg_guard_*`: un guard
+> puede rechazar el cambio o revertir campos de `NEW`, y sellar antes de saber si el
+> cambio es legal es sellar una mentira. `trg_updated_at` cumple porque los BEFORE
+> existentes empiezan por `trg_c`, `trg_g`, `trg_l` y `trg_s`. **Si alguien añade un
+> `BEFORE` que empiece por `v`…`z`, correrá después de este** — la comprobación de
+> la migración falla si eso ocurre.
+
+> **Lo que añadir la columna NO hizo:** cambiar el orden de ninguna cola. Las colas
+> siguen ordenando por `created_at`, con el defecto que H-19 describe —un recurso
+> editado vuelve a revisión y aparece **al fondo**, porque su `created_at` no
+> cambió—. Pasarlas a `updated_at` es un cambio de cliente aparte: altera lo que el
+> superadmin ve en pantalla, y eso se decide mirándolo.
+
+> Las filas que ya existían se rellenaron con `created_at` —y `expedientes`, que no
+> la tiene, con `solicitado_en`—. No es su fecha real de cambio: es lo más honesto
+> que se sabe de una fila que nunca la registró.
+
 ### Una vista no tiene RLS detrás, y nace escribible
 
 `empresas_publico` es la ficha pública del transportista: una vista sobre
