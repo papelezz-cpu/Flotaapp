@@ -32,14 +32,25 @@ Si no, para: estás en producción o el despliegue no ha llegado.
 
 | | |
 |---|---|
-| Camión | **`T-46BC79F9`** — Torton, de Omar Silva Preciado |
-| Tipo a pedir en la solicitud | **Torton** (exacto, o el camión no sale en el desplegable) |
+| Unidad | **la misma en las dos vueltas** — sirve cualquiera |
 | Vuelta A — fechas | **05/11/2026 → 07/11/2026** |
 | Vuelta B — fechas | **06/11/2026 → 08/11/2026** (solapan con A en el 6 y el 7) |
 
-Esas fechas están elegidas: `T-46BC79F9` ya tiene una reservación **Activa del
-10 al 12 de octubre**, y noviembre no la roza. Si usaras octubre, la vuelta A
-fallaría por esa reserva vieja y no probarías nada.
+**La unidad la decide el tipo que pidas en la solicitud**, no tú: el desplegable de
+«Hacer oferta» filtra por dueño y por **tipo exacto**, así que solo aparecen las
+unidades de esa empresa de ese tipo. Lo único que importa para esta prueba es que
+la unidad sea **la misma en A y en B**; cuál sea da igual.
+
+En la corrida del 2026-09-25 las dos solicitudes salieron de tipo **Rabón**, así
+que el desplegable ofreció solo **`R-A330E825`** — y eso vino bien: al haber una
+sola, no hay forma de equivocarse y elegir distinta unidad en cada vuelta.
+Comprobado ese día: `R-A330E825` está `disponible`, `aprobada` y **sin ninguna
+reservación**, así que la vuelta A puede cerrar.
+
+> **Las fechas de noviembre no son arbitrarias.** Si usas una unidad que ya tenga
+> reserva en esas fechas, la vuelta A falla por esa reserva vieja y no prueba nada.
+> `T-46BC79F9` (Torton), por ejemplo, está reservado del **10 al 12 de octubre**.
+> Antes de empezar, mira que la unidad esté libre en el rango que vayas a usar.
 
 ---
 
@@ -49,7 +60,7 @@ fallaría por esa reserva vieja y no probarías nada.
 |---|---|---|---|
 | 1 | cliente | inicio → **«Solicitar servicio»** | Camión **Torton**, **05/11/2026 → 07/11/2026**. Rellena origen y destino con lo que quieras. Botón **«📋 Publicar solicitud»** |
 | 2 | superadmin | inicio → **«Por aprobar»** | **«✓ Aprobar y publicar»** |
-| 3 | empresa (Omar) | inicio → **«Solicitudes»** | **«Hacer oferta»**, elige **«🚛 T-46BC79F9 — Torton (14 ton)»**, pon un precio, **«Enviar oferta»** |
+| 3 | empresa (Omar) | inicio → **«Solicitudes»** | **«Hacer oferta»**, elige **la unidad que ofrezca el desplegable** (anótala: en la vuelta B hay que elegir **la misma**), pon un precio, **«Enviar oferta»** |
 | 4 | cliente | inicio → **«Mis solicitudes»** | **«✓ Aceptar $…»** → rellena el modal → **«✓ Guardar y confirmar»** |
 
 **Resultados esperados, en este orden:**
@@ -64,7 +75,7 @@ Y después del paso 4, **sin tocar nada más y sin entrar como superadmin**:
 
 - la solicitud pasa a **`✓ Acordado`**;
 - en **«Reservaciones»** aparece una reserva **Activa** del 05 al 07 de noviembre
-  con el camión `T-46BC79F9`.
+  con la unidad que ofertaste.
 
 ### Cómo se ve si la corrección NO está
 
@@ -87,7 +98,7 @@ superadmin. No es este fallo.
 Repite los **mismos cuatro pasos**, con:
 
 - fechas **06/11/2026 → 08/11/2026**
-- **el mismo camión `T-46BC79F9`**
+- **la MISMA unidad de la vuelta A**
 
 **En el paso 3 vas a poder elegirlo aunque ya esté reservado, y no es un fallo.**
 Ofertar no reserva: el desplegable no mira fechas, y el cliente puede no aceptar
@@ -115,7 +126,7 @@ abrió.
 ## Rastro que dejan estas pruebas
 
 En pruebas quedan dos solicitudes, sus ofertas y **una** reservación (la de la
-vuelta A), y `T-46BC79F9` aparecerá ocupado del 05 al 07 de noviembre.
+vuelta A), y la unidad usada aparecerá ocupada del 05 al 07 de noviembre.
 
 Queda además, de la sesión anterior, el pedido del **10–11 de octubre** que el
 cron dejó en `pendiente_acuerdo` con su oferta aceptada. **No lo apruebes**: su
