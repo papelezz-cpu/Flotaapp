@@ -2259,9 +2259,23 @@ async function openHacerOferta(pedidoId) {
   // Filtrar por disponibilidad real en las fechas del pedido
   if (recursos.length && pedido?.fecha_ini) {
     const fechaFin = pedido.fecha_fin || pedido.fecha_ini;
+    // H-06 (2026-09-25): también por `recurso_tipo`. `unidad` guarda el id de un
+    // camión, un custodio, un patio o un lavado, así que sin acotar el tipo una
+    // colisión de cadenas ocultaría del desplegable una unidad que está libre.
+    // `recursos` ya viene filtrado por dueño y por tipo, así que haría falta que
+    // la colisión fuera dentro de la misma empresa — improbable, y aun así es la
+    // misma regla que ya aplican las tres capas de la base.
+    // Los CUATRO tipos, no tres: `esLavadoOf` existe y sin él un servicio de
+    // lavado buscaría conflictos con recurso_tipo='camion', no encontraría
+    // ninguno, y el filtro de disponibilidad dejaría de actuar en silencio.
+    const tipoRecurso = esCustodio ? 'custodio'
+                      : esPatio    ? 'patio'
+                      : esLavadoOf ? 'lavado'
+                      : 'camion';
     const { data: conflictos } = await sb.from('reservaciones')
       .select('unidad')
       .in('unidad', recursos.map(r => r.id))
+      .eq('recurso_tipo', tipoRecurso)
       .in('estado', ['Pendiente', 'Activa'])
       .lte('fecha_ini', fechaFin)
       .gte('fecha_fin', pedido.fecha_ini);
@@ -2284,7 +2298,11 @@ async function openHacerOferta(pedidoId) {
         select.appendChild(opt);
       });
       if (!recursos.length) {
-        const tipoNombre = esCustodio ? 'custodios' : esPatio ? 'patios' : 'camiones';
+        // Tambien los cuatro: antes un servicio de lavado leia «No tienes
+        // camiones disponibles», que manda a la empresa a mirar la flota
+        // equivocada.
+        const tipoNombre = esCustodio ? 'custodios' : esPatio ? 'patios'
+                         : esLavadoOf ? 'lavados'   : 'camiones';
         sinRecursosMsg = `⚠ No tienes ${tipoNombre} disponibles en las fechas del pedido (${fmtFecha(pedido.fecha_ini)}${pedido.fecha_fin && pedido.fecha_fin !== pedido.fecha_ini ? ' al ' + fmtFecha(pedido.fecha_fin) : ''}). Revisa tus reservaciones activas.`;
       }
     }

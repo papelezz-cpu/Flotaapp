@@ -669,29 +669,34 @@ revive; lo que cierra el falso positivo **hoy** es el trigger. El mismo día se
 corrigió también [js/detalle.js](../js/detalle.js), que pintaba las fechas ocupadas
 de una unidad sin acotar el tipo — y que es código muerto por el mismo hueco 6.
 
-#### Ofertar una unidad ya reservada: se va a bloquear (decisión del usuario, 2026-09-25)
+#### Ofertar una unidad ya reservada: **ya está bloqueado** (verificado 2026-09-25)
 
-**Hoy está permitido y nadie avisa.** Verificado el 2026-09-25:
-`_enviarOfertaCore()` valida el **tipo** del camión, la **licencia hazmat** del
-chofer y que la empresa no tenga ya una oferta activa **en esa misma solicitud**. No
-mira fechas contra `reservaciones`, y el desplegable de «Hacer oferta» no marca las
-unidades ocupadas. Consecuencia: la empresa compromete dos veces el mismo camión, el
-cliente acepta, y el error sale **al final**, al pulsar «✓ Guardar y confirmar».
+El desplegable de «Hacer oferta» **excluye las unidades que ya tienen reserva en
+las fechas del pedido**, y si no queda ninguna dice «⚠ No tienes camiones
+disponibles en las fechas del pedido (X al Y). Revisa tus reservaciones activas.»
+Está en `openHacerOferta()` ([js/pedidos.js](../js/pedidos.js)), en el bloque
+«Filtrar por disponibilidad real en las fechas del pedido», y compara contra
+`reservaciones` en `Pendiente` y `Activa` — **exactamente los dos estados que
+vigilan las capas de la base**, que era lo único delicado de esta regla.
 
-**Decisión tomada: no se debe poder ofertar una unidad que ya está reservada en esas
-fechas.** El freno se mueve del paso del cliente al de la empresa: se entera quien
-elige la unidad, cuando todavía puede elegir otra.
+> ⚠ **Yo afirmé aquí lo contrario, y era falso.** El 2026-09-25 escribí que
+> «ofertar con una unidad ya comprometida está permitido y nadie avisa», después
+> de leer `_enviarOfertaCore()` —la validación del envío— y los `.eq()` del
+> desplegable. El filtro por fechas está ~100 líneas más abajo, al poblar el
+> `select`, y no lo vi. Sobre esa afirmación falsa se abrió una «decisión
+> pendiente» de bloquearlo: **ya estaba hecho**. Lo destapó el usuario probando,
+> cuando el desplegable le negó la unidad.
+>
+> La lección, que es la misma de siempre en este archivo: **grep sobre la función
+> que valida no es leer el camino completo.** Quien decide qué se puede ofertar es
+> quien LLENA el desplegable, no quien comprueba el envío.
 
-> Yo había anotado aquí lo contrario —que bloquearlo sería peor, porque impediría
-> ofertar sobre una reserva que aún puede cancelarse—. **Esa objeción se planteó y
-> el usuario decidió bloquear igualmente**, así que la decisión es esa. La objeción
-> queda escrita solo como lo que hay que cuidar al implementarlo: qué estados
-> cuentan como «reservada». Las dos capas de la base solo miran `Pendiente` y
-> `Activa`; copiar eso y no algo más amplio es lo que evita bloquear por una
-> reserva que ya no está viva.
-
-Pendiente de implementar; va en su propio cambio, después de que pase la prueba del
-Paso 2 ([PLAN-PRUEBAS-PASO2.md](../pruebas/PLAN-PRUEBAS-PASO2.md)).
+**Consecuencia para las pruebas:** el choque de doble reserva **no se puede
+provocar desde la interfaz**. La empresa no llega a ofertar la unidad ocupada, así
+que el cliente nunca puede aceptarla y el trigger nunca se ejecuta por esa vía. Las
+tres capas de abajo son red para lo que la interfaz no cubre: una carrera entre dos
+cierres simultáneos, el cliente nativo, o un cambio de fechas posterior a la
+oferta.
 
 > **Las tres no vigilan el mismo conjunto de estados, y eso sigue abierto.** Las
 > dos de la base solo miran `Pendiente` y `Activa`; la del navegador usa

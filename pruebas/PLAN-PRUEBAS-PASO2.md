@@ -93,35 +93,29 @@ superadmin. No es este fallo.
 
 ---
 
-## Vuelta B — la doble reserva debe frenar (H-06, por primera vez de verdad)
+## Vuelta B — la unidad ocupada ya no se puede ni ofertar
 
-Repite los **mismos cuatro pasos**, con:
+Repite los pasos con **la misma unidad** y fechas **06/11/2026 → 08/11/2026**.
 
-- fechas **06/11/2026 → 08/11/2026**
-- **la MISMA unidad de la vuelta A**
+**Resultado esperado, y salta ANTES de lo que este guion decía:** al pulsar
+«Hacer oferta» como empresa, la unidad **no aparece en el desplegable**, y si era
+la única de ese tipo sale
 
-**En el paso 3 vas a poder elegirlo aunque ya esté reservado, y no es un fallo.**
-Ofertar no reserva: el desplegable no mira fechas, y el cliente puede no aceptar
-nunca. El freno está en el paso 4.
+> ⚠ No tienes camiones disponibles en las fechas del pedido (06/11/2026 al 08/11/2026). Revisa tus reservaciones activas.
 
-**Resultado esperado en el paso 4:**
+**Eso es el resultado correcto y es doblemente bueno:** demuestra que el bloqueo al
+ofertar ya existe —`openHacerOferta()` excluye las unidades con reserva en esas
+fechas, comparando contra `Pendiente` y `Activa`— **y** confirma que la vuelta A
+creó la reservación de verdad. Si la vuelta A no hubiera cerrado, la unidad
+seguiría libre y el desplegable la ofrecería.
 
-> ❌ Ese recurso ya tiene una reserva en esas fechas. La oferta sigue vigente — elige otra o pide una nueva.
-
-Y **nada debe haber cambiado**:
-
-- **no** aparece una segunda reservación;
-- la solicitud **sigue en negociación**, no en `⏳ Acuerdo en revisión`;
-- **la oferta sigue viva** y el cliente puede volver a intentarlo o pedir otra.
-
-Eso último es nuevo y merece mirarse: antes de la corrección, un intento fallido
-dejaba la oferta marcada como aceptada y el pedido a medias. Ahora la transacción
-revierte entera, así que el mensaje «la oferta sigue vigente» dice la verdad.
-
-**Si el segundo acuerdo se cierra, para**: la protección contra doble reserva se
-abrió.
-
----
+> La versión anterior de este guion esperaba aquí el aviso «❌ Ese recurso ya tiene
+> una reserva en esas fechas» al confirmar como cliente. **Ese camino no se puede
+> recorrer desde la interfaz**: la empresa no llega a ofertar la unidad ocupada. El
+> trigger y el `EXCLUDE` de la base siguen ahí como red para lo que la interfaz no
+> cubre —una carrera entre dos cierres, el cliente nativo, o un cambio de fechas
+> posterior a la oferta—, y se ejercitan en la comprobación de la propia
+> migración, que apaga el trigger para probar cada capa por separado.
 
 ## Rastro que dejan estas pruebas
 
