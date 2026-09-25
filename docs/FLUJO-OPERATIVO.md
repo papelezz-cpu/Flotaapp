@@ -669,18 +669,29 @@ revive; lo que cierra el falso positivo **hoy** es el trigger. El mismo día se
 corrigió también [js/detalle.js](../js/detalle.js), que pintaba las fechas ocupadas
 de una unidad sin acotar el tipo — y que es código muerto por el mismo hueco 6.
 
-> **Ofertar con una unidad ya comprometida está permitido, y nadie avisa.**
-> Verificado el 2026-09-25: `_enviarOfertaCore()` valida el **tipo** del camión, la
-> **licencia hazmat** del chofer y que la empresa no tenga ya una oferta activa **en
-> esa misma solicitud**. No mira fechas contra `reservaciones`, y el desplegable de
-> «Hacer oferta» no marca las unidades ocupadas. Es coherente —una oferta no es una
-> reserva, y el cliente puede no aceptarla nunca— pero tiene una consecuencia: la
-> empresa puede comprometer dos veces el mismo camión, el cliente acepta, y el
-> error solo aparece **al final**, al pulsar «✓ Guardar y confirmar». **Decisión
-> pendiente**, no un hueco cerrado: avisar al ofertar sería más amable, pero
-> bloquearlo sería peor — impediría ofertar por si acaso sobre una reserva que aún
-> puede cancelarse. Sale del guión de pruebas del 2026-09-25, donde se confundió
-> con un fallo.
+#### Ofertar una unidad ya reservada: se va a bloquear (decisión del usuario, 2026-09-25)
+
+**Hoy está permitido y nadie avisa.** Verificado el 2026-09-25:
+`_enviarOfertaCore()` valida el **tipo** del camión, la **licencia hazmat** del
+chofer y que la empresa no tenga ya una oferta activa **en esa misma solicitud**. No
+mira fechas contra `reservaciones`, y el desplegable de «Hacer oferta» no marca las
+unidades ocupadas. Consecuencia: la empresa compromete dos veces el mismo camión, el
+cliente acepta, y el error sale **al final**, al pulsar «✓ Guardar y confirmar».
+
+**Decisión tomada: no se debe poder ofertar una unidad que ya está reservada en esas
+fechas.** El freno se mueve del paso del cliente al de la empresa: se entera quien
+elige la unidad, cuando todavía puede elegir otra.
+
+> Yo había anotado aquí lo contrario —que bloquearlo sería peor, porque impediría
+> ofertar sobre una reserva que aún puede cancelarse—. **Esa objeción se planteó y
+> el usuario decidió bloquear igualmente**, así que la decisión es esa. La objeción
+> queda escrita solo como lo que hay que cuidar al implementarlo: qué estados
+> cuentan como «reservada». Las dos capas de la base solo miran `Pendiente` y
+> `Activa`; copiar eso y no algo más amplio es lo que evita bloquear por una
+> reserva que ya no está viva.
+
+Pendiente de implementar; va en su propio cambio, después de que pase la prueba del
+Paso 2 ([PLAN-PRUEBAS-PASO2.md](../pruebas/PLAN-PRUEBAS-PASO2.md)).
 
 > **Las tres no vigilan el mismo conjunto de estados, y eso sigue abierto.** Las
 > dos de la base solo miran `Pendiente` y `Activa`; la del navegador usa
