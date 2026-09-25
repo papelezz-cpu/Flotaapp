@@ -440,7 +440,7 @@ Shared pattern: `propietario_id`, `estado` (`disponible`|`ocupado`|`no_disponibl
 
 ### DB functions & triggers
 **Notification triggers:** `notificar_nueva_oferta`, `notificar_respuesta_oferta`, `fn_notificar_nuevo_mensaje`, `notificar_nueva_reserva`, `notificar_cambio_reserva`.
-**Helpers:** `is_superadmin()` (RLS), `mi_nombre()`, `tracking_pasos()`, `tabla_recurso()`, `es_servicio_camion()`, `recurso_tipo_de_servicio()`, `expire_stale_offers`, `check_reservacion_disponibilidad` (raises `RECURSO_NO_DISPONIBLE` / `P0001` on overlapping bookings).
+**Helpers:** `is_superadmin()` (RLS), `mi_nombre()`, `tracking_pasos()`, `tabla_recurso()`, `es_servicio_camion()`, `recurso_tipo_de_servicio()`, `expire_stale_offers`, `check_reservacion_disponibilidad` (raises `RECURSO_NO_DISPONIBLE` / `P0001` on overlapping bookings — **`BEFORE`, so it fires before the `reservaciones_sin_solape` EXCLUDE is ever evaluated**; both compare `recurso_tipo` **and** `unidad` since 2026-09-25, and if you change one you must change the other, or the constraint silently stops matching what the user is told).
 **Guard triggers — the transition police.** Beyond RLS (which decides *whether* you may write a row), these decide *which state changes are legal for you*: `trg_guard_perfil_self_update`, `trg_guard_reservacion_update`, `trg_guard_pedido_update`, `trg_guard_oferta_update`, `trg_guard_expediente_documento`, and one per fleet table (`camiones`, `custodios`, `patios`, `lavados`, `operadores`). They read `auth.uid()`, so **they still apply inside `SECURITY DEFINER` functions** — a bad transition rolls back the whole transaction.
 
 All `SECURITY DEFINER` with pinned `search_path`, not callable via REST.

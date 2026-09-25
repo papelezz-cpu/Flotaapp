@@ -629,9 +629,44 @@ revisar los papeles equivocados la mitad de las veces.
 viaje que empieza la semana que viene deja la unidad `disponible`, y eso es
 correcto: hoy está libre.
 
-La doble reserva **no depende de ese campo**. La impide
-`reservaciones_sin_solape`, un `EXCLUDE` con GiST sobre unidad y rango de
-fechas, activo para `Pendiente` y `Activa`.
+La doble reserva **no depende de ese campo**, y la impiden **dos capas que
+tienen que mirar lo mismo**:
+
+| Capa | Qué es | Quién la ve |
+|---|---|---|
+| `check_reservacion_disponibilidad()` | trigger `BEFORE INSERT OR UPDATE` | es la que **lanza `RECURSO_NO_DISPONIBLE`**, el mensaje que llega al usuario |
+| `reservaciones_sin_solape` | `EXCLUDE` con GiST, activo solo para `Pendiente` y `Activa` | nadie, salvo en una carrera: dos inserciones simultáneas que ambas pasan el trigger |
+
+Las dos comparan **`recurso_tipo` Y `unidad`** más el solape de fechas (desde el
+2026-09-25, H-06). Antes comparaban solo `unidad`, y como `unidad` es un `text`
+que guarda el id de un camión, un custodio, un patio o un lavado según
+`recurso_tipo`, **un patio y un camión que compartieran cadena de id se
+estorbaban**: reservar uno daba `RECURSO_NO_DISPONIBLE` sobre el otro, que estaba
+libre. Hoy no ocurría —medido en el volcado del 2026-09-21: ninguna colisión de
+id entre las cinco tablas, y ninguna `unidad` usada con más de un
+`recurso_tipo`— pero nada en el esquema lo impedía.
+
+**El orden importa al arreglar esto.** El trigger es `BEFORE`, así que salta antes
+de que la restricción se evalúe: tocar solo la restricción —que es lo que pedía
+la ficha de H-06— habría dejado el falso positivo igual de visible y con
+apariencia de arreglado. Y al revés: un `EXCLUDE` mal escrito puede pasar meses
+sin dar la cara porque el trigger lo tapa, por eso la comprobación de la
+migración **apaga el trigger** y repite la prueba contra la restricción sola.
+
+Lo que sostiene la referencia sin clave foránea sigue siendo
+`trg_guard_unidad_existe`, que resuelve la tabla con `tabla_recurso(recurso_tipo)`
+y exige que el id exista allí.
+
+> **Con `unidad` en NULL ninguna de las dos capas actúa** —`NULL = NULL` no es
+> cierto— y la columna es nullable. Es anterior a H-06 y H-06 no lo empeora.
+> Medido: 0 de las filas en `Pendiente`/`Activa` tenían `unidad` NULL.
+
+**El CHECK de prefijos que proponía H-06 (c) no se hizo, y no por coste.** El
+convenio no es por tabla: en `camiones` hay **cinco** prefijos (C, T, R, F, S)
+porque el prefijo codifica el **tipo de camión**, no la tabla, así que un CHECK
+tendría que enumerar los cinco de hoy y rompería con el sexto tipo que alguien
+diera de alta. Y con `recurso_tipo` en las dos capas, una colisión entre tablas
+ya no tiene consecuencia: el convenio dejó de sostener nada.
 
 > ⚠ **Hueco conocido:** nada marca la unidad `ocupado` cuando llega su fecha.
 > Los cuatro puntos que lo hacen exigen `fecha_ini <= hoy` y ninguno vuelve a

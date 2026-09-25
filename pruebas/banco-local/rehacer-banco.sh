@@ -49,8 +49,23 @@ create or replace function auth.role() returns text language sql stable as $$
   select coalesce(nullif(current_setting('request.jwt.claim.role', true), ''), 'authenticated') $$;
 SQL
 
+# Extensiones que el esquema necesita ANTES de cargarse. btree_gist es
+# obligatoria: sin ella `reservaciones_sin_solape` —el EXCLUDE con GiST sobre
+# `unidad text`— no se puede crear, y el banco quedaba SIN la protección contra
+# doble reserva sin decir nada. Se descubrió el 2026-09-25 al ir a probar H-06.
+EXT="$RAIZ/supabase/espejo/09b-extensiones-public.sql"
+[ -f "$EXT" ] && psql -U postgres -d "$BD" -q -f "$EXT" 2>/dev/null
+
 psql -U postgres -d "$BD" -q -f "$ESQUEMA" > /tmp/carga-banco.log 2>&1
-ERRS=$(grep -c '^ERROR' /tmp/carga-banco.log || true)
+# `grep -c '^ERROR'` NO funciona, y este guion lo usó hasta el 2026-09-25: psql
+# prefija cada error con `psql:<archivo>:<linea>: `, así que el ancla de
+# principio de línea nunca casaba y el contador daba 0 SIEMPRE. La guarda de
+# abajo no salto ni una vez, y el banco se daba por limpio con el EXCLUDE sin
+# crear. Un contador que solo sabe decir cero no es un contador.
+ERRS=$(grep -cE '(^|: )ERROR:' /tmp/carga-banco.log || true)
+# «schema public already exists» sale siempre y es inofensivo: el `create schema
+# if not exists` de arriba ya lo creó. Se descuenta para que la guarda sirva.
+ERRS=$(( ERRS - $(grep -cE 'ERROR:  schema "public" already exists' /tmp/carga-banco.log || true) ))
 TABLAS=$(psql -U postgres -d "$BD" -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
 
 echo "  banco $BD rehecho · $TABLAS tablas · $ERRS errores de carga"
