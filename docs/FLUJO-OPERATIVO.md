@@ -629,16 +629,20 @@ revisar los papeles equivocados la mitad de las veces.
 viaje que empieza la semana que viene deja la unidad `disponible`, y eso es
 correcto: hoy está libre.
 
-La doble reserva **no depende de ese campo**, y la impiden **TRES capas que
-tienen que mirar lo mismo**. Que sean tres es el dato que se pierde: al arreglar
-H-06 se encontraron las dos de la base, y la tercera —la del navegador, la única
-que el usuario ve de verdad— apareció después, escribiendo el guión de pruebas.
+La doble reserva **no depende de ese campo**, y la impiden **tres capas que tienen
+que mirar lo mismo — de las cuales hoy solo se ejecutan dos**:
 
-| Capa | Qué es | Quién la ve |
+| Capa | Qué es | Quién la ve HOY |
 |---|---|---|
-| [js/modal.js](../js/modal.js) | consulta previa en el navegador, antes de insertar | **la primera que salta** en la reserva directa: «Este recurso ya está reservado del X al Y. Elige otras fechas.» |
-| `check_reservacion_disponibilidad()` | trigger `BEFORE INSERT OR UPDATE` | la que **lanza `RECURSO_NO_DISPONIBLE`** — en el cierre de acuerdo el cliente lee «❌ Ese recurso ya tiene una reserva en esas fechas…» |
+| `check_reservacion_disponibilidad()` | trigger `BEFORE INSERT OR UPDATE` | **la única que alguien ve.** Lanza `RECURSO_NO_DISPONIBLE`, y en el cierre de acuerdo el cliente lee «❌ Ese recurso ya tiene una reserva en esas fechas. La oferta sigue vigente — elige otra o pide una nueva.» |
 | `reservaciones_sin_solape` | `EXCLUDE` con GiST, activo solo para `Pendiente` y `Activa` | nadie, salvo en una carrera: dos inserciones simultáneas que ambas pasan el trigger |
+| [js/modal.js](../js/modal.js) | consulta previa en el navegador, antes de insertar | **nadie: ese camino es inalcanzable.** El modal de reserva directa solo lo abren botones de la rejilla oculta — ver *hueco 6*. Si el camino se revive, sería la primera en saltar, con «Este recurso ya está reservado del X al Y. Elige otras fechas.» |
+
+**La tercera está arreglada pero no se ejecuta, y conviene no confundir las dos
+cosas.** Se corrigió el 2026-09-25 junto con las otras dos, por si el camino se
+revive; lo que cierra el falso positivo **hoy** es el trigger. El mismo día se
+corrigió también [js/detalle.js](../js/detalle.js), que pintaba las fechas ocupadas
+de una unidad sin acotar el tipo — y que es código muerto por el mismo hueco 6.
 
 > **Las tres no vigilan el mismo conjunto de estados, y eso sigue abierto.** Las
 > dos de la base solo miran `Pendiente` y `Activa`; la del navegador usa

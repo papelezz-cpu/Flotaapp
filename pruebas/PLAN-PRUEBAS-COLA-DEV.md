@@ -136,53 +136,71 @@ este cambio estaría ya cambiada.** No es imprescindible para promover.
 
 ---
 
-## Prueba 4 — H-06: doble reserva (5 min, la más importante)
+## Prueba 4 — H-06: doble reserva (10 min, la más importante)
 
-**Qué cambió:** las tres capas que impiden reservar dos veces el mismo recurso
+**Qué cambió:** las capas que impiden reservar dos veces el mismo recurso
 comparaban solo `unidad`, que es un `text` con el id de un camión, un custodio, un
 patio o un lavado. Ahora comparan también `recurso_tipo`.
 
-**El caso que arregla no se puede provocar desde la app** —haría falta un patio
-con el mismo id que un camión, y la app no deja crear eso—, y ya lo ejercitó la
-comprobación de la migración. **Aquí se busca regresión: que la protección de
-verdad siga en pie.**
+**Dos cosas antes de empezar, porque la primera versión de este guion las tenía
+mal y te mandó a buscar un botón que no existe:**
 
-> **Precondición, y no es formalismo: esta prueba MANDA CORREO.** Al guardar la
-> reserva, `js/modal.js` dispara dos avisos por `enviar-notificacion` —uno al
-> dueño de la unidad y otro al cliente— y **pruebas tiene las direcciones REALES
-> de los clientes**. Lo único que lo impide es el secreto `CORREO_SALIDA` de esa
-> Edge Function, que **no vive en Postgres y por tanto el sello de paridad no lo
-> cubre**. Comprobado el 2026-09-25 con `node pruebas/05-sonda-correo.mjs`:
-> salida **BLOQUEADA**, y `mailer_autoconfirm` coincide con producción. La sonda
-> no provoca un envío para averiguarlo: le pregunta a la función en qué modo
-> está. **Si ha pasado tiempo o se ha redesplegado esa función, vuelve a
-> correrla antes del paso 2.**
+- **No hay «Agendar esta unidad», ni reserva directa.** Ese modal existe pero
+  **no se puede abrir**: sus botones viven en la rejilla oculta del Catálogo
+  (*hueco 6* del flujo operativo). Lo saqué de `js/detalle.js`, que es código
+  muerto. En el Catálogo los botones reales son **«📋 Publicar solicitud»**,
+  **«Ver empresa»** y **«Ver N reseñas»**.
+- **El único camino que crea una reservación hoy es el acuerdo**, y por eso la
+  capa que de verdad vigila es el trigger de la base, no el navegador.
 
-1. Entra como **cliente** → tarjeta **«Catálogo»** → elige una empresa → elige una
-   unidad → botón **«Agendar esta unidad»**.
-   Hay **13 camiones disponibles** en esta base; sirve cualquiera, por ejemplo
-   `C-002` o `T-001`. El botón solo se activa si la unidad está `disponible`;
-   si no, dice **«⏳ No disponible»**.
-2. Reserva con fechas, digamos, del **día 10 al 12** del mes que viene. Envía.
-   **Esperado:** «✓ Solicitud enviada — la empresa confirmará pronto».
-3. **Repite con la misma unidad** y fechas que solapen: del **11 al 13**.
+### El camino real, con las etiquetas tal como están en pantalla
 
-**Esperado:** se rechaza, con este texto exacto:
+Hay que llegar a **dos acuerdos sobre el MISMO camión con fechas que solapen**. La
+segunda vez tiene que fallar.
 
-> Este recurso ya está reservado del 10/… al 12/… Elige otras fechas.
+| # | Rol | Dónde | Botón |
+|---|---|---|---|
+| 1 | cliente | Catálogo, o inicio → «Solicitar servicio» | **«📋 Publicar solicitud»** |
+| 2 | superadmin | inicio → **«Por aprobar»** | **«✓ Aprobar y publicar»** |
+| 3 | empresa | inicio → **«Solicitudes»** | **«Hacer oferta»** |
+| 4 | cliente | inicio → **«Mis solicitudes»** | **«✓ Aceptar $…»** y luego **«✓ Guardar y confirmar»** |
 
-Ese aviso lo da el navegador (la primera de las tres capas). **Si la segunda
-reserva entra, párate**: la protección se abrió y eso bloquea la promoción.
+1. **Primera solicitud.** Como cliente, publica una de camión tipo **Torton** con
+   fechas del **día 10 al 12 del mes que viene**. Ojo: **no se admite el mismo
+   día**, los campos de fecha llevan `min = mañana`.
+2. Como **superadmin**, apruébala con **«✓ Aprobar y publicar»**.
+3. Como **empresa**, entra en **«Solicitudes»**, pulsa **«Hacer oferta»** y elige
+   el camión **`T-001`** (el tipo del camión debe coincidir con el de la
+   solicitud, o no aparece en el desplegable).
+4. Como **cliente**, en **«Mis solicitudes»**, **«✓ Aceptar $…»** → **«✓ Guardar y
+   confirmar»**.
+   **Esperado:** el acuerdo se cierra y aparece la reservación.
+5. **Repite los pasos 1–4** con una segunda solicitud, **el mismo camión `T-001`**
+   y fechas que solapen: del **11 al 13**.
 
-4. Opcional, para ejercitar la capa de la base en vez del navegador: como
-   **empresa**, acepta una oferta cuya unidad ya tenga una reserva solapada. El
-   texto entonces es otro:
+**Esperado en el paso 4 de la segunda vuelta:** NO se cierra, y sale este texto:
 
 > ❌ Ese recurso ya tiene una reserva en esas fechas. La oferta sigue vigente — elige otra o pide una nueva.
 
-**Deja rastro:** la reserva del punto 2 se queda en pruebas como `Pendiente`, y
-su unidad aparecerá ocupada en esas fechas. No estorba a nada, pero conviénete
-elegir fechas lejanas para no cruzarte con otras pruebas.
+**Si el segundo acuerdo se cierra, párate**: la protección contra doble reserva se
+abrió y eso bloquea la promoción. Es lo único que esta prueba busca.
+
+> **El caso que H-06 arregla no se puede provocar desde la app** —haría falta un
+> patio con el mismo id que un camión, y la app no deja crear eso—. Ya lo ejercitó
+> la comprobación de la migración, que además apaga el trigger para probar la
+> restricción por separado. **Aquí solo se busca regresión.**
+
+> **Sobre el correo:** este camino sí manda avisos (oferta nueva, acuerdo
+> cerrado), y pruebas tiene las direcciones **REALES** de los clientes. Lo único
+> que lo impide es el secreto `CORREO_SALIDA` de `enviar-notificacion`, que **no
+> vive en Postgres, así que el sello de paridad no lo cubre**. Comprobado el
+> 2026-09-25 con `node pruebas/05-sonda-correo.mjs`: salida **BLOQUEADA**, y
+> `mailer_autoconfirm` coincide con producción. La sonda no provoca un envío para
+> averiguarlo. **Vuelve a correrla si se redespliega esa función.**
+
+**Deja rastro:** quedan dos solicitudes, sus ofertas y una reservación `Activa` en
+pruebas, y el camión `T-001` aparecerá ocupado en esas fechas. Elige fechas
+lejanas para no cruzarte con otras pruebas.
 
 ---
 
