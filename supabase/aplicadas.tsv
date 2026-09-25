@@ -8,6 +8,17 @@
 #   Lo de aquí es fiable; la ausencia de una línea no prueba nada sobre
 #   lo anterior al 2026-09-11.
 #
+# ⚠ EL UNICO `≠` QUE IMPRIME estado-migraciones.sh ESTA EXPLICADO, y no se va a
+#   limpiar nunca: 20260915120000_los_seguros_se_acreditan_no_se_declaran.sql corrio
+#   con LF en pruebas (11bec696…) y con CRLF en produccion (24a7452e…), sin que nadie
+#   lo editara. Es el caso R-03: con core.autocrlf=true y sin .gitattributes, git
+#   entregaba la copia de trabajo con CRLF y `psql -f` los conservaba DENTRO del
+#   cuerpo de la funcion. La causa se cerro el 2026-09-15 con .gitattributes; estas
+#   dos lineas son historia y su hash ya no puede coincidir con el archivo de hoy.
+#
+#   Asi que ese ≠ no es una migracion editada tras aplicarse. Si aparece un SEGUNDO
+#   ≠, ese si hay que mirarlo.
+#
 # fecha_utc	entorno	proyecto_ref	archivo	sha256
 2026-09-11T22:33:16Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260911120000_cierre_acuerdo_sin_carrera.sql	411eafa84c820e1f1782348fc6e28c53f5dffb6b0b9428242c7f392a09446cd2
 2026-09-11T22:33:16Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260911130000_permisos_cierra_anon_y_truncate.sql	93f95a4ada49a6acef050d0ffb53faddf1681bbe2b1918ba1c9b5f8f1da5e861

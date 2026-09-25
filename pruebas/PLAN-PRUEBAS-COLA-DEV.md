@@ -15,6 +15,36 @@ Primero **Ctrl+Shift+R**.
 
 ---
 
+## Qué hay en `dev` y qué cubre este guion (2026-09-25)
+
+La cola creció durante el día. Esta tabla existe para que las pruebas no se queden
+cortas **por construcción**:
+
+| Cambio en `dev` | Dónde se prueba |
+|---|---|
+| R-09 — el globo de la empresa | prueba 1, aquí |
+| H-11 — el filtro de estado del cliente | prueba 2, aquí |
+| El render ya no escribe | prueba 3, aquí |
+| H-06 (a) — doble reserva por tipo | prueba 4, aquí |
+| H-20 — techo de avisos | prueba 5, aquí |
+| Vigencias legible | prueba 6, aquí |
+| **H-22 — el archivado no manda la fecha** | **prueba 7, nueva** |
+| **El desplegable de ofertas: `recurso_tipo` y la rama de lavado** | **prueba 8, nueva** |
+| La aprobación del superadmin por RPC | [PLAN-PRUEBAS-APROBAR-ACUERDO.md](PLAN-PRUEBAS-APROBAR-ACUERDO.md) — aparte, porque necesita montaje |
+| El Paso 2 del cierre | [PLAN-PRUEBAS-PASO2.md](PLAN-PRUEBAS-PASO2.md) — **ya pasada**, y aplicada a producción |
+
+**Dos cambios NO se pueden probar, y no hay que buscarlos:** los de
+[js/modal.js](../js/modal.js) y [js/detalle.js](../js/detalle.js) están en **código
+muerto** — el modal de reserva directa y la ficha de unidad no se pueden abrir desde
+la app (*hueco 6* del flujo operativo). Se arreglaron por consistencia con H-06, por
+si ese camino se revive. Si alguien va a buscar el botón «Agendar», no existe.
+
+**H-19 (`updated_at`) tampoco tiene prueba de pantalla** y es correcto: la migración
+añade la columna y el trigger, pero **no cambia el orden de ninguna cola**. Su
+comprobación se ejecuta dentro de la propia migración al aplicarla.
+
+---
+
 ## Paso 0 — ¿estoy mirando el build nuevo? (30 s, obligatorio)
 
 Pruebas es copia fiel de producción, así que **los datos no distinguen un entorno
@@ -270,6 +300,54 @@ y se oscureció el color; las fechas que faltan llevan además un fondo tenue.
 **Esperado:** debajo de cada empresa/unidad, el nombre del documento y su fecha se
 leen sin esfuerzo. En el grupo de una unidad con carga peligrosa debe verse
 **«Permiso de materiales peligrosos»** — esa línea existía antes y no se veía.
+
+---
+
+## Prueba 7 — H-22: el archivado ya no manda la fecha (3 min)
+
+**Qué cambió:** al archivar una reservación, el cliente mandaba
+`archivado_at: new Date()` —el reloj del navegador—. Ya no manda nada: la pone el
+`DEFAULT now()` del servidor. Eso permitió renombrar la columna a `archivado_en`
+sin ventana de rotura, pero **si me equivoqué, el histórico se queda sin fecha**.
+
+> **El botón se llama «🗑 Eliminar» y NO elimina: archiva.** La confirmación lo
+> dice: «¿Archivar esta reservación? Se moverá al historial y desaparecerá de la
+> lista activa.» Es seguro pulsarlo, y solo lo ve el superadmin.
+
+1. Como **superadmin** → **«Reservaciones»** → elige una reservación cualquiera
+   (sirve la de la prueba 4) → en el grupo *Superadmin*, **«🗑 Eliminar»** →
+   confirma.
+2. Entra en la tarjeta **«Historial»** («Reservaciones archivadas»).
+
+**Esperado:** la reservación aparece en el historial **con su fecha de archivado**,
+la de hoy. Si sale vacía o sin fecha, para y dímelo: significa que el `DEFAULT` no
+está haciendo su trabajo, o que la migración de H-22 no está aplicada en esta base.
+
+**Ojo con el orden:** esta prueba necesita que **`20260925160000` esté aplicada a
+pruebas**. Si no lo está, el cliente no manda la fecha y la columna vieja
+`archivado_at` se queda NULL — que es exactamente el fallo que buscas. Comprueba
+primero que la migración está puesta.
+
+---
+
+## Prueba 8 — el desplegable de ofertas (2 min, solo si hay servicios de lavado)
+
+**Qué cambió:** el filtro de disponibilidad del desplegable comparaba solo
+`unidad`, y asumía **tres** tipos de recurso cuando hay cuatro. Sin la rama de
+lavado, un servicio de lavado buscaba conflictos con `recurso_tipo = 'camion'`, no
+encontraba ninguno, y **el filtro de disponibilidad dejaba de actuar en silencio**.
+
+1. Como **cliente**, publica una solicitud de **lavado** con fechas en las que el
+   lavado `LAV-001` ya esté reservado (si no lo está, esta prueba no aplica).
+2. Como la **empresa dueña de ese lavado**, pulsa **«Hacer oferta»**.
+
+**Esperado:** el lavado ocupado **no aparece**, y si era el único, el aviso dice
+**«No tienes lavados disponibles…»** — no «camiones», que es lo que decía antes y
+mandaba a mirar la flota equivocada.
+
+**Si no hay ningún lavado con reserva, sáltala.** Lo que sí queda comprobado sin
+hacer nada: el filtro por fechas funciona para camiones — se vio en la prueba del
+Paso 2, cuando el desplegable negó el Rabón ya reservado.
 
 ---
 
