@@ -52,6 +52,15 @@
 -- final**: dejar un guard apagado en producción sería mucho peor que no tener
 -- `updated_at`.
 --
+-- ── Lo que rellenó en la primera aplicación real (pruebas, 2026-09-25) ────
+--
+--     pedidos 49 · ofertas 39 · reservaciones 23 · perfiles 13 · camiones 14
+--     custodios 6 · patios 5 · lavados 1 · operadores 4 · expedientes 8
+--
+-- Y `expedientes` se rellenó desde `solicitado_en`, no desde `created_at`: el
+-- arreglo dirigido por el esquema —que la primera versión de esta migración no
+-- tenía, y por eso fallaba— se ganó el sueldo en la primera aplicación real.
+--
 -- ── Una actualización que no cambia nada no cuenta ────────────────────────
 --
 -- El trigger solo sella si `NEW IS DISTINCT FROM OLD`. Sin eso, cualquier
