@@ -1243,6 +1243,46 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
     aplica esa migración, su cabecera dice que **fuerza**
     `propietario_id = auth.uid()`, así que será compatible.
 
+14. **La lista de Solicitudes no se actualiza en vivo, y es una decisión, no un
+    olvido.** `js/main.js` se suscribe por Realtime a ocho tablas; la publicación
+    `supabase_realtime` de producción lleva **seis** —las cuatro de flota,
+    `reservaciones` y `notificaciones`—. `pedidos` y `ofertas` **no están
+    publicadas, así que esas dos suscripciones nunca han disparado.** Verificado
+    el 2026-09-25 cruzando el código contra el volcado de producción del
+    2026-09-21 (`supabase/espejo/08-realtime.sql`, que sale de
+    `pg_publication_tables` de producción y no lleva `for all tables`). No hay
+    ninguna suscripción a `mensajes`.
+
+    Consecuencia para el usuario: cuando un cliente publica una solicitud o una
+    empresa oferta, la pantalla del otro **no se entera hasta que vuelve a
+    entrar en la vista** o recarga. Todo lo demás —flota, reservaciones,
+    campana— sí va en vivo.
+
+    **Por qué se queda así** (decidido el 2026-08-28, migración
+    `20260828120000_publicacion_realtime_declarativa.sql`): `renderPedidos()`
+    ejecuta hasta cuatro `UPDATE` sobre `pedidos` como efecto secundario de
+    dibujar la lista — es la misma máquina de estados del §«El estado de los
+    pedidos avanza por dos vías a la vez» (hueco 4). Publicar la tabla haría que
+    cada cambio despertara a **todos** los navegadores conectados, cada uno
+    escribiría, y cada escritura generaría más eventos. Un bucle de
+    realimentación, no una lista más viva.
+
+    **Requisito previo para publicarlas algún día:** sacar la máquina de estados
+    del render — `20260810130000_sincronizar_estados_OPCIONAL.sql`, que la mueve
+    a pg_cron y **no está aplicada**. Mientras eso no pase, publicar `pedidos`
+    empeora las cosas.
+
+    **Ojo con el hallazgo H-16 de la auditoría**, que describe esto al revés:
+    dice que «Realtime reparte cada cambio de pedidos y ofertas a todas las
+    empresas conectadas» y lo cifra en 800 consultas por solicitud con 200
+    empresas. Esa aritmética parte de que los eventos llegan, y no llegan: las
+    dos tablas no están publicadas. La ficha ya concluía «no procede aún» y
+    dejaba un umbral de vigilancia (~50 empresas conectadas); el umbral que de
+    verdad importa es otro, y es el requisito previo de arriba. Y para `ofertas`
+    el reparto tampoco sería a todos aunque se publicara: `of_select` está
+    acotada a las partes. No se reporta como hallazgo nuevo ni se «arregla».
+
+
 ---
 
 ## Cómo mantener este documento

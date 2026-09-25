@@ -316,7 +316,11 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
 
 ### State
 
-No state library. Globals refreshed via Supabase queries: `currentUser` (auth.js), `_pedidosAccum` (pedidos.js), per-module caches. Realtime subscriptions in `main.js` re-render the active view when `pedidos`, `ofertas`, `mensajes`, `notificaciones`, fleet tables change.
+No state library. Globals refreshed via Supabase queries: `currentUser` (auth.js), `_pedidosAccum` (pedidos.js), per-module caches.
+
+**Realtime re-renders the active view — but only for six tables, and this line used to name three that do not work.** `main.js` subscribes to eight (`camiones`, `custodios`, `patios`, `lavados`, `reservaciones`, `notificaciones`, `pedidos`, `ofertas`), and production's `supabase_realtime` publication carries six: the fleet four, `reservaciones` and `notificaciones`. **`pedidos` and `ofertas` are not published, so those two subscriptions have never fired** and the Solicitudes list does not refresh live. There is no `mensajes` subscription at all.
+
+That exclusion is **deliberate and decided** (2026-08-28, migration `20260828120000_publicacion_realtime_declarativa.sql`), not drift: `renderPedidos()` issues up to four `UPDATE`s on `pedidos` as a side effect of drawing the list, so publishing the table would wake every connected browser, each would write, and each write would emit more events — a feedback loop. Precondition for ever publishing it: move the state machine out of the render (`20260810130000_sincronizar_estados_OPCIONAL`, not applied). Verified again on 2026-09-25 against the production dump; see hueco 14 in [docs/FLUJO-OPERATIVO.md](docs/FLUJO-OPERATIVO.md).
 
 ### Auth & Roles
 
