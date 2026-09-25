@@ -1081,13 +1081,25 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
 3. **`is_superadmin()` no se salta el RLS de `perfiles`.** Funciona en las ~70
    políticas de otras tablas; en una política *de perfiles* provoca recursión.
    Por eso lee de una vista interna.
-4. **El estado de los pedidos avanza por dos vías a la vez.** Desde el
-   2026-09-11, `sincronizar_estados_pedidos()` corre en pg_cron cada 15
-   minutos en producción y en pruebas — pero las reglas equivalentes siguen
-   en `renderPedidos()`. **Se dejaron a propósito:** son idempotentes y
-   coinciden con las del cron, así que da igual quién las corra, y mientras
-   estén las dos un fallo del cron no congela los estados. Retirarlas del
-   navegador es decisión posterior, cuando el cron lleve tiempo funcionando.
+4. ~~**El estado de los pedidos avanza por dos vías a la vez.**~~ **CERRADO el
+   2026-09-25.** `sincronizar_estados_pedidos()` corre en pg_cron cada 15 minutos
+   en producción y en pruebas desde el 2026-09-11, y desde hoy es **la única vía**:
+   `renderPedidos()` ya no escribe. Conserva la normalización **en memoria** —la
+   pantalla enseña el estado corregido al instante— pero no vuelve a la base.
+
+   Se comprobó antes de quitarlas que el cron cubre **las cinco** reglas del
+   render, no cuatro: el archivo `20260810130000_sincronizar_estados_OPCIONAL.sql`
+   lleva cuatro, y la función **viva** lleva cinco y devuelve
+   `solicitudes_vencidas`, con el comentario «FALTABA en 20260810130000: esta
+   regla se anadio al navegador despues». **Si hay que verificarlo otra vez, se
+   lee `pg_get_functiondef`, no el `.sql`** — leer el archivo fue el error que
+   casi dejó este cambio con una regla sin cubrir.
+
+   Lo que cuesta: un estado rancio tarda hasta 15 minutos en cuadrar en la base
+   en vez de cuadrar al repintar. Lo que gana: dos pestañas abiertas ya no emiten
+   los mismos `UPDATE` en carrera —26 sitios llaman a `renderPedidos()`—, y
+   desaparece el impedimento para publicar `pedidos`/`ofertas` en Realtime
+   (hueco 14).
 5. **La tabla `mensajes` no se usa.** Resto de la versión con chat; se
    conserva con sus políticas porque retirarla no aporta nada hoy.
 6. **El listado de camiones y el detalle de unidad son código muerto.** En
@@ -1267,16 +1279,29 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
     escribiría, y cada escritura generaría más eventos. Un bucle de
     realimentación, no una lista más viva.
 
-    **Requisito previo para publicarlas algún día: sacar esas cinco escrituras
-    del render.** Ojo con confundirlo con la migración de pg_cron, que **sí está
-    aplicada** —el volcado de cron de producción lista
-    `portgo-sincronizar-estados │ */15 * * * * │ activo=true`—. Añadir el cron
-    **duplicó** el trabajo en vez de moverlo (hueco 4), así que el bucle de
-    realimentación sigue ahí intacto: medido el 2026-09-25, `renderPedidos()`
-    conserva sus cinco escrituras —una a `ofertas` y cuatro a `pedidos`—.
-    El commit de la sonda de Realtime (2026-09-14) afirmó que «esa razón dejó de
-    existir el 8 de septiembre, cuando la máquina de estados bajó a pg_cron».
-    **Es falso**, y creerlo llevaría a publicar `pedidos` con el bucle puesto.
+    **Ese requisito previo se cumplió el 2026-09-25: el render ya no escribe**
+    (hueco 4). Publicarlas ya no crearía el bucle. Queda como decisión, no como
+    impedimento técnico — y con un matiz que cambia la respuesta: **la campana
+    ya cubre el caso mejor.** Al aprobarse una solicitud, `aprobarSolicitud()`
+    avisa **solo a las empresas con flota de ese tipo**, y `notificaciones` sí
+    está publicada, así que la empresa se entera en vivo y filtrado; pulsar el
+    aviso llama a `showView('pedidos')`, que repinta. Publicar `pedidos` sería
+    difundir a **todas** las sesiones para entregar información **menos**
+    dirigida que la que ya llega. `ofertas` sí tendría sentido —`of_select` la
+    acota a las dos partes, así que el reparto es de 2-3 sesiones— y necesitaría
+    `REPLICA IDENTITY FULL`, porque [js/pedidos.js](../js/pedidos.js) borra
+    ofertas y sin FULL un DELETE no se puede evaluar contra RLS.
+
+    **Dos afirmaciones que circulaban sobre esto y son falsas.** La primera: que
+    el requisito previo era aplicar la migración de pg_cron. No lo era —esa **sí
+    estaba aplicada**, el volcado de cron de producción lista
+    `portgo-sincronizar-estados │ */15 * * * * │ activo=true`—; añadir el cron
+    duplicó el trabajo en vez de moverlo, y lo que faltaba era quitar las
+    escrituras del render, hecho el 2026-09-25. La segunda: el commit de la sonda
+    de Realtime (2026-09-14) dijo que «esa razón dejó de existir el 8 de
+    septiembre, cuando la máquina de estados bajó a pg_cron» — era falso entonces,
+    porque el render seguía escribiendo, y dio la fecha equivocada por casi tres
+    semanas.
 
     **Ojo con el hallazgo H-16 de la auditoría**, que describe esto al revés:
     dice que «Realtime reparte cada cambio de pedidos y ofertas a todas las

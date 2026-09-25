@@ -415,16 +415,37 @@ async function renderPedidos(append = false) {
         _ofertasAccum[o.pedido_id].push(o);
     });
 
-    // Expiración lazy: marcar como rechazadas ofertas vencidas (fire-and-forget)
-    const expiradas = (nuevasOfertas || []).filter(o =>
-      o.estado === 'enviada' && o.expira_en && new Date(o.expira_en) < new Date()
-    );
-    if (expiradas.length) {
-      sb.from('ofertas').update({ estado: 'rechazada' })
-        .in('id', expiradas.map(o => o.id)).then(() => {});
-    }
+    // ── EL RENDER YA NO ESCRIBE (2026-09-25) ────────────────────────────────
+    //
+    // Hasta hoy este tramo hacía cinco escrituras —una a `ofertas` y cuatro a
+    // `pedidos`— como efecto secundario de dibujar la lista. Ya no. Las mismas
+    // cinco reglas las aplica `sincronizar_estados_pedidos()` en pg_cron cada 15
+    // minutos, en producción y en pruebas.
+    //
+    // **Las cinco, comprobado, no cuatro.** El archivo de la migración
+    // `20260810130000_sincronizar_estados_OPCIONAL.sql` solo lleva cuatro; la
+    // función VIVA lleva cinco y devuelve `solicitudes_vencidas`, con el
+    // comentario «FALTABA en 20260810130000: esta regla se anadio al navegador
+    // despues». Si alguna vez hay que verificar esto, se lee la definición viva
+    // (`pg_get_functiondef`) y no el archivo: leer el archivo fue exactamente el
+    // error que casi dejó esta migración a medias.
+    //
+    // Lo que se pierde: latencia. Un estado rancio tarda hasta 15 minutos en
+    // corregirse en la base en vez de al repintar. Lo que se gana: dos pestañas
+    // abiertas ya no emiten los mismos UPDATE en carrera —26 sitios llaman a
+    // renderPedidos()—, y deja de existir el motivo por el que `pedidos` y
+    // `ofertas` no pueden publicarse en Realtime (el render escribía, así que
+    // cada evento habría despertado a todos los navegadores a escribir).
+    //
+    // La normalización EN MEMORIA se conserva a propósito: la pantalla sigue
+    // mostrando el estado corregido al instante, aunque la fila tarde en
+    // cuadrar. Es cosmética y no vuelve a la base.
+    //
+    // Las ofertas vencidas no necesitan ni eso: `ofertasVivaz` (línea ~682)
+    // filtra por `expira_en` directamente, no por el `rechazada` persistido, así
+    // que el conteo de ofertas ya era correcto sin la escritura.
 
-    // Estado lazy: pedidos en_negociacion donde TODAS las ofertas están rechazadas → reabrir
+    // Reabrir en memoria: pedidos en_negociacion donde TODAS las ofertas están rechazadas
     const ofertasPorPedido = {};
     (nuevasOfertas || []).forEach(o => {
       if (!ofertasPorPedido[o.pedido_id]) ofertasPorPedido[o.pedido_id] = [];
@@ -437,13 +458,9 @@ async function renderPedidos(append = false) {
         o.estado === 'rechazada' || (o.estado === 'enviada' && o.expira_en && new Date(o.expira_en) < new Date())
       );
     });
-    if (aReabrir.length) {
-      sb.from('pedidos').update({ estado: 'abierto' })
-        .in('id', aReabrir.map(p => p.id)).then(() => {});
-      aReabrir.forEach(p => { p.estado = 'abierto'; });
-    }
+    aReabrir.forEach(p => { p.estado = 'abierto'; });   // la base la cuadra el cron
 
-    // Estado lazy: solicitudes sin ninguna oferta VIVA cuya fecha de carga ya
+    // Normalizacion en memoria (ya NO escribe): solicitudes sin ninguna oferta VIVA cuya fecha de carga ya
     // llegó o pasó (falta menos de un día) → nadie las va a poder atender a
     // tiempo, se marcan expiradas para que dejen de verse como activas.
     // "Sin oferta viva" no es lo mismo que "sin fila en ofertas": una
@@ -456,38 +473,26 @@ async function renderPedidos(append = false) {
         o.estado === 'rechazada' || (o.estado === 'enviada' && o.expira_en && new Date(o.expira_en) < new Date())
       )
     );
-    if (aExpirarSinOferta.length) {
-      sb.from('pedidos').update({ estado: 'expirado' })
-        .in('id', aExpirarSinOferta.map(p => p.id)).then(() => {});
-      aExpirarSinOferta.forEach(p => { p.estado = 'expirado'; });
-    }
+    aExpirarSinOferta.forEach(p => { p.estado = 'expirado'; });   // idem
 
-    // Estado lazy: pedido en_negociacion pero tiene oferta aceptada → completar a pendiente_acuerdo
+    // Normalizacion en memoria (ya NO escribe): pedido en_negociacion pero tiene oferta aceptada → completar a pendiente_acuerdo
     // (ocurre si la segunda operación falló al confirmar el acuerdo)
     for (const p of (pedidosPage || [])) {
       if (p.estado !== 'en_negociacion') continue;
       const aceptada = (ofertasPorPedido[p.id] || []).find(o => o.estado === 'aceptada');
       if (!aceptada) continue;
-      sb.from('pedidos').update({
-        estado:              'pendiente_acuerdo',
-        oferta_pendiente_id: aceptada.id,
-      }).eq('id', p.id).then(() => {});
-      p.estado              = 'pendiente_acuerdo';
+      p.estado              = 'pendiente_acuerdo';   // idem: la regla (c) del cron
       p.oferta_pendiente_id = aceptada.id;
     }
   }
 
-  // Estado lazy: acuerdos cuya fecha_fin ya pasó y nunca se completaron → expirado
+  // Normalizacion en memoria (ya NO escribe): acuerdos cuya fecha_fin ya pasó y nunca se completaron → expirado
   // (los completados pasan a 'finalizado' al marcar el servicio como completado)
   const _hoy = today();
   const aExpirar = (pedidosPage || []).filter(p =>
     p.estado === 'acordado' && p.fecha_fin && p.fecha_fin < _hoy
   );
-  if (aExpirar.length) {
-    sb.from('pedidos').update({ estado: 'expirado' })
-      .in('id', aExpirar.map(p => p.id)).then(() => {});
-    aExpirar.forEach(p => { p.estado = 'expirado'; });
-  }
+  aExpirar.forEach(p => { p.estado = 'expirado'; });   // idem: la regla (d) del cron
 
   const pedidos      = _pedidosAccum;
   const ofertasMap   = _ofertasAccum;
