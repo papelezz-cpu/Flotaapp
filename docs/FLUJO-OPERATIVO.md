@@ -1267,10 +1267,16 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
     escribiría, y cada escritura generaría más eventos. Un bucle de
     realimentación, no una lista más viva.
 
-    **Requisito previo para publicarlas algún día:** sacar la máquina de estados
-    del render — `20260810130000_sincronizar_estados_OPCIONAL.sql`, que la mueve
-    a pg_cron y **no está aplicada**. Mientras eso no pase, publicar `pedidos`
-    empeora las cosas.
+    **Requisito previo para publicarlas algún día: sacar esas cinco escrituras
+    del render.** Ojo con confundirlo con la migración de pg_cron, que **sí está
+    aplicada** —el volcado de cron de producción lista
+    `portgo-sincronizar-estados │ */15 * * * * │ activo=true`—. Añadir el cron
+    **duplicó** el trabajo en vez de moverlo (hueco 4), así que el bucle de
+    realimentación sigue ahí intacto: medido el 2026-09-25, `renderPedidos()`
+    conserva sus cinco escrituras —una a `ofertas` y cuatro a `pedidos`—.
+    El commit de la sonda de Realtime (2026-09-14) afirmó que «esa razón dejó de
+    existir el 8 de septiembre, cuando la máquina de estados bajó a pg_cron».
+    **Es falso**, y creerlo llevaría a publicar `pedidos` con el bucle puesto.
 
     **Ojo con el hallazgo H-16 de la auditoría**, que describe esto al revés:
     dice que «Realtime reparte cada cambio de pedidos y ofertas a todas las
