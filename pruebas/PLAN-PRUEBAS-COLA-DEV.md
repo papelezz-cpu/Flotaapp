@@ -32,6 +32,7 @@ cortas **por construcción**:
 | **El desplegable de ofertas: `recurso_tipo` y la rama de lavado** | **prueba 8, nueva** |
 | La aprobación del superadmin por RPC | [PLAN-PRUEBAS-APROBAR-ACUERDO.md](PLAN-PRUEBAS-APROBAR-ACUERDO.md) — aparte, porque necesita montaje |
 | El Paso 2 del cierre | [PLAN-PRUEBAS-PASO2.md](PLAN-PRUEBAS-PASO2.md) — **ya pasada**, y aplicada a producción |
+| **El conflicto tardío: oferta viva + unidad ocupada** | **prueba 9, nueva** — el único caso que no se puede montar desde la interfaz |
 
 **Dos cambios NO se pueden probar, y no hay que buscarlos:** los de
 [js/modal.js](../js/modal.js) y [js/detalle.js](../js/detalle.js) están en **código
@@ -348,6 +349,45 @@ mandaba a mirar la flota equivocada.
 **Si no hay ningún lavado con reserva, sáltala.** Lo que sí queda comprobado sin
 hacer nada: el filtro por fechas funciona para camiones — se vio en la prueba del
 Paso 2, cuando el desplegable negó el Rabón ya reservado.
+
+---
+
+## Prueba 9 — el conflicto tardío: una oferta cuya unidad se ocupó después (3 min)
+
+**Es el único escenario que no se puede montar desde la interfaz**, y existe por
+casualidad: el desplegable de «Hacer oferta» impide ofertar una unidad ya
+reservada, así que una oferta viva sobre una unidad ocupada solo puede aparecer si
+**la reserva llegó después de la oferta**. Eso es exactamente lo que hay ahora en
+pruebas, de rebote:
+
+| | |
+|---|---|
+| Solicitud | **10 → 11 de octubre**, camión `T-46BC79F9`, en negociación |
+| Su oferta | **viva** (`enviada`), vence el 27 de septiembre |
+| El estorbo | ese camión tiene una reserva **Activa del 10 al 12 de octubre**, de otro acuerdo |
+
+> Cómo llegó ahí: era el pedido que quedó **`acordado` sin reservación** por la
+> aprobación no atómica del superadmin. Se devolvió a negociación el 2026-09-25 con
+> su oferta a `enviada` (decisión del usuario), y eso dejó este caso servido.
+
+1. Como **cliente**, entra en **«Mis solicitudes»**, busca la del **10 al 11 de
+   octubre** y pulsa **«✓ Aceptar $…»** → **«✓ Guardar y confirmar»**.
+
+**Esperado:**
+
+> ❌ Ese recurso ya tiene una reserva en esas fechas. La oferta sigue vigente — elige otra o pide una nueva.
+
+Y —esto es lo que se comprueba de verdad— **nada debe haber cambiado**: sin
+reservación nueva, la solicitud **sigue en negociación** (no en «⏳ Acuerdo en
+revisión», ni en «✓ Acordado»), y **la oferta sigue viva**. Es la transacción
+revirtiendo entera, que es lo que el Paso 2 restauró.
+
+**Si la solicitud queda en «✓ Acordado» sin reservación, para**: es el mismo daño
+que hubo hoy, y significaría que el arreglo no está haciendo efecto en esta base.
+
+**Ojo: esta prueba se consume al hacerla.** Si sale bien, el estado no cambia y
+puedes repetirla; si quieres convertirla en un cierre limpio, cambia las fechas de
+la solicitud a un rango libre — pero entonces ya no prueba esto.
 
 ---
 
