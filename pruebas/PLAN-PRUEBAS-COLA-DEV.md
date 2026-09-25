@@ -202,13 +202,22 @@ la prueba allí, mira primero «Mis unidades».
 3. Como **empresa (Omar Silva Preciado)**, entra en **«Solicitudes»**, pulsa
    **«Hacer oferta»** y elige **`T-46BC79F9`**. En el desplegable se lee
    **«🚛 T-46BC79F9 — Torton (14 ton)»**.
+
+   > **La oferta con una unidad ya comprometida SE PERMITE, y no es un fallo.**
+   > En la segunda vuelta vas a poder elegir el mismo camión aunque ya tenga una
+   > reserva solapada, y el desplegable no te dirá nada. Es correcto:
+   > `_enviarOfertaCore()` valida el **tipo** del camión, la **licencia hazmat**
+   > del chofer y que no tengas ya una oferta activa **en esa misma solicitud** —
+   > y nada más. Una oferta no es una reserva: el cliente puede no aceptarla
+   > nunca. **El choque salta al cerrar el acuerdo**, en el paso 4.
 4. Como **cliente**, en **«Mis solicitudes»**, **«✓ Aceptar $…»** → **«✓ Guardar y
    confirmar»**.
    **Esperado:** el acuerdo se cierra y aparece la reservación.
 5. **Repite los pasos 1–4** con una segunda solicitud, **el mismo camión
    `T-46BC79F9`** y fechas que solapen: del **11 al 13**.
 
-**Esperado en el paso 4 de la segunda vuelta:** NO se cierra, y sale este texto:
+**Esperado en el paso 4 de la segunda vuelta — al pulsar «✓ Guardar y confirmar»,
+no antes:** el acuerdo NO se cierra, y sale este texto:
 
 > ❌ Ese recurso ya tiene una reserva en esas fechas. La oferta sigue vigente — elige otra o pide una nueva.
 
