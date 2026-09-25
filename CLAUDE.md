@@ -428,6 +428,7 @@ Shared pattern: `propietario_id`, `estado` (`disponible`|`ocupado`|`no_disponibl
 - `catalogos` (PK `clave, valor`): dropdown values served from the DB instead of hardcoded in JS — `etiqueta`, `ayuda`, `orden`, `activo`, `meta jsonb`. Editing a catalog no longer requires a deploy.
 - `app_config` (PK `clave`, `valor jsonb`): runtime settings.
 - `pagos`, `documentos_fiscales`: payment/invoice records tied to reservaciones.
+- `avisos_superadmin` (H-20): one row per accepted `notificar_superadmins()` call, which is how the **60-calls-per-hour-per-caller ceiling** is counted. **RLS on, zero policies, privileges revoked from `anon`/`authenticated`/`service_role`** — only the SECURITY DEFINER function writes it, and that is the point: the author cannot live in a client-writable column. Storing it in `notificaciones.meta` would let any account insert 60 rows to itself carrying someone else's uuid and silence that person for an hour, because the INSERT policy only constrains the recipient. Over the ceiling the function **discards the notice and returns — it never raises**, because four business RPCs call it with `PERFORM` inside their own transaction and an exception there would roll back the whole thing. See [docs/FLUJO-OPERATIVO.md](docs/FLUJO-OPERATIVO.md).
 
 ### DB functions & triggers
 **Notification triggers:** `notificar_nueva_oferta`, `notificar_respuesta_oferta`, `fn_notificar_nuevo_mensaje`, `notificar_nueva_reserva`, `notificar_cambio_reserva`.

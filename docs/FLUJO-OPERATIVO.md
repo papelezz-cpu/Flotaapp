@@ -863,6 +863,46 @@ Los avisos al superadmin van por `notificar_superadmins()`, que es la llamada
 más repetida del código (15 sitios). Los de oferta y reserva los disparan
 triggers de la base, no el navegador: así llegan aunque la pestaña se cierre.
 
+### El techo de 60 avisos/hora por cuenta (H-20, 2026-09-25)
+
+`notificar_superadmins()` está concedida a `authenticated` y escribe saltándose
+`puede_notificar()`, porque tiene que poder: el RLS de `notificaciones` es por
+relación y un cliente no podría avisar al superadmin de otro modo. Lo que no
+tenía era techo, así que cualquier cuenta con sesión podía llenarle el panel del
+texto que quisiera.
+
+Ahora cada cuenta tiene **60 llamadas por hora**. Por encima de eso el aviso se
+**descarta** y la función vuelve.
+
+**No lanza excepción, y eso es lo importante.** Cuatro RPC de negocio la llaman
+con `PERFORM` dentro de su propia transacción —`aceptar_y_cerrar_acuerdo`,
+`cancelar_reservacion`, `registrar_evidencias`, `solicitar_cancelacion`—, así que
+una excepción ahí tumbaría la transacción entera: el cliente no podría aceptar
+una oferta porque un contador de avisos dijo que no.
+
+**Un aviso descartado no esconde trabajo.** `cola_superadmin()` no lee
+`notificaciones`: el globo y el panel «Por aprobar» se calculan sobre las tablas
+de negocio. Se pierde la campanita, no la tarea. El correo va por otro camino
+(`enviar-notificacion` desde el cliente) y tampoco depende de esto. El descarte
+deja un `warning` en el log de Postgres.
+
+**El contador no vive en `notificaciones`.** Esa tabla no guarda quién generó la
+fila —`user_id` es el destinatario—, y guardarlo en `meta` sería explotable: la
+política de INSERT solo restringe el destinatario, y `puede_notificar()` deja a
+cualquiera notificarse a sí mismo, así que una cuenta podría insertarse 60 filas
+con el uuid de otra en `meta` y **dejarla muda una hora**. El contador vive en
+`public.avisos_superadmin`, con RLS activo, **cero políticas** y privilegios
+revocados a `anon`, `authenticated` y `service_role`: solo la escribe la propia
+función. Una fila por llamada aceptada.
+
+**De dónde sale el 60:** del volcado de producción del 2026-09-21. En todo el
+histórico hay 132 llamadas; por hora la mediana es 1, el p90 es 4 y el máximo
+**17**. El techo es 3,5× ese máximo, que deja sitio a la ráfaga legítima — un
+alta de flota de N unidades dispara N avisos seguidos. No es una medición por
+usuario: hasta esta migración no se guardaba el autor, así que 17 es el máximo de
+todas las cuentas juntas y por tanto una cota superior de lo que hizo cualquiera.
+
+
 Cada usuario puede silenciar **correos** por tipo (`perfiles.notif_email`),
 pero **nunca la campana ni el correo transaccional** — ver `TIPOS_SILENCIABLES`
 en la Edge Function `enviar-notificacion`.
