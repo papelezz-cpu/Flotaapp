@@ -78,24 +78,42 @@ demás clientes y los cancelados propios se quedaban fuera.
 3. Ve pulsando, una por una, las cinco pastillas:
    **Todos · Activos · En revisión · Acuerdos · Cancelados**
 
-**Esperado en cada una:**
+**Antes de pulsar nada, lo que hay en esta base.** Medido el 2026-09-25 con la
+cuenta de cliente de pruebas, para que no confundas «vacío» con «roto»:
 
-| Pastilla | Bajo «Mis negociaciones» / «Mis solicitudes» / «Historial» |
-|---|---|
-| Todos | todo lo tuyo |
-| Activos | solo abierto, en negociación, pendiente de acuerdo, rechazado |
-| En revisión | solo las que el superadmin aún no ha publicado |
-| Acuerdos | solo acordado, finalizado, expirado |
-| Cancelados | solo canceladas |
+| Pastilla | Solicitudes propias que existen |
+|---|---:|
+| Todos | 2 |
+| Activos | 1 |
+| En revisión | **0** |
+| Acuerdos | 1 |
+| Cancelados | **0** |
 
-**Y en las cinco, la sección «Otras solicitudes activas» sigue apareciendo.** Eso
-es correcto y es lo que más fácil se confunde con un fallo: esa sección son los
-pedidos abiertos de *otros* clientes y **no se filtra por estado** a propósito —
+**«En revisión» y «Cancelados» van a salir vacías, y es correcto.** No hay ninguna
+fila de esos estados. Lo que hay que comprobar es que las otras tres muestren
+exactamente lo que dice la tabla.
+
+**Y la sección «Otras solicitudes activas» NO va a aparecer en ninguna de las
+cinco.** Eso también es correcto, y la versión anterior de este guion decía lo
+contrario: esa sección pinta los pedidos abiertos de *otros* clientes, y en esta
+base hay **0**, así que el código no llega ni a poner el título
+(`if (otrosPedidos.length)`). Si algún día hay pedidos abiertos de otro cliente,
+aparecerá **en las cinco pastillas**, porque no se filtra por estado a propósito —
 todos están en «abierto», así que filtrar por «Cancelados» la vaciaría.
 
-**Lo que sería un fallo:** que al filtrar por «Cancelados» no salga ninguna
-solicitud cancelada tuya **teniendo alguna**. Si no tienes ninguna cancelada, esta
-pastilla no prueba nada: pasa a la siguiente.
+**Esperado:** cada pastilla muestra el número de la tabla, ni más ni menos, y
+cambiar de pastilla no deja filas del filtro anterior en pantalla.
+
+> ⚠ **Esta prueba NO puede detectar el defecto que H-11 arregló.** Hace falta que
+> haya **más de 30 pedidos abiertos de otros clientes** para que la página se
+> llene con ellos y las filas propias se queden fuera; aquí hay 0. Lo que esta
+> prueba comprueba es que **no haya regresión**: que el filtro siga mostrando lo
+> que debe. El defecto en sí se demostró sobre la semántica de la paginación, no
+> en pantalla, y así quedó escrito en el commit de H-11.
+
+**Nota sobre los números de arriba:** son de `portgo-pruebas`, y el sello de
+paridad del 2026-09-24 dice **`diverge`** con 72 diferencias, así que **no son los
+números de producción** — sirven solo para saber qué esperar en el preview.
 
 ---
 
@@ -129,8 +147,22 @@ con el mismo id que un camión, y la app no deja crear eso—, y ya lo ejercitó
 comprobación de la migración. **Aquí se busca regresión: que la protección de
 verdad siga en pie.**
 
+> **Precondición, y no es formalismo: esta prueba MANDA CORREO.** Al guardar la
+> reserva, `js/modal.js` dispara dos avisos por `enviar-notificacion` —uno al
+> dueño de la unidad y otro al cliente— y **pruebas tiene las direcciones REALES
+> de los clientes**. Lo único que lo impide es el secreto `CORREO_SALIDA` de esa
+> Edge Function, que **no vive en Postgres y por tanto el sello de paridad no lo
+> cubre**. Comprobado el 2026-09-25 con `node pruebas/05-sonda-correo.mjs`:
+> salida **BLOQUEADA**, y `mailer_autoconfirm` coincide con producción. La sonda
+> no provoca un envío para averiguarlo: le pregunta a la función en qué modo
+> está. **Si ha pasado tiempo o se ha redesplegado esa función, vuelve a
+> correrla antes del paso 2.**
+
 1. Entra como **cliente** → tarjeta **«Catálogo»** → elige una empresa → elige una
    unidad → botón **«Agendar esta unidad»**.
+   Hay **13 camiones disponibles** en esta base; sirve cualquiera, por ejemplo
+   `C-002` o `T-001`. El botón solo se activa si la unidad está `disponible`;
+   si no, dice **«⏳ No disponible»**.
 2. Reserva con fechas, digamos, del **día 10 al 12** del mes que viene. Envía.
    **Esperado:** «✓ Solicitud enviada — la empresa confirmará pronto».
 3. **Repite con la misma unidad** y fechas que solapen: del **11 al 13**.
@@ -147,6 +179,10 @@ reserva entra, párate**: la protección se abrió y eso bloquea la promoción.
    texto entonces es otro:
 
 > ❌ Ese recurso ya tiene una reserva en esas fechas. La oferta sigue vigente — elige otra o pide una nueva.
+
+**Deja rastro:** la reserva del punto 2 se queda en pruebas como `Pendiente`, y
+su unidad aparecerá ocupada en esas fechas. No estorba a nada, pero conviénete
+elegir fechas lejanas para no cruzarte con otras pruebas.
 
 ---
 
