@@ -165,18 +165,48 @@ segunda vez tiene que fallar.
 | 3 | empresa | inicio → **«Solicitudes»** | **«Hacer oferta»** |
 | 4 | cliente | inicio → **«Mis solicitudes»** | **«✓ Aceptar $…»** y luego **«✓ Guardar y confirmar»** |
 
+### Qué camión usar, y por qué importa
+
+El desplegable de **«Hacer oferta»** filtra por **dueño** y por **tipo exacto**
+(`.eq('propietario_id', …).eq('tipo', tipo)`), así que si la solicitud y el camión
+no coinciden en tipo, el camión **no aparece** y parece que algo está roto.
+
+Unidades de **Omar Silva Preciado** en esta base, con su tipo exacto:
+
+| id | tipo (el que hay que pedir en la solicitud) |
+|---|---|
+| `T-46BC79F9` | Torton |
+| `T-629F701C` | Torton |
+| `R-A330E825` | Rabón |
+| `S-965A48AE` | Sencillo porta contenedor 40/20 |
+| `C-CBFCC424` | Camioneta 1.5 ton caja seca |
+
+Usa **`T-46BC79F9`** y pide la solicitud de tipo **Torton**. Hay dos Tortones, así
+que en la segunda vuelta el desplegable te dejará elegir **el mismo**, que es lo
+que la prueba necesita.
+
+Los ids y los dueños de esta tabla son de `portgo-pruebas`, leídos el 2026-09-25 con
+sesión de superadmin. El sello de paridad del 2026-09-24 dice **`diverge`** con 72
+diferencias, así que **en producción la flota puede no ser esta**. Si vas a repetir
+la prueba allí, mira primero «Mis unidades».
+
+> `T-001` **no sirve y la primera versión de este guión lo daba por bueno**: es de
+> **Champi**, no de Omar, y además su tipo es «Torton caja seca», no «Torton». No
+> habría aparecido en el desplegable ni entrando como Champi con una solicitud de
+> Torton.
+
 1. **Primera solicitud.** Como cliente, publica una de camión tipo **Torton** con
    fechas del **día 10 al 12 del mes que viene**. Ojo: **no se admite el mismo
    día**, los campos de fecha llevan `min = mañana`.
 2. Como **superadmin**, apruébala con **«✓ Aprobar y publicar»**.
-3. Como **empresa**, entra en **«Solicitudes»**, pulsa **«Hacer oferta»** y elige
-   el camión **`T-001`** (el tipo del camión debe coincidir con el de la
-   solicitud, o no aparece en el desplegable).
+3. Como **empresa (Omar Silva Preciado)**, entra en **«Solicitudes»**, pulsa
+   **«Hacer oferta»** y elige **`T-46BC79F9`**. En el desplegable se lee
+   **«🚛 T-46BC79F9 — Torton (14 ton)»**.
 4. Como **cliente**, en **«Mis solicitudes»**, **«✓ Aceptar $…»** → **«✓ Guardar y
    confirmar»**.
    **Esperado:** el acuerdo se cierra y aparece la reservación.
-5. **Repite los pasos 1–4** con una segunda solicitud, **el mismo camión `T-001`**
-   y fechas que solapen: del **11 al 13**.
+5. **Repite los pasos 1–4** con una segunda solicitud, **el mismo camión
+   `T-46BC79F9`** y fechas que solapen: del **11 al 13**.
 
 **Esperado en el paso 4 de la segunda vuelta:** NO se cierra, y sale este texto:
 
@@ -199,7 +229,7 @@ abrió y eso bloquea la promoción. Es lo único que esta prueba busca.
 > averiguarlo. **Vuelve a correrla si se redespliega esa función.**
 
 **Deja rastro:** quedan dos solicitudes, sus ofertas y una reservación `Activa` en
-pruebas, y el camión `T-001` aparecerá ocupado en esas fechas. Elige fechas
+pruebas, y el camión `T-46BC79F9` aparecerá ocupado en esas fechas. Elige fechas
 lejanas para no cruzarte con otras pruebas.
 
 ---
