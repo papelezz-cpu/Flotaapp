@@ -405,6 +405,23 @@ async function renderPedidos(append = false) {
   // Fetch ofertas only for the new pedido IDs
   const todosNuevosIds = [...(pedidosPage || []), ...(acordadosSA || []), ...(otrosAbiertos || [])].map(p => p.id);
   if (todosNuevosIds.length) {
+    // ── Este select('*') SE QUEDA, y está medido (H-08, 2026-09-25) ────────
+    //
+    // La ficha de H-08 pedía enumerar tres consultas: `pedidos` y `ofertas` de
+    // aquí, y `reservaciones` de renderReserv. Las dos anchas ya están hechas
+    // —`PED_COLS_LISTA` y `RES_COLS_LISTA`— y son las que pagaban:
+    //
+    //     pedidos        30 filas   46,8 KB -> 12,5 KB    73 % menos
+    //     reservaciones  23 filas   34,9 KB ->  7,6 KB    78 % menos
+    //     ofertas        39 filas   19,2 KB -> 15,3 KB    21 % menos
+    //
+    // `ofertas` tiene **16 columnas**, no 63, y de ese 21 % casi todo son
+    // `mensaje` y `contra_mensaje` — que **se pintan** (js/pedidos.js las lee 6
+    // veces, aprobaciones.js 2). Igual que `operador_nombre`, `ronda` y
+    // `permite_reoferta`. Enumerarlas dejaría fuera una o dos columnas cortas:
+    // unos pocos KB, a cambio del riesgo que la propia ficha señala —olvidar una
+    // no da error, deja un hueco en la interfaz—. No se hace por eso, no por
+    // pereza. Si alguien vuelve aquí: mide antes de enumerar.
     const { data: nuevasOfertas } = await sb.from('ofertas')
       .select('*').order('created_at', { ascending: true })
       .in('pedido_id', todosNuevosIds);
