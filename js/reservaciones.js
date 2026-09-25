@@ -728,7 +728,19 @@ function eliminarReserva(reservaId) {
       tracking_estado: r.tracking_estado,
       created_at:      r.created_at,
       archivado_por:   currentUser.id,
-      archivado_at:    new Date().toISOString(),
+      // La marca de archivado NO se manda: la pone el `DEFAULT now()` de la
+      // columna. Dos motivos, y el segundo es el que importa (H-22, 2026-09-25):
+      //
+      //   · `new Date().toISOString()` era el reloj del NAVEGADOR. `now()` es el
+      //     del servidor, que es el mismo para todas las filas y no arrastra el
+      //     desajuste ni la zona del cliente.
+      //   · y así el nombre de la columna deja de aparecer aquí, lo que permite
+      //     renombrarla (`archivado_at` → `archivado_en`, para que siga la
+      //     convención `_en` del resto del esquema) **sin ventana de rotura en
+      //     ningún orden de despliegue**. Es lo mismo que hizo `_pv()` en H-05.
+      //
+      // Nadie LEE esta columna: no se pinta, no se ordena por ella, no aparece en
+      // ninguna política ni función. Medido el 2026-09-25.
     });
     if (insertErr) { showToast('Error al archivar: ' + (insertErr.message || '')); return; }
 
