@@ -23,8 +23,10 @@ console.log(JSON.stringify({ base: (typeof sb!=='undefined'&&sb.supabaseUrl)||'s
   v: [...document.scripts].map(s=>s.src.split('/').pop()).filter(n=>/^pedidos\./.test(n)) }, null, 2));
 ```
 
-Debe decir `base` terminando en **`xskgnudiznryhgagxadu`** y **`pedidos.js?v=84`**.
-Si no, para: estás en producción o el despliegue no ha llegado.
+Debe decir `base` terminando en **`xskgnudiznryhgagxadu`**. Para la versión de los
+ficheros, usa el bloque autocomparado del **paso 0 de**
+[PLAN-PRUEBAS-COLA-DEV.md](PLAN-PRUEBAS-COLA-DEV.md): aquí había un `v=84` escrito a
+mano que se quedó viejo en tres días.
 
 ---
 

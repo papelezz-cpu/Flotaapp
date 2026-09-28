@@ -50,30 +50,46 @@ comprobación se ejecuta dentro de la propia migración al aplicarla.
 
 Pruebas es copia fiel de producción, así que **los datos no distinguen un entorno
 del otro ni un build del otro**. El 2026-09-18 se gastaron tres rondas de pruebas
-en un build que no llevaba el cambio. Pega esto en la consola:
+en un build que no llevaba el cambio.
+
+**Este bloque no lleva números escritos a mano — se compara solo.** La versión
+anterior sí los llevaba y se quedó vieja en tres días: decía `pedidos.js?v=84`
+cuando ya iba por 86, y el usuario tuvo que preguntar si el guion estaba al día.
 
 ```js
-console.log(JSON.stringify({
-  url:  location.href,
-  base: (typeof sb !== 'undefined' && sb.supabaseUrl) || 'sb no definido',
-  v:    [...document.scripts].map(s => s.src.split('/').pop())
-          .filter(n => /^(pedidos|views|modal|detalle|vigencias)\./.test(n)),
-  css:  [...document.styleSheets].map(s => (s.href||'').split('/').pop()).filter(n => /components/.test(n))
-}, null, 2)); caches.keys().then(k => console.log('caches:', k));
+fetch('app.html', { cache: 'no-store' }).then(r => r.text()).then(html => {
+  const pide = {};
+  for (const m of html.matchAll(/(?:js|css)\/([\w.-]+)\?v=(\d+)/g)) pide[m[1]] = m[2];
+  const carga = {};
+  for (const el of [...document.scripts, ...document.styleSheets]) {
+    const m = (el.src || el.href || '').match(/(?:js|css)\/([\w.-]+)\?v=(\d+)/);
+    if (m) carga[m[1]] = m[2];
+  }
+  const mal = Object.keys(carga).filter(f => pide[f] && pide[f] !== carga[f])
+                    .map(f => `${f}: cargado v${carga[f]}, app.html pide v${pide[f]}`);
+  console.log(JSON.stringify({
+    base:     (typeof sb !== 'undefined' && sb.supabaseUrl) || 'sb no definido',
+    ficheros: Object.keys(carga).length + ' comparados',
+    desfase:  mal.length ? mal : 'ninguno'
+  }, null, 2));
+  caches.keys().then(k => console.log('caches:', k));
+});
 ```
 
-Tiene que decir **exactamente** esto:
+**Qué tiene que salir:**
 
-| Debe decir | Si dice otra cosa |
+| Campo | Debe decir |
 |---|---|
-| `base` termina en `xskgnudiznryhgagxadu` | **estás en producción** — para y cambia de URL |
-| `pedidos.js?v=84` | el despliegue no ha llegado; espera y recarga |
-| `views.js?v=34`, `modal.js?v=14`, `detalle.js?v=15`, `vigencias.js?v=8` | idem |
-| `components.css?v=37` | idem |
-| `caches: ['portgo-v225']` | si hay varias, recarga otra vez |
+| `base` | termina en **`xskgnudiznryhgagxadu`**. Si termina en `xnyqsewaluezkkrlyhxg` **estás en producción** — para y cambia de URL |
+| `desfase` | **`"ninguno"`**. Si lista algo, el navegador sirve ficheros viejos: **Ctrl+Shift+R** otra vez |
+| `caches` | **una sola** entrada `portgo-vNNN`. Si hay varias, recarga otra vez |
 
-**Si algo no cuadra, no sigas y no depures el código.** El despliegue tarda, y en
-septiembre llegó a tardar 52 minutos.
+> **Lo que este bloque NO puede comprobar, y lo cubro yo:** si el despliegue de
+> Vercel llegó. Compara lo que el navegador cargó contra el `app.html` **que
+> Vercel está sirviendo**, así que si el despliegue va con retraso los dos son
+> viejos y el desfase sale «ninguno» igualmente. Eso se comprueba desde fuera,
+> contra el estado del commit en GitHub, y es lo primero que hago antes de pedirte
+> que pruebes.
 
 ---
 

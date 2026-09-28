@@ -49,13 +49,17 @@ Lo que **nadie ha ejecutado todavía** son las ~20 líneas de JavaScript nuevas:
 
 ## Paso 0 — ¿build correcto? (30 s)
 
-```js
-console.log(JSON.stringify({ base: (typeof sb!=='undefined'&&sb.supabaseUrl)||'sb no definido',
-  v: [...document.scripts].map(s=>s.src.split('/').pop()).filter(n=>/^(aprobaciones|pedidos)\./.test(n)) }, null, 2));
-```
+Usa el **bloque autocomparado del paso 0 de
+[PLAN-PRUEBAS-COLA-DEV.md](PLAN-PRUEBAS-COLA-DEV.md)**: compara lo que el navegador
+cargó contra lo que pide `app.html`, sin números escritos a mano.
 
-Debe decir `base` terminando en **`xskgnudiznryhgagxadu`**, **`aprobaciones.js?v=47`**
-y **`pedidos.js?v=86`**. Si no, para.
+`base` tiene que terminar en **`xskgnudiznryhgagxadu`** y `desfase` decir
+**«ninguno»**. Si no, para.
+
+> Aquí había dos versiones apuntadas a mano (`aprobaciones.js?v=47`,
+> `pedidos.js?v=86`). Se retiraron: en este repo esos números cambian cada vez que
+> se toca el fichero, y un guion que los lleva escritos caduca en días — pasó con
+> el de la cola, que decía `v=84` cuando ya iba por 86.
 
 ---
 
