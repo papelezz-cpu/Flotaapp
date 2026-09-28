@@ -448,7 +448,7 @@ ficheros.
 | 4 | H-06 — doble reserva | no aplica: no se puede provocar desde la interfaz; la cubre la 9 |
 | 5 | H-20 — techo de avisos | pendiente |
 | 6 | Vigencias legible | ✅ **pasa** |
-| 7 | H-22 — archivado | ⚠ **destapó dos defectos de la pantalla**, arreglados el 28; **hay que repetirla** con `reservaciones.js?v=59` |
+| 7 | H-22 — archivado | ✅ **pasa** con `reservaciones.js?v=59`. La primera pasada destapó **dos defectos de la pantalla** —la columna «Archivado» pintaba `created_at` y la tabla se ordenaba por `created_at`—, arreglados el 28. El archivado en sí nunca falló |
 | 8 | desplegable, rama de lavado | pendiente (opcional) |
 | 9 | conflicto tardío | pendiente |
 
