@@ -343,8 +343,15 @@ sin ventana de rotura, pero **si me equivoqué, el histórico se queda sin fecha
    confirma.
 2. Entra en la tarjeta **«Historial»** («Reservaciones archivadas»).
 
-**Esperado:** la reservación aparece en el historial **con su fecha de archivado**,
-la de hoy. Si sale vacía o sin fecha, para y dímelo: significa que el `DEFAULT` no
+**Esperado:** la reservación aparece en el historial **la primera**, y la columna
+**«Archivado» muestra la fecha de HOY**.
+
+> Hasta el 2026-09-28 esto fallaba por dos sitios a la vez, y los dos se
+> arreglaron ese día al probarlo: la tabla se ordenaba por `created_at` —cuándo se
+> creó la reservación, no cuándo se archivó— y la columna «Archivado» **pintaba
+> también `created_at`**. Así que al archivar una reserva creada semanas antes,
+> esa columna seguía mostrando la fecha vieja y parecía que la fila no había
+> llegado. Sí había llegado. Si sale vacía o sin fecha, para y dímelo: significa que el `DEFAULT` no
 está haciendo su trabajo, o que la migración de H-22 no está aplicada en esta base.
 
 **Ojo con el orden:** esta prueba necesita que **`20260925160000` esté aplicada a
@@ -437,11 +444,11 @@ ficheros.
 | 0 | build y entorno | ✅ correcto |
 | 1 | R-09 — el globo de la empresa | ✅ **pasa** |
 | 2 | H-11 — filtro de estado del cliente | ✅ **pasa** — activos 2, revisión 0, acuerdos 5, cancelados 1, total 8; la suma cuadra |
-| 3 | el render ya no escribe | pendiente |
+| 3 | el render ya no escribe | ✅ **pasa** |
 | 4 | H-06 — doble reserva | no aplica: no se puede provocar desde la interfaz; la cubre la 9 |
 | 5 | H-20 — techo de avisos | pendiente |
-| 6 | Vigencias legible | pendiente |
-| 7 | H-22 — archivado | pendiente |
+| 6 | Vigencias legible | ✅ **pasa** |
+| 7 | H-22 — archivado | ⚠ **destapó dos defectos de la pantalla**, arreglados el 28; **hay que repetirla** con `reservaciones.js?v=59` |
 | 8 | desplegable, rama de lavado | pendiente (opcional) |
 | 9 | conflicto tardío | pendiente |
 
