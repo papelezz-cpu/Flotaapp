@@ -199,7 +199,13 @@ dim acl_por_defecto <<'SQL'
 select coalesce(pg_get_userbyid(d.defaclrole), '?')||'|'||
        coalesce(nsp.nspname, '(todos)')||'|'||
        d.defaclobjtype::text||'|'||
-       d.defaclacl::text
+-- El array va ORDENADO, no tal cual. El orden de un aclitem[] es el de
+-- insercion y no significa nada: produccion tiene `postgres` primero porque se
+-- concedio primero, y pruebas lo tendria al final porque se anade despues. Mismo
+-- conjunto, texto distinto -> la dimension divergia por una diferencia que no
+-- existe. Visto el 2026-09-28 al cerrar las 6 ultimas diferencias del sello.
+       coalesce((select string_agg(a::text, ',' order by a::text)
+                   from unnest(d.defaclacl) a), '(vacio)')
   from pg_default_acl d
   left join pg_namespace nsp on nsp.oid = d.defaclnamespace
  where d.defaclrole = 'postgres'::regrole;
