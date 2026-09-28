@@ -237,6 +237,8 @@ The app is served from **Vercel**, same project for both branches (repo `papelez
 
 > ⚠️ **Auth redirect URLs:** the Vercel domain must be in Supabase → Authentication → URL Configuration (Site URL + Redirect URLs), or password-reset links won't redirect. Add any new domain (e.g. a custom domain) there too.
 
+> ⚠ **The `supabase/*.sh` scripts must be run from the Git Bash window (`MINGW64`), not PowerShell.** In PowerShell `bash` resolves to WSL — which is not installed on this machine — so the command dies with *«instale una distribución»* and nothing runs. Worse, a multi-line command with `\` continuations is **not** a continuation in PowerShell: it swallows each line as a separate command and prints nothing useful. That happened on 2026-09-28 with the five-migration promotion; no harm, because nothing executed — but the failure looks like the script misbehaving rather than the shell. **When handing over a script command, give it on ONE line.**
+
 To run locally: `npx serve .` (connects to the live Supabase project; credentials in `js/config.js`).
 
 > ⚠️ Never commit secrets. `js/config.js` contains the anon key (safe to expose). The service role key lives only in Edge Function secrets, never in client code.
