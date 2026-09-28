@@ -648,6 +648,14 @@ echo
 # Idempotente: ejecutarlo dos veces deja lo mismo.
 echo "── 4b/6 · Privilegios por omisión ──"
 if q "$PRUE" -q -v ON_ERROR_STOP=1 <<'SQL' >/dev/null 2>&1
+-- La entrada de `postgres` A SI MISMO. Es REDUNDANTE en la practica —el dueño ya
+-- tiene todo sobre lo que crea— pero produccion la tiene explicita en las tres
+-- filas y sin ella `pg_default_acl` divergia PARA SIEMPRE: 3 filas x 2 lados = 6
+-- diferencias que ninguna replica podia cerrar. Medido el 2026-09-28, cuando el
+-- sello se quedo en `diverge` con 10 diferencias y estas eran 6 de ellas.
+alter default privileges for role postgres in schema public grant all on tables    to postgres;
+alter default privileges for role postgres in schema public grant all on sequences to postgres;
+alter default privileges for role postgres in schema public grant all on functions to postgres;
 alter default privileges for role postgres in schema public grant all on tables    to authenticated;
 alter default privileges for role postgres in schema public grant all on tables    to service_role;
 alter default privileges for role postgres in schema public grant all on sequences to anon;
