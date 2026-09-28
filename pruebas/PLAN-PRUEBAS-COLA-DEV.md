@@ -427,6 +427,28 @@ Rabón aparecerá ocupado esas fechas.
 
 ---
 
+## Resultados — corrida del 2026-09-28
+
+Preview `dev`, build comprobado: `base` = `xskgnudiznryhgagxadu`, sin desfase de
+ficheros.
+
+| # | Qué | Resultado |
+|---|---|---|
+| 0 | build y entorno | ✅ correcto |
+| 1 | R-09 — el globo de la empresa | ✅ **pasa** |
+| 2 | H-11 — filtro de estado del cliente | ✅ **pasa** — activos 2, revisión 0, acuerdos 5, cancelados 1, total 8; la suma cuadra |
+| 3 | el render ya no escribe | pendiente |
+| 4 | H-06 — doble reserva | no aplica: no se puede provocar desde la interfaz; la cubre la 9 |
+| 5 | H-20 — techo de avisos | pendiente |
+| 6 | Vigencias legible | pendiente |
+| 7 | H-22 — archivado | pendiente |
+| 8 | desplegable, rama de lavado | pendiente (opcional) |
+| 9 | conflicto tardío | pendiente |
+
+**Decide la promoción: 1, 2, 7 y 9.** Las demás son de confirmación.
+
+---
+
 ## Al terminar
 
 Di qué pasó por cada prueba. Lo que decide la promoción es **1, 2 y 4**; 3, 5 y 6
