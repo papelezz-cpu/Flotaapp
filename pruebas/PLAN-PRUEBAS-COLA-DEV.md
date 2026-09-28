@@ -450,9 +450,31 @@ ficheros.
 | 6 | Vigencias legible | ✅ **pasa** |
 | 7 | H-22 — archivado | ✅ **pasa** con `reservaciones.js?v=59`. La primera pasada destapó **dos defectos de la pantalla** —la columna «Archivado» pintaba `created_at` y la tabla se ordenaba por `created_at`—, arreglados el 28. El archivado en sí nunca falló |
 | 8 | desplegable, rama de lavado | pendiente (opcional) |
-| 9 | conflicto tardío | pendiente |
+| 9 | conflicto tardío | ✅ **pasa**, y es el resultado más fuerte de la corrida — ver abajo |
 
 **Decide la promoción: 1, 2, 7 y 9.** Las demás son de confirmación.
+
+### La prueba 9, medida en la base tras el paso 8
+
+El aviso salió, pero lo que la prueba comprueba de verdad es que **no quedara nada
+escrito**. Medido:
+
+| | Estado | Oferta | Reservación |
+|---|---|---|---|
+| **A** (20–22 dic) | `en_negociacion` | **`enviada` — viva** | **ninguna** |
+| **B** (21–23 dic) | `acordado` | `aceptada` | Activa 21–23 dic |
+
+Y `R-A330E825` quedó con **exactamente dos** reservaciones (5–7 nov y 21–23 dic). Sin
+una tercera.
+
+Eso prueba tres cosas de golpe, y por el camino real de la interfaz:
+
+1. el **Paso 2** cierra el acuerdo sin que el superadmin intervenga (la B);
+2. el **trigger de H-06** salta en el conflicto tardío, que es el caso para el que
+   existen las capas de la base;
+3. y la **transacción revierte entera** — la oferta de A sigue viva, así que el
+   mensaje «la oferta sigue vigente» dice la verdad. Antes del 2026-09-25 un intento
+   fallido dejaba la oferta aceptada y el pedido a medias.
 
 ---
 
