@@ -8,6 +8,17 @@
 #   Lo de aquí es fiable; la ausencia de una línea no prueba nada sobre
 #   lo anterior al 2026-09-11.
 #
+# ⚠ EL UNICO `≠` QUE IMPRIME estado-migraciones.sh ESTA EXPLICADO, y no se va a
+#   limpiar nunca: 20260915120000_los_seguros_se_acreditan_no_se_declaran.sql corrio
+#   con LF en pruebas (11bec696…) y con CRLF en produccion (24a7452e…), sin que nadie
+#   lo editara. Es el caso R-03: con core.autocrlf=true y sin .gitattributes, git
+#   entregaba la copia de trabajo con CRLF y `psql -f` los conservaba DENTRO del
+#   cuerpo de la funcion. La causa se cerro el 2026-09-15 con .gitattributes; estas
+#   dos lineas son historia y su hash ya no puede coincidir con el archivo de hoy.
+#
+#   Asi que ese ≠ no es una migracion editada tras aplicarse. Si aparece un SEGUNDO
+#   ≠, ese si hay que mirarlo.
+#
 # fecha_utc	entorno	proyecto_ref	archivo	sha256
 2026-09-11T22:33:16Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260911120000_cierre_acuerdo_sin_carrera.sql	411eafa84c820e1f1782348fc6e28c53f5dffb6b0b9428242c7f392a09446cd2
 2026-09-11T22:33:16Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260911130000_permisos_cierra_anon_y_truncate.sql	93f95a4ada49a6acef050d0ffb53faddf1681bbe2b1918ba1c9b5f8f1da5e861
@@ -56,3 +67,15 @@
 2026-09-24T22:13:11Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260924150000_hazmat_del_camion_frena_el_trato.sql	f1beffda480d0f997f79c45f0f06291133be2ad141cec196130ee88089f8ee52
 2026-09-24T23:06:33Z	produccion	xnyqsewaluezkkrlyhxg	supabase/migrations/20260924140000_recursos_con_dueno_obligatorio.sql	c9c77f49e936b510ee97f76663604e1cdeaac00b3d1c276d5e769d4fc1363ea4
 2026-09-24T23:06:33Z	produccion	xnyqsewaluezkkrlyhxg	supabase/migrations/20260924150000_hazmat_del_camion_frena_el_trato.sql	f1beffda480d0f997f79c45f0f06291133be2ad141cec196130ee88089f8ee52
+2026-09-24T23:34:02Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260924160000_globo_de_solicitudes_cuenta_en_la_base.sql	ab5b5ccaf3ce4bc0add8b613338339a79023640dcf325149ab12379014754210
+2026-09-25T19:18:13Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260925130000_doble_reserva_distingue_el_tipo_de_recurso.sql	b994e869b88b3329c3ddea45f124e0001c13a27418fe77f27b2668884c846897
+2026-09-25T19:28:54Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260925120000_techo_de_avisos_al_superadmin.sql	69f70a5cb23f8a5df991f46ab30de2da86d0e6e00b565112ef9def0db37aea56
+2026-09-25T21:55:57Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260925140000_URGENTE_devuelve_el_paso2_del_cierre.sql	a03e212108855971496323673124d607d1fee2ea8c2451ac11d87755534c96a0
+2026-09-25T22:35:21Z	produccion	xnyqsewaluezkkrlyhxg	supabase/migrations/20260925140000_URGENTE_devuelve_el_paso2_del_cierre.sql	a03e212108855971496323673124d607d1fee2ea8c2451ac11d87755534c96a0
+2026-09-25T23:38:56Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260925150000_updated_at_en_las_tablas_con_flujo.sql	ec3a85cee5e480b7330df430828e5c5a0fd9e6efcebdb8ac3fcb53bb7a6bfa35
+2026-09-25T23:39:07Z	pruebas	xskgnudiznryhgagxadu	supabase/migrations/20260925160000_archivado_at_pasa_a_archivado_en.sql	122ef9833531615333deb55797d73d74872cf9a3083cfcda03a141786e6bfb3b
+2026-09-28T22:56:44Z	produccion	xnyqsewaluezkkrlyhxg	supabase/migrations/20260924160000_globo_de_solicitudes_cuenta_en_la_base.sql	ab5b5ccaf3ce4bc0add8b613338339a79023640dcf325149ab12379014754210
+2026-09-28T22:56:44Z	produccion	xnyqsewaluezkkrlyhxg	supabase/migrations/20260925120000_techo_de_avisos_al_superadmin.sql	69f70a5cb23f8a5df991f46ab30de2da86d0e6e00b565112ef9def0db37aea56
+2026-09-28T22:56:44Z	produccion	xnyqsewaluezkkrlyhxg	supabase/migrations/20260925130000_doble_reserva_distingue_el_tipo_de_recurso.sql	b994e869b88b3329c3ddea45f124e0001c13a27418fe77f27b2668884c846897
+2026-09-28T22:56:44Z	produccion	xnyqsewaluezkkrlyhxg	supabase/migrations/20260925150000_updated_at_en_las_tablas_con_flujo.sql	9c738d82a0c256403afa186710242d21237471a0096df18d4c95e1801ac7fa24
+2026-09-28T22:56:44Z	produccion	xnyqsewaluezkkrlyhxg	supabase/migrations/20260925160000_archivado_at_pasa_a_archivado_en.sql	122ef9833531615333deb55797d73d74872cf9a3083cfcda03a141786e6bfb3b

@@ -728,7 +728,19 @@ function eliminarReserva(reservaId) {
       tracking_estado: r.tracking_estado,
       created_at:      r.created_at,
       archivado_por:   currentUser.id,
-      archivado_at:    new Date().toISOString(),
+      // La marca de archivado NO se manda: la pone el `DEFAULT now()` de la
+      // columna. Dos motivos, y el segundo es el que importa (H-22, 2026-09-25):
+      //
+      //   · `new Date().toISOString()` era el reloj del NAVEGADOR. `now()` es el
+      //     del servidor, que es el mismo para todas las filas y no arrastra el
+      //     desajuste ni la zona del cliente.
+      //   · y así el nombre de la columna deja de aparecer aquí, lo que permite
+      //     renombrarla (`archivado_at` → `archivado_en`, para que siga la
+      //     convención `_en` del resto del esquema) **sin ventana de rotura en
+      //     ningún orden de despliegue**. Es lo mismo que hizo `_pv()` en H-05.
+      //
+      // Nadie LEE esta columna: no se pinta, no se ordena por ella, no aparece en
+      // ninguna política ni función. Medido el 2026-09-25.
     });
     if (insertErr) { showToast('Error al archivar: ' + (insertErr.message || '')); return; }
 
@@ -1452,9 +1464,14 @@ async function renderHistorialReservas() {
   if (!el) return;
   el.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando historial…</div>`;
 
+  // Ordenado por FECHA DE ARCHIVADO, no por `created_at`. Un historial se lee
+  // por lo último que entró en él; ordenarlo por cuándo se creó la reservación
+  // coloca lo recién archivado en medio de la lista, y eso es lo que hizo pensar
+  // al usuario que no había llegado (2026-09-28). Aquí coincidió que era la
+  // primera —la reserva era la más reciente de las ocho— pero fue casualidad.
   const { data, error } = await sb.from('reservaciones_historico')
     .select('*')
-    .order('created_at', { ascending: false })
+    .order('archivado_en', { ascending: false })
     .limit(100);
 
   if (error) { el.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar historial.</div>`; return; }
@@ -1477,7 +1494,14 @@ async function renderHistorialReservas() {
           <td>${fmtFecha(r.fecha_ini)}</td>
           <td>${fmtFecha(r.fecha_fin)}</td>
           <td><span class="badge badge-maint">${esc(r.estado || '—')}</span></td>
-          <td style="font-size:0.75rem;color:var(--text-muted)">${r.created_at ? new Date(r.created_at).toLocaleDateString('es-MX') : '—'}</td>
+          <!-- La columna se llama Archivado y hasta el 2026-09-28 pintaba
+               created_at: la fecha en que se CREO la reservacion, no la de
+               archivado. Lo encontro el usuario probando H-22: archivo una
+               reserva, busco la fecha de hoy en esta columna y no la vio, porque
+               esa fila se habia creado el 21. La fila estaba, y primera.
+               OJO: nada de acentos graves aqui dentro, esto va dentro de un
+               template literal y lo cerrarian. -->
+          <td style="font-size:0.75rem;color:var(--text-muted)">${r.archivado_en ? fmtFecha(r.archivado_en) : '—'}</td>
         </tr>`).join('')}
       </tbody>
     </table>`;

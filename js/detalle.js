@@ -38,9 +38,15 @@ async function openDetail(id) {
     // select('*') sobre perfiles, que entregaba las 37 columnas —documentos,
     // estado de moderacion, fotos de verificacion— para mostrar un nombre.
     sb.from('empresas_publico').select('*').eq('user_id', c.propietario_id).maybeSingle(),
+    // H-06: `unidad` guarda el id de un camión, un custodio, un patio o un
+    // lavado, así que sin acotar el tipo esta consulta pintaría las fechas
+    // ocupadas de OTRO recurso que compartiera cadena de id. Aquí el tipo es
+    // siempre 'camion' —`c` sale de `allCamiones`— así que va fijo y no de una
+    // variable que pueda venir vacía.
     sb.from('reservaciones')
       .select('fecha_ini, fecha_fin, estado')
       .eq('unidad', id)
+      .eq('recurso_tipo', 'camion')
       .in('estado', ['Activa', 'Pendiente'])
       .gte('fecha_fin', hoy)
   ]);

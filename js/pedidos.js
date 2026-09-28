@@ -69,18 +69,23 @@ function aplicarFiltrosPedidos(q) {
   return q;
 }
 
-// ── FILTRO DE ESTADO DEL CLIENTE ──────────────────────
+// ── FILTRO DE ESTADO DEL CLIENTE (H-11, segunda mitad) ────────────────────
 //
-// Los mismos grupos que aplica _filtrarEstadoCli, para poder pedirle a la
-// base solo los estados que la pantalla va a pintar en vez de traerse los
-// nueve y descartar ocho en el navegador.
+// Estos grupos son **la única definición** del filtro, y se aplican en la
+// consulta. Antes vivían aquí Y otra vez en un `_filtrarEstadoCli` que volvía a
+// filtrar en el navegador; el comentario que había advertía justamente de eso
+// —«repetir la regla en dos sitios es cómo se desincronizan»— así que al
+// llevarla al servidor se retiró la copia.
 //
-// `abierto` se añade SIEMPRE, filtre lo que filtre. La sección «Otras
-// solicitudes activas» pinta los pedidos abiertos de OTROS clientes y usa
-// _filtrar, no _filtrarEstadoCli — o sea que el filtro de estado nunca la ha
-// tocado, a propósito. Quitar `abierto` de la consulta la vaciaría al filtrar
-// por «Cancelados», y eso no es llevar un filtro al servidor: es cambiar lo
-// que la pantalla enseña.
+// Lo que hacía falta para poder retirarla: hasta el 2026-09-24 la consulta
+// añadía `abierto` SIEMPRE, filtrara lo que filtrara, porque la MISMA consulta
+// alimentaba dos secciones con reglas distintas — «Otras solicitudes activas»
+// pinta los abiertos de OTROS clientes y nunca debe filtrarse por estado. La
+// consecuencia: al filtrar por «Cancelados» la página de 30 se llenaba con los
+// abiertos de todos los demás y los cancelados propios no aparecían.
+//
+// Ahora son dos consultas: la paginada trae solo lo del cliente con su filtro
+// de verdad, y los abiertos de otros vienen aparte. Ver `renderPedidos()`.
 const PED_ESTADOS_TODOS = ['abierto','en_negociacion','pendiente_revision','pendiente_acuerdo',
                            'rechazado','acordado','cancelado','finalizado','expirado'];
 const PED_ESTADOS_POR_FILTRO = {
@@ -89,11 +94,6 @@ const PED_ESTADOS_POR_FILTRO = {
   acordado:  ['acordado','finalizado','expirado'],
   cancelado: ['cancelado'],
 };
-function estadosParaConsulta() {
-  const sel = PED_ESTADOS_POR_FILTRO[_filtroEstadoCli];
-  if (!sel) return PED_ESTADOS_TODOS;              // 'todos', o un valor que no conozco
-  return [...new Set([...sel, 'abierto'])];        // ver el comentario de arriba
-}
 
 // ── COLUMNAS DEL LISTADO (H-08) ───────────────────────
 //
@@ -335,14 +335,30 @@ async function renderPedidos(append = false) {
       `and(created_at.eq.${_pedidosCursor.created_at},id.lt.${_pedidosCursor.id})`
     );
   }
-  // El filtro de estado se estrecha aquí, para que la página no se gaste en
-  // filas que el navegador va a descartar. _filtrarEstadoCli SE MANTIENE
-  // abajo y no sobra: la consulta trae además los `abierto` de otros clientes
-  // para «Otras solicitudes activas», y esos hay que seguir apartándolos de
-  // las secciones propias. Con esto la página rinde más; lo que NO hace es
-  // convertir el filtro de estado en un filtro de la lista entera, y por eso
-  // no se anuncia como tal.
-  if (esCliente) pedidosQ = pedidosQ.in('estado', estadosParaConsulta());
+  // ── El filtro de estado del cliente, completo (H-11, segunda mitad) ──────
+  //
+  // Antes esto era `pedidosQ.in('estado', estadosParaConsulta())`, y
+  // `estadosParaConsulta()` añadía `abierto` SIEMPRE. El motivo era correcto —
+  // la sección «Otras solicitudes activas» pinta los abiertos de OTROS clientes
+  // y nunca debe filtrarse por estado— pero la consecuencia era que **una sola
+  // consulta alimentaba dos secciones con reglas distintas**: al filtrar por
+  // «Cancelados», la página de 30 se llenaba con los abiertos de todos los
+  // demás y los cancelados propios se quedaban abajo, sin aparecer. El mismo
+  // defecto que H-11 describía para tipo y zona, con el filtro de estado.
+  //
+  // Se parte en dos, como ya hacía el superadmin con sus acordados:
+  //   · esta consulta = SOLO lo del cliente, con su filtro de estado de verdad
+  //     y paginada. Así «Cargar más» trae más de LO SUYO.
+  //   · `otrosAbiertosQ` (abajo) = los abiertos de otros, una sola vez.
+  //
+  // Decisión del usuario, 2026-09-24: «otras solicitudes activas» se queda en
+  // las 30 más recientes y no crece al paginar. Es la sección exploratoria; la
+  // que se filtra y se recorre es la propia.
+  if (esCliente) {
+    pedidosQ = pedidosQ
+      .eq('cliente_id', currentUser.id)
+      .in('estado', PED_ESTADOS_POR_FILTRO[_filtroEstadoCli] || PED_ESTADOS_TODOS);
+  }
 
   // H-11: los filtros de tipo y zona van aquí, no sobre lo ya descargado.
   pedidosQ = aplicarFiltrosPedidos(pedidosQ);
@@ -354,7 +370,18 @@ async function renderPedidos(append = false) {
         sb.from('pedidos').select(PED_COLS_LISTA).in('estado', ['acordado', 'finalizado', 'expirado']).order('created_at', { ascending: false }).limit(100))
     : Promise.resolve({ data: [] });
 
-  const [{ data: pedidosPage, error }, { data: acordadosSA }] = await Promise.all([pedidosQ, acordadosExtraQ]);
+  // Cliente: los abiertos de OTROS, para «Otras solicitudes activas». Sin filtro
+  // de estado a propósito —es la sección exploratoria— y una sola vez, no al
+  // paginar. Lleva los filtros de tipo y zona, que sí aplican aquí.
+  const otrosAbiertosQ = (!append && esCliente)
+    ? aplicarFiltrosPedidos(
+        sb.from('pedidos').select(PED_COLS_LISTA)
+          .eq('estado', 'abierto').neq('cliente_id', currentUser.id)
+          .order('created_at', { ascending: false }).limit(PEDIDOS_PAGE))
+    : Promise.resolve({ data: [] });
+
+  const [{ data: pedidosPage, error }, { data: acordadosSA }, { data: otrosAbiertos }] =
+    await Promise.all([pedidosQ, acordadosExtraQ, otrosAbiertosQ]);
 
   if (error) {
     container.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar solicitudes.</div>`;
@@ -368,14 +395,33 @@ async function renderPedidos(append = false) {
     _pedidosCursor = { created_at: ultimo.created_at, id: ultimo.id };
   }
 
-  // Accumulate new pedidos (skip duplicates); merge acordados SA
+  // Accumulate new pedidos (skip duplicates); merge acordados SA y los abiertos
+  // de otros clientes (H-11: vienen de su propia consulta, no de la paginada)
   const existingIds = new Set(_pedidosAccum.map(p => p.id));
-  (pedidosPage || []).forEach(p => { if (!existingIds.has(p.id)) { _pedidosAccum.push(p); existingIds.add(p.id); } });
-  (acordadosSA  || []).forEach(p => { if (!existingIds.has(p.id)) { _pedidosAccum.push(p); existingIds.add(p.id); } });
+  (pedidosPage   || []).forEach(p => { if (!existingIds.has(p.id)) { _pedidosAccum.push(p); existingIds.add(p.id); } });
+  (acordadosSA   || []).forEach(p => { if (!existingIds.has(p.id)) { _pedidosAccum.push(p); existingIds.add(p.id); } });
+  (otrosAbiertos || []).forEach(p => { if (!existingIds.has(p.id)) { _pedidosAccum.push(p); existingIds.add(p.id); } });
 
   // Fetch ofertas only for the new pedido IDs
-  const todosNuevosIds = [...(pedidosPage || []), ...(acordadosSA || [])].map(p => p.id);
+  const todosNuevosIds = [...(pedidosPage || []), ...(acordadosSA || []), ...(otrosAbiertos || [])].map(p => p.id);
   if (todosNuevosIds.length) {
+    // ── Este select('*') SE QUEDA, y está medido (H-08, 2026-09-25) ────────
+    //
+    // La ficha de H-08 pedía enumerar tres consultas: `pedidos` y `ofertas` de
+    // aquí, y `reservaciones` de renderReserv. Las dos anchas ya están hechas
+    // —`PED_COLS_LISTA` y `RES_COLS_LISTA`— y son las que pagaban:
+    //
+    //     pedidos        30 filas   46,8 KB -> 12,5 KB    73 % menos
+    //     reservaciones  23 filas   34,9 KB ->  7,6 KB    78 % menos
+    //     ofertas        39 filas   19,2 KB -> 15,3 KB    21 % menos
+    //
+    // `ofertas` tiene **16 columnas**, no 63, y de ese 21 % casi todo son
+    // `mensaje` y `contra_mensaje` — que **se pintan** (js/pedidos.js las lee 6
+    // veces, aprobaciones.js 2). Igual que `operador_nombre`, `ronda` y
+    // `permite_reoferta`. Enumerarlas dejaría fuera una o dos columnas cortas:
+    // unos pocos KB, a cambio del riesgo que la propia ficha señala —olvidar una
+    // no da error, deja un hueco en la interfaz—. No se hace por eso, no por
+    // pereza. Si alguien vuelve aquí: mide antes de enumerar.
     const { data: nuevasOfertas } = await sb.from('ofertas')
       .select('*').order('created_at', { ascending: true })
       .in('pedido_id', todosNuevosIds);
@@ -386,16 +432,37 @@ async function renderPedidos(append = false) {
         _ofertasAccum[o.pedido_id].push(o);
     });
 
-    // Expiración lazy: marcar como rechazadas ofertas vencidas (fire-and-forget)
-    const expiradas = (nuevasOfertas || []).filter(o =>
-      o.estado === 'enviada' && o.expira_en && new Date(o.expira_en) < new Date()
-    );
-    if (expiradas.length) {
-      sb.from('ofertas').update({ estado: 'rechazada' })
-        .in('id', expiradas.map(o => o.id)).then(() => {});
-    }
+    // ── EL RENDER YA NO ESCRIBE (2026-09-25) ────────────────────────────────
+    //
+    // Hasta hoy este tramo hacía cinco escrituras —una a `ofertas` y cuatro a
+    // `pedidos`— como efecto secundario de dibujar la lista. Ya no. Las mismas
+    // cinco reglas las aplica `sincronizar_estados_pedidos()` en pg_cron cada 15
+    // minutos, en producción y en pruebas.
+    //
+    // **Las cinco, comprobado, no cuatro.** El archivo de la migración
+    // `20260810130000_sincronizar_estados_OPCIONAL.sql` solo lleva cuatro; la
+    // función VIVA lleva cinco y devuelve `solicitudes_vencidas`, con el
+    // comentario «FALTABA en 20260810130000: esta regla se anadio al navegador
+    // despues». Si alguna vez hay que verificar esto, se lee la definición viva
+    // (`pg_get_functiondef`) y no el archivo: leer el archivo fue exactamente el
+    // error que casi dejó esta migración a medias.
+    //
+    // Lo que se pierde: latencia. Un estado rancio tarda hasta 15 minutos en
+    // corregirse en la base en vez de al repintar. Lo que se gana: dos pestañas
+    // abiertas ya no emiten los mismos UPDATE en carrera —26 sitios llaman a
+    // renderPedidos()—, y deja de existir el motivo por el que `pedidos` y
+    // `ofertas` no pueden publicarse en Realtime (el render escribía, así que
+    // cada evento habría despertado a todos los navegadores a escribir).
+    //
+    // La normalización EN MEMORIA se conserva a propósito: la pantalla sigue
+    // mostrando el estado corregido al instante, aunque la fila tarde en
+    // cuadrar. Es cosmética y no vuelve a la base.
+    //
+    // Las ofertas vencidas no necesitan ni eso: `ofertasVivaz` (línea ~682)
+    // filtra por `expira_en` directamente, no por el `rechazada` persistido, así
+    // que el conteo de ofertas ya era correcto sin la escritura.
 
-    // Estado lazy: pedidos en_negociacion donde TODAS las ofertas están rechazadas → reabrir
+    // Reabrir en memoria: pedidos en_negociacion donde TODAS las ofertas están rechazadas
     const ofertasPorPedido = {};
     (nuevasOfertas || []).forEach(o => {
       if (!ofertasPorPedido[o.pedido_id]) ofertasPorPedido[o.pedido_id] = [];
@@ -408,13 +475,9 @@ async function renderPedidos(append = false) {
         o.estado === 'rechazada' || (o.estado === 'enviada' && o.expira_en && new Date(o.expira_en) < new Date())
       );
     });
-    if (aReabrir.length) {
-      sb.from('pedidos').update({ estado: 'abierto' })
-        .in('id', aReabrir.map(p => p.id)).then(() => {});
-      aReabrir.forEach(p => { p.estado = 'abierto'; });
-    }
+    aReabrir.forEach(p => { p.estado = 'abierto'; });   // la base la cuadra el cron
 
-    // Estado lazy: solicitudes sin ninguna oferta VIVA cuya fecha de carga ya
+    // Normalizacion en memoria (ya NO escribe): solicitudes sin ninguna oferta VIVA cuya fecha de carga ya
     // llegó o pasó (falta menos de un día) → nadie las va a poder atender a
     // tiempo, se marcan expiradas para que dejen de verse como activas.
     // "Sin oferta viva" no es lo mismo que "sin fila en ofertas": una
@@ -427,38 +490,26 @@ async function renderPedidos(append = false) {
         o.estado === 'rechazada' || (o.estado === 'enviada' && o.expira_en && new Date(o.expira_en) < new Date())
       )
     );
-    if (aExpirarSinOferta.length) {
-      sb.from('pedidos').update({ estado: 'expirado' })
-        .in('id', aExpirarSinOferta.map(p => p.id)).then(() => {});
-      aExpirarSinOferta.forEach(p => { p.estado = 'expirado'; });
-    }
+    aExpirarSinOferta.forEach(p => { p.estado = 'expirado'; });   // idem
 
-    // Estado lazy: pedido en_negociacion pero tiene oferta aceptada → completar a pendiente_acuerdo
+    // Normalizacion en memoria (ya NO escribe): pedido en_negociacion pero tiene oferta aceptada → completar a pendiente_acuerdo
     // (ocurre si la segunda operación falló al confirmar el acuerdo)
     for (const p of (pedidosPage || [])) {
       if (p.estado !== 'en_negociacion') continue;
       const aceptada = (ofertasPorPedido[p.id] || []).find(o => o.estado === 'aceptada');
       if (!aceptada) continue;
-      sb.from('pedidos').update({
-        estado:              'pendiente_acuerdo',
-        oferta_pendiente_id: aceptada.id,
-      }).eq('id', p.id).then(() => {});
-      p.estado              = 'pendiente_acuerdo';
+      p.estado              = 'pendiente_acuerdo';   // idem: la regla (c) del cron
       p.oferta_pendiente_id = aceptada.id;
     }
   }
 
-  // Estado lazy: acuerdos cuya fecha_fin ya pasó y nunca se completaron → expirado
+  // Normalizacion en memoria (ya NO escribe): acuerdos cuya fecha_fin ya pasó y nunca se completaron → expirado
   // (los completados pasan a 'finalizado' al marcar el servicio como completado)
   const _hoy = today();
   const aExpirar = (pedidosPage || []).filter(p =>
     p.estado === 'acordado' && p.fecha_fin && p.fecha_fin < _hoy
   );
-  if (aExpirar.length) {
-    sb.from('pedidos').update({ estado: 'expirado' })
-      .in('id', aExpirar.map(p => p.id)).then(() => {});
-    aExpirar.forEach(p => { p.estado = 'expirado'; });
-  }
+  aExpirar.forEach(p => { p.estado = 'expirado'; });   // idem: la regla (d) del cron
 
   const pedidos      = _pedidosAccum;
   const ofertasMap   = _ofertasAccum;
@@ -470,18 +521,10 @@ async function renderPedidos(append = false) {
   // nada, pero repetir la regla en dos sitios es cómo se desincronizan.
   const _filtrar = lista => lista;
 
-  const _filtrarEstadoCli = lista => {
-    if (_filtroEstadoCli === 'todos') return lista;
-    if (_filtroEstadoCli === 'activo')
-      return lista.filter(p => ['abierto','en_negociacion','pendiente_acuerdo','rechazado'].includes(p.estado));
-    if (_filtroEstadoCli === 'revision')
-      return lista.filter(p => p.estado === 'pendiente_revision');
-    if (_filtroEstadoCli === 'acordado')
-      return lista.filter(p => ['acordado','finalizado','expirado'].includes(p.estado));
-    if (_filtroEstadoCli === 'cancelado')
-      return lista.filter(p => p.estado === 'cancelado');
-    return lista;
-  };
+  // _filtrarEstadoCli ya no existe: la consulta trae solo los estados del
+  // filtro (ver PED_ESTADOS_POR_FILTRO arriba). Mantenerlo habría sido la
+  // duplicación contra la que avisaba su propio comentario.
+
 
   let html = '';
 
@@ -490,13 +533,13 @@ async function renderPedidos(append = false) {
     const ESTADOS_ACTIVOS = ['abierto', 'en_negociacion', 'pendiente_revision', 'pendiente_acuerdo', 'rechazado'];
     const ESTADOS_HIST    = ['acordado', 'cancelado', 'finalizado', 'expirado'];
     const todosMios = _filtrar((pedidos || []).filter(p => p.cliente_id === currentUser.id));
-    const misActivos    = _filtrarEstadoCli(todosMios.filter(p => ESTADOS_ACTIVOS.includes(p.estado)));
+    const misActivos    = todosMios.filter(p => ESTADOS_ACTIVOS.includes(p.estado));
     // Las que ya tienen ofertas que revisar o un acuerdo por cerrarse van
     // primero: son las que de verdad requieren que el cliente haga algo,
     // a diferencia de las que solo están esperando (abierto/revisión).
     const misNegociaciones = misActivos.filter(p => ['en_negociacion', 'pendiente_acuerdo'].includes(p.estado));
     const misPedidos       = misActivos.filter(p => !['en_negociacion', 'pendiente_acuerdo'].includes(p.estado));
-    const misHistorial = _filtrarEstadoCli(todosMios.filter(p => ESTADOS_HIST.includes(p.estado)));
+    const misHistorial = todosMios.filter(p => ESTADOS_HIST.includes(p.estado));
     const otrosPedidos = _filtrar((pedidos || []).filter(p => p.cliente_id !== currentUser.id && p.estado === 'abierto'));
 
     if (misNegociaciones.length) {
@@ -2233,9 +2276,23 @@ async function openHacerOferta(pedidoId) {
   // Filtrar por disponibilidad real en las fechas del pedido
   if (recursos.length && pedido?.fecha_ini) {
     const fechaFin = pedido.fecha_fin || pedido.fecha_ini;
+    // H-06 (2026-09-25): también por `recurso_tipo`. `unidad` guarda el id de un
+    // camión, un custodio, un patio o un lavado, así que sin acotar el tipo una
+    // colisión de cadenas ocultaría del desplegable una unidad que está libre.
+    // `recursos` ya viene filtrado por dueño y por tipo, así que haría falta que
+    // la colisión fuera dentro de la misma empresa — improbable, y aun así es la
+    // misma regla que ya aplican las tres capas de la base.
+    // Los CUATRO tipos, no tres: `esLavadoOf` existe y sin él un servicio de
+    // lavado buscaría conflictos con recurso_tipo='camion', no encontraría
+    // ninguno, y el filtro de disponibilidad dejaría de actuar en silencio.
+    const tipoRecurso = esCustodio ? 'custodio'
+                      : esPatio    ? 'patio'
+                      : esLavadoOf ? 'lavado'
+                      : 'camion';
     const { data: conflictos } = await sb.from('reservaciones')
       .select('unidad')
       .in('unidad', recursos.map(r => r.id))
+      .eq('recurso_tipo', tipoRecurso)
       .in('estado', ['Pendiente', 'Activa'])
       .lte('fecha_ini', fechaFin)
       .gte('fecha_fin', pedido.fecha_ini);
@@ -2258,7 +2315,11 @@ async function openHacerOferta(pedidoId) {
         select.appendChild(opt);
       });
       if (!recursos.length) {
-        const tipoNombre = esCustodio ? 'custodios' : esPatio ? 'patios' : 'camiones';
+        // Tambien los cuatro: antes un servicio de lavado leia «No tienes
+        // camiones disponibles», que manda a la empresa a mirar la flota
+        // equivocada.
+        const tipoNombre = esCustodio ? 'custodios' : esPatio ? 'patios'
+                         : esLavadoOf ? 'lavados'   : 'camiones';
         sinRecursosMsg = `⚠ No tienes ${tipoNombre} disponibles en las fechas del pedido (${fmtFecha(pedido.fecha_ini)}${pedido.fecha_fin && pedido.fecha_fin !== pedido.fecha_ini ? ' al ' + fmtFecha(pedido.fecha_fin) : ''}). Revisa tus reservaciones activas.`;
       }
     }
@@ -2497,6 +2558,18 @@ async function responderContra(accion) {
 
 // ── CERRAR ACUERDO → CREAR RESERVACIÓN ────────────────
 
+// ⚠ CODIGO MUERTO desde el 2026-09-25: NADIE la llama.
+//
+// Su unico llamador era `_ejecutarAprobarAcuerdo()` (js/aprobaciones.js), que
+// ahora usa la RPC `cerrar_acuerdo()` — una transaccion en vez de estas seis
+// escrituras encadenadas. Se cambio porque esta version se rompio de verdad:
+// al fallar el INSERT de la reservacion, el pedido se quedaba en `acordado`
+// SIN reservacion, porque marca el pedido ANTES de insertar y el `catch` del
+// llamador no deshacia nada.
+//
+// Se conserva sin borrar a proposito, no por olvido: retirarla es una decision
+// aparte. Si alguien vuelve a necesitar cerrar un acuerdo desde el navegador,
+// la respuesta es la RPC, no esto.
 async function cerrarAcuerdo(oferta, pedido) {
   // Obtener las otras ofertas activas ANTES de rechazarlas (para notificar)
   const { data: otrasOfertas } = await sb.from('ofertas')

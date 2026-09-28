@@ -487,6 +487,41 @@ Consecuencia práctica: **una solicitud con fecha pasada no se puede crear desde
 la app**, ni siquiera para probar. Hay que crearla con la fecha más temprana
 que admita y retrasarla luego por SQL, apartando `trg_guard_pedido_update`.
 
+### Lo que el cliente ve en «Solicitudes», y qué filtra el filtro
+
+La pantalla del cliente son **cuatro secciones**, en este orden, y salen de
+`renderPedidos()` en [js/pedidos.js](../js/pedidos.js):
+
+| Sección | Qué lleva |
+|---|---|
+| Mis negociaciones | las propias en `en_negociacion` o `pendiente_acuerdo` — las que piden que el cliente haga algo |
+| Mis solicitudes | el resto de las propias activas: `abierto`, `pendiente_revision`, `rechazado` |
+| Otras solicitudes activas | los `abierto` **de otros clientes**, en modo lectura (`'publico'`) |
+| Historial | las propias en `acordado`, `cancelado`, `finalizado`, `expirado` |
+
+**El cliente ve las solicitudes abiertas de los demás clientes, a propósito.**
+No es una fuga: `ped_select` deja leer todo pedido en `abierto` a cualquier
+autenticado, y la sección existe para que el cliente vea qué se está moviendo.
+Se pinta con la plantilla `'publico'`, que no entra en ninguna de las ramas de
+botones de `pedidoCardHTML()` —así que la tarjeta no lleva ninguna acción— y
+además **oculta el conteo de ofertas**: la etiqueta dice `Abierta` a secas, no
+«N ofertas». Es deliberado: `of_select` solo enseña a cada uno sus propias
+ofertas, así que el número ahí daría siempre cero y decir «Sin ofertas aún» en
+una solicitud que tiene cinco no es ocultar, es mentir.
+
+**Las pastillas de estado filtran solo lo propio** (`PED_ESTADOS_POR_FILTRO`).
+«Otras solicitudes activas» no se filtra por estado — todas están en `abierto`,
+así que filtrar por «Cancelados» la vaciaría — pero sí respeta los filtros de
+tipo y zona.
+
+**«Cargar más» trae más de lo propio, no de lo ajeno.** Decisión del usuario del
+2026-09-24: «Otras solicitudes activas» se queda en las 30 más recientes y no
+crece al paginar; es la sección exploratoria. Hasta ese día las dos secciones
+compartían una sola consulta que añadía `abierto` siempre, y por eso al filtrar
+por «Cancelados» la página de 30 se llenaba con los abiertos de los demás
+clientes y los cancelados propios no aparecían. Son dos consultas desde
+entonces.
+
 ### Categorías de carga
 
 Deciden qué campos pide el formulario, y de eso dependen cosas más abajo:
@@ -519,6 +554,31 @@ vacía el desplegable y desactiva el botón. Es la primera de dos capas.
 ---
 
 ## 5. Cierre del acuerdo
+
+> ⚠ **`cerrar_acuerdo()` exige que el pedido llegue en `pendiente_acuerdo` con su
+> `oferta_pendiente_id` puesto, y si no, NO HACE NADA Y NO AVISA.** Tiene una salida
+> temprana que devuelve la reservación ya existente —o `NULL` si no hay ninguna— sin
+> crear nada. Existe por idempotencia (migración `20260827190000`, el caso de la
+> oferta huérfana) y está bien; el peligro es llamarla sin cumplir la precondición.
+>
+> Quien la cumple es el **Paso 2** de `aceptar_y_cerrar_acuerdo()`, un `UPDATE` que
+> marca el pedido inmediatamente antes de llamarla. **Ese bloque se perdió el
+> 2026-09-24** al reescribir la función para el permiso de materiales peligrosos, y
+> durante 22 horas en producción **aceptar una oferta no creó ninguna reservación**
+> mientras la interfaz decía que sí. Lo devuelve
+> `20260925140000_URGENTE_devuelve_el_paso2_del_cierre.sql`.
+>
+> **Lo que lo tapó, y por qué se vio justo ese día:** la regla (c) de
+> `sincronizar_estados_pedidos()` —«pedido en negociación con una oferta aceptada →
+> `pendiente_acuerdo`»— recoge el destrozo, así que el acuerdo acaba cerrándose pero
+> **con el superadmin de por medio en cada trato**. Hasta el 2026-09-25 esa regla
+> también corría en el navegador al dibujar la lista, o sea al instante; al dejarla
+> solo en el cron (hueco 4) la espera pasó a 15 minutos y el síntoma se hizo
+> visible. El cambio del render no causó el fallo: le quitó la venda.
+>
+> **Si hay que reescribir esta función, se deriva de `pg_get_functiondef`, no se
+> teclea** — y su comprobación tiene que **cerrar un acuerdo de verdad**, no
+> afirmar cosas sobre el texto con `prosrc LIKE`, que es lo que dejó pasar esto.
 
 **Cuando las dos partes aceptan, la reserva se crea. El superadmin no
 interviene.** Decidido el 2026-09-09.
@@ -594,9 +654,91 @@ revisar los papeles equivocados la mitad de las veces.
 viaje que empieza la semana que viene deja la unidad `disponible`, y eso es
 correcto: hoy está libre.
 
-La doble reserva **no depende de ese campo**. La impide
-`reservaciones_sin_solape`, un `EXCLUDE` con GiST sobre unidad y rango de
-fechas, activo para `Pendiente` y `Activa`.
+La doble reserva **no depende de ese campo**, y la impiden **tres capas que tienen
+que mirar lo mismo — de las cuales hoy solo se ejecutan dos**:
+
+| Capa | Qué es | Quién la ve HOY |
+|---|---|---|
+| `check_reservacion_disponibilidad()` | trigger `BEFORE INSERT OR UPDATE` | **la única que alguien ve.** Lanza `RECURSO_NO_DISPONIBLE`, y en el cierre de acuerdo el cliente lee «❌ Ese recurso ya tiene una reserva en esas fechas. La oferta sigue vigente — elige otra o pide una nueva.» |
+| `reservaciones_sin_solape` | `EXCLUDE` con GiST, activo solo para `Pendiente` y `Activa` | nadie, salvo en una carrera: dos inserciones simultáneas que ambas pasan el trigger |
+| [js/modal.js](../js/modal.js) | consulta previa en el navegador, antes de insertar | **nadie: ese camino es inalcanzable.** El modal de reserva directa solo lo abren botones de la rejilla oculta — ver *hueco 6*. Si el camino se revive, sería la primera en saltar, con «Este recurso ya está reservado del X al Y. Elige otras fechas.» |
+
+**La tercera está arreglada pero no se ejecuta, y conviene no confundir las dos
+cosas.** Se corrigió el 2026-09-25 junto con las otras dos, por si el camino se
+revive; lo que cierra el falso positivo **hoy** es el trigger. El mismo día se
+corrigió también [js/detalle.js](../js/detalle.js), que pintaba las fechas ocupadas
+de una unidad sin acotar el tipo — y que es código muerto por el mismo hueco 6.
+
+#### Ofertar una unidad ya reservada: **ya está bloqueado** (verificado 2026-09-25)
+
+El desplegable de «Hacer oferta» **excluye las unidades que ya tienen reserva en
+las fechas del pedido**, y si no queda ninguna dice «⚠ No tienes camiones
+disponibles en las fechas del pedido (X al Y). Revisa tus reservaciones activas.»
+Está en `openHacerOferta()` ([js/pedidos.js](../js/pedidos.js)), en el bloque
+«Filtrar por disponibilidad real en las fechas del pedido», y compara contra
+`reservaciones` en `Pendiente` y `Activa` — **exactamente los dos estados que
+vigilan las capas de la base**, que era lo único delicado de esta regla.
+
+> ⚠ **Yo afirmé aquí lo contrario, y era falso.** El 2026-09-25 escribí que
+> «ofertar con una unidad ya comprometida está permitido y nadie avisa», después
+> de leer `_enviarOfertaCore()` —la validación del envío— y los `.eq()` del
+> desplegable. El filtro por fechas está ~100 líneas más abajo, al poblar el
+> `select`, y no lo vi. Sobre esa afirmación falsa se abrió una «decisión
+> pendiente» de bloquearlo: **ya estaba hecho**. Lo destapó el usuario probando,
+> cuando el desplegable le negó la unidad.
+>
+> La lección, que es la misma de siempre en este archivo: **grep sobre la función
+> que valida no es leer el camino completo.** Quien decide qué se puede ofertar es
+> quien LLENA el desplegable, no quien comprueba el envío.
+
+**Consecuencia para las pruebas:** el choque de doble reserva **no se puede
+provocar desde la interfaz**. La empresa no llega a ofertar la unidad ocupada, así
+que el cliente nunca puede aceptarla y el trigger nunca se ejecuta por esa vía. Las
+tres capas de abajo son red para lo que la interfaz no cubre: una carrera entre dos
+cierres simultáneos, el cliente nativo, o un cambio de fechas posterior a la
+oferta.
+
+> **Las tres no vigilan el mismo conjunto de estados, y eso sigue abierto.** Las
+> dos de la base solo miran `Pendiente` y `Activa`; la del navegador usa
+> `estado <> 'Cancelada'`, así que bloquea además sobre `PorAprobar`,
+> `CancelacionSolicitada` y `Completada`. Puede ser deliberado —rechaza de más,
+> no de menos— y alinearlo abriría reservas que hoy se rechazan, que es otra
+> decisión. Queda anotado, sin tocar.
+
+Las tres comparan **`recurso_tipo` Y `unidad`** más el solape de fechas (desde el
+2026-09-25, H-06). En el navegador el tipo se lee con la **misma expresión** que
+usa el insert (`currentRecurso?.tipo_recurso || 'camion'`): si difirieran, el
+aviso hablaría de un recurso distinto del que se va a guardar. Antes comparaban solo `unidad`, y como `unidad` es un `text`
+que guarda el id de un camión, un custodio, un patio o un lavado según
+`recurso_tipo`, **un patio y un camión que compartieran cadena de id se
+estorbaban**: reservar uno daba `RECURSO_NO_DISPONIBLE` sobre el otro, que estaba
+libre. Hoy no ocurría —medido en el volcado del 2026-09-21: ninguna colisión de
+id entre las cinco tablas, y ninguna `unidad` usada con más de un
+`recurso_tipo`— pero nada en el esquema lo impedía.
+
+**El orden importa al arreglar esto, y es contraintuitivo: la capa más profunda es
+la que menos se ve.** El navegador salta primero, el trigger es `BEFORE` y salta
+antes de que la restricción se evalúe, y la restricción no la ve nadie salvo en
+una carrera. Tocar solo la restricción —que es lo que pedía la ficha de H-06—
+habría dejado el falso positivo igual de visible y con apariencia de arreglado,
+porque las dos capas de delante lo habrían seguido produciendo. Y al revés: un `EXCLUDE` mal escrito puede pasar meses
+sin dar la cara porque el trigger lo tapa, por eso la comprobación de la
+migración **apaga el trigger** y repite la prueba contra la restricción sola.
+
+Lo que sostiene la referencia sin clave foránea sigue siendo
+`trg_guard_unidad_existe`, que resuelve la tabla con `tabla_recurso(recurso_tipo)`
+y exige que el id exista allí.
+
+> **Con `unidad` en NULL ninguna de las dos capas actúa** —`NULL = NULL` no es
+> cierto— y la columna es nullable. Es anterior a H-06 y H-06 no lo empeora.
+> Medido: 0 de las filas en `Pendiente`/`Activa` tenían `unidad` NULL.
+
+**El CHECK de prefijos que proponía H-06 (c) no se hizo, y no por coste.** El
+convenio no es por tabla: en `camiones` hay **cinco** prefijos (C, T, R, F, S)
+porque el prefijo codifica el **tipo de camión**, no la tabla, así que un CHECK
+tendría que enumerar los cinco de hoy y rompería con el sexto tipo que alguien
+diera de alta. Y con `recurso_tipo` en las dos capas, una colisión entre tablas
+ya no tiene consecuencia: el convenio dejó de sostener nada.
 
 > ⚠ **Hueco conocido:** nada marca la unidad `ocupado` cuando llega su fecha.
 > Los cuatro puntos que lo hacen exigen `fecha_ini <= hoy` y ninguno vuelve a
@@ -828,6 +970,46 @@ Los avisos al superadmin van por `notificar_superadmins()`, que es la llamada
 más repetida del código (15 sitios). Los de oferta y reserva los disparan
 triggers de la base, no el navegador: así llegan aunque la pestaña se cierre.
 
+### El techo de 60 avisos/hora por cuenta (H-20, 2026-09-25)
+
+`notificar_superadmins()` está concedida a `authenticated` y escribe saltándose
+`puede_notificar()`, porque tiene que poder: el RLS de `notificaciones` es por
+relación y un cliente no podría avisar al superadmin de otro modo. Lo que no
+tenía era techo, así que cualquier cuenta con sesión podía llenarle el panel del
+texto que quisiera.
+
+Ahora cada cuenta tiene **60 llamadas por hora**. Por encima de eso el aviso se
+**descarta** y la función vuelve.
+
+**No lanza excepción, y eso es lo importante.** Cuatro RPC de negocio la llaman
+con `PERFORM` dentro de su propia transacción —`aceptar_y_cerrar_acuerdo`,
+`cancelar_reservacion`, `registrar_evidencias`, `solicitar_cancelacion`—, así que
+una excepción ahí tumbaría la transacción entera: el cliente no podría aceptar
+una oferta porque un contador de avisos dijo que no.
+
+**Un aviso descartado no esconde trabajo.** `cola_superadmin()` no lee
+`notificaciones`: el globo y el panel «Por aprobar» se calculan sobre las tablas
+de negocio. Se pierde la campanita, no la tarea. El correo va por otro camino
+(`enviar-notificacion` desde el cliente) y tampoco depende de esto. El descarte
+deja un `warning` en el log de Postgres.
+
+**El contador no vive en `notificaciones`.** Esa tabla no guarda quién generó la
+fila —`user_id` es el destinatario—, y guardarlo en `meta` sería explotable: la
+política de INSERT solo restringe el destinatario, y `puede_notificar()` deja a
+cualquiera notificarse a sí mismo, así que una cuenta podría insertarse 60 filas
+con el uuid de otra en `meta` y **dejarla muda una hora**. El contador vive en
+`public.avisos_superadmin`, con RLS activo, **cero políticas** y privilegios
+revocados a `anon`, `authenticated` y `service_role`: solo la escribe la propia
+función. Una fila por llamada aceptada.
+
+**De dónde sale el 60:** del volcado de producción del 2026-09-21. En todo el
+histórico hay 132 llamadas; por hora la mediana es 1, el p90 es 4 y el máximo
+**17**. El techo es 3,5× ese máximo, que deja sitio a la ráfaga legítima — un
+alta de flota de N unidades dispara N avisos seguidos. No es una medición por
+usuario: hasta esta migración no se guardaba el autor, así que 17 es el máximo de
+todas las cuentas juntas y por tanto una cota superior de lo que hizo cualquiera.
+
+
 Cada usuario puede silenciar **correos** por tipo (`perfiles.notif_email`),
 pero **nunca la campana ni el correo transaccional** — ver `TIPOS_SILENCIABLES`
 en la Edge Function `enviar-notificacion`.
@@ -849,6 +1031,31 @@ escribir una fila; los guards deciden *qué transición* es legal para ti.
 | `guard_perfil_self_update` | perfiles | Cambiarse el rol, el estado de aprobación de la cuenta o los campos de verificación. **Se dispara en toda actualización de `perfiles`, no solo en la propia** — ver abajo |
 | `guard_expediente_documento` | expediente_documentos | Que cada parte haga el trabajo de la otra: **solo el cliente sube**, **solo el transportista revisa** |
 | `guard_operador_hazmat` | ofertas, reservaciones | Asignar a carga peligrosa un chofer sin licencia vigente |
+
+**Y uno que no es un guard, pero comparte el mismo `BEFORE UPDATE`:**
+`trg_updated_at` → `set_updated_at()`, en las diez tablas con flujo de estados
+(pedidos, ofertas, reservaciones, perfiles, las cuatro de flota, operadores y
+expedientes). Sella `updated_at` **solo si la fila cambió de verdad**
+(`NEW IS DISTINCT FROM OLD`), para que un reenvío de payload idéntico —que este
+cliente hace— no suba la fila en ninguna cola.
+
+> **El nombre importa y no es decorativo.** El orden de disparo de los `BEFORE` es
+> **alfabético**, y este tiene que correr **después** de los `trg_guard_*`: un guard
+> puede rechazar el cambio o revertir campos de `NEW`, y sellar antes de saber si el
+> cambio es legal es sellar una mentira. `trg_updated_at` cumple porque los BEFORE
+> existentes empiezan por `trg_c`, `trg_g`, `trg_l` y `trg_s`. **Si alguien añade un
+> `BEFORE` que empiece por `v`…`z`, correrá después de este** — la comprobación de
+> la migración falla si eso ocurre.
+
+> **Lo que añadir la columna NO hizo:** cambiar el orden de ninguna cola. Las colas
+> siguen ordenando por `created_at`, con el defecto que H-19 describe —un recurso
+> editado vuelve a revisión y aparece **al fondo**, porque su `created_at` no
+> cambió—. Pasarlas a `updated_at` es un cambio de cliente aparte: altera lo que el
+> superadmin ve en pantalla, y eso se decide mirándolo.
+
+> Las filas que ya existían se rellenaron con `created_at` —y `expedientes`, que no
+> la tiene, con `solicitado_en`—. No es su fecha real de cambio: es lo más honesto
+> que se sabe de una fila que nunca la registró.
 
 ### Una vista no tiene RLS detrás, y nace escribible
 
@@ -1006,13 +1213,25 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
 3. **`is_superadmin()` no se salta el RLS de `perfiles`.** Funciona en las ~70
    políticas de otras tablas; en una política *de perfiles* provoca recursión.
    Por eso lee de una vista interna.
-4. **El estado de los pedidos avanza por dos vías a la vez.** Desde el
-   2026-09-11, `sincronizar_estados_pedidos()` corre en pg_cron cada 15
-   minutos en producción y en pruebas — pero las reglas equivalentes siguen
-   en `renderPedidos()`. **Se dejaron a propósito:** son idempotentes y
-   coinciden con las del cron, así que da igual quién las corra, y mientras
-   estén las dos un fallo del cron no congela los estados. Retirarlas del
-   navegador es decisión posterior, cuando el cron lleve tiempo funcionando.
+4. ~~**El estado de los pedidos avanza por dos vías a la vez.**~~ **CERRADO el
+   2026-09-25.** `sincronizar_estados_pedidos()` corre en pg_cron cada 15 minutos
+   en producción y en pruebas desde el 2026-09-11, y desde hoy es **la única vía**:
+   `renderPedidos()` ya no escribe. Conserva la normalización **en memoria** —la
+   pantalla enseña el estado corregido al instante— pero no vuelve a la base.
+
+   Se comprobó antes de quitarlas que el cron cubre **las cinco** reglas del
+   render, no cuatro: el archivo `20260810130000_sincronizar_estados_OPCIONAL.sql`
+   lleva cuatro, y la función **viva** lleva cinco y devuelve
+   `solicitudes_vencidas`, con el comentario «FALTABA en 20260810130000: esta
+   regla se anadio al navegador despues». **Si hay que verificarlo otra vez, se
+   lee `pg_get_functiondef`, no el `.sql`** — leer el archivo fue el error que
+   casi dejó este cambio con una regla sin cubrir.
+
+   Lo que cuesta: un estado rancio tarda hasta 15 minutos en cuadrar en la base
+   en vez de cuadrar al repintar. Lo que gana: dos pestañas abiertas ya no emiten
+   los mismos `UPDATE` en carrera —26 sitios llaman a `renderPedidos()`—, y
+   desaparece el impedimento para publicar `pedidos`/`ofertas` en Realtime
+   (hueco 14).
 5. **La tabla `mensajes` no se usa.** Resto de la versión con chat; se
    conserva con sus políticas porque retirarla no aporta nada hoy.
 6. **El listado de camiones y el detalle de unidad son código muerto.** En
@@ -1066,6 +1285,29 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
    pedido y, sobre todo, el desvío por documentos vencidos: **por esa vía una
    empresa con el permiso SCT vencido cerraba el trato sin que nadie lo
    mirara.**
+
+   **Actualizado el 2026-09-25: la aprobación del superadmin también usa una RPC.**
+   `_ejecutarAprobarAcuerdo()` llamaba a `cerrarAcuerdo()`, la función JS de seis
+   escrituras encadenadas, y **se rompió de verdad ese día**: al fallar el INSERT de
+   la reservación por un solape, el pedido se quedó en `acordado` SIN reservación
+   —marca el pedido antes de insertar y el `catch` no deshacía nada— y la pantalla
+   lo enseñaba como cerrado. Ahora llama a `cerrar_acuerdo()`, que hace lo mismo en
+   una transacción y además notifica a las partes.
+
+   Tres cosas que hubo que cuidar al cambiarlo, por si se toca otra vez:
+
+   - **Avisos duplicados.** La RPC ya inserta el par «acuerdo cerrado»; el par que
+     `_ejecutarAprobarAcuerdo()` insertaba a mano se retiró, o las dos partes
+     recibían dos campanas por el mismo acuerdo.
+   - **Los expedientes.** `_crearExpedienteAuto()` es una llamada de cliente y la
+     RPC no la hace; se conserva después, con el id que devuelve la RPC.
+   - **El NULL silencioso.** Si el pedido no llega en `pendiente_acuerdo`,
+     `cerrar_acuerdo()` devuelve NULL sin crear nada y sin error. Se comprueba el
+     id que vuelve; es el defecto que estuvo 22 horas en producción.
+
+   `cerrarAcuerdo()` (js/pedidos.js) queda **sin llamadores** y marcada como código
+   muerto. No se borra: es una decisión aparte.
+
 8. **`aprobarCuenta()` escribe dos tablas y solo mira el error de una.**
    `js/aprobaciones.js` actualiza `perfiles` y `solicitudes_cuenta` en el
    mismo `Promise.all` y comprueba únicamente el de `perfiles`. Si el segundo
@@ -1167,6 +1409,65 @@ Verificados, sin resolver, y no deben confundirse con fallos nuevos:
     romper ese camino: no puede, porque el camino no existe — y si algún día se
     aplica esa migración, su cabecera dice que **fuerza**
     `propietario_id = auth.uid()`, así que será compatible.
+
+14. **La lista de Solicitudes no se actualiza en vivo, y es una decisión, no un
+    olvido.** `js/main.js` se suscribe por Realtime a ocho tablas; la publicación
+    `supabase_realtime` de producción lleva **seis** —las cuatro de flota,
+    `reservaciones` y `notificaciones`—. `pedidos` y `ofertas` **no están
+    publicadas, así que esas dos suscripciones nunca han disparado.** Verificado
+    el 2026-09-25 cruzando el código contra el volcado de producción del
+    2026-09-21 (`supabase/espejo/08-realtime.sql`, que sale de
+    `pg_publication_tables` de producción y no lleva `for all tables`). No hay
+    ninguna suscripción a `mensajes`.
+
+    Consecuencia para el usuario: cuando un cliente publica una solicitud o una
+    empresa oferta, la pantalla del otro **no se entera hasta que vuelve a
+    entrar en la vista** o recarga. Todo lo demás —flota, reservaciones,
+    campana— sí va en vivo.
+
+    **Por qué se queda así** (decidido el 2026-08-28, migración
+    `20260828120000_publicacion_realtime_declarativa.sql`): `renderPedidos()`
+    ejecuta hasta cuatro `UPDATE` sobre `pedidos` como efecto secundario de
+    dibujar la lista — es la misma máquina de estados del §«El estado de los
+    pedidos avanza por dos vías a la vez» (hueco 4). Publicar la tabla haría que
+    cada cambio despertara a **todos** los navegadores conectados, cada uno
+    escribiría, y cada escritura generaría más eventos. Un bucle de
+    realimentación, no una lista más viva.
+
+    **Ese requisito previo se cumplió el 2026-09-25: el render ya no escribe**
+    (hueco 4). Publicarlas ya no crearía el bucle. Queda como decisión, no como
+    impedimento técnico — y con un matiz que cambia la respuesta: **la campana
+    ya cubre el caso mejor.** Al aprobarse una solicitud, `aprobarSolicitud()`
+    avisa **solo a las empresas con flota de ese tipo**, y `notificaciones` sí
+    está publicada, así que la empresa se entera en vivo y filtrado; pulsar el
+    aviso llama a `showView('pedidos')`, que repinta. Publicar `pedidos` sería
+    difundir a **todas** las sesiones para entregar información **menos**
+    dirigida que la que ya llega. `ofertas` sí tendría sentido —`of_select` la
+    acota a las dos partes, así que el reparto es de 2-3 sesiones— y necesitaría
+    `REPLICA IDENTITY FULL`, porque [js/pedidos.js](../js/pedidos.js) borra
+    ofertas y sin FULL un DELETE no se puede evaluar contra RLS.
+
+    **Dos afirmaciones que circulaban sobre esto y son falsas.** La primera: que
+    el requisito previo era aplicar la migración de pg_cron. No lo era —esa **sí
+    estaba aplicada**, el volcado de cron de producción lista
+    `portgo-sincronizar-estados │ */15 * * * * │ activo=true`—; añadir el cron
+    duplicó el trabajo en vez de moverlo, y lo que faltaba era quitar las
+    escrituras del render, hecho el 2026-09-25. La segunda: el commit de la sonda
+    de Realtime (2026-09-14) dijo que «esa razón dejó de existir el 8 de
+    septiembre, cuando la máquina de estados bajó a pg_cron» — era falso entonces,
+    porque el render seguía escribiendo, y dio la fecha equivocada por casi tres
+    semanas.
+
+    **Ojo con el hallazgo H-16 de la auditoría**, que describe esto al revés:
+    dice que «Realtime reparte cada cambio de pedidos y ofertas a todas las
+    empresas conectadas» y lo cifra en 800 consultas por solicitud con 200
+    empresas. Esa aritmética parte de que los eventos llegan, y no llegan: las
+    dos tablas no están publicadas. La ficha ya concluía «no procede aún» y
+    dejaba un umbral de vigilancia (~50 empresas conectadas); el umbral que de
+    verdad importa es otro, y es el requisito previo de arriba. Y para `ofertas`
+    el reparto tampoco sería a todos aunque se publicara: `of_select` está
+    acotada a las partes. No se reporta como hallazgo nuevo ni se «arregla».
+
 
 ---
 

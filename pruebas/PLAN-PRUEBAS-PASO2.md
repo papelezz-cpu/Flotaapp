@@ -1,0 +1,141 @@
+# Prueba del Paso 2 — el acuerdo se cierra solo, sin superadmin
+
+Un solo caso, dos vueltas. Unos 10 minutos.
+
+Prueba la corrección de `20260925140000` (ya aplicada a pruebas el 2026-09-25
+21:55Z) **y, de paso, H-06**, que hasta ahora no se podía probar: el trigger de
+doble reserva nunca llegaba a ejecutarse porque el cierre abortaba antes.
+
+El resto de la cola de `dev` se prueba con
+[PLAN-PRUEBAS-COLA-DEV.md](PLAN-PRUEBAS-COLA-DEV.md); aquí no está.
+
+URL: `https://portgo-git-dev-salvador-s-projects13.vercel.app/app.html` · **Ctrl+Shift+R**
+
+---
+
+## Paso 0 — ¿build correcto? (30 s, obligatorio)
+
+Pruebas es copia de producción: los datos no dicen en qué entorno ni en qué build
+estás. Pega en la consola:
+
+```js
+console.log(JSON.stringify({ base: (typeof sb!=='undefined'&&sb.supabaseUrl)||'sb no definido',
+  v: [...document.scripts].map(s=>s.src.split('/').pop()).filter(n=>/^pedidos\./.test(n)) }, null, 2));
+```
+
+Debe decir `base` terminando en **`xskgnudiznryhgagxadu`**. Para la versión de los
+ficheros, usa el bloque autocomparado del **paso 0 de**
+[PLAN-PRUEBAS-COLA-DEV.md](PLAN-PRUEBAS-COLA-DEV.md): aquí había un `v=84` escrito a
+mano que se quedó viejo en tres días.
+
+---
+
+## Datos fijos de las dos vueltas
+
+| | |
+|---|---|
+| Unidad | **la misma en las dos vueltas** — sirve cualquiera |
+| Vuelta A — fechas | **05/11/2026 → 07/11/2026** |
+| Vuelta B — fechas | **06/11/2026 → 08/11/2026** (solapan con A en el 6 y el 7) |
+
+**La unidad la decide el tipo que pidas en la solicitud**, no tú: el desplegable de
+«Hacer oferta» filtra por dueño y por **tipo exacto**, así que solo aparecen las
+unidades de esa empresa de ese tipo. Lo único que importa para esta prueba es que
+la unidad sea **la misma en A y en B**; cuál sea da igual.
+
+En la corrida del 2026-09-25 las dos solicitudes salieron de tipo **Rabón**, así
+que el desplegable ofreció solo **`R-A330E825`** — y eso vino bien: al haber una
+sola, no hay forma de equivocarse y elegir distinta unidad en cada vuelta.
+Comprobado ese día: `R-A330E825` está `disponible`, `aprobada` y **sin ninguna
+reservación**, así que la vuelta A puede cerrar.
+
+> **Las fechas de noviembre no son arbitrarias.** Si usas una unidad que ya tenga
+> reserva en esas fechas, la vuelta A falla por esa reserva vieja y no prueba nada.
+> `T-46BC79F9` (Torton), por ejemplo, está reservado del **10 al 12 de octubre**.
+> Antes de empezar, mira que la unidad esté libre en el rango que vayas a usar.
+
+---
+
+## Vuelta A — el acuerdo debe cerrarse SOLO (esto es lo que se arregló)
+
+| # | Rol | Dónde | Qué haces |
+|---|---|---|---|
+| 1 | cliente | inicio → **«Solicitar servicio»** | Camión **Torton**, **05/11/2026 → 07/11/2026**. Rellena origen y destino con lo que quieras. Botón **«📋 Publicar solicitud»** |
+| 2 | superadmin | inicio → **«Por aprobar»** | **«✓ Aprobar y publicar»** |
+| 3 | empresa (Omar) | inicio → **«Solicitudes»** | **«Hacer oferta»**, elige **la unidad que ofrezca el desplegable** (anótala: en la vuelta B hay que elegir **la misma**), pon un precio, **«Enviar oferta»** |
+| 4 | cliente | inicio → **«Mis solicitudes»** | **«✓ Aceptar $…»** → rellena el modal → **«✓ Guardar y confirmar»** |
+
+**Resultados esperados, en este orden:**
+
+| Paso | Debe salir |
+|---|---|
+| 1 | `✓ Solicitud enviada — un administrador la revisará pronto` |
+| 3 | `✓ Oferta enviada al cliente` |
+| 4 | **`✓ Acuerdo cerrado — ya tienes una reservación activa`** |
+
+Y después del paso 4, **sin tocar nada más y sin entrar como superadmin**:
+
+- la solicitud pasa a **`✓ Acordado`**;
+- en **«Reservaciones»** aparece una reserva **Activa** del 05 al 07 de noviembre
+  con la unidad que ofertaste.
+
+### Cómo se ve si la corrección NO está
+
+Es justo lo que viste antes: la etiqueta se queda en **`⏳ Acuerdo en revisión`**,
+no aparece reservación, y **hasta 15 minutos después** el pedido cae en tu cola de
+«Por aprobar» para que lo cierres tú. Si eso pasa, para y dímelo: significa que el
+preview no tiene el cambio o que la migración no está en esta base.
+
+### La otra rama posible, para que no la confundas con un fallo
+
+Si el camión o la empresa tuvieran un documento vencido, el paso 4 no cierra y
+sale un aviso que **nombra el documento** (lo trae la RPC desde el guard), y el
+pedido va a tu cola. Eso es correcto y es el único caso que sigue pasando por el
+superadmin. No es este fallo.
+
+---
+
+## Vuelta B — la unidad ocupada ya no se puede ni ofertar
+
+Repite los pasos con **la misma unidad** y fechas **06/11/2026 → 08/11/2026**.
+
+**Resultado esperado, y salta ANTES de lo que este guion decía:** al pulsar
+«Hacer oferta» como empresa, la unidad **no aparece en el desplegable**, y si era
+la única de ese tipo sale
+
+> ⚠ No tienes camiones disponibles en las fechas del pedido (06/11/2026 al 08/11/2026). Revisa tus reservaciones activas.
+
+**Eso es el resultado correcto y es doblemente bueno:** demuestra que el bloqueo al
+ofertar ya existe —`openHacerOferta()` excluye las unidades con reserva en esas
+fechas, comparando contra `Pendiente` y `Activa`— **y** confirma que la vuelta A
+creó la reservación de verdad. Si la vuelta A no hubiera cerrado, la unidad
+seguiría libre y el desplegable la ofrecería.
+
+> La versión anterior de este guion esperaba aquí el aviso «❌ Ese recurso ya tiene
+> una reserva en esas fechas» al confirmar como cliente. **Ese camino no se puede
+> recorrer desde la interfaz**: la empresa no llega a ofertar la unidad ocupada. El
+> trigger y el `EXCLUDE` de la base siguen ahí como red para lo que la interfaz no
+> cubre —una carrera entre dos cierres, el cliente nativo, o un cambio de fechas
+> posterior a la oferta—, y se ejercitan en la comprobación de la propia
+> migración, que apaga el trigger para probar cada capa por separado.
+
+## Rastro que dejan estas pruebas
+
+En pruebas quedan dos solicitudes, sus ofertas y **una** reservación (la de la
+vuelta A), y la unidad usada aparecerá ocupada del 05 al 07 de noviembre.
+
+Queda además, de la sesión anterior, el pedido del **10–11 de octubre** que el
+cron dejó en `pendiente_acuerdo` con su oferta aceptada. **No lo apruebes**: su
+camión ya está reservado del 10 al 12, así que fallaría — y esta vez sí fallaría
+de verdad, con el mensaje de recurso no disponible. Es el residuo del fallo, no
+una prueba.
+
+---
+
+## Decisión ya tomada, para después de esta prueba
+
+**No se debe poder ofertar una unidad que ya está reservada en esas fechas**
+(decisión del usuario, 2026-09-25). Se implementa **después** de que esta prueba
+pase, en su propio cambio, y mueve el freno del paso 4 al paso 3: la empresa se
+enteraría al ofertar, no el cliente al aceptar. Ver la sección *La unidad ocupada*
+de [FLUJO-OPERATIVO.md](../docs/FLUJO-OPERATIVO.md).

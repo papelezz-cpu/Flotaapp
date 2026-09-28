@@ -1717,11 +1717,41 @@ body:not(.role-admin):not(.role-superadmin) .admin-hidden { display: flex; }
   font-size: 0.88rem; font-weight: 700; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.vig-item-doc   { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+.vig-item-doc   { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
 .vig-item-fecha { font-size: 0.8rem; color: var(--text-muted); }
 .vig-item-dias  { font-size: 0.78rem; font-weight: 700; margin-top: 2px; }
 .vig-item-dias--vencido { color: #f87171; }
 .vig-item-dias--proximo { color: #fb923c; }
+
+/* ── Legibilidad de este panel (medida, 2026-09-24) ──────────────────────
+   Un usuario no encontró en pantalla el permiso hazmat de una unidad aunque
+   estaba renderizado y visible: «el texto es tan pequeño y tenue que pasa
+   desapercibido». Medido: la fila daba **2.47:1** de contraste, cuando el
+   mínimo recomendado para texto pequeño es 4.5. Se acumulaban cuatro cosas —
+   `opacity:0.75` en la tarjeta, 12px, color atenuado y ningún fondo.
+
+   Un panel de cumplimiento cuya información no se lee no cumple su función, así
+   que la jerarquía pasa a señalarse con TAMAÑO Y PESO, no bajando el contraste.
+
+   En tema oscuro `--text-muted` sobre la tarjeta ya daba 5.56 y cumple; el
+   problema era la opacidad. En tema claro el propio token da 3.60, así que aquí
+   se sube solo dentro de este panel — cambiarlo globalmente afectaría a toda la
+   aplicación y es otra conversación. */
+body.light .vig-item-doc,
+body.light .vig-item-fecha { color: #5a6b66; }   /* 5.63:1 sobre blanco */
+
+/* Filas «sin fecha»: documentos que nadie vigila. Antes solo se distinguían por
+   un borde y texto apagado; ahora llevan tinta de fondo como las de vencido y
+   próximo, para que se lean como una categoría y no como texto desvaído. */
+.vig-item--sinfecha {
+  background: rgba(122,156,196,0.10);
+  border-left: 3px solid var(--text-muted);
+}
+.vig-item--sinfecha .vig-item-doc  { color: var(--text); }
+.vig-item-dias--sinfecha           { color: var(--text); }
+body.light .vig-item--sinfecha     { background: rgba(16,42,38,0.05); }
+body.light .vig-item--sinfecha .vig-item-doc,
+body.light .vig-item-dias--sinfecha { color: #3f4f4a; }
 
 body.light .vig-empresa-card    { background: #fff; }
 body.light .vig-item--vencido   { background: rgba(239,68,68,0.05); }

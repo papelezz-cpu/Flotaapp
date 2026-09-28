@@ -1391,36 +1391,66 @@ async function aprobarAcuerdo(pedidoId) {
 }
 
 async function _ejecutarAprobarAcuerdo(ped, oferta) {
-  // Ejecutar el cierre real (rechaza otras ofertas, crea reservación, marca recurso ocupado)
-  try {
-    await cerrarAcuerdo(oferta, ped);
-  } catch (e) {
-    if (e.message === 'RECURSO_NO_DISPONIBLE') {
-      showToast('❌ El recurso ya tiene una reserva activa en esas fechas. Rechaza el acuerdo antes de asignar otro recurso.', 'error');
-    } else {
-      showToast('Error al crear reservación: ' + e.message, 'error');
+  // ── EL CIERRE VA POR LA RPC, EN UNA TRANSACCIÓN (2026-09-25) ─────────────
+  //
+  // Antes esto llamaba a `cerrarAcuerdo(oferta, ped)`, la función JS de
+  // escrituras encadenadas. **Y se rompió de verdad**, no en teoría: el
+  // 2026-09-25, al fallar el INSERT de la reservación por un solape, el pedido
+  // se quedó en `acordado` SIN reservación — porque la función marca el pedido
+  // antes de insertar y el `catch` de aquí no deshacía nada. La pantalla lo
+  // enseñaba como cerrado.
+  //
+  // Es el hallazgo §7 de la auditoría —«el mismo hecho de negocio es atómico si
+  // lo cierra el cliente y no lo es si lo aprueba el superadmin»— y su consejo:
+  // mover la llamada a la RPC antes que parchear la secuencia del cliente.
+  //
+  // `cerrar_acuerdo()` hace lo mismo y más, en una sola transacción: rechaza las
+  // ofertas rivales y las notifica, marca el pedido `acordado`, crea la
+  // reservación, ocupa el recurso si la fecha ya llegó, y avisa a las dos
+  // partes. Está concedida a `authenticated` y **permite explícitamente al
+  // superadmin** (`IF NOT is_superadmin() AND auth.uid() NOT IN (...)`).
+  //
+  // Su precondición: el pedido tiene que llegar en `pendiente_acuerdo` con su
+  // `oferta_pendiente_id`. Se cumple — `aprobarAcuerdo()` no sigue sin él —,
+  // pero si algún día deja de cumplirse, la RPC **devuelve NULL sin crear nada
+  // y sin error**, así que abajo se comprueba el id que vuelve. Es el defecto
+  // que estuvo 22 horas en producción; no se confía en que no vuelva.
+  let reservaId;
+  {
+    const { data, error } = await sb.rpc('cerrar_acuerdo', { p_oferta_id: oferta.id });
+    if (error) {
+      const msg = error.message || '';
+      // Dos códigos, no uno: el trigger lanza `RECURSO_NO_DISPONIBLE` (P0001) y,
+      // si alguna vez se le adelantara una inserción simultánea, el que responde
+      // es el EXCLUDE `reservaciones_sin_solape` con 23P01 y otro texto. Las dos
+      // cosas son lo mismo para quien está mirando la pantalla.
+      if (msg.includes('RECURSO_NO_DISPONIBLE') || error.code === '23P01') {
+        showToast('❌ El recurso ya tiene una reserva activa en esas fechas. Rechaza el acuerdo antes de asignar otro recurso.', 'error');
+      } else {
+        showToast('No se pudo cerrar el acuerdo: ' + (msg || 'error desconocido'), 'error');
+      }
+      console.error('cerrar_acuerdo:', error);
+      return;   // nada quedó escrito: la RPC revierte entera
     }
-    return;
+    reservaId = data;
+    if (!reservaId) {
+      showToast('No se cerró el acuerdo: la solicitud no estaba lista para cerrarse. Recarga y vuelve a intentarlo.', 'error');
+      console.error('cerrar_acuerdo devolvió NULL — el pedido no llegó en pendiente_acuerdo', { ped, oferta });
+      return;
+    }
   }
 
-  // Notificar a cliente y proveedor
-  const notifs = [
-    {
-      user_id: ped.cliente_id,
-      tipo:    'acuerdo_aprobado',
-      titulo:  '¡Acuerdo aprobado!',
-      mensaje: `Tu acuerdo de ${esc(ped.tipo_camion || 'servicio')} fue aprobado. Ya tienes una reservación activa.`,
-      leido:   false,
-    },
-    {
-      user_id: oferta.admin_id,
-      tipo:    'acuerdo_aprobado',
-      titulo:  '¡Acuerdo aprobado!',
-      mensaje: `El acuerdo con ${esc(ped.cliente_nombre || 'el cliente')} para ${esc(ped.tipo_camion || 'servicio')} fue aprobado. Revisa tus reservaciones.`,
-      leido:   false,
-    },
-  ];
-  await sb.from('notificaciones').insert(notifs);
+  // Los avisos de «acuerdo cerrado» a cliente y proveedor los inserta ya la
+  // propia RPC. El par que se insertaba aquí a mano se retiró: con la RPC
+  // dentro, las dos partes recibían DOS campanas por el mismo acuerdo.
+
+  // Documentación de puerto/vacíos: la abría `cerrarAcuerdo()` y la RPC no lo
+  // hace (es una llamada de cliente), así que se conserva aquí. Es el mismo
+  // bloque que corre la ruta del cliente tras `aceptar_y_cerrar_acuerdo`.
+  if (typeof _crearExpedienteAuto === 'function') {
+    if (ped.entra_a_puerto) await _crearExpedienteAuto(reservaId, 'ingreso_puerto');
+    if (ped.patio_externo)  await _crearExpedienteAuto(reservaId, 'entrega_vacios');
+  }
 
   // Correo al cliente y proveedor: acuerdo aprobado
   _notificarEmail({

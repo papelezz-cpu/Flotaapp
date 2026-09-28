@@ -65,11 +65,31 @@ async function confirmarReserva() {
     return;
   }
 
-  // Verificar solapamiento solo si hay un recurso asignado
+  // Verificar solapamiento solo si hay un recurso asignado.
+  //
+  // H-06: esta es la TERCERA capa que vigila el solape, y hasta el 2026-09-25
+  // era la única que seguía comparando solo `unidad`. Las otras dos viven en la
+  // base —`check_reservacion_disponibilidad()` y `reservaciones_sin_solape`— y
+  // ya distinguen el tipo. Sin esta línea el falso positivo seguía vivo justo
+  // donde el usuario lo ve: `unidad` guarda el id de un camión, un custodio, un
+  // patio o un lavado, así que un patio que compartiera cadena de id con un
+  // camión daba «Este recurso ya está reservado» sobre un recurso libre, y ni
+  // llegaba a la base.
+  //
+  // `tipo_recurso` se lee con la MISMA expresión que usa el insert de abajo, a
+  // propósito: si las dos difirieran, el aviso hablaría de un recurso distinto
+  // del que se va a guardar.
+  //
+  // Lo que NO se toca aquí: el `.neq('estado','Cancelada')`. Las dos capas de la
+  // base solo miran `Pendiente` y `Activa`, así que esta consulta bloquea de más
+  // —también sobre `PorAprobar`, `Completada` o `CancelacionSolicitada`—. Puede
+  // ser deliberado y cambiarlo abriría reservas que hoy se rechazan, que es otra
+  // decisión y no la de H-06. Queda anotado como hueco.
   if (currentRecurso?.id) {
     const { data: conflictos } = await sb.from('reservaciones')
       .select('fecha_ini, fecha_fin')
       .eq('unidad', currentRecurso.id)
+      .eq('recurso_tipo', currentRecurso?.tipo_recurso || 'camion')
       .neq('estado', 'Cancelada')
       .lte('fecha_ini', fin)
       .gte('fecha_fin', ini);

@@ -139,15 +139,18 @@ async function actualizarBadgePedidos() {
   } else if (currentUser.rol === 'admin') {
     // "Disponibles" = abiertas y sin oferta mía todavía activa, ni bloqueada
     // por el cliente tras un rechazo (ver confirmarRechazarOferta).
-    const [{ data: abiertos }, { data: misOfertas }] = await Promise.all([
-      sb.from('pedidos').select('id').eq('estado', 'abierto'),
-      sb.from('ofertas').select('pedido_id, estado, permite_reoferta').eq('admin_id', currentUser.id),
-    ]);
-    const noDisponible = new Set();
-    (misOfertas || []).forEach(o => {
-      if (o.estado !== 'rechazada' || o.permite_reoferta === false) noDisponible.add(o.pedido_id);
-    });
-    count = (abiertos || []).filter(p => !noDisponible.has(p.id)).length;
+    //
+    // R-09: esto traía el `id` de TODOS los pedidos abiertos y TODAS las ofertas
+    // de la empresa para contar en JavaScript — un contador implementado
+    // transfiriendo filas, 890 llamadas medidas (auditoria-2.md:535). Y el globo
+    // se repinta con cada notificación propia, así que no era un coste de una
+    // vez. La condición vive ahora en `pedidos_disponibles_para_mi()`, que
+    // reproduce literalmente la de la sección «Solicitudes disponibles» de
+    // js/pedidos.js — la lección de R-05 fue que un globo que cuenta algo
+    // distinto de lo que la pantalla lista es peor que no tener globo.
+    const { data, error } = await sb.rpc('pedidos_disponibles_para_mi');
+    if (error) { console.error('Error al contar solicitudes disponibles:', error); return; }
+    count = data || 0;
   }
 
   if (count > 0) {
