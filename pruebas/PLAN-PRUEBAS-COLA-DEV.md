@@ -125,31 +125,30 @@ demás clientes y los cancelados propios se quedaban fuera.
 3. Ve pulsando, una por una, las cinco pastillas:
    **Todos · Activos · En revisión · Acuerdos · Cancelados**
 
-**Antes de pulsar nada, lo que hay en esta base.** Medido el 2026-09-25 con la
-cuenta de cliente de pruebas, para que no confundas «vacío» con «roto»:
+**No compares contra números escritos aquí: compara contra una invariante.** La
+versión anterior de este guion traía una tabla de cuántas hay por pastilla, medida
+el 2026-09-25. Tres días después ya estaba vieja (decía Activos 1, Acuerdos 1,
+Cancelados 0; eran 2, 5 y 1), porque cada prueba crea solicitudes.
 
-| Pastilla | Solicitudes propias que existen |
-|---|---:|
-| Todos | 2 |
-| Activos | 1 |
-| En revisión | **0** |
-| Acuerdos | 1 |
-| Cancelados | **0** |
+**Lo que tiene que cumplirse, y no caduca:**
 
-**«En revisión» y «Cancelados» van a salir vacías, y es correcto.** No hay ninguna
-fila de esos estados. Lo que hay que comprobar es que las otras tres muestren
-exactamente lo que dice la tabla.
+> **La suma de «Activos» + «En revisión» + «Acuerdos» + «Cancelados» tiene que dar
+> exactamente lo mismo que «Todos».**
 
-**Y la sección «Otras solicitudes activas» NO va a aparecer en ninguna de las
-cinco.** Eso también es correcto, y la versión anterior de este guion decía lo
-contrario: esa sección pinta los pedidos abiertos de *otros* clientes, y en esta
-base hay **0**, así que el código no llega ni a poner el título
-(`if (otrosPedidos.length)`). Si algún día hay pedidos abiertos de otro cliente,
-aparecerá **en las cinco pastillas**, porque no se filtra por estado a propósito —
-todos están en «abierto», así que filtrar por «Cancelados» la vaciaría.
+Los cuatro grupos parten los nueve estados sin solaparse y sin dejar ninguno fuera,
+así que si la suma no cuadra, el filtro está perdiendo filas — que es justo el
+defecto que H-11 arregló. Una pastilla vacía no es un fallo: significa que no tienes
+ninguna en esos estados.
 
-**Esperado:** cada pastilla muestra el número de la tabla, ni más ni menos, y
-cambiar de pastilla no deja filas del filtro anterior en pantalla.
+**Dos cosas que hacen fácil contar mal, y las dos son de la interfaz, no del filtro:**
+
+- **El «Historial» está al final de la página**, después de «Mis solicitudes», con un
+  hueco por delante. Con «Todos» es fácil contar solo lo de arriba y dar un número
+  mucho más bajo. Baja hasta el fondo.
+- **`expirado` cuenta como «Acuerdos».** El grupo es `acordado` + `finalizado` +
+  `expirado`, así que una pastilla que dice «Acuerdos» lista también solicitudes
+  vencidas que nunca llegaron a acuerdo. Es lo que hay hoy, a propósito; ver la nota
+  al final de esta prueba.
 
 > ⚠ **Esta prueba NO puede detectar el defecto que H-11 arregló.** Hace falta que
 > haya **más de 30 pedidos abiertos de otros clientes** para que la página se
@@ -158,9 +157,17 @@ cambiar de pastilla no deja filas del filtro anterior en pantalla.
 > que debe. El defecto en sí se demostró sobre la semántica de la paginación, no
 > en pantalla, y así quedó escrito en el commit de H-11.
 
-**Nota sobre los números de arriba:** son de `portgo-pruebas`, y el sello de
-paridad del 2026-09-24 dice **`diverge`** con 72 diferencias, así que **no son los
-números de producción** — sirven solo para saber qué esperar en el preview.
+#### Lo que salió al probarla el 2026-09-28, y es decisión del usuario
+
+Al contar las pastillas apareció que **«Acuerdos» lista también las `expirado`**, y
+que eso desconcierta: de 5 filas, 3 eran solicitudes vencidas que nunca llegaron a
+acuerdo. El grupo está definido así en `PED_ESTADOS_POR_FILTRO`
+(`acordado` + `finalizado` + `expirado`) y no es un fallo — pero la etiqueta promete
+otra cosa.
+
+Opciones, sin tocar nada todavía: renombrar la pastilla («Cerradas», «Historial»),
+o sacar `expirado` a su propio grupo. Lo primero es una palabra; lo segundo añade una
+pastilla y cambia lo que el cliente ve. **No se decide de paso en una prueba.**
 
 ---
 
