@@ -510,6 +510,12 @@ ofertas, así que el número ahí daría siempre cero y decir «Sin ofertas aún
 una solicitud que tiene cinco no es ocultar, es mentir.
 
 **Las pastillas de estado filtran solo lo propio** (`PED_ESTADOS_POR_FILTRO`).
+
+> **«Acuerdos» incluye las `expirado`, y se queda así** — decisión del usuario del
+> 2026-09-28. El grupo es `acordado` + `finalizado` + `expirado`, así que esa pastilla
+> lista también solicitudes vencidas que nunca llegaron a acuerdo (probando el 28:
+> 3 de 5). Se planteó renombrarla o sacar `expirado` a un grupo propio y **se
+> descartó**. No se vuelve a proponer.
 «Otras solicitudes activas» no se filtra por estado — todas están en `abierto`,
 así que filtrar por «Cancelados» la vaciaría — pero sí respeta los filtros de
 tipo y zona.

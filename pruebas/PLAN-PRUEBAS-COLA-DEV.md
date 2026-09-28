@@ -157,17 +157,15 @@ ninguna en esos estados.
 > que debe. El defecto en sí se demostró sobre la semántica de la paginación, no
 > en pantalla, y así quedó escrito en el commit de H-11.
 
-#### Lo que salió al probarla el 2026-09-28, y es decisión del usuario
+#### La pastilla «Acuerdos» lista también las expiradas, y se queda así
 
-Al contar las pastillas apareció que **«Acuerdos» lista también las `expirado`**, y
-que eso desconcierta: de 5 filas, 3 eran solicitudes vencidas que nunca llegaron a
-acuerdo. El grupo está definido así en `PED_ESTADOS_POR_FILTRO`
-(`acordado` + `finalizado` + `expirado`) y no es un fallo — pero la etiqueta promete
-otra cosa.
+Al contar las pastillas apareció que «Acuerdos» incluye las `expirado`: de 5 filas,
+3 eran solicitudes vencidas que nunca llegaron a acuerdo. Está definido así en
+`PED_ESTADOS_POR_FILTRO` (`acordado` + `finalizado` + `expirado`).
 
-Opciones, sin tocar nada todavía: renombrar la pastilla («Cerradas», «Historial»),
-o sacar `expirado` a su propio grupo. Lo primero es una palabra; lo segundo añade una
-pastilla y cambia lo que el cliente ve. **No se decide de paso en una prueba.**
+**Decisión del usuario, 2026-09-28: se queda igual.** No se renombra la pastilla ni
+se saca `expirado` a un grupo propio. Así que quien lea esto no tiene que volver a
+proponerlo: la etiqueta promete algo más estrecho de lo que lista, y es a propósito.
 
 ---
 
