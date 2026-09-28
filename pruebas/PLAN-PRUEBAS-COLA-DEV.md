@@ -352,42 +352,55 @@ Paso 2, cuando el desplegable negó el Rabón ya reservado.
 
 ---
 
-## Prueba 9 — el conflicto tardío: una oferta cuya unidad se ocupó después (3 min)
+## Prueba 9 — el conflicto tardío: una oferta cuya unidad se ocupó después (8 min)
 
-**Es el único escenario que no se puede montar desde la interfaz**, y existe por
-casualidad: el desplegable de «Hacer oferta» impide ofertar una unidad ya
-reservada, así que una oferta viva sobre una unidad ocupada solo puede aparecer si
-**la reserva llegó después de la oferta**. Eso es exactamente lo que hay ahora en
-pruebas, de rebote:
+**Es el único escenario que las tres capas de la base existen para cubrir**, y el
+único que no se puede provocar por el camino corto: el desplegable de «Hacer
+oferta» impide ofertar una unidad **ya reservada**, así que una oferta viva sobre
+una unidad ocupada solo aparece si **la reserva llegó después de la oferta**.
 
-| | |
-|---|---|
-| Solicitud | **10 → 11 de octubre**, camión `T-46BC79F9`, en negociación |
-| Su oferta | **viva** (`enviada`), vence el 27 de septiembre |
-| El estorbo | ese camión tiene una reserva **Activa del 10 al 12 de octubre**, de otro acuerdo |
+> **Se monta con dos solicitudes, y la segunda se cierra primero.** Funciona porque
+> el desplegable mira `reservaciones`, no ofertas: mientras la primera oferta solo
+> está *enviada*, la unidad sigue contando como libre.
+>
+> La versión anterior de este guion usaba un caso que había quedado servido de
+> rebote. **Se caducó solo el 2026-09-27**: el cron expiró esa oferta (regla a) y
+> reabrió el pedido (regla b). Funcionó como debía, y se llevó el caso por delante
+> — de ahí que ahora se monte a propósito.
 
-> Cómo llegó ahí: era el pedido que quedó **`acordado` sin reservación** por la
-> aprobación no atómica del superadmin. Se devolvió a negociación el 2026-09-25 con
-> su oferta a `enviada` (decisión del usuario), y eso dejó este caso servido.
+Fechas y unidad: **Rabón** (la única de Omar es `R-A330E825`, libre en diciembre).
 
-1. Como **cliente**, entra en **«Mis solicitudes»**, busca la del **10 al 11 de
-   octubre** y pulsa **«✓ Aceptar $…»** → **«✓ Guardar y confirmar»**.
+| # | Rol | Qué haces |
+|---|---|---|
+| 1 | cliente | publica **solicitud A** de **Rabón**, **20/12/2026 → 22/12/2026** |
+| 2 | superadmin | **«✓ Aprobar y publicar»** la A |
+| 3 | empresa (Omar) | **«Hacer oferta»** en la A con el Rabón → **«Enviar oferta»**. **NO la aceptes todavía** |
+| 4 | cliente | publica **solicitud B** de **Rabón**, **21/12/2026 → 23/12/2026** (solapa con A en el 21 y el 22) |
+| 5 | superadmin | **«✓ Aprobar y publicar»** la B |
+| 6 | empresa (Omar) | **«Hacer oferta»** en la B **con el mismo Rabón**. **Debe dejarte**: la unidad no tiene reserva todavía, solo una oferta pendiente |
+| 7 | cliente | acepta la **B** → **«✓ Guardar y confirmar»** → `✓ Acuerdo cerrado — ya tienes una reservación activa` |
+| 8 | cliente | **ahora acepta la A** → **«✓ Guardar y confirmar»** |
 
-**Esperado:**
+**Esperado en el paso 8:**
 
 > ❌ Ese recurso ya tiene una reserva en esas fechas. La oferta sigue vigente — elige otra o pide una nueva.
 
-Y —esto es lo que se comprueba de verdad— **nada debe haber cambiado**: sin
-reservación nueva, la solicitud **sigue en negociación** (no en «⏳ Acuerdo en
-revisión», ni en «✓ Acordado»), y **la oferta sigue viva**. Es la transacción
-revirtiendo entera, que es lo que el Paso 2 restauró.
+Y **nada debe haber cambiado**, que es lo que de verdad se comprueba:
 
-**Si la solicitud queda en «✓ Acordado» sin reservación, para**: es el mismo daño
-que hubo hoy, y significaría que el arreglo no está haciendo efecto en esta base.
+- **no** aparece una segunda reservación;
+- la solicitud **A sigue en negociación** — ni «⏳ Acuerdo en revisión», ni «✓ Acordado»;
+- **la oferta de A sigue viva** (`enviada`), así que el cliente puede pedir otra unidad.
 
-**Ojo: esta prueba se consume al hacerla.** Si sale bien, el estado no cambia y
-puedes repetirla; si quieres convertirla en un cierre limpio, cambia las fechas de
-la solicitud a un rango libre — pero entonces ya no prueba esto.
+**Si A queda en «✓ Acordado» sin reservación, para.** Es exactamente el daño que
+hubo el 2026-09-25 por la ruta no atómica, y significaría que el arreglo del Paso 2
+no está haciendo efecto en esta base.
+
+**Si el paso 6 NO te deja ofertar**, para también y dímelo: significaría que el
+desplegable está mirando ofertas además de reservaciones, y entonces este escenario
+no puede existir — que sería una buena noticia, pero cambia lo que protege la base.
+
+**Rastro:** quedan dos solicitudes de diciembre y una reservación del 21 al 23; el
+Rabón aparecerá ocupado esas fechas.
 
 ---
 
