@@ -1692,7 +1692,10 @@
 <!-- ══ MODAL DETALLES DEL SERVICIO (post-acuerdo) ══════ -->
 <div class="modal-overlay" id="modal-detalles-servicio">
   <div class="modal" style="max-width:500px">
-    <h2>📋 Datos adicionales del servicio</h2>
+    <div class="modal-header">
+      <h2>📋 Datos adicionales del servicio</h2>
+      <button class="modal-close" onclick="closeDetallesServicio()" title="Cancelar y volver">✕</button>
+    </div>
     <p id="ds-resumen" class="sub"></p>
     <p style="font-size:0.82rem;color:var(--text-muted);margin:-4px 0 14px">Estos datos son opcionales — puedes coordinarlos después desde Reservaciones.</p>
     <div class="form-group">
@@ -1708,7 +1711,8 @@
       <input type="text" id="ds-lugar" placeholder="Ej. Terminal Lázaro Cárdenas, Patio 3…">
     </div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="omitirDetallesServicio()">Omitir</button>
+      <button class="btn-cancel" onclick="closeDetallesServicio()">Cancelar</button>
+      <button class="btn-cancel" onclick="omitirDetallesServicio()">Omitir detalles</button>
       <button class="btn-confirm" onclick="confirmarDetallesServicio()">✓ Guardar y confirmar</button>
     </div>
   </div>

@@ -446,13 +446,33 @@ ficheros.
 | 2 | H-11 — filtro de estado del cliente | ✅ **pasa** — activos 2, revisión 0, acuerdos 5, cancelados 1, total 8; la suma cuadra |
 | 3 | el render ya no escribe | ✅ **pasa** |
 | 4 | H-06 — doble reserva | no aplica: no se puede provocar desde la interfaz; la cubre la 9 |
-| 5 | H-20 — techo de avisos | pendiente |
+| 5 | H-20 — techo de avisos | ✅ **pasa** |
 | 6 | Vigencias legible | ✅ **pasa** |
 | 7 | H-22 — archivado | ✅ **pasa** con `reservaciones.js?v=59`. La primera pasada destapó **dos defectos de la pantalla** —la columna «Archivado» pintaba `created_at` y la tabla se ordenaba por `created_at`—, arreglados el 28. El archivado en sí nunca falló |
-| 8 | desplegable, rama de lavado | pendiente (opcional) |
+| 8 | desplegable, rama de lavado | ⚠ no se pudo cerrar, pero **destapó un callejón sin salida** en el modal de «Guardar y confirmar» — arreglado el 28, ver abajo |
 | 9 | conflicto tardío | ✅ **pasa**, y es el resultado más fuerte de la corrida — ver abajo |
 
 **Decide la promoción: 1, 2, 7 y 9.** Las demás son de confirmación.
+
+### El callejón sin salida que encontró la prueba 8 (2026-09-28)
+
+Cuando el cierre del acuerdo falla —por ejemplo porque el recurso ya está
+reservado— **el modal «Datos adicionales del servicio» no se podía cerrar**. Sus dos
+botones eran «Omitir», que **no cancela**: pide confirmación y vuelve a intentar el
+cierre, que falla igual; y «✓ Guardar y confirmar», que falla otra vez. Y en esta
+app **no hay cierre por Escape ni por clic en el fondo**. Hubo que recargar la
+página.
+
+Lo curioso: **la función de cierre ya existía** — `closeDetallesServicio()`, que
+cierra, reabre el detalle del pedido y limpia el estado pendiente. Estaba escrita
+para esto y **ningún botón la llamaba**. Ahora la llaman dos: una **✕** en la
+cabecera, como el resto de los modales, y un **«Cancelar»** explicito junto a
+«Omitir detalles» — que se renombró así, porque «Omitir» a secas se lee como una
+salida y no lo es.
+
+Se revisaron los otros 37 modales: los diez sin `btn-cancel` tienen todos salida
+(«✕» o «Cerrar»). Este era el único atrapado, y precisamente porque su botón
+**parecía** un cancelar.
 
 ### La prueba 9, medida en la base tras el paso 8
 
