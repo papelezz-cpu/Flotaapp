@@ -798,6 +798,31 @@ sola por etapa, y un segundo intento devuelve la existente.
 En `entrega_vacios` corren las **demoras** a partir de `fecha_limite_vacios`.
 Ahí es donde está el dinero.
 
+**El cliente dispara `solicitado`→`en_revision`, y el guard lo verifica antes
+de dejarlo pasar.** `_avisarSiCompleto()` (js/expedientes.js) corre en la
+sesión del cliente en cuanto termina de subir el último documento
+obligatorio y avisa al transportista («📄 Documentación lista para
+revisar»). Quien de verdad decide si el expediente pasa a revisión es
+`guard_expediente_update` — repite la cuenta de obligatorios contra
+`expediente_documentos`, no se fía de lo que ya calculó el navegador.
+Cualquier otro cambio de `estado` que intente el cliente (marcarlo
+`completo`, por ejemplo) lo sigue bloqueando igual que antes.
+
+**Hasta el 2026-09-29 esa transición estaba rota.** El guard original
+(`20260817190000_fix_guard_expediente_y_licencia_peligrosa.sql`) cerró un
+hueco real —el cliente podía marcar el expediente `completo` por su cuenta,
+sin que el transportista revisara nada— pero de paso bloqueaba **cualquier**
+cambio de `estado` hecho por el cliente, sin excepción, incluida la única
+transición que el cliente sí debe poder disparar. El `UPDATE` fallaba, y
+`js/expedientes.js` no comprobaba el error de esa llamada — así que el aviso
+al transportista salía igual, como si el cambio hubiera pasado, mientras el
+expediente se quedaba en `solicitado` para siempre: la campana avisaba de un
+cambio que nunca ocurrió. Corregido en
+`20260929120000_guard_expediente_deja_pasar_a_revision.sql` (el guard, con
+la verificación server-side) y en `js/expedientes.js` (ahora usa
+`actualizarConfirmado()`, así que un fallo futuro de este `UPDATE` se ve en
+un toast en vez de desaparecer en silencio).
+
 ---
 
 ## 8. Cierre del servicio
@@ -1036,6 +1061,7 @@ escribir una fila; los guards deciden *qué transición* es legal para ti.
 | `guard_fleet_resource_update` | flota | Auto-aprobarse un recurso; transferir la propiedad |
 | `guard_perfil_self_update` | perfiles | Cambiarse el rol, el estado de aprobación de la cuenta o los campos de verificación. **Se dispara en toda actualización de `perfiles`, no solo en la propia** — ver abajo |
 | `guard_expediente_documento` | expediente_documentos | Que cada parte haga el trabajo de la otra: **solo el cliente sube**, **solo el transportista revisa** |
+| `guard_expediente_update` | expedientes | Que el cliente cierre el expediente, reporte incidentes o fije los datos de vacíos. Del `estado`, al cliente solo le deja disparar `solicitado`→`en_revision`, y repite la cuenta de documentos obligatorios contra la base antes de dejarlo pasar — no se fía del cálculo que ya hizo el navegador |
 | `guard_operador_hazmat` | ofertas, reservaciones | Asignar a carga peligrosa un chofer sin licencia vigente |
 
 **Y uno que no es un guard, pero comparte el mismo `BEFORE UPDATE`:**
