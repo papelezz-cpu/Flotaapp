@@ -87,7 +87,7 @@ async function renderVigencias() {
       // Sin fila, o con fila que solo tiene archivo y ninguna fecha: en los dos
       // casos no hay nada que vigilar. Son los «14 documentos con archivo pero
       // sin vencimiento» que la Etapa 2 hizo visibles.
-      if (requerido) sinFecha.push({ empId, empNombre, tipo, nombre, docLabel });
+      if (requerido) sinFecha.push({ empId, empNombre, tipo, nombre, docLabel, entTipo, entId });
       return;
     }
     const d = new Date(fecha + 'T00:00:00');
@@ -96,7 +96,7 @@ async function renderVigencias() {
     if (estado === 'vigente') return;
     // El sufijo solo acompaña a la fila que SÍ tiene caducidad: en la lista de
     // «sin fecha» no hay periodo que anunciar, y así era antes.
-    items.push({ empId, empNombre, tipo, nombre, docLabel: docLabel + _sufijo(tipoDoc), fecha, dias, estado });
+    items.push({ empId, empNombre, tipo, nombre, docLabel: docLabel + _sufijo(tipoDoc), fecha, dias, estado, entTipo, entId });
   };
 
   (camiones || []).forEach(c => {
@@ -218,31 +218,26 @@ async function renderVigencias() {
               <span class="apr-emp-toggle" id="vig-tog-sf-${uid_safe}">▼</span>
             </div>
             <div class="vig-empresa-items" id="vig-items-sf-${uid_safe}" style="display:none">
-              ${grupo.items.map(sf => `
-                <div class="vig-item vig-item--sinfecha">
-                  <div class="vig-item-left">
-                    <div class="vig-item-nombre">${_VIG_EMOJI[sf.tipo] || '📄'} ${esc(sf.nombre)}</div>
-                    <div class="vig-item-doc">${esc(sf.tipo)} · ${esc(sf.docLabel)}</div>
-                  </div>
-                  <div class="vig-item-right"><div class="vig-item-dias vig-item-dias--sinfecha">Sin fecha</div></div>
-                </div>`).join('')}
+              ${grupo.items.map(_vigSinFechaHTML).join('')}
             </div>
           </div>`;
       }
     } else {
       html += `<div class="vig-seccion-title" style="margin-top:${items.length ? '28px' : '0'};color:var(--text-muted)">⚠ Documentos sin fecha registrada (${sinFecha.length})</div>`;
-      html += sinFecha.map(sf => `
-        <div class="vig-item vig-item--sinfecha">
-          <div class="vig-item-left">
-            <div class="vig-item-nombre">${_VIG_EMOJI[sf.tipo] || '📄'} ${esc(sf.nombre)}</div>
-            <div class="vig-item-doc">${esc(sf.tipo)} · ${esc(sf.docLabel)}</div>
-          </div>
-          <div class="vig-item-right"><div class="vig-item-dias vig-item-dias--sinfecha">Sin fecha</div></div>
-        </div>`).join('');
+      html += sinFecha.map(_vigSinFechaHTML).join('');
     }
   }
 
   content.innerHTML = html;
+}
+
+// El perfil de otra empresa no se edita desde aquí: el superadmin no tiene
+// ese formulario (perfil-empresa-card nace oculto para él — ver renderAdmin),
+// y el documento fiscal es cosa de cada empresa. Todo lo demás (camión,
+// operador, custodio, patio) sí es editable por el superadmin también —
+// «Mis unidades» ya le muestra la flota completa, no solo la propia.
+function _vigAccionable(item) {
+  return item.entTipo && item.entId && !(item.tipo === 'Empresa' && currentUser.rol === 'superadmin');
 }
 
 function _vigItemHTML(item) {
@@ -252,9 +247,14 @@ function _vigItemHTML(item) {
     ? `Venció hace ${diasAbs} día${diasAbs !== 1 ? 's' : ''}`
     : item.dias === 0 ? 'Vence hoy'
     : `Vence en ${item.dias} día${item.dias !== 1 ? 's' : ''}`;
+  const accionable = _vigAccionable(item);
+  const claseClic = accionable ? ' vig-item--clic' : '';
+  const attrsClic = accionable
+    ? ` title="Actualizar" onclick="irAEditarVigencia('${item.entTipo}','${escJs(item.entId)}')"`
+    : '';
 
   return `
-    <div class="vig-item vig-item--${item.estado}">
+    <div class="vig-item vig-item--${item.estado}${claseClic}"${attrsClic}>
       <div class="vig-item-left">
         <div class="vig-item-nombre">${_VIG_EMOJI[item.tipo] || '📄'} ${esc(item.nombre)}</div>
         <div class="vig-item-doc">${esc(item.tipo)} · ${esc(item.docLabel)}</div>
@@ -264,6 +264,60 @@ function _vigItemHTML(item) {
         <div class="vig-item-dias vig-item-dias--${item.estado}">${diasLabel}</div>
       </div>
     </div>`;
+}
+
+function _vigSinFechaHTML(sf) {
+  const accionable = _vigAccionable(sf);
+  const claseClic = accionable ? ' vig-item--clic' : '';
+  const attrsClic = accionable
+    ? ` title="Ir a registrar la fecha" onclick="irAEditarVigencia('${sf.entTipo}','${escJs(sf.entId)}')"`
+    : '';
+  return `
+    <div class="vig-item vig-item--sinfecha${claseClic}"${attrsClic}>
+      <div class="vig-item-left">
+        <div class="vig-item-nombre">${_VIG_EMOJI[sf.tipo] || '📄'} ${esc(sf.nombre)}</div>
+        <div class="vig-item-doc">${esc(sf.tipo)} · ${esc(sf.docLabel)}</div>
+      </div>
+      <div class="vig-item-right"><div class="vig-item-dias vig-item-dias--sinfecha">Sin fecha</div></div>
+    </div>`;
+}
+
+// ── IR A ACTUALIZAR ────────────────────────────────────
+// Lleva de un renglón de Vigencias al formulario donde de verdad se
+// actualiza ese documento, en vez de dejar que cada quien adivine en qué
+// pestaña de Mis unidades vive. 'camion' espera a que renderAdmin() termine
+// porque editarCamion() lee de `allCamiones` (global que solo ese render
+// llena); los demás piden su registro fresco por id y no dependen de
+// ninguna lista ya cargada, así que no hace falta esperar nada más que el
+// cambio de pestaña.
+async function irAEditarVigencia(entTipo, entId) {
+  if (typeof showView !== 'function' || typeof cambiarAdminTab !== 'function') return;
+  showView('admin', null);
+  if (entTipo === 'camion') {
+    cambiarAdminTab('camion');
+    await renderAdmin();
+    editarCamion(entId);
+  } else if (entTipo === 'operador') {
+    cambiarAdminTab('operador');
+    editarOperadorAprobado(entId);
+  } else if (entTipo === 'custodio') {
+    cambiarAdminTab('custodio');
+    editarCustodio(entId);
+  } else if (entTipo === 'patio') {
+    cambiarAdminTab('patio');
+    editarPatio(entId);
+  } else if (entTipo === 'perfil') {
+    // Necesita esperar por el mismo motivo que 'camion': renderAdmin() es
+    // quien llena los campos de la tarjeta (renderPerfilEmpresa() corre
+    // dentro). _vigAccionable ya descarta este caso para el superadmin,
+    // para quien la tarjeta ni siquiera existe en el DOM.
+    await renderAdmin();
+    const body = document.getElementById('perfil-card-body');
+    const icon = document.getElementById('perfil-toggle-icon');
+    if (body) body.style.display = 'block';
+    if (icon) icon.textContent = '▲ Ocultar';
+    document.getElementById('perfil-empresa-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 function toggleVigEmpresa(uid) {

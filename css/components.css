@@ -1730,6 +1730,11 @@ body:not(.role-admin):not(.role-superadmin) .admin-hidden { display: flex; }
 .vig-item--proximo {
   background: rgba(251,146,60,0.07); border-color: rgba(251,146,60,0.25);
 }
+/* Lleva directo al formulario donde se actualiza ese documento — ver
+   irAEditarVigencia(). Sin flecha ni texto de más: el cursor y el
+   resaltado al pasar ya avisan que el renglón hace algo. */
+.vig-item--clic { cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.vig-item--clic:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .vig-item-left  { flex: 1; min-width: 0; }
 .vig-item-right { text-align: right; flex-shrink: 0; margin-left: 12px; }
 .vig-item-nombre {
