@@ -455,8 +455,15 @@ async function renderReserv(append = false) {
       const precioLbl = r.precio_acordado
         ? `<span style="font-size:0.7rem;color:var(--text-muted)">$${Number(r.precio_acordado).toLocaleString('es-MX')} MXN</span>`
         : '';
-      const pagarBtn = (r.estado === 'Activa' && !r.pagado)
-        ? `<button class="btn-prox" disabled title="Pagos en línea — próximamente">💳 Pagar <span class="prox-badge">Prox.</span></button>`
+      // Antes solo aparecía en 'Activa', que es cuando el cliente TODAVÍA no
+      // debe nada — estadoCobro() no devuelve nada hasta 'Completada'. Ahí es
+      // donde de verdad hay algo que pagar (badge "Por cobrar"/"Vencido"), y
+      // era justo donde no había ningún botón. Sigue deshabilitado — no hay
+      // pasarela conectada todavía (Stripe, sin dar de alta) — pero el
+      // cliente ya debe ver DÓNDE va a poder pagar cuando esté lista.
+      const debeCobro = typeof estadoCobro === 'function' && !!estadoCobro(r);
+      const pagarBtn = ((r.estado === 'Activa' && !r.pagado) || debeCobro)
+        ? `<button class="btn-prox" disabled title="Pago con tarjeta en línea — próximamente">💳 Pagar <span class="prox-badge">Prox.</span></button>`
         : '';
       // Carta Porte / documentos de carga y maniobra: subida libre, sin
       // checklist, disponible en cuanto hay match (la reservación existe).
