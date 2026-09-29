@@ -233,6 +233,7 @@ pentest lo puso en cuarto lugar de su orden de corrección con la nota de que
 
 | Id | Qué | Estado medido |
 |---|---|---|
+| `Q-01` 🔴 | `perfiles` no tiene guard de INSERT: la política solo exige `auth.uid() = user_id`, así que una cuenta sin perfil puede crearse el suyo como `superadmin`, activa, verificada o acreditada (5ª auditoría, 29/09) | **Migración escrita, en `dev`, sin aplicar.** `20260929120000_perfiles_guard_de_alta.sql`: `trg_guard_perfil_insert` protege al nacer las columnas de `guard_perfil_self_update`; su bloque ejecuta 12 altas como `authenticated` y 1 como `service_role`. Pendiente: aplicar en pruebas tras réplica fresca, y promoción con permiso explícito |
 | `H-17` | 1 índice redundante (`idx_pedidos_fecha`) y 2 incoherentes con sus hermanos (`idx_lavados_pendientes`, `idx_operadores_pendientes`) | **Abierto.** Los tres siguen igual que el 14/09. El `DROP` se condicionó a leer `pg_stat_user_indexes`, que sigue sin leerse; alinear los dos no depende de ese dato |
 | `H-18` (mitad) | Dinero con dos tipos: catálogo `numeric(14,2)`, flujo `numeric` sin escala | **Abierto, y estaba dado por cerrado.** Medido: `precio_cliente`, `precio_oferta`, `contra_precio`, `precio_acordado` y `pagos.monto` siguen sin escala. El `CHECK` de `aprobacion_cuenta` sí se puso |
 | `H-14` | Grupo repetitivo `contenedor_1/_2` | **Acotado.** Hay `CHECK` de coherencia; la estructura sigue. Decidido no normalizar: añadiría un `JOIN` a la consulta más caliente para modelar un máximo de dos |
