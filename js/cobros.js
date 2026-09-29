@@ -64,9 +64,16 @@ function estadoCobro(r) {
   if (r.pagado) {
     return { clave: 'pagado', label: '💰 Pagado', cls: 'cobro-pagado', dias: null };
   }
+  // Mismo estado, perspectiva distinta: la empresa está "por cobrar", el
+  // cliente está "por pagar" — es el mismo dinero, pero mostrarle "por
+  // cobrar" al cliente lee como si la deuda fuera de otro. Ya había
+  // precedente de esto: las tarjetas del home se llaman "Cobros" para la
+  // empresa y "Mis pagos" para el cliente (js/views.js); esto solo lleva la
+  // misma idea al badge, que hasta ahora decía "cobrar" para los dos.
+  const etiqueta = currentUser?.rol === 'cliente' ? 'Por pagar' : 'Por cobrar';
   const venc = r.fecha_vencimiento_pago;
   if (!venc) {
-    return { clave: 'por_cobrar', label: 'Por cobrar', cls: 'cobro-pendiente', dias: null };
+    return { clave: 'por_cobrar', label: etiqueta, cls: 'cobro-pendiente', dias: null };
   }
   // Comparación por fecha (sin hora) para que "vence hoy" no cuente vencido
   const hoyStr = new Date().toISOString().split('T')[0];
@@ -77,7 +84,7 @@ function estadoCobro(r) {
   }
   if (dias === 0) return { clave: 'por_cobrar', label: 'Vence hoy', cls: 'cobro-porvencer', dias };
   if (dias <= 3) return { clave: 'por_cobrar', label: `Vence en ${dias} día${dias !== 1 ? 's' : ''}`, cls: 'cobro-porvencer', dias };
-  return { clave: 'por_cobrar', label: `Por cobrar · ${fmtFecha(venc)}`, cls: 'cobro-pendiente', dias };
+  return { clave: 'por_cobrar', label: `${etiqueta} · ${fmtFecha(venc)}`, cls: 'cobro-pendiente', dias };
 }
 
 function cobroBadgeHTML(r) {

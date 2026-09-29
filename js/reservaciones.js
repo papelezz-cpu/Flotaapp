@@ -244,6 +244,10 @@ async function renderReserv(append = false) {
   // Sincronizar las pills con el filtro activo (p. ej. al llegar desde el home)
   document.querySelectorAll('#reserv-filtros-bar .ped-filtro-pill').forEach(el =>
     el.classList.toggle('active', el.dataset.rest === _reservFiltro));
+  // Misma pill para las tres vistas, pero "cobrar" es la empresa y "pagar" es
+  // el cliente — ver el comentario en estadoCobro() (js/cobros.js).
+  const pillPorCobrar = document.querySelector('#reserv-filtros-bar .ped-filtro-pill[data-rest="PorCobrar"] .pill-label');
+  if (pillPorCobrar) pillPorCobrar.textContent = currentUser.rol === 'cliente' ? 'Por pagar' : 'Por cobrar';
   // No se espera: son 3 COUNT aparte y no deben retrasar la lista principal.
   actualizarBadgesPillsReserv();
 
@@ -289,7 +293,8 @@ async function renderReserv(append = false) {
     const data = _reservAccum;
 
     if (!data.length) {
-      const lbl = _RESERV_FILTRO_LABEL[_reservFiltro] || '';
+      // 'por cobrar' es del lado de la empresa; aquí siempre es el cliente.
+      const lbl = _reservFiltro === 'PorCobrar' ? 'por pagar' : (_RESERV_FILTRO_LABEL[_reservFiltro] || '');
       body.innerHTML = `<div class="empty-state"><div class="icon">📋</div>No tienes reservaciones${lbl ? ' ' + lbl : ''}.</div>`;
       return;
     }
