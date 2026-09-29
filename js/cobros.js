@@ -136,17 +136,22 @@ function revertirPago(reservaId) {
   }, { danger: true, confirmLabel: 'Sí, revertir' });
 }
 
-// ── BADGE DE COBROS VENCIDOS (inicio) ──────────────────
+// ── BADGE DE COBROS PENDIENTES (inicio) ────────────────
 // Cliente: lo que él debe. Empresa: lo que le deben. Superadmin: todo.
+//
+// Cuenta 'Por cobrar' + 'Vencido' juntos (no solo vencido, como antes): a la
+// gente le sirve saber que algo está pendiente de cobrar ANTES de que se
+// venza, no solo cuando ya se pasó. Antes esta tarjeta se quedaba en blanco
+// con una reservación recién completada y sin pagar, mientras la pill "Por
+// cobrar" de Reservaciones sí la mostraba — dos lugares contando cosas
+// distintas para la misma pregunta ("¿tengo algo pendiente?").
 async function actualizarBadgeCobros() {
   const badge = document.getElementById('home-cobros-badge');
   if (!badge || !currentUser.id) return;
-  const hoy = new Date().toISOString().split('T')[0];
   let q = sb.from('reservaciones')
     .select('id', { count: 'exact', head: true })
     .eq('estado', 'Completada')
-    .eq('pagado', false)
-    .lt('fecha_vencimiento_pago', hoy);
+    .eq('pagado', false);
   // Por cliente_user_id, no por correo: ver el comentario en renderReserv().
   if (currentUser.rol === 'cliente')      q = q.eq('cliente_user_id', currentUser.id);
   else if (currentUser.rol === 'admin')   q = q.eq('propietario_id', currentUser.id);
