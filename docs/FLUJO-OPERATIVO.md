@@ -550,6 +550,21 @@ EMPRESA oferta           → ofertas('enviada'), pedido → 'en_negociacion'
 CLIENTE contraoferta     → 'contra_oferta'  (máximo 2 rondas)
 ```
 
+**La empresa no puede volver a contraofertar después del cliente, aunque la
+interfaz le ofrezca el botón** (Q-14, medido el 2026-09-29 en `dev`). La
+contraoferta del cliente pone `ronda = 2` (`js/pedidos.js:2001`); «Responder» →
+«↩ Contraofertar» de la empresa calcula `ronda = (oferta.ronda || 1) + 1`, es
+decir 3 (`js/pedidos.js:2530`), y `ofertas_ronda_check` solo admite 1 o 2. Falla
+siempre, también en producción. Lo que sí funciona desde ese modal es
+«✓ Aceptar» (cierra el acuerdo por `aceptar_y_cerrar_acuerdo`) y «✕ Rechazar».
+Pendiente de decisión: ocultar el botón o admitir más rondas.
+
+**El globo de «Solicitudes» de la empresa no cuenta contraofertas.** Cuenta las
+solicitudes abiertas donde todavía no tiene oferta activa —trabajo nuevo que
+puede ofertar— con `pedidos_disponibles_para_mi()` (`js/views.js`,
+`actualizarBadgePedidos`). Una contraoferta del cliente sobre una oferta que ya
+existe le llega por la campana, no por el globo. Es el diseño, no un fallo.
+
 `ofertas.expira_en` son 2 días por defecto. El cron `expire-stale-offers` corre
 cada hora y marca `rechazada` las vencidas.
 
