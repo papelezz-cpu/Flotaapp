@@ -561,8 +561,8 @@ Antes el máximo era 2 y el «↩ Contraofertar» de la empresa tras la contraof
 del cliente calculaba ronda 3 contra un CHECK de 1-2: fallaba siempre, también
 en producción. **Estado:** `20260929191000_ofertas_rondas_sin_tope.sql` (CHECK
 `ronda >= 1` y `responder_oferta()` con `ronda + 1`) y el cambio de
-`enviarContraoferta()` están escritos en `dev`, **sin aplicar**. La migración
-va primero: con el código nuevo y el CHECK viejo, la tercera vuelta sigue
+`enviarContraoferta()` están en `dev`; la migración, **aplicada en pruebas el 29/09 23:19 UTC y en
+producción todavía no**. La migración va primero: con el código nuevo y el CHECK viejo, la tercera vuelta sigue
 fallando.
 
 **El globo de «Solicitudes» de la empresa no cuenta contraofertas.** Cuenta las
