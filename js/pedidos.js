@@ -2013,10 +2013,16 @@ async function enviarContraoferta(ofertaId) {
   const msg    = document.getElementById(`contra-msg-${ofertaId}`).value.trim();
   if (!precio || precio <= 0) { showToast('Ingresa un precio válido.', 'error'); return; }
 
+  // Q-14: la negociación ya no tiene tope de rondas (la acota la caducidad de
+  // la oferta). La ronda avanza desde la actual; antes se fijaba en 2 y una
+  // segunda contraoferta del cliente la hacía retroceder.
+  const { data: actual, error: eLee } = await sb.from('ofertas').select('ronda').eq('id', ofertaId).single();
+  if (eLee || !actual) { showToast('No se pudo leer la oferta: ' + (eLee?.message || ''), 'error'); return; }
+
   const { error } = await sb.from('ofertas').update({
     contra_precio:  precio,
     contra_mensaje: msg || null,
-    ronda:          2,
+    ronda:          (actual.ronda || 1) + 1,
     estado:         'contra_oferta',
   }).eq('id', ofertaId);
   if (error) { showToast('Error al enviar contraoferta'); return; }

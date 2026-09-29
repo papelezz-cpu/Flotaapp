@@ -449,7 +449,7 @@ Cargo-driven fields (the request is built from the load, not from the truck): `c
 > `renderPedidos()` **no longer writes.** It used to do the same five as a side effect of drawing the list, which is why `pedidos`/`ofertas` could not be published to Realtime. It keeps the equivalent normalization **in memory only** (cosmetic, so the screen shows the corrected state at once) while the row converges within 15 minutes. Consequence: a stale state now takes up to 15 minutes to settle in the DB instead of settling on render — and two open tabs no longer race to issue the same `UPDATE`.
 
 ### `ofertas` — company bids. PK `id` (uuid)
-`pedido_id`, `admin_id/_nombre`, `precio_oferta`, `contra_precio` (client counter), `ronda` (1|2), `camion_id`, `estado` (`enviada` | `contra_oferta` | `aceptada` | `rechazada`), `expira_en` (now + 2 days). The offered truck's `tipo` must match `pedidos.tipo_camion` (validated in `openHacerOferta` + `_enviarOfertaCore`).
+`pedido_id`, `admin_id/_nombre`, `precio_oferta`, `contra_precio` (client counter), `ronda` (≥ 1, no cap since Q-14 — `20260929191000`; 1|2 wherever that migration isn't applied yet), `camion_id`, `estado` (`enviada` | `contra_oferta` | `aceptada` | `rechazada`), `expira_en` (now + 2 days). The offered truck's `tipo` must match `pedidos.tipo_camion` (validated in `openHacerOferta` + `_enviarOfertaCore`).
 
 ### `reservaciones` — active bookings. PK `id` (uuid)
 `pedido_id` (links back for cancel-reopen), `propietario_id`, `cliente_user_id`, `cliente/_email`, `unidad`, `recurso_tipo` (`camion`|`custodio`|`patio`|`lavado`), `fecha_ini/_fin`, `precio_acordado`, `completado_en`, `calificado`.

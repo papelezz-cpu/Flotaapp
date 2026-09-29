@@ -281,7 +281,7 @@ oferta_pendiente_id uuid · rechazo_nota text · created_at timestamptz
 ```
 id uuid · pedido_id uuid · admin_id uuid · admin_nombre text
 camion_id text · operador_id text · operador_nombre text
-precio_oferta numeric · contra_precio numeric · ronda int(1|2)
+precio_oferta numeric · contra_precio numeric · ronda int ≥ 1 (sin tope desde Q-14; `responder_oferta` suma 1 en cada contraoferta)
 estado text -- enviada|contra_oferta|aceptada|rechazada
 permite_reoferta bool · expira_en timestamptz · mensaje text · created_at
 ```

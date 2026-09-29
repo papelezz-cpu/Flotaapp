@@ -98,7 +98,7 @@ Reservaciones · Mis pagos · Privacidad · Avisos.
   unen con nada, solo se recuperan enteros para rellenar el formulario. Las 49
   columnas siguen en la tabla, sin que nadie las escriba, como red para revertir.
 - Ver el Catálogo de empresas y la ficha pública de cada una.
-- Aceptar una oferta, o **contraofertar** un precio menor (máximo 2 rondas).
+- Aceptar una oferta, o **contraofertar** un precio menor. Sin tope de rondas desde Q-14 (decidido 2026-09-29; ver §4): lo acota la caducidad de la oferta.
 - Subir los documentos que le pida un expediente de viaje.
 - Subir su propia evidencia de cierre, y **pedir** el cierre del servicio.
 - **Solicitar** la cancelación — pedir, no cancelar.
@@ -263,7 +263,7 @@ Salen de los `CHECK` de la base. Si un estado no está aquí, no existe.
 `expirado`
 
 **`ofertas.estado`** — `enviada` · `contra_oferta` · `aceptada` · `rechazada`
-（`ronda` solo admite 1 o 2)
+（`ronda` ≥ 1 desde `20260929191000` (Q-14); hasta que esa migración se aplique en una base, allí solo admite 1 o 2)
 
 **`reservaciones.estado`** — `Pendiente` · `Activa` · `PorAprobar` ·
 `CancelacionSolicitada` · `Completada` · `Cancelada` · `Rechazada`
@@ -547,17 +547,23 @@ Deciden qué campos pide el formulario, y de eso dependen cosas más abajo:
 
 ```
 EMPRESA oferta           → ofertas('enviada'), pedido → 'en_negociacion'
-CLIENTE contraoferta     → 'contra_oferta'  (máximo 2 rondas)
+CLIENTE contraoferta     → 'contra_oferta', ronda + 1
+EMPRESA recontraoferta   → 'enviada' con precio nuevo, ronda + 1   (sin tope; ver Q-14)
 ```
 
-**La empresa no puede volver a contraofertar después del cliente, aunque la
-interfaz le ofrezca el botón** (Q-14, medido el 2026-09-29 en `dev`). La
-contraoferta del cliente pone `ronda = 2` (`js/pedidos.js:2001`); «Responder» →
-«↩ Contraofertar» de la empresa calcula `ronda = (oferta.ronda || 1) + 1`, es
-decir 3 (`js/pedidos.js:2530`), y `ofertas_ronda_check` solo admite 1 o 2. Falla
-siempre, también en producción. Lo que sí funciona desde ese modal es
-«✓ Aceptar» (cierra el acuerdo por `aceptar_y_cerrar_acuerdo`) y «✕ Rechazar».
-Pendiente de decisión: ocultar el botón o admitir más rondas.
+**Sin tope de rondas (Q-14, decidido por el usuario el 2026-09-29).** Cliente y
+empresa pueden contraofertarse las veces que quieran; cada vuelta suma 1 a
+`ronda`. Lo único que acota la negociación es la caducidad: ninguna
+contraoferta renueva `expira_en`, así que todo se cierra en los 2 días desde
+la oferta o `sincronizar_estados_pedidos()` la vence.
+
+Antes el máximo era 2 y el «↩ Contraofertar» de la empresa tras la contraoferta
+del cliente calculaba ronda 3 contra un CHECK de 1-2: fallaba siempre, también
+en producción. **Estado:** `20260929191000_ofertas_rondas_sin_tope.sql` (CHECK
+`ronda >= 1` y `responder_oferta()` con `ronda + 1`) y el cambio de
+`enviarContraoferta()` están escritos en `dev`, **sin aplicar**. La migración
+va primero: con el código nuevo y el CHECK viejo, la tercera vuelta sigue
+fallando.
 
 **El globo de «Solicitudes» de la empresa no cuenta contraofertas.** Cuenta las
 solicitudes abiertas donde todavía no tiene oferta activa —trabajo nuevo que
