@@ -538,7 +538,26 @@ input[type=date]::-webkit-calendar-picker-indicator { margin-left: 4px; }
   box-shadow: 0 0 0 2px var(--accent);
   animation: reservNextPulse 2s ease-in-out infinite;
 }
-@media (prefers-reduced-motion: reduce) { .reserv-next { animation: none; } }
+/* El aro ya distingue el botón dentro del panel, pero el panel está detrás
+   del ▾ — antes de abrirlo lo único visible es la fila. El punto que
+   parpadea va también en el chip de la fila (siempre visible) y se repite
+   en el botón real para que, al abrir el panel, sea obvio cuál es. */
+@keyframes reservNextBlink {
+  0%, 40%   { opacity: 1;    transform: scale(1); }
+  50%       { opacity: 0.25; transform: scale(0.75); }
+  60%, 100% { opacity: 1;    transform: scale(1); }
+}
+.reserv-next, .reserv-next-chip { position: relative; }
+.reserv-next::after, .reserv-next-chip::after {
+  content: ''; position: absolute; top: -4px; right: -4px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #ef4444; border: 1.5px solid var(--navy-mid);
+  animation: reservNextBlink 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reserv-next { animation: none; }
+  .reserv-next::after, .reserv-next-chip::after { animation: none; }
+}
 .reserv-next-chip {
   font: inherit; font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 8px;
   cursor: pointer; white-space: nowrap;

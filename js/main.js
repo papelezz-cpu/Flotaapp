@@ -28,6 +28,7 @@ function iniciarSuscripcionesRealtime() {
   const adminActivo         = () => document.getElementById('view-admin').classList.contains('active');
   const pendientesActivo    = () => document.getElementById('view-pendientes')?.classList.contains('active');
   const pedidosActivo       = () => document.getElementById('view-pedidos').classList.contains('active');
+  const reservacionesActivo = () => document.getElementById('view-reservaciones').classList.contains('active');
 
   // Un solo canal para las notificaciones propias, y filtrado en el servidor.
   // Antes había dos escuchadores del mismo evento — este, y otro sin filtro
@@ -45,6 +46,14 @@ function iniciarSuscripcionesRealtime() {
         _loadAprBadge();
         if (pendientesActivo()) renderAprobaciones();
       }
+      // Reservaciones también se refresca aquí, y no solo con el canal de
+      // abajo: la guía de "siguiente paso" depende de `expedientes`, y esa
+      // tabla no está en la publicación de Realtime (a diferencia de
+      // reservaciones/notificaciones — ver docs/FLUJO-OPERATIVO.md §14). Sin
+      // esto, quien recibe «Documentación lista para revisar» ve la campana
+      // pero el botón resaltado se queda apuntando al paso de ayer hasta que
+      // recarga la vista a mano.
+      if (reservacionesActivo()) renderReserv();
     })
     .subscribe();
 
@@ -89,7 +98,7 @@ function iniciarSuscripcionesRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'patios',    ...filtroFlota }, _flota(renderAdminPatios))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'lavados',   ...filtroFlota }, _flota(renderAdminLavados))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'reservaciones', ...filtroReservas }, _agrupado(() => {
-      if (document.getElementById('view-reservaciones').classList.contains('active')) renderReserv();
+      if (reservacionesActivo()) renderReserv();
       // El superadmin necesita ver en vivo cuando cliente/empresa suben su
       // evidencia de cierre (no siempre dispara una notificación nueva).
       if (pendientesActivo()) renderAprobaciones();
