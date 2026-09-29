@@ -253,20 +253,27 @@ async function guardarEntregaFisica() {
   showToast('✓ Datos de entrega guardados');
 }
 
-// Depósito y fecha límite: es donde está el dinero de las demoras.
+// Depósito y fecha límite: es donde está el dinero de las demoras. Lo fija
+// el transportista, no el cliente — guard_expediente_update ya lo bloquea
+// del lado de la base (es trabajo del transportista, no del cliente: si el
+// cliente pudiera poner su propia fecha límite, podría fijarla cómoda para
+// él mismo y evitarse cargos). Esta condición tenía el `soyCliente` volteado
+// —copiado de _expEntregaFisicaHTML, donde sí es al revés— y dejaba ver el
+// formulario editable al cliente, que el guard rechazaba en silencio hasta
+// que dejó de estarlo. El guard nunca estuvo mal; esta función sí.
 function _expVaciosHTML(e, soyCliente) {
   return `
     <div class="exp-vacios">
       <div class="form-group">
         <label>Depósito de vacíos asignado</label>
         <input type="text" id="exp-deposito" value="${esc(e.deposito_vacios || '')}"
-               placeholder="Ej. Patio Ferromex, Av. Tepeyac 300" ${soyCliente ? '' : 'disabled'}>
+               placeholder="Ej. Patio Ferromex, Av. Tepeyac 300" ${soyCliente ? 'disabled' : ''}>
       </div>
       <div class="form-group">
         <label>Último día para devolver sin demoras</label>
-        <input type="date" id="exp-fecha-limite" value="${e.fecha_limite_vacios || ''}" ${soyCliente ? '' : 'disabled'}>
+        <input type="date" id="exp-fecha-limite" value="${e.fecha_limite_vacios || ''}" ${soyCliente ? 'disabled' : ''}>
       </div>
-      ${soyCliente ? `<button class="btn-add" onclick="guardarDatosVacios()">💾 Guardar</button>` : ''}
+      ${soyCliente ? '' : `<button class="btn-add" onclick="guardarDatosVacios()">💾 Guardar</button>`}
     </div>`;
 }
 
