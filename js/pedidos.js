@@ -1610,6 +1610,11 @@ async function crearPedido() {
     destino_estado:   esCamion ? (_mapaPuntos?.destino?.estado  ?? null) : null,
     capacidad_min:    esCamion ? vi('np-cap')    : null,
     tipo_carga:       esCamion ? v('np-carga')   : null,
+    // Opcional a propósito: el catálogo SAT de productos/servicios tiene
+    // decenas de miles de claves, no se importa completo (ver Etapa 5 del
+    // plan de Carta Porte). Quien ya hace comercio exterior normalmente
+    // conoce la suya; quien no, deja el campo vacío y no bloquea el pedido.
+    clave_prod_serv_sat: esCamion ? v('np-clave-sat') : null,
     peso_carga:       esCamion ? vn('np-peso')   : null,
     num_tarimas:      _campoAplica('tarimas') ? vi('np-tarimas') : null,
     // Volumen equivalente, derivado: sirve para reportes sin volver a pedirle
