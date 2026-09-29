@@ -408,6 +408,12 @@
           </select>
         </div>
         <div class="form-group">
+          <label>Configuración vehicular (SAT)</label>
+          <select id="admin-config-vehicular">
+            <option value="">— Seleccionar —</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>Marca</label>
           <select id="admin-marca">
             <option value="">— Seleccionar —</option>
@@ -493,6 +499,10 @@
         <div class="form-group">
           <label>Vencimiento del seguro</label>
           <input type="date" id="admin-vence-seguro">
+        </div>
+        <div class="form-group">
+          <label>Número de permiso SCT (de esta unidad)</label>
+          <input type="text" id="admin-numero-permiso-sct" placeholder="Ej. SCT/TPAF/MZ-0001/2024">
         </div>
         <div class="form-group">
           <label>Vencimiento del permiso SCT</label>
@@ -2066,6 +2076,12 @@
       </select>
     </div>
     <div class="form-group">
+      <label>Configuración vehicular (SAT)</label>
+      <select id="editar-config-vehicular">
+        <option value="">— Seleccionar —</option>
+      </select>
+    </div>
+    <div class="form-group">
       <label>Marca</label>
       <select id="editar-marca">
         <option value="">— Seleccionar —</option>
@@ -2136,6 +2152,10 @@
         <span id="editar-doc-seguro-label" class="file-upload-text">Adjuntar póliza de seguro</span>
       </label>
       <input type="file" id="editar-doc-seguro" accept="image/*,.pdf" style="display:none" onchange="updateFileLabel('editar-doc-seguro','editar-doc-seguro-label')">
+    </div>
+    <div class="form-group">
+      <label>Número de permiso SCT (de esta unidad)</label>
+      <input type="text" id="editar-numero-permiso-sct" placeholder="Ej. SCT/TPAF/MZ-0001/2024">
     </div>
     <div class="form-group">
       <label>Vence permiso SCT</label>
@@ -2799,7 +2819,7 @@
 <script src="js/pedidos.js?v=86"></script>
 <script src="js/plantillas.js?v=9"></script>
 <script src="js/aprobaciones.js?v=48"></script>
-<script src="js/admin.js?v=39"></script>
+<script src="js/admin.js?v=40"></script>
 <script src="js/operadores.js?v=18"></script>
 <script src="js/usuarios.js?v=22"></script>
 <script src="js/verificacion.js?v=1"></script>

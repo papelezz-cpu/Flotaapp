@@ -164,6 +164,8 @@ async function renderAdmin() {
   if (currentUser.rol === 'superadmin') await _cargarEmpresasDropdowns();
   else document.querySelectorAll('.sa-empresa-row').forEach(el => el.style.display = 'none');
 
+  await _poblarConfigVehicular();
+
   if (currentUser.rol !== 'superadmin') renderMisPendientes();
 
   // Render the currently active admin tab
@@ -209,6 +211,25 @@ async function _cargarEmpresasDropdowns() {
     if (sel) sel.innerHTML = `<option value="">— Selecciona empresa —</option>${opts}`;
   });
   document.querySelectorAll('.sa-empresa-row').forEach(el => el.style.display = '');
+}
+
+// Configuración vehicular (clave SAT del Complemento Carta Porte: C2, C3,
+// T3S2…) — mismo patrón que js/vigencias.js usa para 'vigencia_tipo': la
+// lista vive en `catalogos`, no en el código, así que agregar una clave
+// nueva es una fila, no un despliegue. No es una fecha de vigencia, así que
+// no entra al espejo (`vigencias`) — es un identificador estático.
+async function _poblarConfigVehicular() {
+  const altaSel  = document.getElementById('admin-config-vehicular');
+  const editSel  = document.getElementById('editar-config-vehicular');
+  if (!altaSel && !editSel) return;
+
+  const { data, error } = await sb.from('catalogos')
+    .select('valor, etiqueta').eq('clave', 'config_vehicular_sat').eq('activo', true).order('orden');
+  if (error || !data?.length) return;
+
+  const opts = data.map(c => `<option value="${esc(c.valor)}">${esc(c.valor)} — ${esc(c.etiqueta)}</option>`).join('');
+  if (altaSel) altaSel.innerHTML = `<option value="">— Seleccionar —</option>${opts}`;
+  if (editSel) editSel.innerHTML = `<option value="">— Seleccionar —</option>${opts}`;
 }
 
 function _getPropietarioId(tipo) {
@@ -461,6 +482,8 @@ async function editarCamion(id) {
   set('editar-dim', c.dimensiones || '');
   set('editar-precio', c.precio_dia || '');
   set('editar-estado', c.estado);
+  set('editar-config-vehicular', c.configuracion_vehicular || '');
+  set('editar-numero-permiso-sct', c.numero_permiso_sct || '');
   set('editar-marca', c.marca || '');
   set('editar-num-serie', c.num_serie || '');
   set('editar-num-motor', c.num_motor || '');
@@ -511,6 +534,8 @@ async function guardarEdicion() {
     precio_dia:          parseFloat(document.getElementById('editar-precio').value) || null,
     estado:              document.getElementById('editar-estado').value,
     emoji:               { Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️' }[tipo] || '🚛',
+    configuracion_vehicular: g('editar-config-vehicular'),
+    numero_permiso_sct:      g('editar-numero-permiso-sct'),
     marca:               g('editar-marca'),
     num_serie:           g('editar-num-serie'),
     num_motor:           g('editar-num-motor'),
@@ -1049,6 +1074,8 @@ async function agregarCamion() {
     ...(placas         && { placas }),
     ...(dim            && { dimensiones: dim }),
     ...(tipoCarga.length && { tipo_carga: tipoCarga }),
+    configuracion_vehicular: g('admin-config-vehicular'),
+    numero_permiso_sct:      g('admin-numero-permiso-sct'),
     marca:               g('admin-marca'),
     version:             g('admin-version'),
     modelo_anio:         parseInt(document.getElementById('admin-modelo-anio')?.value) || null,
