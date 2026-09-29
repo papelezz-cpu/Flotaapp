@@ -120,7 +120,7 @@ comment on function public.guard_perfil_insert() is
   'Q-01: un usuario final solo puede crear su perfil como cliente/admin, '
   'pendiente, sin verificacion ni acreditacion. Protege al nacer las mismas '
   'columnas que guard_perfil_self_update en UPDATE. auth.uid() NULL (clave de '
-  'servicio, postgres) pasa: ver 20260929120000.';
+  'servicio, postgres) pasa: ver 20260929130000.';
 
 -- Regla 1: nace abierta. PUBLIC explicito, porque es donde PostgreSQL concede
 -- (H-21: el revoke a anon/authenticated solo no retiraba nada).
