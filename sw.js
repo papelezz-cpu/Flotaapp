@@ -1,5 +1,5 @@
 // ── SERVICE WORKER — PortGo ────────────────────────────
-const CACHE      = 'portgo-v241';
+const CACHE      = 'portgo-v242';
 const DATA_CACHE = 'portgo-data-v1';
 
 const SHELL = [
@@ -38,6 +38,7 @@ const SHELL = [
   '/js/verificacion.js',
   '/js/privacidad.js',
   '/js/preferencias.js',
+  '/js/perfil.js',
   '/js/cobros.js',
   '/js/reportes.js',
   '/js/catalogo.js',

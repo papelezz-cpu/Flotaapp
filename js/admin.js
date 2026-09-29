@@ -245,6 +245,11 @@ async function renderPerfilEmpresa() {
   set('pe-anos',     p.anos_operacion);
   set('pe-unidades', p.num_unidades);
   set('pe-desc',      p.descripcion);
+  set('pe-calle',    p.calle);
+  set('pe-colonia',  p.colonia);
+  set('pe-cp',       p.cp);
+  set('pe-ciudad',   p.ciudad);
+  set('pe-estado',   p.estado_mx);
 
   // Mostrar fechas pendientes o aprobadas en los campos de documentos.
   // permiso_sct baja aquí con su fecha y su documento: el número suelto no
@@ -279,6 +284,11 @@ async function guardarPerfilEmpresa() {
     anos_operacion: parseInt(document.getElementById('pe-anos').value)    || null,
     num_unidades:   parseInt(document.getElementById('pe-unidades').value) || null,
     descripcion:    document.getElementById('pe-desc').value.trim(),
+    calle:          document.getElementById('pe-calle').value.trim()   || null,
+    colonia:        document.getElementById('pe-colonia').value.trim() || null,
+    cp:             document.getElementById('pe-cp').value.trim()      || null,
+    ciudad:         document.getElementById('pe-ciudad').value.trim()  || null,
+    estado_mx:      document.getElementById('pe-estado').value.trim()  || null,
   };
   // permiso_sct, seguro_rc y seguro_carga NO se mandan desde aquí: dejaron de
   // ser algo que la empresa declara y pasaron a ser consecuencia de un

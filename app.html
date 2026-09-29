@@ -264,6 +264,30 @@
             <textarea id="pe-desc" rows="3" placeholder="¿Qué servicios ofrecen? ¿Zonas que cubren? ¿Especialidad?"></textarea>
           </div>
         </div>
+        <!-- ── Domicilio fiscal ─────────────────────────────── -->
+        <div class="op-form-section-title" style="margin-top:20px">📍 Domicilio fiscal</div>
+        <div class="admin-grid" style="margin-top:4px">
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Calle y número</label>
+            <input type="text" id="pe-calle" placeholder="Ej. Av. Industrial 450">
+          </div>
+          <div class="form-group">
+            <label>Colonia</label>
+            <input type="text" id="pe-colonia" placeholder="Ej. Zona Industrial">
+          </div>
+          <div class="form-group">
+            <label>Código postal</label>
+            <input type="text" id="pe-cp" placeholder="Ej. 64000" maxlength="5">
+          </div>
+          <div class="form-group">
+            <label>Ciudad</label>
+            <input type="text" id="pe-ciudad" placeholder="Ej. Monterrey">
+          </div>
+          <div class="form-group">
+            <label>Estado</label>
+            <input type="text" id="pe-estado" placeholder="Ej. Nuevo León">
+          </div>
+        </div>
         <button class="btn-add" style="margin-top:8px" onclick="guardarPerfilEmpresa()">💾 Guardar perfil</button>
 
         <div class="pref-link-row">
@@ -1155,6 +1179,59 @@
     <div class="section-title">🔔 Avisos y correos</div>
     <div id="pref-content">
       <div class="empty-state"><div class="icon">⏳</div>Cargando...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ VISTA: MI PERFIL (cliente) ═══════════════════════ -->
+<div id="view-mi-perfil" class="view">
+  <div class="page">
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
+    <div class="section-title">🧾 Mi perfil</div>
+    <div class="admin-card">
+      <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px">
+        Estos son los datos fiscales con los que te diste de alta. Mantenlos
+        al día — se usan para identificarte ante el transportista y en tus
+        documentos de viaje.
+      </p>
+      <div class="admin-grid">
+        <div class="form-group">
+          <label>Razón social</label>
+          <input type="text" id="mp-razon" placeholder="Ej. Comercializadora ACME S.A. de C.V.">
+        </div>
+        <div class="form-group">
+          <label>RFC</label>
+          <input type="text" id="mp-rfc" placeholder="Ej. ACM900101ABC">
+        </div>
+        <div class="form-group">
+          <label>Teléfono de contacto</label>
+          <input type="tel" id="mp-telefono" placeholder="+52 314 000 0000">
+        </div>
+      </div>
+      <div class="op-form-section-title" style="margin-top:20px">📍 Domicilio fiscal</div>
+      <div class="admin-grid" style="margin-top:4px">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Calle y número</label>
+          <input type="text" id="mp-calle" placeholder="Ej. Av. Insurgentes 123">
+        </div>
+        <div class="form-group">
+          <label>Colonia</label>
+          <input type="text" id="mp-colonia" placeholder="Ej. Roma Norte">
+        </div>
+        <div class="form-group">
+          <label>Código postal</label>
+          <input type="text" id="mp-cp" placeholder="Ej. 06600" maxlength="5">
+        </div>
+        <div class="form-group">
+          <label>Ciudad</label>
+          <input type="text" id="mp-ciudad" placeholder="Ej. CDMX">
+        </div>
+        <div class="form-group">
+          <label>Estado</label>
+          <input type="text" id="mp-estado" placeholder="Ej. Ciudad de México">
+        </div>
+      </div>
+      <button class="btn-add" style="margin-top:8px" onclick="guardarMiPerfil()">💾 Guardar</button>
     </div>
   </div>
 </div>
@@ -2712,7 +2789,7 @@
 <script src="js/config.js?v=13"></script>
 <script src="js/auth.js?v=24"></script>
 <script src="js/theme.js?v=11"></script>
-<script src="js/views.js?v=35"></script>
+<script src="js/views.js?v=36"></script>
 <script src="js/camiones.js?v=13"></script>
 <script src="js/recursos.js?v=13"></script>
 <script src="js/reservaciones.js?v=65"></script>
@@ -2721,13 +2798,14 @@
 <script src="js/expedientes.js?v=11"></script>
 <script src="js/pedidos.js?v=86"></script>
 <script src="js/plantillas.js?v=9"></script>
-<script src="js/aprobaciones.js?v=47"></script>
-<script src="js/admin.js?v=38"></script>
+<script src="js/aprobaciones.js?v=48"></script>
+<script src="js/admin.js?v=39"></script>
 <script src="js/operadores.js?v=18"></script>
 <script src="js/usuarios.js?v=22"></script>
 <script src="js/verificacion.js?v=1"></script>
 <script src="js/privacidad.js?v=2"></script>
 <script src="js/preferencias.js?v=1"></script>
+<script src="js/perfil.js?v=1"></script>
 <script src="js/cobros.js?v=6"></script>
 <script src="js/reportes.js?v=4"></script>
 <script src="js/catalogo.js?v=25"></script>

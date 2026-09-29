@@ -926,7 +926,16 @@ function verDocRegistro(path) {
 }
 
 // Datos que el registro pide y que la ficha del perfil vuelve a pedir.
-const _CAMPOS_FICHA = ['razon_social', 'rfc', 'telefono', 'tipo_persona'];
+// calle/colonia/cp/ciudad/estado_mx: mismo hueco que los otros cuatro
+// —el registro los pide, js/auth.js no los escribe en perfiles al crear la
+// cuenta— cerrado el mismo día que se le puso columna a perfiles para
+// guardarlos (20260929140000_domicilio_fiscal_en_perfiles.sql, que además
+// recupera con un backfill el domicilio de las cuentas ya aprobadas antes
+// de este cambio).
+const _CAMPOS_FICHA = [
+  'razon_social', 'rfc', 'telefono', 'tipo_persona',
+  'calle', 'colonia', 'cp', 'ciudad', 'estado_mx',
+];
 
 async function aprobarCuenta(userId, metodo) {
   const esFisica = metodo === 'fisica';
