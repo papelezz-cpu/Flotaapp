@@ -337,17 +337,62 @@ async function renderReserv(append = false) {
       // El servicio se cierra cuando cliente Y empresa marcan completado (cada
       // quien sube su propia evidencia) y el superadmin aprueba la revisión.
       const miEvidenciaCli = r.evidencias_cliente?.length || 0;
+      const unidadLabel = recursoNombreMap[r.unidad] || esc(r.unidad) || '—';
+      const propId = r.propietario_id || '';
+      const nombreEmpresa = perfMap[r.propietario_id] || '';
+
+      // ── SIGUIENTE PASO (cliente) ──────────────────────────
+      // Espejo de _siguientePasoReserva (misma más abajo, lado empresa): qué
+      // le toca al CLIENTE, no a la empresa. Mismo criterio — solo se
+      // sugiere lo que el sistema ya sabe pendiente (expediente 'solicitado',
+      // tracking en el último paso, evidencia sin subir, calificación sin
+      // dar); nunca se inventa un paso que no tenga un dato detrás.
+      const ACCION_CLI = {
+        puerto:    `abrirExpediente('${r.id}','ingreso_puerto')`,
+        vacios:    `abrirExpediente('${r.id}','entrega_vacios')`,
+        completar: `abrirEvidencias('${r.id}','evidencias_cliente')`,
+        calificar: `openCalificar('${r.id}','${propId}','${escJs(nombreEmpresa)}')`,
+      };
+      const sigCli = (() => {
+        if (r.estado === 'Completada') {
+          return (!r.calificado && propId) ? {
+            clave: 'calificar', corto: 'Calificar servicio', accion: ACCION_CLI.calificar,
+            detalle: 'El servicio ya se completó: califica cómo te fue.',
+          } : null;
+        }
+        if (r.estado === 'PorAprobar') {
+          return miEvidenciaCli ? null : {
+            clave: 'completar', corto: 'Subir mi evidencia', accion: ACCION_CLI.completar,
+            detalle: 'La empresa ya marcó el servicio como terminado: sube tu evidencia para que el superadmin apruebe el cierre.',
+          };
+        }
+        if (r.estado !== 'Activa') return null;
+        // "solicitado" = la pelota está en tu cancha (ver expedientes.js).
+        if (r._expIngreso?.estado === 'solicitado') return {
+          clave: 'puerto', corto: 'Subir docs de Puerto', accion: ACCION_CLI.puerto,
+          detalle: 'La empresa pidió los documentos para entrar a puerto: súbelos para que el viaje no se atore.',
+        };
+        if (r._expVacios?.estado === 'solicitado') return {
+          clave: 'vacios', corto: 'Subir docs de Vacíos', accion: ACCION_CLI.vacios,
+          detalle: 'La empresa pidió los documentos para entregar el contenedor vacío: súbelos antes de que corran las demoras.',
+        };
+        if (typeof _trackingEnUltimoPaso === 'function' && _trackingEnUltimoPaso(r)) return {
+          clave: 'completar', corto: 'Marcar completado', accion: ACCION_CLI.completar,
+          detalle: 'El seguimiento llegó al final: marca el servicio como completado.',
+        };
+        return null; // nada pendiente de tu lado — el envío sigue su curso
+      })();
+      const nxCli = clave => (sigCli?.clave === clave ? ' reserv-next' : '');
+
       const completarBtn = r.estado === 'Activa'
-        ? `<button class="btn-completar-reserva" style="font-size:0.7rem" onclick="abrirEvidencias('${r.id}','evidencias_cliente')">✓ Marcar completado</button>`
+        ? `<button class="btn-completar-reserva${nxCli('completar')}" style="font-size:0.7rem" onclick="abrirEvidencias('${r.id}','evidencias_cliente')">✓ Marcar completado</button>`
         : r.estado === 'PorAprobar'
           ? (miEvidenciaCli
               ? `<span style="font-size:0.7rem;color:var(--text-muted)">⏳ Esperando aprobación</span>`
-              : `<button class="btn-completar-reserva" style="font-size:0.7rem" onclick="abrirEvidencias('${r.id}','evidencias_cliente')">📎 Subir mi evidencia</button>`)
+              : `<button class="btn-completar-reserva${nxCli('completar')}" style="font-size:0.7rem" onclick="abrirEvidencias('${r.id}','evidencias_cliente')">📎 Subir mi evidencia</button>`)
           : '';
-      const unidadLabel = recursoNombreMap[r.unidad] || esc(r.unidad) || '—';
-      const propId = r.propietario_id || '';
       const calBtn = (r.estado === 'Completada' && !r.calificado && propId)
-        ? `<button class="btn-calificar" onclick="openCalificar('${r.id}','${propId}','${escJs(perfMap[r.propietario_id]||'')}')">⭐ Calificar</button>`
+        ? `<button class="btn-calificar${nxCli('calificar')}" onclick="openCalificar('${r.id}','${propId}','${escJs(nombreEmpresa)}')">⭐ Calificar</button>`
         : '';
       // El cliente ve su estado de cobro: pagado, por cobrar o vencido.
       const pagoLbl = cobroBadgeHTML(r);
@@ -361,7 +406,7 @@ async function renderReserv(append = false) {
       // checklist, disponible en cuanto hay match (la reservación existe).
       const numDocsCarga = r.documentos_carga?.length || 0;
       const cartaPorteBtn = `<button class="btn-edit" style="font-size:0.7rem" onclick="abrirDocumentosCarga('${r.id}')">📄 ${numDocsCarga ? `Documentos (${numDocsCarga})` : 'Carta Porte / documentos'}</button>`;
-      const expedientePills = typeof expedienteBotonesHTML === 'function' ? expedienteBotonesHTML(r, true) : '';
+      const expedientePills = typeof expedienteBotonesHTML === 'function' ? expedienteBotonesHTML(r, true, sigCli?.clave) : '';
       const abierta = _reservAbiertas.has(r.id);
       const grupo = (label, html) => html ? `
         <div class="reserv-detail-group">
@@ -379,10 +424,12 @@ async function renderReserv(append = false) {
           <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
           ${trackBtn}
           ${pagoLbl}
+          ${sigCli ? `<button class="reserv-next-chip" title="Ir directo a este paso" onclick="${sigCli.accion}">👉 ${esc(sigCli.corto)}</button>` : ''}
           <button id="reserv-toggle-${r.id}" class="reserv-toggle${abierta ? ' open' : ''}" aria-expanded="${abierta}" title="Más acciones" onclick="toggleReservDetalle('${r.id}')">▾</button>
         </div>
       </div>
       <div id="reserv-detalle-${r.id}" class="reserv-detail${abierta ? ' open' : ''}">
+        ${sigCli ? `<div class="reserv-next-hint"><span><strong>👉 Siguiente:</strong> ${esc(sigCli.detalle)}</span></div>` : ''}
         ${grupo('Operación', gpsBtnCli)}
         ${grupo('Documentos', cartaPorteBtn + expedientePills)}
         ${grupo('Pago', precioLbl + pagarBtn)}
