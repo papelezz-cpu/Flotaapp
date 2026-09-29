@@ -182,10 +182,10 @@ function _filtroReservaSQL(q, filtro = _reservFiltro) {
 // decir algo distinto de lo que se ve al hacer clic (R-05: un globo que
 // cuenta distinto de lo que la pantalla lista es peor que no tener globo).
 //
-// Solo estas tres: son las que de verdad significan "algo pendiente".
+// Solo estas: son las que de verdad significan "algo pendiente".
 // 'Pendiente' se queda fuera a propósito — es un estado inalcanzable hoy
 // (hueco 6, docs/FLUJO-OPERATIVO.md), badgearlo siempre mostraría 0.
-const _RESERV_PILLS_BADGE = ['PorAprobar', 'CancelacionSolicitada', 'Vencido'];
+const _RESERV_PILLS_BADGE = ['PorAprobar', 'CancelacionSolicitada', 'PorCobrar', 'Vencido'];
 
 async function actualizarBadgesPillsReserv() {
   if (!currentUser?.id) return;
