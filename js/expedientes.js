@@ -511,12 +511,15 @@ async function abrirExpedienteVaciosSiAplica(reserva) {
 }
 
 // ── Botones dentro de la fila de la reservación ─────────
-// `siguiente` ('puerto' | 'vacios' | otro): la clave de _siguientePasoReserva;
-// si coincide con la etapa, la pastilla se resalta como "lo que toca ahora".
+// `siguiente`: claves de _siguientesPasosReserva pendientes AHORA — un
+// arreglo (puede traer 'puerto' y 'vacios' los dos a la vez) o, por
+// compatibilidad, una sola clave suelta. Si la etapa aparece, esa pastilla
+// se resalta como "lo que toca ahora" — puede haber más de una resaltada.
 function expedienteBotonesHTML(r, soyCliente, siguiente) {
+  const pendientes = Array.isArray(siguiente) ? siguiente : (siguiente ? [siguiente] : []);
   const btns = [];
   const pill = (etapa, exp) => {
-    const nx = siguiente === (etapa === 'entrega_vacios' ? 'vacios' : 'puerto') ? ' reserv-next' : '';
+    const nx = pendientes.includes(etapa === 'entrega_vacios' ? 'vacios' : 'puerto') ? ' reserv-next' : '';
     const cfg = EXP_ETAPAS[etapa];
     const nombre = etapa === 'entrega_vacios' ? 'Vacíos' : 'Puerto';
     if (!exp) {

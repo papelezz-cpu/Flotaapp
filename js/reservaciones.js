@@ -64,17 +64,24 @@ const RES_COLS_LISTA = [
 // estadoCobro. Es una guía, no un candado: lo único que se bloquea es lo que
 // el sistema ya bloqueaba (avanzar sin chofer, completar sin llegar al último
 // paso del seguimiento).
-//   clave   → qué botón se resalta: chofer | avanzar | puerto | vacios | completar | cobro
-//   corto   → texto del chip en la fila
+//
+// Devuelve un ARRAY, no un solo paso: revisar documentos y avanzar el
+// seguimiento son pistas independientes —una no espera a la otra—, así que
+// pueden estar pendientes las dos a la vez y las dos se resaltan. Solo se
+// excluyen entre sí las que de verdad son incompatibles: avanzar y completar
+// (son pasos distintos del mismo seguimiento) y avanzar cuando falta el
+// chofer que lo bloquea (ver tracking.js) — eso sí seguiría dando error.
+//   clave   → qué botón(es) se resaltan: chofer | avanzar | puerto | vacios | completar | cobro
+//   corto   → texto del chip en la fila (uno por paso pendiente)
 //   detalle → frase completa dentro del panel
 //   accion  → el onclick que lleva directo a hacerlo (lo usa el chip de la fila)
-//   espera  → lo que depende del cliente (no es una acción de la empresa)
+//   espera  → lo que depende del cliente, igual en todos los pasos devueltos
 function _trackingEnUltimoPaso(r) {
   const pasos = _getEstados(r.recurso_tipo);
   return (r.tracking_estado || pasos[0].key) === pasos[pasos.length - 1].key;
 }
 
-function _siguientePasoReserva(r) {
+function _siguientesPasosReserva(r) {
   const ACCION = {
     chofer:    `abrirAsignarChofer('${r.id}')`,
     puerto:    `abrirExpediente('${r.id}','ingreso_puerto')`,
@@ -84,12 +91,12 @@ function _siguientePasoReserva(r) {
     cobro:     `abrirRegistrarPago('${r.id}')`,
   };
   if (r.estado === 'Completada') {
-    return r.pagado ? null : {
+    return r.pagado ? [] : [{
       clave: 'cobro', corto: 'Registrar pago', accion: ACCION.cobro,
-      detalle: 'El servicio ya se completó: registra el pago cuando lo recibas.',
-    };
+      detalle: 'El servicio ya se completó: registra el pago cuando lo recibas.', espera: null,
+    }];
   }
-  if (r.estado !== 'Activa' || typeof _getEstados !== 'function') return null;
+  if (r.estado !== 'Activa' || typeof _getEstados !== 'function') return [];
 
   // "solicitado" = la pelota la tiene el cliente; "en_revision" = ya subió
   // todo y le toca a la empresa aprobar o rechazar (ver expedientes.js).
@@ -100,24 +107,33 @@ function _siguientePasoReserva(r) {
     ? `Esperando que el cliente suba los documentos de ${pendCliente.join(' y ')}.` : null;
   const paso = (clave, corto, detalle) => ({ clave, corto, detalle, accion: ACCION[clave], espera });
 
-  const esCamion = !r.recurso_tipo || r.recurso_tipo === 'camion';
-  if (esCamion && !r.operador_nombre) {
-    return paso('chofer', 'Asignar chofer', 'Asigna un chofer: sin él no se puede avanzar el seguimiento del viaje.');
+  const pasos = [];
+  const esCamion    = !r.recurso_tipo || r.recurso_tipo === 'camion';
+  const choferFalta = esCamion && !r.operador_nombre;
+  if (choferFalta) {
+    pasos.push(paso('chofer', 'Asignar chofer', 'Asigna un chofer: sin él no se puede avanzar el seguimiento del viaje.'));
   }
   if (r._expIngreso?.estado === 'en_revision') {
-    return paso('puerto', 'Revisar docs de Puerto', 'El cliente ya subió los documentos de Puerto: revísalos y apruébalos o recházalos.');
+    pasos.push(paso('puerto', 'Revisar docs de Puerto', 'El cliente ya subió los documentos de Puerto: revísalos y apruébalos o recházalos.'));
   }
   if (r._expVacios?.estado === 'en_revision') {
-    return paso('vacios', 'Revisar docs de Vacíos', 'El cliente ya subió los documentos de Vacíos: revísalos y apruébalos o recházalos.');
+    pasos.push(paso('vacios', 'Revisar docs de Vacíos', 'El cliente ya subió los documentos de Vacíos: revísalos y apruébalos o recházalos.'));
   }
 
-  const pasos = _getEstados(r.recurso_tipo);
-  const idx   = Math.max(0, pasos.findIndex(p => p.key === (r.tracking_estado || pasos[0].key)));
-  if (idx < pasos.length - 1) {
-    const sig = pasos[idx + 1];
-    return paso('avanzar', `Marcar: ${sig.label}`, `Cuando ocurra, marca en el seguimiento: «${sig.label}».`);
+  const pasosTracking = _getEstados(r.recurso_tipo);
+  const idx = Math.max(0, pasosTracking.findIndex(p => p.key === (r.tracking_estado || pasosTracking[0].key)));
+  // Solo el primer paso exige chofer (tracking.js); de ahí en adelante avanzar
+  // no depende de él, así que sí se muestra junto con lo demás pendiente.
+  const avanzarBloqueado = choferFalta && idx === 0;
+  if (!avanzarBloqueado) {
+    if (idx < pasosTracking.length - 1) {
+      const sig = pasosTracking[idx + 1];
+      pasos.push(paso('avanzar', `Marcar: ${sig.label}`, `Cuando ocurra, marca en el seguimiento: «${sig.label}».`));
+    } else {
+      pasos.push(paso('completar', 'Completar servicio', 'El seguimiento llegó al final: completa el servicio subiendo tu evidencia.'));
+    }
   }
-  return paso('completar', 'Completar servicio', 'El seguimiento llegó al final: completa el servicio subiendo tu evidencia.');
+  return pasos;
 }
 
 // ── PAGINACIÓN ────────────────────────────────────────
@@ -342,7 +358,7 @@ async function renderReserv(append = false) {
       const nombreEmpresa = perfMap[r.propietario_id] || '';
 
       // ── SIGUIENTE PASO (cliente) ──────────────────────────
-      // Espejo de _siguientePasoReserva (misma más abajo, lado empresa): qué
+      // Espejo de _siguientesPasosReserva (más abajo, lado empresa): qué
       // le toca al CLIENTE, no a la empresa. Mismo criterio — solo se
       // sugiere lo que el sistema ya sabe pendiente (expediente 'solicitado',
       // tracking en el último paso, evidencia sin subir, calificación sin
@@ -353,36 +369,41 @@ async function renderReserv(append = false) {
         completar: `abrirEvidencias('${r.id}','evidencias_cliente')`,
         calificar: `openCalificar('${r.id}','${propId}','${escJs(nombreEmpresa)}')`,
       };
-      const sigCli = (() => {
+      // Array, no un solo paso: subir documentos y marcar completado no se
+      // esperan entre sí (ver _siguientesPasosReserva, lado empresa), así
+      // que pueden estar pendientes los dos a la vez.
+      const pasosCli = (() => {
         if (r.estado === 'Completada') {
-          return (!r.calificado && propId) ? {
+          return (!r.calificado && propId) ? [{
             clave: 'calificar', corto: 'Calificar servicio', accion: ACCION_CLI.calificar,
             detalle: 'El servicio ya se completó: califica cómo te fue.',
-          } : null;
+          }] : [];
         }
         if (r.estado === 'PorAprobar') {
-          return miEvidenciaCli ? null : {
+          return miEvidenciaCli ? [] : [{
             clave: 'completar', corto: 'Subir mi evidencia', accion: ACCION_CLI.completar,
             detalle: 'La empresa ya marcó el servicio como terminado: sube tu evidencia para que el superadmin apruebe el cierre.',
-          };
+          }];
         }
-        if (r.estado !== 'Activa') return null;
+        if (r.estado !== 'Activa') return [];
+        const pasos = [];
         // "solicitado" = la pelota está en tu cancha (ver expedientes.js).
-        if (r._expIngreso?.estado === 'solicitado') return {
+        if (r._expIngreso?.estado === 'solicitado') pasos.push({
           clave: 'puerto', corto: 'Subir docs de Puerto', accion: ACCION_CLI.puerto,
           detalle: 'La empresa pidió los documentos para entrar a puerto: súbelos para que el viaje no se atore.',
-        };
-        if (r._expVacios?.estado === 'solicitado') return {
+        });
+        if (r._expVacios?.estado === 'solicitado') pasos.push({
           clave: 'vacios', corto: 'Subir docs de Vacíos', accion: ACCION_CLI.vacios,
           detalle: 'La empresa pidió los documentos para entregar el contenedor vacío: súbelos antes de que corran las demoras.',
-        };
-        if (typeof _trackingEnUltimoPaso === 'function' && _trackingEnUltimoPaso(r)) return {
+        });
+        if (typeof _trackingEnUltimoPaso === 'function' && _trackingEnUltimoPaso(r)) pasos.push({
           clave: 'completar', corto: 'Marcar completado', accion: ACCION_CLI.completar,
           detalle: 'El seguimiento llegó al final: marca el servicio como completado.',
-        };
-        return null; // nada pendiente de tu lado — el envío sigue su curso
+        });
+        return pasos; // vacío = nada pendiente de tu lado — el envío sigue su curso
       })();
-      const nxCli = clave => (sigCli?.clave === clave ? ' reserv-next' : '');
+      const clavesPasosCli = pasosCli.map(p => p.clave);
+      const nxCli = clave => (clavesPasosCli.includes(clave) ? ' reserv-next' : '');
 
       const completarBtn = r.estado === 'Activa'
         ? `<button class="btn-completar-reserva${nxCli('completar')}" style="font-size:0.7rem" onclick="abrirEvidencias('${r.id}','evidencias_cliente')">✓ Marcar completado</button>`
@@ -406,8 +427,11 @@ async function renderReserv(append = false) {
       // checklist, disponible en cuanto hay match (la reservación existe).
       const numDocsCarga = r.documentos_carga?.length || 0;
       const cartaPorteBtn = `<button class="btn-edit" style="font-size:0.7rem" onclick="abrirDocumentosCarga('${r.id}')">📄 ${numDocsCarga ? `Documentos (${numDocsCarga})` : 'Carta Porte / documentos'}</button>`;
-      const expedientePills = typeof expedienteBotonesHTML === 'function' ? expedienteBotonesHTML(r, true, sigCli?.clave) : '';
+      const expedientePills = typeof expedienteBotonesHTML === 'function' ? expedienteBotonesHTML(r, true, clavesPasosCli) : '';
       const abierta = _reservAbiertas.has(r.id);
+      const chipsHTMLCli = pasosCli.map(p =>
+        `<button class="reserv-next-chip" title="Ir directo a este paso" onclick="${p.accion}">👉 ${esc(p.corto)}</button>`
+      ).join('');
       const grupo = (label, html) => html ? `
         <div class="reserv-detail-group">
           <span class="reserv-detail-group-label">${label}</span>
@@ -424,12 +448,12 @@ async function renderReserv(append = false) {
           <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
           ${trackBtn}
           ${pagoLbl}
-          ${sigCli ? `<button class="reserv-next-chip" title="Ir directo a este paso" onclick="${sigCli.accion}">👉 ${esc(sigCli.corto)}</button>` : ''}
+          ${chipsHTMLCli}
           <button id="reserv-toggle-${r.id}" class="reserv-toggle${abierta ? ' open' : ''}" aria-expanded="${abierta}" title="Más acciones" onclick="toggleReservDetalle('${r.id}')">▾</button>
         </div>
       </div>
       <div id="reserv-detalle-${r.id}" class="reserv-detail${abierta ? ' open' : ''}">
-        ${sigCli ? `<div class="reserv-next-hint"><span><strong>👉 Siguiente:</strong> ${esc(sigCli.detalle)}</span></div>` : ''}
+        ${pasosCli.length ? `<div class="reserv-next-hint">${pasosCli.map(p => `<span><strong>👉</strong> ${esc(p.detalle)}</span>`).join('')}</div>` : ''}
         ${grupo('Operación', gpsBtnCli)}
         ${grupo('Documentos', cartaPorteBtn + expedientePills)}
         ${grupo('Pago', precioLbl + pagarBtn)}
@@ -549,9 +573,12 @@ async function renderReserv(append = false) {
     let primaria = '';
     const gruposDetalle = [];
     const grupo = (label, html) => { if (html) gruposDetalle.push({ label, html }); };
-    // Guía de "qué sigue": resalta el botón que toca (clase reserv-next).
-    const sig = esDueno ? _siguientePasoReserva(r) : null;
-    const nx  = clave => (sig?.clave === clave ? ' reserv-next' : '');
+    // Guía de "qué sigue": resalta TODOS los botones pendientes a la vez
+    // (clase reserv-next), no solo el de mayor prioridad — ver
+    // _siguientesPasosReserva.
+    const pasos = esDueno ? _siguientesPasosReserva(r) : [];
+    const clavesPasos = pasos.map(p => p.clave);
+    const nx = clave => (clavesPasos.includes(clave) ? ' reserv-next' : '');
 
     if (esDueno && esPendiente) {
       primaria = `
@@ -562,7 +589,7 @@ async function renderReserv(append = false) {
       // El chofer ya no es obligatorio al ofertar: se asigna aquí, en
       // cualquier momento mientras el viaje sigue Activo. El tracking no
       // deja avanzar del primer paso sin uno asignado (ver tracking.js) —
-      // por eso, si falta, es lo primero que marca _siguientePasoReserva.
+      // por eso, si falta, es uno de los pasos que marca _siguientesPasosReserva.
       const esCamion = r.recurso_tipo === 'camion' || !r.recurso_tipo;
       const choferBtn = esCamion
         ? `<button class="btn-edit${nx('chofer')}" onclick="abrirAsignarChofer('${r.id}')" title="${r.operador_nombre ? 'Cambiar chofer' : 'Asignar chofer antes de iniciar el viaje'}">👷 ${r.operador_nombre ? esc(r.operador_nombre) : 'Asignar chofer'}</button>`
@@ -573,7 +600,7 @@ async function renderReserv(append = false) {
       const numDocsCargaDueno = r.documentos_carga?.length || 0;
       const docsCargaBtnDueno = `<button class="btn-edit" onclick="abrirDocumentosCarga('${r.id}')" title="Ver Carta Porte y documentos que subió el cliente">📄 ${numDocsCargaDueno ? `Documentos (${numDocsCargaDueno})` : 'Documentos del cliente'}</button>`;
       const expedientePillsActiva = typeof expedienteBotonesHTML === 'function'
-        ? expedienteBotonesHTML(r, r.cliente_user_id === currentUser.id, sig?.clave) : '';
+        ? expedienteBotonesHTML(r, r.cliente_user_id === currentUser.id, clavesPasos) : '';
       // Completar solo se habilita al llegar al último paso del seguimiento:
       // abrirEvidencias ya lo exigía, pero con un aviso de error DESPUÉS de
       // pulsar. Mejor que el botón lo diga desde antes.
@@ -627,16 +654,21 @@ async function renderReserv(append = false) {
     }
 
     const abierta = _reservAbiertas.has(r.id);
-    const hintHTML = (sig && gruposDetalle.length) ? `
+    // Una línea de "Siguiente" por paso pendiente, y la espera (si la hay) una
+    // sola vez al final — es el mismo dato en todos los pasos devueltos.
+    const hintHTML = (pasos.length && gruposDetalle.length) ? `
         <div class="reserv-next-hint">
-          <span><strong>👉 Siguiente:</strong> ${esc(sig.detalle)}</span>
-          ${sig.espera ? `<span class="reserv-next-espera">⏳ ${esc(sig.espera)}</span>` : ''}
+          ${pasos.map(p => `<span><strong>👉</strong> ${esc(p.detalle)}</span>`).join('')}
+          ${pasos[0].espera ? `<span class="reserv-next-espera">⏳ ${esc(pasos[0].espera)}</span>` : ''}
         </div>` : '';
     const detalleHTML = gruposDetalle.length ? hintHTML + gruposDetalle.map(g => `
         <div class="reserv-detail-group">
           <span class="reserv-detail-group-label">${g.label}</span>
           <div class="reserv-detail-group-btns">${g.html}</div>
         </div>`).join('') : '';
+    const chipsHTML = (pasos.length && detalleHTML) ? pasos.map(p =>
+      `<button class="reserv-next-chip" title="Ir directo a este paso" onclick="${p.accion}">👉 ${esc(p.corto)}</button>`
+    ).join('') : '';
 
     return `
     <div class="reserv-item">
@@ -649,7 +681,7 @@ async function renderReserv(append = false) {
       <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
         <span class="badge ${badgeCls}">${esc(_estadoLabel(r.estado))}</span>
         ${primaria}
-        ${(sig && detalleHTML) ? `<button class="reserv-next-chip" title="Ir directo a este paso" onclick="${sig.accion}">👉 ${esc(sig.corto)}</button>` : ''}
+        ${chipsHTML}
         ${detalleHTML ? `<button id="reserv-toggle-${r.id}" class="reserv-toggle${abierta ? ' open' : ''}" aria-expanded="${abierta}" title="Más acciones" onclick="toggleReservDetalle('${r.id}')">▾</button>` : ''}
       </div>
     </div>
