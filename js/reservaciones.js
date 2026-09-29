@@ -646,6 +646,13 @@ async function renderReserv(append = false) {
       const gpsBtn = `<button class="btn-edit" onclick="abrirGpsLink('${r.id}')" title="Link de GPS temporal">🛰️ GPS${r.gps_link ? ' ✓' : ''}</button>`;
       const numDocsCargaDueno = r.documentos_carga?.length || 0;
       const docsCargaBtnDueno = `<button class="btn-edit" onclick="abrirDocumentosCarga('${r.id}')" title="Ver Carta Porte y documentos que subió el cliente">📄 ${numDocsCargaDueno ? `Documentos (${numDocsCargaDueno})` : 'Documentos del cliente'}</button>`;
+      // Documento de referencia (no fiscal) armado con lo que ya se capturó
+      // en el pedido/unidad/operador — ver js/cartaporte.js. Solo del lado
+      // dueño: es quien puede leer completo todo lo que el documento junta
+      // (RLS le recorta esos mismos datos al cliente — ver el comentario en
+      // ese archivo).
+      const cartaPorteRefBtn = typeof generarCartaPorte === 'function'
+        ? `<button class="btn-edit" onclick="generarCartaPorte('${r.id}')" title="Documento de referencia — no es válido ante el SAT">🧾 Carta Porte (ref.)</button>` : '';
       const expedientePillsActiva = typeof expedienteBotonesHTML === 'function'
         ? expedienteBotonesHTML(r, r.cliente_user_id === currentUser.id, clavesPasos) : '';
       // Completar solo se habilita al llegar al último paso del seguimiento:
@@ -660,7 +667,7 @@ async function renderReserv(append = false) {
       primaria = `
         <button class="btn-edit${nx('avanzar')}" onclick="openTracking('${r.id}')" title="Ver seguimiento">📍 ${esc(trackStep)}</button>`;
       grupo('Operación', choferBtn + `<button class="btn-edit" onclick="abrirCambiarUnidad('${r.id}')" title="Reasignar a otra unidad (p. ej. si se descompuso)">🔧 Cambiar unidad</button>` + gpsBtn);
-      grupo('Documentos', docsCargaBtnDueno + expedientePillsActiva);
+      grupo('Documentos', docsCargaBtnDueno + expedientePillsActiva + cartaPorteRefBtn);
       // Avisos al cliente sin necesidad de chat: un aviso puntual (campana +
       // correo) en vez de un mensaje libre.
       grupo('Avisos', `<button class="btn-edit" onclick="confirmarLugarHora('${r.id}')" title="Pedirle al cliente que confirme lugar y hora">📍 Confirmar lugar y hora</button>` +
