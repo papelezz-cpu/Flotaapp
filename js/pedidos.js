@@ -1595,6 +1595,19 @@ async function crearPedido() {
     origen_lng:       esCamion ? (_mapaPuntos?.origen?.lng  ?? null) : null,
     destino_lat:      esCamion ? (_mapaPuntos?.destino?.lat ?? null) : null,
     destino_lng:      esCamion ? (_mapaPuntos?.destino?.lng ?? null) : null,
+    // Domicilio estructurado, gratis: js/mapa.js ya le pregunta a Nominatim
+    // por el punto marcado (para la etiqueta legible) y ahora también guarda
+    // el desglose que la misma respuesta trae — sin pedirle nada nuevo al
+    // cliente. Nominatim no siempre lo resuelve todo (zonas portuarias, por
+    // ejemplo): lo que falte queda nulo, nunca inventado.
+    origen_colonia:   esCamion ? (_mapaPuntos?.origen?.colonia  ?? null) : null,
+    origen_cp:        esCamion ? (_mapaPuntos?.origen?.cp       ?? null) : null,
+    origen_ciudad:    esCamion ? (_mapaPuntos?.origen?.ciudad   ?? null) : null,
+    origen_estado:    esCamion ? (_mapaPuntos?.origen?.estado   ?? null) : null,
+    destino_colonia:  esCamion ? (_mapaPuntos?.destino?.colonia ?? null) : null,
+    destino_cp:       esCamion ? (_mapaPuntos?.destino?.cp      ?? null) : null,
+    destino_ciudad:   esCamion ? (_mapaPuntos?.destino?.ciudad  ?? null) : null,
+    destino_estado:   esCamion ? (_mapaPuntos?.destino?.estado  ?? null) : null,
     capacidad_min:    esCamion ? vi('np-cap')    : null,
     tipo_carga:       esCamion ? v('np-carga')   : null,
     peso_carga:       esCamion ? vn('np-peso')   : null,
