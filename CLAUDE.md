@@ -307,7 +307,7 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
     ├── functions/
     │   ├── gestionar-usuario/   # Privileged user CRUD (superadmin only, service role key)
     │   └── enviar-notificacion/ # Email notifications
-    ├── migrations/         # 63 SQL migrations — the source of truth for schema, RLS,
+    ├── migrations/         # 93 SQL migrations — the source of truth for schema, RLS,
     │                       #   guard triggers and the business RPCs
     ├── aplicadas.tsv       # Migration ledger: which .sql ran against which project,
     │                       #   when, and the sha256 of the file at that moment. Written
@@ -492,7 +492,7 @@ Shared pattern: `propietario_id`, `estado` (`disponible`|`ocupado`|`no_disponibl
 **Helpers:** `is_superadmin()` (RLS), `mi_nombre()`, `tracking_pasos()`, `tabla_recurso()`, `es_servicio_camion()`, `recurso_tipo_de_servicio()`, `expire_stale_offers`, `check_reservacion_disponibilidad` (raises `RECURSO_NO_DISPONIBLE` / `P0001` on overlapping bookings — **`BEFORE`, so it fires before the `reservaciones_sin_solape` EXCLUDE is ever evaluated**; both compare `recurso_tipo` **and** `unidad` since 2026-09-25, and if you change one you must change the other, or the constraint silently stops matching what the user is told).
 **`updated_at` (H-19).** `trg_updated_at` → `set_updated_at()` on the ten tables with a state flow (pedidos, ofertas, reservaciones, perfiles, the four fleet tables, operadores, expedientes). Stamps **only when the row really changed** (`NEW IS DISTINCT FROM OLD`). **The name is load-bearing:** `BEFORE` triggers fire in alphabetical order and this one must run *after* the `trg_guard_*` — a guard can reject the update or revert `NEW`. A new `BEFORE` trigger starting with `v`…`z` would run after it; the migration's check fails if one appears. Queues still order by `created_at` — moving them is a separate client change.
 
-**Guard triggers — the transition police.** Beyond RLS (which decides *whether* you may write a row), these decide *which state changes are legal for you*: `trg_guard_perfil_self_update`, `trg_guard_reservacion_update`, `trg_guard_pedido_update`, `trg_guard_oferta_update`, `trg_guard_expediente_documento`, and one per fleet table (`camiones`, `custodios`, `patios`, `lavados`, `operadores`). They read `auth.uid()`, so **they still apply inside `SECURITY DEFINER` functions** — a bad transition rolls back the whole transaction.
+**Guard triggers — the transition police.** Beyond RLS (which decides *whether* you may write a row), these decide *which state changes are legal for you*: `trg_guard_perfil_self_update`, `trg_guard_perfil_insert` (since 2026-09-29, Q-01: a user can only create their own profile as `cliente`/`admin` + `pendiente`), `trg_guard_reservacion_update`, `trg_guard_pedido_update`, `trg_guard_oferta_update`, `trg_guard_expediente_documento`, and one per fleet table (`camiones`, `custodios`, `patios`, `lavados`, `operadores`). They read `auth.uid()`, so **they still apply inside `SECURITY DEFINER` functions** — a bad transition rolls back the whole transaction.
 
 All `SECURITY DEFINER` with pinned `search_path`, not callable via REST.
 
