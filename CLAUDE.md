@@ -156,6 +156,42 @@ Obligan a tocarlo: un estado nuevo o retirado, un permiso que cambia de rol, un 
 
 ---
 
+## 🛑 RULE #5 — NADA SE CONSTRUYE SIN LOS TRES ARCHIVOS MAESTROS DELANTE
+
+**Toda modificación y toda creación nueva —una función, una pantalla, una columna, una política, una migración, un botón— se diseña contra los tres archivos maestros, abiertos, antes de escribir una línea.** No de memoria y no «según recuerdo del código».
+
+| Archivo | Qué decide | Qué pasa si no se lee |
+|---|---|---|
+| **`CLAUDE.md`** (este) | Qué está prohibido, qué exige permiso explícito, cómo se despliega, qué convenciones son obligatorias | Se borra algo sin autorización, se toca producción sin permiso, o se despliega sin subir `?v=` y el usuario prueba el fichero viejo |
+| **[`docs/FLUJO-OPERATIVO.md`](docs/FLUJO-OPERATIVO.md)** | Qué hace el sistema: qué rol ejecuta, en qué estado está la fila y a cuál pasa, qué guard vigila la transición, y qué ya está decidido como hueco conocido | Se inventa un estado, un botón o un permiso; se propone «arreglar» algo que es una decisión tomada; se rompe una precedencia que está escrita porque el orden inverso falla |
+| **[`docs/AUDITORIA.md`](docs/AUDITORIA.md)** | Qué ya se rompió antes en este sistema, qué sigue abierto, qué está revisado y correcto, y qué regla concreta evita repetir cada fallo | Se reintroduce un fallo ya pagado, se «arregla» algo que estaba bien a propósito, o se reporta como hallazgo nuevo algo que lleva un mes con decisión tomada |
+
+### El orden de autoridad
+
+**`CLAUDE.md` manda sobre los otros dos.** Y sobre los tres manda el código:
+**si un documento y el código se contradicen, gana el código** — y el documento se corrige en el mismo commit, nunca al revés.
+
+### Las cuatro preguntas, antes de proponer nada
+
+1. **¿Qué rol lo ejecuta, en qué estado, y qué guard vigila esa transición?** → `FLUJO-OPERATIVO.md`. Casi nunca lo decide la interfaz.
+2. **¿Esto ya se rompió antes?** → `docs/AUDITORIA.md` §3 (abierto) y §8 (índice de hallazgos). Si está ahí, **no es un hallazgo nuevo**: es uno conocido, y se propone en vez de arreglarlo por iniciativa propia.
+3. **¿Está en la lista de lo que no se toca?** → `docs/AUDITORIA.md` §5. Cada entrada de esa lista costó una auditoría averiguar por qué está así; cambiarla es una regresión, no una mejora.
+4. **¿Qué reglas del §4 de la auditoría aplican a lo que voy a escribir?** Hay reglas para migraciones, permisos y RLS, consultas, código de cliente, estados, pruebas, despliegue y datos personales. **Si la respuesta es «ninguna», es casi seguro que no se leyeron.**
+
+### Después de cambiar, los tres se actualizan en el mismo commit
+
+No después, no en una tarea aparte. Obligan a tocarlos:
+
+- **`FLUJO-OPERATIVO.md`** — un estado nuevo o retirado, un permiso que cambia de rol, un guard nuevo o modificado, un paso que se añade o se salta, una pantalla que aparece o muere, y cualquier decisión de negocio tomada en una conversación.
+- **`docs/AUDITORIA.md`** — un hallazgo que se cierra, un defecto nuevo, una regla nueva, y **cualquier afirmación de ese archivo que resulte falsa al medirla**.
+- **`CLAUDE.md`** — cuando algo de lo que afirma deja de ser cierto. **Este es el que más se ha quedado atrás en silencio**, y es el peor sitio donde puede pasar porque va siempre en contexto y por eso se cree: ha afirmado que ninguna RPC se usaba, que tres tablas se repintaban por Realtime, que ambas partes tenían que subir evidencia, que `renderPedidos()` seguía escribiendo y que tres ficheros faltaban del `SHELL` del service worker. Las cinco eran falsas cuando se leyeron.
+
+### Por qué existe esta regla
+
+Porque el objetivo de los tres archivos juntos es **que un cambio nuevo no traiga un fallo viejo**. Las cuatro auditorías de este proyecto encontraron 97 hallazgos numerados, y **23 defectos más que ninguna de ellas vio**: aparecieron al arreglar otra cosa. La mitad de esos 23 son un fallo reintroducido, un arreglo peor que el defecto, o una comprobación que no podía fallar. Todos estaban a una lectura de distancia.
+
+---
+
 ## Project Overview
 
 **PortGo** is a PWA logistics platform for port transport services built as a fully client-side app with Supabase as the backend (PostgreSQL + Auth + Realtime + Storage).
@@ -256,7 +292,16 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
 ├── terminos.html           # Términos y condiciones (static)
 ├── css/                    # base → layout → components → login → detalle → theme (load order matters)
 ├── js/                     # Classic scripts, global scope, order defined in app.html (30 files)
+├── docs/FLUJO-OPERATIVO.md # Master file #2 (Rule #4/#5): what the system does, by role,
+│                       #   state and guard. Plus the 14 known gaps, with their decision
+├── docs/AUDITORIA.md       # Master file #3 (Rule #5): the four audits consolidated —
+│                       #   what is still open, what must NOT be touched, and the
+│                       #   construction rules each finding produced
 ├── docs/CONTRATO-MOVIL.md  # Backend contract for the native iOS/Android clients
+├── Auditoriabd.md          # The 25-section brief the 4th audit answered (template for a 5th)
+├── auditoria-2.md          # 2nd audit, 2026-08-28 — the only one with EXPLAIN / pg_stat_statements
+├── auditoria-3.md          # 3rd audit, 2026-09-11 — whole web platform
+├── security-findings.md    # 1st audit, 2026-08-24 — authorized pentest, exercised
 ├── android/                # Native Android client (separate from the PWA)
 └── supabase/
     ├── functions/
@@ -322,7 +367,9 @@ No state library. Globals refreshed via Supabase queries: `currentUser` (auth.js
 
 **Realtime re-renders the active view — but only for six tables, and this line used to name three that do not work.** `main.js` subscribes to eight (`camiones`, `custodios`, `patios`, `lavados`, `reservaciones`, `notificaciones`, `pedidos`, `ofertas`), and production's `supabase_realtime` publication carries six: the fleet four, `reservaciones` and `notificaciones`. **`pedidos` and `ofertas` are not published, so those two subscriptions have never fired** and the Solicitudes list does not refresh live. There is no `mensajes` subscription at all.
 
-That exclusion is **deliberate and decided** (2026-08-28, migration `20260828120000_publicacion_realtime_declarativa.sql`), not drift: `renderPedidos()` issues up to four `UPDATE`s on `pedidos` as a side effect of drawing the list, so publishing the table would wake every connected browser, each would write, and each write would emit more events — a feedback loop. **The precondition is not the pg_cron migration — that one is applied.** It is taking the five writes *out of the render*, which has not happened: adding the cron duplicated the work instead of moving it (hueco 4). Measured again on 2026-09-25: `renderPedidos()` still writes. See hueco 14 in [docs/FLUJO-OPERATIVO.md](docs/FLUJO-OPERATIVO.md).
+That exclusion is **deliberate and decided** (2026-08-28, migration `20260828120000_publicacion_realtime_declarativa.sql`), not drift: `renderPedidos()` *used to* issue five `UPDATE`s as a side effect of drawing the list, so publishing the table would wake every connected browser, each would write, and each write would emit more events — a feedback loop.
+
+**Both preconditions are now met, and this paragraph claimed otherwise until 2026-09-28.** The pg_cron migration is applied, and the five writes came **out of the render on 2026-09-25** (verified again 2026-09-28: `renderPedidos()` executes no `update`/`insert`/`delete`). Publishing `pedidos`/`ofertas` still isn't worth it, but for a different reason: `aprobarSolicitud()` already notifies only the companies with fleet of that type, `notificaciones` *is* published, and tapping the notice re-renders the view — the bell covers the case better than broadcasting to every session. See hueco 14 in [docs/FLUJO-OPERATIVO.md](docs/FLUJO-OPERATIVO.md) and `H-16` in [docs/AUDITORIA.md](docs/AUDITORIA.md).
 
 ### Auth & Roles
 
@@ -483,7 +530,7 @@ Deploy with `mcp__supabase__deploy_edge_function` (or `supabase functions deploy
 ## PWA / Service Worker
 
 - `sw.js`: **network-first** for JS/CSS/HTML and for Supabase REST GETs (falls back to cache only when actually offline — a prior stale-while-revalidate strategy for REST GETs always served last-known data first, so the app looked "one step behind" until a second refresh; don't reintroduce it), network-only for auth/realtime/Edge Functions, cache-first for images.
-- New static assets → add to the `SHELL` list in `sw.js`. ⚠️ `js/detalle.js`, `js/notificaciones.js` and `css/detalle.css` are currently **missing** from `SHELL` — they load fine online (network-first) but are absent from the offline shell.
+- New static assets → add to the `SHELL` list in `sw.js`. ⚠️ This line said `js/detalle.js`, `js/notificaciones.js` and `css/detalle.css` were **missing** from `SHELL` until 2026-09-28; measured that day, the three are there (`sw.js:18,25,26`). It was `A3-B1`, and it is closed.
 - Bumping `CACHE` (`portgo-vXX`) purges all old caches on activate — required on every deploy.
 - `app.html` also loads **Leaflet 1.9.4 from unpkg** (CSS + JS) for the map picker — the only runtime CDN dependency besides the Supabase SDK. It is not in `SHELL`, so the map needs connectivity; `abrirMapa()` degrades with a toast when `L` is undefined.
 

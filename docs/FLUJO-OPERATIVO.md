@@ -1502,3 +1502,15 @@ Cada afirmación de aquí sale de un `CHECK`, una política, un guard o una lín
 concreta. Al añadir algo, decir de dónde sale; si no se pudo verificar,
 decirlo también. Una frase sin respaldo envenena el resto: si una es de
 memoria, ninguna es fiable.
+
+**Y este documento es uno de tres.** La Regla #5 de [`CLAUDE.md`](../CLAUDE.md)
+los fija: `CLAUDE.md` dice qué está prohibido y qué exige permiso, este archivo
+dice qué hace el sistema, y [`docs/AUDITORIA.md`](AUDITORIA.md) dice qué ya se
+rompió antes, qué sigue abierto y qué no se debe tocar. Los tres se leen antes
+de construir y los tres se actualizan en el mismo commit.
+
+Los **huecos conocidos** de aquí y los **hallazgos abiertos** de la auditoría no
+son la misma lista y conviene no confundirlas: un hueco es una cosa verificada
+**con decisión tomada de dejarla así**; un hallazgo abierto es trabajo sin hacer.
+Lo que está en los huecos no se reporta como defecto nuevo. Cuando un hueco se
+cierra, se marca aquí y se refleja allí.
