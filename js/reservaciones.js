@@ -154,9 +154,9 @@ let _reservAccum  = [];
 // es determinista, así que se puede expresar en SQL — y el índice parcial
 // idx_reservaciones_cobro (pagado, fecha_vencimiento_pago) WHERE
 // estado='Completada' la cubre exactamente.
-function _filtroReservaSQL(q) {
+function _filtroReservaSQL(q, filtro = _reservFiltro) {
   const hoy = today();
-  switch (_reservFiltro) {
+  switch (filtro) {
     case 'todas':
       return q;
     case 'Cancelada':
@@ -169,8 +169,41 @@ function _filtroReservaSQL(q) {
       return q.eq('estado', 'Completada').eq('pagado', false)
               .lt('fecha_vencimiento_pago', hoy);
     default:
-      return q.eq('estado', _reservFiltro);
+      return q.eq('estado', filtro);
   }
+}
+
+// ── BADGES DE LAS PILLS ────────────────────────────────
+// Cuántas reservaciones hay en cada pill, para que no haya que hacer clic en
+// cada una para enterarse — mismo problema que resuelve el chip "siguiente
+// paso" dentro de la fila, un nivel arriba: si la pestaña por defecto
+// ("Activas") está vacía, nada avisaba que "Por aprobar" tenía algo
+// esperando. Reutiliza _filtroReservaSQL, así que el número nunca puede
+// decir algo distinto de lo que se ve al hacer clic (R-05: un globo que
+// cuenta distinto de lo que la pantalla lista es peor que no tener globo).
+//
+// Solo estas tres: son las que de verdad significan "algo pendiente".
+// 'Pendiente' se queda fuera a propósito — es un estado inalcanzable hoy
+// (hueco 6, docs/FLUJO-OPERATIVO.md), badgearlo siempre mostraría 0.
+const _RESERV_PILLS_BADGE = ['PorAprobar', 'CancelacionSolicitada', 'Vencido'];
+
+async function actualizarBadgesPillsReserv() {
+  if (!currentUser?.id) return;
+  await Promise.all(_RESERV_PILLS_BADGE.map(async filtro => {
+    const el = document.querySelector(`#reserv-filtros-bar .ped-filtro-pill[data-rest="${filtro}"] .pill-count`);
+    if (!el) return;
+    let q = sb.from('reservaciones').select('id', { count: 'exact', head: true });
+    if (currentUser.rol === 'cliente')    q = q.eq('cliente_user_id', currentUser.id);
+    else if (currentUser.rol === 'admin') q = q.eq('propietario_id', currentUser.id);
+    q = _filtroReservaSQL(q, filtro);
+    const { count } = await q;
+    if (count > 0) {
+      el.textContent = count > 99 ? '99+' : count;
+      el.style.display = 'inline-flex';
+    } else {
+      el.style.display = 'none';
+    }
+  }));
 }
 
 function filtrarReservas(est) {
@@ -211,6 +244,8 @@ async function renderReserv(append = false) {
   // Sincronizar las pills con el filtro activo (p. ej. al llegar desde el home)
   document.querySelectorAll('#reserv-filtros-bar .ped-filtro-pill').forEach(el =>
     el.classList.toggle('active', el.dataset.rest === _reservFiltro));
+  // No se espera: son 3 COUNT aparte y no deben retrasar la lista principal.
+  actualizarBadgesPillsReserv();
 
   // Sin sesión
   if (!currentUser.id) {

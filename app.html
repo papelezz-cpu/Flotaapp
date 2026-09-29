@@ -28,7 +28,7 @@
   <!-- Estilos -->
   <link rel="stylesheet" href="css/base.css?v=8">
   <link rel="stylesheet" href="css/layout.css?v=4">
-  <link rel="stylesheet" href="css/components.css?v=38">
+  <link rel="stylesheet" href="css/components.css?v=39">
   <!-- Mapa para marcar origen y destino. Leaflet + OpenStreetMap: sin API key
        ni facturación, y ya usamos Nominatim (mismo proyecto) para geocodificar. -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -148,12 +148,12 @@
       <div class="ped-filtro-pills">
         <button class="ped-filtro-pill active" data-rest="Activa"     onclick="filtrarReservas('Activa')">Activas</button>
         <button class="ped-filtro-pill"        data-rest="Pendiente"  onclick="filtrarReservas('Pendiente')">Pendientes</button>
-        <button class="ped-filtro-pill"        data-rest="PorAprobar" onclick="filtrarReservas('PorAprobar')">Por aprobar</button>
+        <button class="ped-filtro-pill"        data-rest="PorAprobar" onclick="filtrarReservas('PorAprobar')">Por aprobar<span class="pill-count"></span></button>
         <button class="ped-filtro-pill"        data-rest="Completada" onclick="filtrarReservas('Completada')">Completadas</button>
         <button class="ped-filtro-pill"        data-rest="Cancelada"  onclick="filtrarReservas('Cancelada')">Canceladas</button>
-        <button class="ped-filtro-pill"        data-rest="CancelacionSolicitada" onclick="filtrarReservas('CancelacionSolicitada')">Cancelación en revisión</button>
+        <button class="ped-filtro-pill"        data-rest="CancelacionSolicitada" onclick="filtrarReservas('CancelacionSolicitada')">Cancelación en revisión<span class="pill-count"></span></button>
         <button class="ped-filtro-pill"        data-rest="PorCobrar"  onclick="filtrarReservas('PorCobrar')">Por cobrar</button>
-        <button class="ped-filtro-pill pill-alerta" data-rest="Vencido" onclick="filtrarReservas('Vencido')">Pago vencido</button>
+        <button class="ped-filtro-pill pill-alerta" data-rest="Vencido" onclick="filtrarReservas('Vencido')">Pago vencido<span class="pill-count"></span></button>
         <button class="ped-filtro-pill"        data-rest="todas"      onclick="filtrarReservas('todas')">Todas</button>
       </div>
     </div>
@@ -2712,10 +2712,10 @@
 <script src="js/config.js?v=13"></script>
 <script src="js/auth.js?v=24"></script>
 <script src="js/theme.js?v=11"></script>
-<script src="js/views.js?v=34"></script>
+<script src="js/views.js?v=35"></script>
 <script src="js/camiones.js?v=13"></script>
 <script src="js/recursos.js?v=13"></script>
-<script src="js/reservaciones.js?v=61"></script>
+<script src="js/reservaciones.js?v=62"></script>
 <script src="js/modal.js?v=14"></script>
 <script src="js/mapa.js?v=4"></script>
 <script src="js/expedientes.js?v=11"></script>

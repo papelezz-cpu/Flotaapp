@@ -1850,6 +1850,18 @@ body.light .cobro-pagado    { color: #15803d; }
 .ped-filtro-pill.pill-alerta { color: var(--danger); border-color: rgba(239,68,68,0.35); }
 .ped-filtro-pill.pill-alerta.active { background: var(--danger); border-color: var(--danger); color: #fff; }
 
+/* Cuántas reservaciones hay en esa pill — oculto hasta que JS pone un
+   número (ver actualizarBadgesPillsReserv). Mismo estilo que .notif-badge,
+   pero inline junto al texto en vez de flotando en una esquina. */
+.pill-count {
+  display: none; align-items: center; justify-content: center;
+  min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 9px; font-size: 0.66rem; font-weight: 700;
+  background: #ef4444; color: #fff; font-family: 'Syne', sans-serif;
+}
+.ped-filtro-pill.pill-alerta .pill-count { background: #fff; color: var(--danger); }
+.ped-filtro-pill.pill-alerta.active .pill-count { background: #fff; color: var(--danger); }
+
 /* ── SOLICITUDES FRECUENTES (plantillas del cliente) ──── */
 .plant-titulo {
   font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;

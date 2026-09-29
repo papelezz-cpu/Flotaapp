@@ -170,7 +170,26 @@ async function actualizarBadgeReservas() {
   // Por cliente_user_id, no por correo: ver el comentario en renderReserv().
   if (currentUser.rol === 'cliente')   q = q.eq('cliente_user_id', currentUser.id);
   else if (currentUser.rol === 'admin') q = q.eq('propietario_id', currentUser.id);
-  const { count } = await q;
+  const { count: activas } = await q;
+
+  // 'PorAprobar' donde a MÍ me falta subir mi evidencia — no todas: si ya la
+  // subí, lo que sigue es que el superadmin apruebe, y eso no es una acción
+  // mía pendiente. El superadmin no suma aquí por lo mismo desde el otro
+  // lado: esa cola ya está en su propia tarjeta «Por aprobar»
+  // (cola_superadmin, ver _loadAprBadge) — sumarla aquí también contaría lo
+  // mismo dos veces en dos tarjetas distintas.
+  let pendientesEvidencia = 0;
+  if (currentUser.rol === 'cliente' || currentUser.rol === 'admin') {
+    const campo = currentUser.rol === 'cliente' ? 'evidencias_cliente' : 'evidencias';
+    let qAprobar = sb.from('reservaciones').select(campo).eq('estado', 'PorAprobar');
+    qAprobar = currentUser.rol === 'cliente'
+      ? qAprobar.eq('cliente_user_id', currentUser.id)
+      : qAprobar.eq('propietario_id', currentUser.id);
+    const { data } = await qAprobar;
+    pendientesEvidencia = (data || []).filter(r => !r[campo]?.length).length;
+  }
+
+  const count = (activas || 0) + pendientesEvidencia;
   if (count > 0) {
     badge.textContent = count > 99 ? '99+' : count;
     badge.style.display = 'inline-block';
