@@ -47,15 +47,14 @@ async function renderCatalogo() {
     sb.from('custodios_publico').select('id, tipo, estado, propietario_id').in('propietario_id', ids),
     sb.from('patios_publico'   ).select('id, tipo, estado, propietario_id').in('propietario_id', ids),
     sb.from('lavados_publico'  ).select('id, tipos_vehiculo, tipos_lavado, estado, propietario_id').in('propietario_id', ids),
-    sb.from('calificaciones').select('admin_id, rating, comentario, created_at').in('admin_id', ids).order('created_at', { ascending: false }),
+    // Q-09 (2026-09-30): solo total y promedio, calculados en la base. Antes se
+    // bajaban todas las calificaciones —con sus comentarios— para contarlas.
+    // Los comentarios se piden al abrir «Ver reseñas» (openVerCalificaciones).
+    sb.from('calificaciones_resumen').select('admin_id, total, promedio').in('admin_id', ids),
   ]);
 
-  // Agrupar calificaciones por empresa
   const califMap = {};
-  (califs || []).forEach(c => {
-    if (!califMap[c.admin_id]) califMap[c.admin_id] = [];
-    califMap[c.admin_id].push(c);
-  });
+  (califs || []).forEach(c => { califMap[c.admin_id] = c; });
 
   const empresas = perfiles.map(p => ({
     ...p,
@@ -63,7 +62,8 @@ async function renderCatalogo() {
     custodios: (custodios || []).filter(r => r.propietario_id === p.user_id),
     patios:    (patios    || []).filter(r => r.propietario_id === p.user_id),
     lavados:   (lavados   || []).filter(r => r.propietario_id === p.user_id),
-    califs:    califMap[p.user_id] || [],
+    calTotal:  califMap[p.user_id]?.total || 0,
+    calProm:   Number(califMap[p.user_id]?.promedio) || 0,
   })).filter(e =>
     e.camiones.length + e.custodios.length + e.patios.length + e.lavados.length > 0
   );
@@ -105,8 +105,8 @@ function _empresaCardHTML(e) {
   ).join('');
 
   // Rating promedio
-  const numCal = e.califs.length;
-  const avg    = numCal ? (e.califs.reduce((s, c) => s + c.rating, 0) / numCal) : 0;
+  const numCal = e.calTotal;
+  const avg    = numCal ? e.calProm : 0;
   const avgStr = avg.toFixed(1);
   const stars  = numCal
     ? `<div class="emp-rating">
@@ -191,7 +191,7 @@ function _tieneFicha(e) {
             e.permiso_sct  ||
             e.fecha_vencimiento_permiso_sct || e.fecha_vencimiento_seguro_rc ||
             e.fecha_vencimiento_seguro_carga ||
-            e.anos_operacion || e.num_unidades || e.califs?.length);
+            e.anos_operacion || e.num_unidades || e.calTotal);
 }
 
 // ─── Bloque genérico (camiones / custodios / patios) ────
