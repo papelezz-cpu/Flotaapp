@@ -98,7 +98,7 @@ Reservaciones · Mis pagos · Privacidad · Avisos.
   unen con nada, solo se recuperan enteros para rellenar el formulario. Las 49
   columnas siguen en la tabla, sin que nadie las escriba, como red para revertir.
 - Ver el Catálogo de empresas y la ficha pública de cada una.
-- Aceptar una oferta, o **contraofertar** un precio menor (máximo 2 rondas).
+- Aceptar una oferta, o **contraofertar** un precio menor. Sin tope de rondas desde Q-14 (decidido 2026-09-29; ver §4): lo acota la caducidad de la oferta.
 - Subir los documentos que le pida un expediente de viaje.
 - Subir su propia evidencia de cierre, y **pedir** el cierre del servicio.
 - **Solicitar** la cancelación — pedir, no cancelar.
@@ -212,6 +212,11 @@ encerrado:
   (`pendiente_acuerdo`). Sin esto, esa empresa no podría cerrar nada.
 - **Gestionar usuarios** con la Edge Function `gestionar-usuario`, que verifica
   el rol en el servidor y usa la clave de servicio.
+  **Una empresa con flota no se borra: se suspende** (🚫 en «Usuarios»). Decisión
+  del usuario, 2026-09-30 (Q-07): `propietario_id` es obligatorio desde el
+  24/09 y sus FK siguen `ON DELETE SET NULL`, así que el borrado fallaría entero;
+  `gestionar-usuario` lo comprueba antes y responde cuántas unidades tiene y que
+  la suspenda. Las FK no se tocan. *(En producción y en pruebas desde el 30/09: v17 y v11, mismo paquete.)*
 
 **Lo que NO hace, y conviene tener claro:** no aprueba acuerdos. Desde el
 2026-09-09, cuando las dos partes aceptan, la reserva se crea sola.
@@ -263,7 +268,7 @@ Salen de los `CHECK` de la base. Si un estado no está aquí, no existe.
 `expirado`
 
 **`ofertas.estado`** — `enviada` · `contra_oferta` · `aceptada` · `rechazada`
-（`ronda` solo admite 1 o 2)
+（`ronda` ≥ 1 desde `20260929191000` (Q-14); hasta que esa migración se aplique en una base, allí solo admite 1 o 2)
 
 **`reservaciones.estado`** — `Pendiente` · `Activa` · `PorAprobar` ·
 `CancelacionSolicitada` · `Completada` · `Cancelada` · `Rechazada`
@@ -547,8 +552,29 @@ Deciden qué campos pide el formulario, y de eso dependen cosas más abajo:
 
 ```
 EMPRESA oferta           → ofertas('enviada'), pedido → 'en_negociacion'
-CLIENTE contraoferta     → 'contra_oferta'  (máximo 2 rondas)
+CLIENTE contraoferta     → 'contra_oferta', ronda + 1
+EMPRESA recontraoferta   → 'enviada' con precio nuevo, ronda + 1   (sin tope; ver Q-14)
 ```
+
+**Sin tope de rondas (Q-14, decidido por el usuario el 2026-09-29).** Cliente y
+empresa pueden contraofertarse las veces que quieran; cada vuelta suma 1 a
+`ronda`. Lo único que acota la negociación es la caducidad: ninguna
+contraoferta renueva `expira_en`, así que todo se cierra en los 2 días desde
+la oferta o `sincronizar_estados_pedidos()` la vence.
+
+Antes el máximo era 2 y el «↩ Contraofertar» de la empresa tras la contraoferta
+del cliente calculaba ronda 3 contra un CHECK de 1-2: fallaba siempre, también
+en producción. **Estado:** `20260929191000_ofertas_rondas_sin_tope.sql` (CHECK
+`ronda >= 1` y `responder_oferta()` con `ronda + 1`) y el cambio de
+`enviarContraoferta()` están en `dev`; la migración, **aplicada en pruebas el 29/09 23:19 UTC y en
+producción todavía no**. La migración va primero: con el código nuevo y el CHECK viejo, la tercera vuelta sigue
+fallando.
+
+**El globo de «Solicitudes» de la empresa no cuenta contraofertas.** Cuenta las
+solicitudes abiertas donde todavía no tiene oferta activa —trabajo nuevo que
+puede ofertar— con `pedidos_disponibles_para_mi()` (`js/views.js`,
+`actualizarBadgePedidos`). Una contraoferta del cliente sobre una oferta que ya
+existe le llega por la campana, no por el globo. Es el diseño, no un fallo.
 
 `ofertas.expira_en` son 2 días por defecto. El cron `expire-stale-offers` corre
 cada hora y marca `rechazada` las vencidas.
@@ -1055,16 +1081,18 @@ escribir una fila; los guards deciden *qué transición* es legal para ti.
 | Guard | Sobre | Qué impide |
 |---|---|---|
 | `guard_pedido_update` | pedidos | Que un cliente marque `acordado`/`rechazado` sin pasar por el flujo; que un admin toque un pedido fuera de negociación |
+| *(sin guard: REVOKE)* | pedidos | **Escrito en `dev` el 2026-09-30 (`20260930130000`, Q-06); en producción y en pruebas desde el 30/09 (producción 20:32 UTC).** Nadie borra pedidos: ni el cliente (que podía hacerlo por la API en cualquier estado) ni el superadmin (el botón «🗑 Eliminar» se retira). Lo que se quiera quitar de la vista se archivará, con una función aparte que todavía no existe |
 | `guard_oferta_update` | ofertas | Aceptar con documentos de empresa vencidos; **aceptar un pedido de carga peligrosa con una unidad sin permiso hazmat vigente**; aceptar la oferta propia salvo respondiendo una contraoferta |
-| `guard_oferta_insert` | ofertas | **Escrito en `dev` el 2026-09-29 (`20260929160000`, Q-04); aplicado en pruebas el 29/09 21:50 UTC, en producción todavía no.** Que una empresa cree una oferta que no sea `enviada` en ronda 1 sin contraoferta, con caducidad de más de 2 días, o sobre un pedido que no esté `abierto`/`en_negociacion`. La ronda 2 y la contraoferta siguen siendo UPDATE sobre la oferta existente |
-| *(sin guard: REVOKE)* | calificaciones | **Escrito en `dev` el 2026-09-29 (`20260929150000`, Q-03); aplicado en pruebas el 29/09 21:47 UTC, en producción todavía no.** `authenticated` pierde el INSERT directo: se califica solo por `calificar_servicio()`, que ya es lo único que usa la web |
-| `guard_reservacion_insert` | reservaciones | Que un cliente se cree una reserva ya confirmada y con precio puesto por él |
+| `guard_oferta_insert` | ofertas | **En producción y en pruebas desde el 2026-09-29** (`20260929160000`, Q-04; producción 23:48 UTC). Que una empresa cree una oferta que no sea `enviada` en ronda 1 sin contraoferta, con caducidad de más de 2 días, o sobre un pedido que no esté `abierto`/`en_negociacion`. La ronda 2 y la contraoferta siguen siendo UPDATE sobre la oferta existente |
+| *(sin guard: REVOKE)* | calificaciones | **En producción y en pruebas desde el 2026-09-29** (`20260929150000`, Q-03; producción 23:48 UTC). `authenticated` pierde el INSERT directo: se califica solo por `calificar_servicio()`, que ya es lo único que usa la web |
+| `guard_reservacion_insert` | reservaciones | Que un cliente se cree una reserva ya confirmada y con precio puesto por él. **Y, desde `20260930120000` (Q-05; en producción y en pruebas desde el 30/09, producción 17:22 UTC), que una empresa cree reservaciones:** hasta ahora podía crearlas en cualquier estado, con cualquier precio y a nombre de cualquier cliente. La reservación de un acuerdo nace solo en `cerrar_acuerdo()` (marca `portgo.cierre_acuerdo`), también cuando acepta la empresa; el cliente sigue pudiendo agendar desde el catálogo (`Pendiente`, sin precio) |
 | `guard_reservacion_update` | reservaciones | Que el cliente toque precio, unidad o fechas; que suba la evidencia de la empresa; que cualquiera de los dos apruebe su propio cierre o resuelva su propia cancelación — eso lo hace el superadmin |
 | `guard_fleet_resource_update` | flota | Auto-aprobarse un recurso; transferir la propiedad |
-| `guard_fleet_resource_insert` | flota (las cinco tablas) | **Escrito en `dev` el 2026-09-29 (`20260929140000`, Q-02); aplicado en pruebas el 29/09 21:46 UTC, en producción todavía no.** Que una empresa cree un recurso ya `aprobada` (o `rechazada`): nace `pendiente` salvo que lo cree el superadmin. La misma migración pone `DEFAULT 'pendiente'` en `camiones`, `custodios` y `patios`, que nacían aprobados por omisión |
+| `guard_fleet_resource_insert` | flota (las cinco tablas) | **En producción y en pruebas desde el 2026-09-29** (`20260929140000`, Q-02; producción 23:48 UTC). Que una empresa cree un recurso ya `aprobada` (o `rechazada`): nace `pendiente` salvo que lo cree el superadmin. La misma migración pone `DEFAULT 'pendiente'` en `camiones`, `custodios` y `patios`, que nacían aprobados por omisión |
 | `guard_perfil_self_update` | perfiles | Cambiarse el rol, el estado de aprobación de la cuenta o los campos de verificación. **Se dispara en toda actualización de `perfiles`, no solo en la propia** — ver abajo |
 | `guard_perfil_insert` | perfiles | **En producción y en pruebas desde el 2026-09-29** (`20260929130000`, Q-01). Que un usuario final cree su propio perfil con otro rol que `cliente`/`admin`, sin `aprobacion_cuenta = 'pendiente'`, verificado o con seguros/permiso SCT acreditados — las mismas columnas que el guard de UPDATE, al nacer. `auth.uid()` NULL (clave de servicio de `gestionar-usuario`, postgres) pasa |
 | `guard_expediente_documento` | expediente_documentos | Que cada parte haga el trabajo de la otra: **solo el cliente sube**, **solo el transportista revisa** |
+| *(sin guard: REVOKE)* | expediente_documentos | **Escrito en `dev` el 2026-09-30 (`20260930140000`, Q-06); en producción y en pruebas desde el 30/09 (producción 20:32 UTC).** Que cualquiera de las dos partes inserte o borre renglones de la lista de documentos: el guard de arriba solo vigila UPDATE. Los renglones nacen únicamente en `abrir_expediente()`, copiados de `documentos_catalogo`; subir, aprobar y rechazar siguen siendo UPDATE |
 | `guard_expediente_update` | expedientes | Que el cliente cierre el expediente, reporte incidentes o fije los datos de vacíos. Del `estado`, al cliente solo le deja disparar `solicitado`→`en_revision`, y repite la cuenta de documentos obligatorios contra la base antes de dejarlo pasar — no se fía del cálculo que ya hizo el navegador |
 | `guard_operador_hazmat` | ofertas, reservaciones | Asignar a carga peligrosa un chofer sin licencia vigente |
 
@@ -1227,6 +1255,14 @@ sincronización de estados por cron.
 
 Ninguna es un fallo; todas confunden si no se saben.
 
+- **Los globos del Inicio se calculan al pintar el Inicio, no en vivo.** Se
+  recalculan al entrar, al recargar y al volver con «← Inicio»; una reservación
+  creada mientras estás en otra vista no los mueve hasta entonces. La lista de
+  «Reservaciones», en cambio, sí se refresca por Realtime mientras está abierta.
+  Y el globo de «Reservaciones» no es lo mismo que la pestaña «Activas»: cuenta
+  las `Activa` **más** las `PorAprobar` donde te falta subir tu evidencia
+  (`actualizarBadgeReservas`, `js/views.js`). Medido el 2026-09-30: cuadró con
+  la base en las dos cuentas de la prueba.
 - **Los botones de acción viven detrás del `▾`** de cada fila de reservación.
   Los grupos *Documentos*, *Avisos* y *Cierre* no se dibujan si está plegada.
 - **Las pastillas de filtro se traducen a un `WHERE estado = …`**, así que al

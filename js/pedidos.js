@@ -799,10 +799,10 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
         : ''}`;
   }
 
-  // Superadmin puede eliminar cualquier pedido
-  const btnEliminar = currentUser.rol === 'superadmin'
-    ? `<button class="btn-edit btn-rechazar" style="font-size:0.72rem" onclick="eliminarPedido('${p.id}')">🗑 Eliminar</button>`
-    : '';
+  // Q-06 (2026-09-30): los pedidos no se borran, ni el superadmin — la base ya
+  // no concede DELETE (20260930130000). Lo que se quiera quitar de la vista se
+  // archivará, con una función aparte que todavía no existe.
+  const btnEliminar = '';
 
   // Chips de detalles extra según tipo
   const esLavadoCard   = p.tipo_camion?.startsWith('Lavado') || p.tipo_camion === 'Desinfección';
@@ -2013,10 +2013,16 @@ async function enviarContraoferta(ofertaId) {
   const msg    = document.getElementById(`contra-msg-${ofertaId}`).value.trim();
   if (!precio || precio <= 0) { showToast('Ingresa un precio válido.', 'error'); return; }
 
+  // Q-14: la negociación ya no tiene tope de rondas (la acota la caducidad de
+  // la oferta). La ronda avanza desde la actual; antes se fijaba en 2 y una
+  // segunda contraoferta del cliente la hacía retroceder.
+  const { data: actual, error: eLee } = await sb.from('ofertas').select('ronda').eq('id', ofertaId).single();
+  if (eLee || !actual) { showToast('No se pudo leer la oferta: ' + (eLee?.message || ''), 'error'); return; }
+
   const { error } = await sb.from('ofertas').update({
     contra_precio:  precio,
     contra_mensaje: msg || null,
-    ronda:          2,
+    ronda:          (actual.ronda || 1) + 1,
     estado:         'contra_oferta',
   }).eq('id', ofertaId);
   if (error) { showToast('Error al enviar contraoferta'); return; }
@@ -2708,6 +2714,8 @@ function cancelarPedido(pedidoId) {
 }
 
 // ── ELIMINAR PEDIDO (superadmin) ───────────────────────
+// SIN USO desde Q-06 (2026-09-30): ningún botón la llama y la base ya no
+// concede DELETE sobre pedidos. La sustituirá la función de archivar.
 
 function eliminarPedido(pedidoId) {
   showConfirm('¿Eliminar esta solicitud permanentemente? Esta acción no se puede deshacer.', async () => {
