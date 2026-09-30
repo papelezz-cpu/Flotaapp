@@ -479,7 +479,7 @@ Shared pattern: `propietario_id`, `estado` (`disponible`|`ocupado`|`no_disponibl
 
 ### Privacy & consent (`js/privacidad.js`)
 - `consentimientos`: `user_id`, `tipo` (`aviso_privacidad` | `terminos` | `datos_sensibles_operador`), `version`, `aceptado_en`, `contexto`, `referencia`. Written at registro and at alta de operador.
-- `consentimientos_bloqueados` (Q-11, `20260930160000`, applied in pruebas 2026-09-30, not in production yet): **legal hold**. A `BEFORE DELETE` trigger on `consentimientos` copies the minimum evidence here before the account-deletion cascade removes it. RLS on, **zero policies, no privileges for anon/authenticated/service_role** — never used for any operational purpose. Retention period still undefined (`conservar_hasta` NULL, no automatic purge); on expiry, anonymize (`titular`, `referencia` → NULL).
+- `consentimientos_bloqueados` (Q-11, `20260930160000`, in both projects since 2026-09-30): **legal hold**. A `BEFORE DELETE` trigger on `consentimientos` copies the minimum evidence here before the account-deletion cascade removes it. RLS on, **zero policies, no privileges for anon/authenticated/service_role** — never used for any operational purpose. Retention period still undefined (`conservar_hasta` NULL, no automatic purge); on expiry, anonymize (`titular`, `referencia` → NULL).
 - `solicitudes_arco`: ARCO rights requests. `tipo` (`acceso`|`rectificacion`|`cancelacion`|`oposicion`), `descripcion`, `estado` (`pendiente`|`en_proceso`|`atendida`|`rechazada`), `respuesta`, `atendida_por/_en`. Legal deadlines apply to responses.
 
 ### Other tables

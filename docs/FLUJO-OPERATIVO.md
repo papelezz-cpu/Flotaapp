@@ -314,8 +314,8 @@ datos sensibles. Si esa escritura falla, **la pantalla lo avisa** desde el
 2026-09-30 (Q-11); antes solo iba a la consola.
 
 **Al borrar una cuenta, sus consentimientos no desaparecen: pasan a bloqueo
-legal** (decisión del usuario, 2026-09-30, `20260930160000` — aplicado en pruebas
-el 30/09, en producción todavía no). Un trigger los copia a `consentimientos_bloqueados` antes
+legal** (decisión del usuario, 2026-09-30, `20260930160000` — en producción y en
+pruebas desde el 30/09). Un trigger los copia a `consentimientos_bloqueados` antes
 de que la cascada los borre, con solo la evidencia mínima: id, cuenta, tipo,
 versión, fecha, mecanismo, motivo y fecha del bloqueo; sin IP. **Nadie la lee
 desde la app, ni el superadmin**: solo el administrador de la base, ante un
@@ -593,6 +593,8 @@ solicitudes abiertas donde todavía no tiene oferta activa —trabajo nuevo que
 puede ofertar— con `pedidos_disponibles_para_mi()` (`js/views.js`,
 `actualizarBadgePedidos`). Una contraoferta del cliente sobre una oferta que ya
 existe le llega por la campana, no por el globo. Es el diseño, no un fallo.
+
+**Una oferta viva por empresa y solicitud** (Q-12, `20260930170000`, escrito en `dev`, sin aplicar todavía): la base lo impondrá con un índice único parcial sobre `enviada`, `contra_oferta` y `aceptada`, los mismos estados que la interfaz ya trata como «oferta activa». Volver a ofertar tras un rechazo sigue funcionando. Y los importes (oferta, contraoferta, precio del cliente, precio acordado) tendrán que ser mayores que 0 (Q-13).
 
 `ofertas.expira_en` son 2 días por defecto. El cron `expire-stale-offers` corre
 cada hora y marca `rechazada` las vencidas.
