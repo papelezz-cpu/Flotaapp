@@ -216,7 +216,7 @@ encerrado:
   del usuario, 2026-09-30 (Q-07): `propietario_id` es obligatorio desde el
   24/09 y sus FK siguen `ON DELETE SET NULL`, así que el borrado fallaría entero;
   `gestionar-usuario` lo comprueba antes y responde cuántas unidades tiene y que
-  la suspenda. Las FK no se tocan. *(Desplegado en pruebas el 30/09, versión 11; en producción todavía no.)*
+  la suspenda. Las FK no se tocan. *(En producción y en pruebas desde el 30/09: v17 y v11, mismo paquete.)*
 
 **Lo que NO hace, y conviene tener claro:** no aprueba acuerdos. Desde el
 2026-09-09, cuando las dos partes aceptan, la reserva se crea sola.
