@@ -299,14 +299,19 @@ async function abrirPerfilEmpresaCat(adminId, adminNombre) {
     '<div style="text-align:center;padding:24px;color:var(--text-muted)">Cargando…</div>';
   document.getElementById('modal-emp-cat').classList.add('open');
 
-  const [{ data: p }, { data: cals }] = await Promise.all([
+  const [{ data: p }, { data: cals }, { data: resumen }] = await Promise.all([
     sb.from('empresas_publico')
       .select('rfc, razon_social, anos_operacion, num_unidades, seguro_rc, seguro_carga, permiso_sct, descripcion, telefono, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga')
       .eq('user_id', adminId).maybeSingle(),
     sb.from('calificaciones').select('rating, comentario, created_at').eq('admin_id', adminId).order('created_at', { ascending: false }).limit(5),
+    sb.from('calificaciones_resumen').select('total, promedio').eq('admin_id', adminId).maybeSingle(),
   ]);
 
-  const avg = cals?.length ? (cals.reduce((s, c) => s + c.rating, 0) / cals.length).toFixed(1) : null;
+  // El promedio sale de TODAS las calificaciones (calificaciones_resumen, Q-09),
+  // igual que en la tarjeta del catálogo. Antes se calculaba con las 5 últimas,
+  // que son solo las que se piden para mostrar comentarios, y los dos números
+  // no coincidían en cuanto una empresa tenía más de 5.
+  const avg = resumen?.total ? Number(resumen.promedio).toFixed(1) : null;
 
   const hoyEpc = new Date().toISOString().slice(0, 10);
   const _fmtDoc = (fecha) => {
