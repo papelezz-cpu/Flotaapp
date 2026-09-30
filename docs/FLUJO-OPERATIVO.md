@@ -594,7 +594,7 @@ puede ofertar— con `pedidos_disponibles_para_mi()` (`js/views.js`,
 `actualizarBadgePedidos`). Una contraoferta del cliente sobre una oferta que ya
 existe le llega por la campana, no por el globo. Es el diseño, no un fallo.
 
-**Una oferta viva por empresa y solicitud** (Q-12, `20260930170000`, escrito en `dev`, sin aplicar todavía): la base lo impondrá con un índice único parcial sobre `enviada`, `contra_oferta` y `aceptada`, los mismos estados que la interfaz ya trata como «oferta activa». Volver a ofertar tras un rechazo sigue funcionando. Y los importes (oferta, contraoferta, precio del cliente, precio acordado) tendrán que ser mayores que 0 (Q-13).
+**Una oferta viva por empresa y solicitud** (Q-12, `20260930173000`, escrito en `dev`, sin aplicar todavía): la base lo impondrá con un índice único parcial sobre `enviada`, `contra_oferta` y `aceptada`, los mismos estados que la interfaz ya trata como «oferta activa». Volver a ofertar tras un rechazo sigue funcionando. Y los importes (oferta, contraoferta, precio del cliente, precio acordado) tendrán que ser mayores que 0 (Q-13).
 
 `ofertas.expira_en` son 2 días por defecto. El cron `expire-stale-offers` corre
 cada hora y marca `rechazada` las vencidas.

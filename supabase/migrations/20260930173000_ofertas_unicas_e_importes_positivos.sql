@@ -48,7 +48,7 @@ create unique index if not exists uq_ofertas_viva_por_empresa
 comment on index public.uq_ofertas_viva_por_empresa is
   'Q-12: una empresa solo puede tener una oferta viva (enviada, contra_oferta '
   'o aceptada) por solicitud. Mismos estados que la interfaz trata como '
-  '«oferta activa». Ver 20260930170000.';
+  '«oferta activa». Ver 20260930173000.';
 
 
 -- ─────────────────────────────────────────────────────────────────────────

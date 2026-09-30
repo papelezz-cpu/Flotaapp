@@ -50,6 +50,11 @@ echo "── Lo que contiene ──"
 grep -vE '^\s*(--)?\s*$' "$ARCHIVO" | grep -v '^\s*--' | sed 's/^/   /'
 echo
 
+# Choques con trabajo de otra persona pendiente de promover. Solo lee el
+# repositorio; no para nada por su cuenta, avisa antes de la pregunta.
+bash "$AQUI/choques-migraciones.sh" "$ARCHIVO"   || echo "  ⚠ Hay avisos de choque arriba: revísalos antes de contestar."
+echo
+
 preguntar "  ¿Aplicar? [s/N] " || exit 2
 [[ "$RESPUESTA" =~ ^[sS]$ ]] || { echo "  Cancelado. No se tocó nada."; exit 0; }
 
