@@ -6,33 +6,31 @@
 // datos que las Etapas 1-5 del plan ya reunieron. Lo que falte se imprime en
 // blanco — nunca se inventa un dato.
 //
-// Solo para quien ya puede leer TODO lo que el documento necesita sin que
-// RLS le recorte nada: el dueño de la unidad (o el superadmin). El cliente
-// no puede generarla todavía — camiones_publico (la vista que sí puede leer)
-// no trae placas, configuración vehicular ni número de permiso SCT desde que
-// H-10 cerró la lectura de flota ajena (20260917130000); solo el dueño y el
-// superadmin leen la tabla completa. Habilitarlo para el cliente necesita
-// una RPC que verifique el llamador y le entregue esos campos igual que
-// registrar_evidencias/calificar_servicio ya hacen para otros casos — es
-// trabajo aparte, no algo que se pueda resolver leyendo distinto en el navegador.
+// Antes esto hacía consultas directas a `perfiles` por cliente_user_id y por
+// propietario_id — y desde 20260901120000_perfiles_cierra_leer_nombre_empresa
+// (antes de esta sesión), `perfiles` solo se lee la fila propia o, siendo
+// superadmin, cualquiera. Cuando quien generaba el documento era la EMPRESA,
+// su consulta al perfil del CLIENTE la bloqueaba RLS en silencio: el
+// remitente salía en blanco mientras el transportista —su propia fila—
+// salía completo. Medido el 2026-09-30 contra portgo-pruebas: el perfil del
+// cliente tenía todo el dato, y aun así no llegaba.
+//
+// Se corrige con la RPC datos_carta_porte (20260930120000): verifica que el
+// llamador sea el cliente, el propietario o el superadmin de ESA
+// reservación, y entrega los dos lados en una sola llamada — mismo patrón
+// que registrar_evidencias/calificar_servicio. De paso resuelve el otro
+// hueco: ahora cliente Y propietario pueden generarla, no solo el dueño.
 
 const _CP_AVISO = 'Documento de referencia interna — no es un Complemento Carta Porte del CFDI y no tiene validez fiscal ante el SAT.';
 
 async function generarCartaPorte(reservaId) {
-  const { data: r, error } = await sb.from('reservaciones').select('*').eq('id', reservaId).single();
-  if (error || !r) { showToast('No se pudo cargar la reservación', 'error'); return; }
+  const { data, error } = await sb.rpc('datos_carta_porte', { p_reserva_id: reservaId });
+  if (error || !data) { showToast('No se pudo generar el documento: ' + (error?.message || 'sin datos'), 'error'); return; }
 
-  const esCamion = !r.recurso_tipo || r.recurso_tipo === 'camion';
-
-  const [{ data: pedido }, { data: cliente }, { data: transportista }, { data: camion }, { data: operador }] = await Promise.all([
-    r.pedido_id        ? sb.from('pedidos').select('*').eq('id', r.pedido_id).maybeSingle()               : Promise.resolve({ data: null }),
-    r.cliente_user_id  ? sb.from('perfiles').select('*').eq('user_id', r.cliente_user_id).maybeSingle()   : Promise.resolve({ data: null }),
-    r.propietario_id   ? sb.from('perfiles').select('*').eq('user_id', r.propietario_id).maybeSingle()    : Promise.resolve({ data: null }),
-    (esCamion && r.unidad) ? sb.from('camiones').select('*').eq('id', r.unidad).maybeSingle()              : Promise.resolve({ data: null }),
-    r.operador_id      ? sb.from('operadores').select('*').eq('id', r.operador_id).maybeSingle()          : Promise.resolve({ data: null }),
-  ]);
-
-  const html = _cartaPorteHTML({ r, pedido, cliente, transportista, camion, operador });
+  const html = _cartaPorteHTML({
+    r: data.reservacion, pedido: data.pedido, cliente: data.cliente,
+    transportista: data.transportista, camion: data.camion, operador: data.operador,
+  });
 
   const w = window.open('', '_blank');
   if (!w) { showToast('El navegador bloqueó la ventana. Permite pop-ups para generar el documento.', 'error'); return; }

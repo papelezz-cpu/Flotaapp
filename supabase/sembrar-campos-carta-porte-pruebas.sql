@@ -27,12 +27,21 @@ begin;
 -- no son de las que el espejo refleja, así que apagarlo aquí no pierde nada.
 alter table public.perfiles disable trigger trg_vigencias_espejo;
 
+-- rfc/razon_social/permiso_sct no son de las Etapas 1/2/5 -- ya existían --
+-- pero una cuenta creada desde "Usuarios" (gestionar-usuario, accion
+-- 'crear') solo escribe user_id/nombre/rol en perfiles: sin solicitud de
+-- cuenta de la que copiar, se quedan vacíos para siempre. Se llenan aquí
+-- también, por la misma razón que el domicilio: para poder ver el
+-- documento completo al probarlo.
 update public.perfiles
-   set calle     = coalesce(calle,     'Calle de Prueba 123'),
-       colonia   = coalesce(colonia,   'Colonia de Prueba'),
-       cp        = coalesce(cp,        '00000'),
-       ciudad    = coalesce(ciudad,    'Ciudad de Prueba'),
-       estado_mx = coalesce(estado_mx, 'Estado de Prueba')
+   set calle        = coalesce(calle,        'Calle de Prueba 123'),
+       colonia      = coalesce(colonia,      'Colonia de Prueba'),
+       cp           = coalesce(cp,           '00000'),
+       ciudad       = coalesce(ciudad,       'Ciudad de Prueba'),
+       estado_mx    = coalesce(estado_mx,    'Estado de Prueba'),
+       rfc          = coalesce(rfc,          'XAXX010101000'),
+       razon_social = coalesce(razon_social, nombre),
+       permiso_sct  = case when rol = 'admin' then coalesce(permiso_sct, 'SCT/TPAF/PRUEBA-EMPRESA-0001/2024') else permiso_sct end
  where rol in ('cliente', 'admin');
 
 alter table public.perfiles enable trigger trg_vigencias_espejo;
