@@ -799,10 +799,10 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
         : ''}`;
   }
 
-  // Superadmin puede eliminar cualquier pedido
-  const btnEliminar = currentUser.rol === 'superadmin'
-    ? `<button class="btn-edit btn-rechazar" style="font-size:0.72rem" onclick="eliminarPedido('${p.id}')">🗑 Eliminar</button>`
-    : '';
+  // Q-06 (2026-09-30): los pedidos no se borran, ni el superadmin — la base ya
+  // no concede DELETE (20260930130000). Lo que se quiera quitar de la vista se
+  // archivará, con una función aparte que todavía no existe.
+  const btnEliminar = '';
 
   // Chips de detalles extra según tipo
   const esLavadoCard   = p.tipo_camion?.startsWith('Lavado') || p.tipo_camion === 'Desinfección';
@@ -2714,6 +2714,8 @@ function cancelarPedido(pedidoId) {
 }
 
 // ── ELIMINAR PEDIDO (superadmin) ───────────────────────
+// SIN USO desde Q-06 (2026-09-30): ningún botón la llama y la base ya no
+// concede DELETE sobre pedidos. La sustituirá la función de archivar.
 
 function eliminarPedido(pedidoId) {
   showConfirm('¿Eliminar esta solicitud permanentemente? Esta acción no se puede deshacer.', async () => {
