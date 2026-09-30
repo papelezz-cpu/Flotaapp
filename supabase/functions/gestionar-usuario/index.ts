@@ -191,6 +191,33 @@ Deno.serve(async (req: Request) => {
         }, 409)
       }
 
+      // Q-07 (2026-09-30): una empresa con flota NO se borra — se suspende.
+      // Desde 20260924140000 `propietario_id` es obligatorio en las cinco
+      // tablas de flota, pero sus FK siguen `ON DELETE SET NULL`: borrar la
+      // cuenta intenta vaciar el dueño, el NOT NULL lo impide y el borrado
+      // entero se revierte (medido en banco local el 2026-09-30). Sin esta
+      // comprobacion el superadmin solo veia el error crudo de la base.
+      // Decision del usuario: avisar y ofrecer suspender; no tocar las FK.
+      const TABLAS_FLOTA: Array<[string, string]> = [
+        ['camiones', 'camion(es)'], ['custodios', 'custodio(s)'], ['patios', 'patio(s)'],
+        ['lavados', 'servicio(s) de lavado'], ['operadores', 'operador(es)'],
+      ]
+      const flota: string[] = []
+      for (const [tabla, etiqueta] of TABLAS_FLOTA) {
+        const { count, error: cErr } = await sbAdmin.from(tabla)
+          .select('id', { count: 'exact', head: true }).eq('propietario_id', user_id)
+        // Si no se puede contar, no se borra: ante la duda, no se toca.
+        if (cErr) return json({ error: `No se pudo comprobar la flota (${tabla}): ${cErr.message}` }, 500)
+        if (count) flota.push(`${count} ${etiqueta}`)
+      }
+      if (flota.length) {
+        return json({
+          error: `Esta cuenta tiene flota registrada (${flota.join(', ')}) y no se puede borrar: ` +
+                 `sus unidades, reservaciones y vigencias dependen de ella. ` +
+                 `Suspéndela con 🚫 en lugar de borrarla.`,
+        }, 409)
+      }
+
       // Hay cuentas cuyo borrado falla por las restricciones CHECK que exigen
       // partes presentes en pedidos y reservaciones. Sin comprobarlo, el
       // superadmin veia "ok" y el usuario seguia ahi — y si la peticion venia de
