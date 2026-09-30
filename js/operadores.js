@@ -508,7 +508,12 @@ async function agregarOperador() {
     contexto:   'alta_operador',
     referencia: id,
   });
-  if (errConsent) console.error('No se pudo registrar la declaración:', errConsent);
+  // Q-11 (2026-09-30): antes solo iba a la consola, y un operador pudo quedar
+  // sin su declaración sin que nadie lo viera (OP-A86E8DC0, 11/08).
+  if (errConsent) {
+    console.error('No se pudo registrar la declaración:', errConsent);
+    showToast(`El operador se registró, pero no se pudo guardar la declaración de consentimiento sobre sus datos. No lo vuelvas a dar de alta: escribe a ${SOPORTE_EMAIL}.`, 'error');
+  }
 
   // Notificar a superadmins
   await sb.rpc('notificar_superadmins', {

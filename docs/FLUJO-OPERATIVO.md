@@ -306,6 +306,24 @@ no `solicitudes_cuenta`.** Si los dos números no coinciden, hay altas a medias.
 El superadmin aprueba con verificación física o sin ella; eso escribe
 `verificado` y `metodo_verificacion` ∈ `fisica` · `documental`.
 
+### La constancia de consentimiento, y qué pasa al borrar la cuenta
+
+El registro guarda en `consentimientos` la aceptación del aviso de privacidad y
+de los términos (versión y fecha); el alta de operador, la declaración sobre sus
+datos sensibles. Si esa escritura falla, **la pantalla lo avisa** desde el
+2026-09-30 (Q-11); antes solo iba a la consola.
+
+**Al borrar una cuenta, sus consentimientos no desaparecen: pasan a bloqueo
+legal** (decisión del usuario, 2026-09-30, `20260930160000` — escrito en `dev`,
+sin aplicar todavía). Un trigger los copia a `consentimientos_bloqueados` antes
+de que la cascada los borre, con solo la evidencia mínima: id, cuenta, tipo,
+versión, fecha, mecanismo, motivo y fecha del bloqueo; sin IP. **Nadie la lee
+desde la app, ni el superadmin**: solo el administrador de la base, ante un
+requerimiento legal. El plazo de conservación está **por definir**
+(`conservar_hasta` vacío, sin purga automática); al vencer se anonimizará
+(cuenta y referencia a NULL). La revocación del consentimiento no existe como
+flujo todavía y no tiene efectos retroactivos.
+
 ### Qué datos sobreviven al alta
 
 El formulario de registro pide razón social, RFC y teléfono, pero los guarda
