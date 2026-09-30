@@ -351,21 +351,42 @@ async function solicitarActualizacionDocs() {
   const uid = currentUser.id;
   const ts  = Date.now();
 
-  const _uploadDoc = async (inputId, nombre) => {
+  // Antes, si sb.storage...upload() fallaba, esta función devolvía null en
+  // silencio: el formulario seguía como si todo hubiera salido bien, la
+  // fecha de vencimiento quedaba guardada SIN su documento, y el usuario
+  // veía "✓ Documentos enviados" sin enterarse de que faltó el archivo.
+  // Encontrado el 2026-09-30 probando el flujo de Carta Porte: la tarjeta
+  // de aprobación mostraba la fecha del permiso SCT con "Sin archivo".
+  let _errorSubida = null;
+  const _uploadDoc = async (inputId, nombre, label) => {
     const file = document.getElementById(inputId)?.files?.[0];
     if (!file) return null;
     const ext  = file.name.split('.').pop();
     const path = `${uid}/${nombre}_${ts}.${ext}`;
     const { error } = await sb.storage.from('documentos-empresa').upload(path, file, { upsert: true });
-    if (error) return null;
+    if (error) {
+      console.error(`No se pudo subir ${label}:`, error);
+      _errorSubida = `No se pudo subir ${label}: ${error.message}`;
+      return null;
+    }
     return sb.storage.from('documentos-empresa').getPublicUrl(path).data?.publicUrl || null;
   };
 
   const [docSct, docRc, docCarga] = await Promise.all([
-    _uploadDoc('pe-doc-sct',   'permiso_sct'),
-    _uploadDoc('pe-doc-rc',    'seguro_rc'),
-    _uploadDoc('pe-doc-carga', 'seguro_carga'),
+    _uploadDoc('pe-doc-sct',   'permiso_sct', 'el permiso SCT'),
+    _uploadDoc('pe-doc-rc',    'seguro_rc', 'el seguro RC'),
+    _uploadDoc('pe-doc-carga', 'seguro_carga', 'el seguro de carga'),
   ]);
+
+  // Mismo criterio que la comprobación de arriba (un archivo sin fecha no
+  // se manda): una fecha cuyo archivo no se pudo subir tampoco se manda.
+  // Se detiene todo el envío, no solo el documento que falló, para no dejar
+  // "documentos pendientes" a medias.
+  if (_errorSubida) {
+    _done();
+    showToast(_errorSubida, 'error');
+    return;
+  }
 
   const payload = {
     perfil_docs_pendiente:                    true,
