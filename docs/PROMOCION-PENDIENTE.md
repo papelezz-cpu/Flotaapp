@@ -19,6 +19,10 @@ existir ya.
 
 ## Paso 1 · Comparación de paridad, justo antes
 
+Para no pegar las cadenas en cada paso, empieza la ventana de Git Bash con
+`source supabase/sesion-conexiones.sh`: las pide una vez, las comprueba y las deja
+solo en esa ventana.
+
 En Git Bash (MINGW64), una sola línea:
 
 ```

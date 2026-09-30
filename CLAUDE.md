@@ -275,7 +275,7 @@ The app is served from **Vercel**, same project for both branches (repo `papelez
 
 > ⚠ **Two people work on PortGo at the same time** (both start in `dev` and promote later). The ledger records what ran where; **it does not prevent collisions** — if two migrations rewrite the same function, whichever is applied last wins, silently. Measured 2026-09-29/30: two migration numbers reused, and the shared hot spots (`perfiles`, `pedidos`, `ofertas`, `reservaciones` and their guards) touched by both within hours. So: (1) `supabase/choques-migraciones.sh <file>` runs automatically inside both apply scripts — read its warnings before confirming; (2) before writing a migration, `git pull` and check that its 14-digit number is free; (3) before editing a shared guard or table, tell the other person; (4) a migration that rewrites a function should substitute over the live definition and abort if it isn't the expected one (as Q-05 and Q-14 do), never re-type it.
 
-> ⚠ **The `supabase/*.sh` scripts must be run from the Git Bash window (`MINGW64`), not PowerShell.** In PowerShell `bash` resolves to WSL — which is not installed on this machine — so the command dies with *«instale una distribución»* and nothing runs. Worse, a multi-line command with `\` continuations is **not** a continuation in PowerShell: it swallows each line as a separate command and prints nothing useful. That happened on 2026-09-28 with the five-migration promotion; no harm, because nothing executed — but the failure looks like the script misbehaving rather than the shell. **When handing over a script command, give it on ONE line.**
+> ⚠ **The `supabase/*.sh` scripts must be run from the Git Bash window (`MINGW64`), not PowerShell.** In PowerShell `bash` resolves to WSL — which is not installed on this machine — so the command dies with *«instale una distribución»* and nothing runs. Worse, a multi-line command with `\` continuations is **not** a continuation in PowerShell: it swallows each line as a separate command and prints nothing useful. That happened on 2026-09-28 with the five-migration promotion; no harm, because nothing executed — but the failure looks like the script misbehaving rather than the shell. **When handing over a script command, give it on ONE line.** To avoid pasting the connection strings on every run, start the window with `source supabase/sesion-conexiones.sh` (both, or `pruebas` / `produccion` alone); `aplicar-a-produccion.sh` still demands typing `APLICAR A PRODUCCION`.
 
 To run locally: `npx serve .` (connects to the live Supabase project; credentials in `js/config.js`).
 
@@ -320,6 +320,11 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
     │                       #   (·). Touches no database. Entries start 2026-09-11 —
     │                       #   a `·` on anything older means "unknown", not "pending"
     ├── registrar-aplicada.sh  # Appends to the ledger. Called by the apply scripts
+    ├── sesion-conexiones.sh # `source` it once per Git Bash window: asks for both
+    │                       #   connection strings (hidden), validates each belongs to
+    │                       #   its project, and exports PORTGO_DB_URL_PROD/_PRUEBAS for
+    │                       #   that window only — nothing written to disk or history.
+    │                       #   Every supabase/*.sh then stops asking. `olvidar` clears them
     ├── choques-migraciones.sh # Read-only. Lists the objects a migration touches and
     │                       #   warns when another migration pending promotion (in
     │                       #   pruebas, not production — or written and not in main)
