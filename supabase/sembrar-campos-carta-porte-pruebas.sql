@@ -27,12 +27,22 @@ begin;
 -- no son de las que el espejo refleja, así que apagarlo aquí no pierde nada.
 alter table public.perfiles disable trigger trg_vigencias_espejo;
 
--- rfc/razon_social/permiso_sct no son de las Etapas 1/2/5 -- ya existían --
--- pero una cuenta creada desde "Usuarios" (gestionar-usuario, accion
--- 'crear') solo escribe user_id/nombre/rol en perfiles: sin solicitud de
--- cuenta de la que copiar, se quedan vacíos para siempre. Se llenan aquí
--- también, por la misma razón que el domicilio: para poder ver el
--- documento completo al probarlo.
+-- rfc/razon_social no son de las Etapas 1/2/5 -- ya existían -- pero una
+-- cuenta creada desde "Usuarios" (gestionar-usuario, accion 'crear') solo
+-- escribe user_id/nombre/rol en perfiles: sin solicitud de cuenta de la que
+-- copiar, se quedan vacíos para siempre. Se llenan aquí también, por la
+-- misma razón que el domicilio: para poder ver el documento completo al
+-- probarlo.
+--
+-- permiso_sct (y seguro_rc/seguro_carga) NO se tocan aquí, ni se tocarán:
+-- guard_perfil_self_update los protege a propósito, incluso contra una
+-- sesión sin auth.uid() -- "los seguros y el permiso SCT se acreditan con
+-- documento aprobado, no se declaran" (H-02: la empresa propone, el
+-- superadmin acredita). Es una regla de negocio, no un efecto secundario
+-- como el trigger de vigencias o el guard de pedidos -- no hay rodeo que
+-- tenga sentido intentar. Para llenarlo hay que pasar por Perfil de
+-- empresa -> Documentos legales, de verdad, con un documento y la
+-- aprobación del superadmin.
 update public.perfiles
    set calle        = coalesce(calle,        'Calle de Prueba 123'),
        colonia      = coalesce(colonia,      'Colonia de Prueba'),
@@ -40,8 +50,7 @@ update public.perfiles
        ciudad       = coalesce(ciudad,       'Ciudad de Prueba'),
        estado_mx    = coalesce(estado_mx,    'Estado de Prueba'),
        rfc          = coalesce(rfc,          'XAXX010101000'),
-       razon_social = coalesce(razon_social, nombre),
-       permiso_sct  = case when rol = 'admin' then coalesce(permiso_sct, 'SCT/TPAF/PRUEBA-EMPRESA-0001/2024') else permiso_sct end
+       razon_social = coalesce(razon_social, nombre)
  where rol in ('cliente', 'admin');
 
 alter table public.perfiles enable trigger trg_vigencias_espejo;
