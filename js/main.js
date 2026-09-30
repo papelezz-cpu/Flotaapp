@@ -74,8 +74,9 @@ function iniciarSuscripcionesRealtime() {
   const esSA = currentUser.rol === 'superadmin';
 
   // Filtro de flota: a la empresa solo le interesan sus propios recursos, que
-  // es lo que dibuja renderAdmin. El cliente y el superadmin no lo llevan
-  // porque el catálogo y el panel de aprobaciones necesitan verlo todo.
+  // es lo que dibuja renderAdmin. El superadmin no lo lleva porque el catálogo
+  // y el panel de aprobaciones necesitan verlo todo. El cliente no se suscribe
+  // a flota (ver Q-10 más abajo).
   const filtroFlota = currentUser.rol === 'admin'
     ? { filter: `propietario_id=eq.${currentUser.id}` } : {};
 
@@ -92,11 +93,22 @@ function iniciarSuscripcionesRealtime() {
   //     el trabajo: nadie recibe eventos de ofertas ajenas.
   const _renderPedidos = _agrupado(() => { if (pedidosActivo()) renderPedidos(); });
 
-  sb.channel('portgo-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'camiones',  ...filtroFlota }, _flota(renderAdmin))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'custodios', ...filtroFlota }, _flota(renderAdminCustodios))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'patios',    ...filtroFlota }, _flota(renderAdminPatios))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'lavados',   ...filtroFlota }, _flota(renderAdminLavados))
+  const canal = sb.channel('portgo-changes');
+
+  // Q-10 (2026-09-30): el cliente NO se suscribe a flota. Desde H-10 no puede
+  // leer esas tablas —ve la flota por las vistas *_publico—, y Realtime aplica
+  // la RLS de quien escucha: nunca le llegaba un evento, pero el servidor
+  // evaluaba la politica de cada cambio de flota para cada cliente conectado.
+  // El catalogo del cliente ya no se refrescaba en vivo; esto no cambia lo que ve.
+  if (currentUser.rol !== 'cliente') {
+    canal
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'camiones',  ...filtroFlota }, _flota(renderAdmin))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'custodios', ...filtroFlota }, _flota(renderAdminCustodios))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'patios',    ...filtroFlota }, _flota(renderAdminPatios))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lavados',   ...filtroFlota }, _flota(renderAdminLavados));
+  }
+
+  canal
     .on('postgres_changes', { event: '*', schema: 'public', table: 'reservaciones', ...filtroReservas }, _agrupado(() => {
       if (reservacionesActivo()) renderReserv();
       // El superadmin necesita ver en vivo cuando cliente/empresa suben su
