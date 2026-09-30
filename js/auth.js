@@ -817,7 +817,11 @@ async function doRegistro() {
 
   // Constancia de la aceptación (versión + fecha). Se guarda también en el
   // re-registro: puede haber cambiado la versión del aviso desde la vez pasada.
-  await _registrarConsentimientos(userId, 'registro');
+  // Q-11 (2026-09-30): el fallo ya no es silencioso. La cuenta se crea igual
+  // —ya existe en auth a estas alturas—, pero quien se registra se entera.
+  if (!await _registrarConsentimientos(userId, 'registro')) {
+    showToast(`Tu solicitud se envió, pero no se pudo guardar la constancia de que aceptaste el aviso de privacidad. Escribe a ${SOPORTE_EMAIL}.`, 'error');
+  }
 
   await sb.rpc('notificar_superadmins', {
     p_tipo:    'nueva_cuenta_pendiente',
