@@ -335,6 +335,12 @@ body.light .ep-recurso-row { background: rgba(0,0,0,0.04); }
   z-index: 200; place-items: center;
 }
 .modal-overlay.open { display: grid; }
+/* Diálogos que se abren ENCIMA de otra ventana: la nota de rechazo/corrección
+   y showConfirm(). Con el mismo z-index manda el orden del HTML, y estos dos
+   van antes que modal-expediente: «⚠ Pedir corrección» se abría detrás del
+   expediente y no se podía escribir (medido en dev el 2026-09-30). */
+#modal-rechazar-nota,
+#modal-confirm { z-index: 210; }
 .modal {
   background: var(--navy-mid); border: 1px solid rgba(78,142,247,0.3);
   border-radius: 20px; width: 90%; max-width: 480px;
