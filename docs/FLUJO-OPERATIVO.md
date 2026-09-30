@@ -1275,10 +1275,17 @@ sincronización de estados por cron.
 
 Ninguna es un fallo; todas confunden si no se saben.
 
+- **Hasta Q-19 (30/09), nada se refrescaba en vivo salvo la campana.** El canal
+  `portgo-changes` mezclaba `pedidos` y `ofertas`, que no están publicadas en
+  Realtime, con la flota y `reservaciones`: eso deja el canal entero sin
+  entregar eventos, aunque diga `SUBSCRIBED`. Medido en `dev` con dos canales
+  de diagnóstico. Desde `main.js?v=23` (en `dev`; producción con la fusión)
+  `pedidos`/`ofertas` van en su propio canal y el resto vuelve a funcionar.
 - **Los globos del Inicio se calculan al pintar el Inicio, no en vivo.** Se
   recalculan al entrar, al recargar y al volver con «← Inicio»; una reservación
   creada mientras estás en otra vista no los mueve hasta entonces. La lista de
-  «Reservaciones», en cambio, sí se refresca por Realtime mientras está abierta.
+  «Reservaciones» se refresca por Realtime mientras está abierta **solo desde
+  Q-19** (`main.js?v=23`, 30/09, en `dev`): hasta entonces no lo hacía (ver abajo).
   Y el globo de «Reservaciones» no es lo mismo que la pestaña «Activas»: cuenta
   las `Activa` **más** las `PorAprobar` donde te falta subir tu evidencia
   (`actualizarBadgeReservas`, `js/views.js`). Medido el 2026-09-30: cuadró con

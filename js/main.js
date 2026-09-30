@@ -115,6 +115,18 @@ function iniciarSuscripcionesRealtime() {
       // evidencia de cierre (no siempre dispara una notificación nueva).
       if (pendientesActivo()) renderAprobaciones();
     }))
+    .subscribe();
+
+  // Q-19 (2026-09-30): pedidos y ofertas van en su PROPIO canal. No estan en
+  // la publicacion de Realtime (decidido el 2026-08-28, hueco 14), y meter en
+  // un canal una tabla no publicada lo deja sordo ENTERO sin dar error: el
+  // canal dice SUBSCRIBED y no entrega nada. Medido en dev el 30/09 con dos
+  // canales de diagnostico: el mismo filtro de camiones recibia solo, y dejaba
+  // de recibir en cuanto se le sumaban pedidos y ofertas. Por eso la flota de
+  // la empresa y la lista de reservaciones nunca se refrescaron en vivo desde
+  // entonces. Aparte, este canal no bloquea a los demas; si algun dia se
+  // publican esas tablas, empieza a funcionar sin tocar nada.
+  sb.channel('portgo-negociacion')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, _renderPedidos)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ofertas' }, _renderPedidos)
     .subscribe();
