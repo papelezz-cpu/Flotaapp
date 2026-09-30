@@ -314,8 +314,8 @@ datos sensibles. Si esa escritura falla, **la pantalla lo avisa** desde el
 2026-09-30 (Q-11); antes solo iba a la consola.
 
 **Al borrar una cuenta, sus consentimientos no desaparecen: pasan a bloqueo
-legal** (decisión del usuario, 2026-09-30, `20260930160000` — escrito en `dev`,
-sin aplicar todavía). Un trigger los copia a `consentimientos_bloqueados` antes
+legal** (decisión del usuario, 2026-09-30, `20260930160000` — aplicado en pruebas
+el 30/09, en producción todavía no). Un trigger los copia a `consentimientos_bloqueados` antes
 de que la cascada los borre, con solo la evidencia mínima: id, cuenta, tipo,
 versión, fecha, mecanismo, motivo y fecha del bloqueo; sin IP. **Nadie la lee
 desde la app, ni el superadmin**: solo el administrador de la base, ante un
