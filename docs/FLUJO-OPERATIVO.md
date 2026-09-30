@@ -1248,6 +1248,14 @@ sincronización de estados por cron.
 
 Ninguna es un fallo; todas confunden si no se saben.
 
+- **Los globos del Inicio se calculan al pintar el Inicio, no en vivo.** Se
+  recalculan al entrar, al recargar y al volver con «← Inicio»; una reservación
+  creada mientras estás en otra vista no los mueve hasta entonces. La lista de
+  «Reservaciones», en cambio, sí se refresca por Realtime mientras está abierta.
+  Y el globo de «Reservaciones» no es lo mismo que la pestaña «Activas»: cuenta
+  las `Activa` **más** las `PorAprobar` donde te falta subir tu evidencia
+  (`actualizarBadgeReservas`, `js/views.js`). Medido el 2026-09-30: cuadró con
+  la base en las dos cuentas de la prueba.
 - **Los botones de acción viven detrás del `▾`** de cada fila de reservación.
   Los grupos *Documentos*, *Avisos* y *Cierre* no se dibujan si está plegada.
 - **Las pastillas de filtro se traducen a un `WHERE estado = …`**, así que al
