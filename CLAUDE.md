@@ -417,7 +417,7 @@ Any user-controlled value interpolated into `onclick="...'${...}'..."` MUST use 
 | `unidades` | ❌ private | First path segment must be `auth.uid()`. Read with `createSignedUrl(path, 3600)` — **never `getPublicUrl`** |
 | `registros` | ❌ private | Same path rule; signed URLs only. Also holds `perfiles.fotos_verificacion` |
 | `documentos-viaje` | ❌ private | Trip file documents (`expediente_documentos.archivo_path`); signed URLs only |
-| `operadores` | ✅ public | `getPublicUrl` OK. List/upload/delete only in your own `<uid>/` folder or as superadmin (S-01, `20261001120000`: in pruebas since 2026-10-01, **not yet in production**) — it holds drivers' medical and toxicology exams. Public URLs still open for anyone holding one (S-01 step 2, pending) |
+| `operadores` | ✅ public | `getPublicUrl` OK. List/upload/delete only in your own `<uid>/` folder or as superadmin (S-01, `20261001120000`: in pruebas and production since 2026-10-01) — it holds drivers' medical and toxicology exams. Public URLs still open for anyone holding one (S-01 step 2, pending) |
 | `custodios` | ✅ public | `getPublicUrl` OK |
 | `documentos-empresa` | ✅ public | `getPublicUrl` OK |
 

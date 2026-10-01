@@ -373,7 +373,7 @@ Desde `20260915120000_los_seguros_se_acreditan_no_se_declaran`:
   las seis columnas reales; las `*_pendiente` siguen abiertas, que es donde la
   empresa propone.
   ⚠ **Para la empresa ya acreditada esto no fue cierto entre el 23/09 y `S-02`**
-  (`20261001130000`, en pruebas desde el 01/10, producción pendiente): el espejo
+  (`20261001130000`, en pruebas y en producción desde el 01/10): el espejo
   de `vigencias` reescribía en cada UPDATE sus documentos vigentes, el guard de
   `vigencias` lo rechazaba, y cualquier guardado de su perfil —también proponer
   una renovación o cambiar el interruptor de correos— fallaba con
@@ -856,8 +856,8 @@ propietario o un superadmin de esa reservación**, en cualquier estado; a
 cualquier otro le responde `No autorizado`. Tiene que ser `DEFINER` porque la
 empresa no puede leer el perfil del cliente por RLS.
 
-Desde `S-03` (`20261001140000`, en pruebas desde el 01/10, producción
-pendiente) devuelve **solo las columnas que imprime el documento**: 6 de la
+Desde `S-03` (`20261001140000`, en pruebas y en producción desde el 01/10)
+devuelve **solo las columnas que imprime el documento**: 6 de la
 reservación, 17 del pedido, 8 de cada perfil (nombre o razón social, RFC,
 domicilio fiscal; la empresa además su permiso SCT), 3 del camión (placas,
 permiso SCT de la unidad, configuración vehicular SAT) y 6 del chofer (nombre,
