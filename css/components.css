@@ -335,6 +335,12 @@ body.light .ep-recurso-row { background: rgba(0,0,0,0.04); }
   z-index: 200; place-items: center;
 }
 .modal-overlay.open { display: grid; }
+/* Diálogos que se abren ENCIMA de otra ventana: la nota de rechazo/corrección
+   y showConfirm(). Con el mismo z-index manda el orden del HTML, y estos dos
+   van antes que modal-expediente: «⚠ Pedir corrección» se abría detrás del
+   expediente y no se podía escribir (medido en dev el 2026-09-30). */
+#modal-rechazar-nota,
+#modal-confirm { z-index: 210; }
 .modal {
   background: var(--navy-mid); border: 1px solid rgba(78,142,247,0.3);
   border-radius: 20px; width: 90%; max-width: 480px;
@@ -538,7 +544,26 @@ input[type=date]::-webkit-calendar-picker-indicator { margin-left: 4px; }
   box-shadow: 0 0 0 2px var(--accent);
   animation: reservNextPulse 2s ease-in-out infinite;
 }
-@media (prefers-reduced-motion: reduce) { .reserv-next { animation: none; } }
+/* El aro ya distingue el botón dentro del panel, pero el panel está detrás
+   del ▾ — antes de abrirlo lo único visible es la fila. El punto que
+   parpadea va también en el chip de la fila (siempre visible) y se repite
+   en el botón real para que, al abrir el panel, sea obvio cuál es. */
+@keyframes reservNextBlink {
+  0%, 40%   { opacity: 1;    transform: scale(1); }
+  50%       { opacity: 0.25; transform: scale(0.75); }
+  60%, 100% { opacity: 1;    transform: scale(1); }
+}
+.reserv-next, .reserv-next-chip { position: relative; }
+.reserv-next::after, .reserv-next-chip::after {
+  content: ''; position: absolute; top: -4px; right: -4px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #ef4444; border: 1.5px solid var(--navy-mid);
+  animation: reservNextBlink 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reserv-next { animation: none; }
+  .reserv-next::after, .reserv-next-chip::after { animation: none; }
+}
 .reserv-next-chip {
   font: inherit; font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 8px;
   cursor: pointer; white-space: nowrap;
@@ -1711,6 +1736,11 @@ body:not(.role-admin):not(.role-superadmin) .admin-hidden { display: flex; }
 .vig-item--proximo {
   background: rgba(251,146,60,0.07); border-color: rgba(251,146,60,0.25);
 }
+/* Lleva directo al formulario donde se actualiza ese documento — ver
+   irAEditarVigencia(). Sin flecha ni texto de más: el cursor y el
+   resaltado al pasar ya avisan que el renglón hace algo. */
+.vig-item--clic { cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.vig-item--clic:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .vig-item-left  { flex: 1; min-width: 0; }
 .vig-item-right { text-align: right; flex-shrink: 0; margin-left: 12px; }
 .vig-item-nombre {
@@ -1830,6 +1860,18 @@ body.light .cobro-pagado    { color: #15803d; }
 /* Pastilla de filtro que señala una alerta */
 .ped-filtro-pill.pill-alerta { color: var(--danger); border-color: rgba(239,68,68,0.35); }
 .ped-filtro-pill.pill-alerta.active { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* Cuántas reservaciones hay en esa pill — oculto hasta que JS pone un
+   número (ver actualizarBadgesPillsReserv). Mismo estilo que .notif-badge,
+   pero inline junto al texto en vez de flotando en una esquina. */
+.pill-count {
+  display: none; align-items: center; justify-content: center;
+  min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 9px; font-size: 0.66rem; font-weight: 700;
+  background: #ef4444; color: #fff; font-family: 'Syne', sans-serif;
+}
+.ped-filtro-pill.pill-alerta .pill-count { background: #fff; color: var(--danger); }
+.ped-filtro-pill.pill-alerta.active .pill-count { background: #fff; color: var(--danger); }
 
 /* ── SOLICITUDES FRECUENTES (plantillas del cliente) ──── */
 .plant-titulo {

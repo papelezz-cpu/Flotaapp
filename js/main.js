@@ -28,6 +28,7 @@ function iniciarSuscripcionesRealtime() {
   const adminActivo         = () => document.getElementById('view-admin').classList.contains('active');
   const pendientesActivo    = () => document.getElementById('view-pendientes')?.classList.contains('active');
   const pedidosActivo       = () => document.getElementById('view-pedidos').classList.contains('active');
+  const reservacionesActivo = () => document.getElementById('view-reservaciones').classList.contains('active');
 
   // Un solo canal para las notificaciones propias, y filtrado en el servidor.
   // Antes había dos escuchadores del mismo evento — este, y otro sin filtro
@@ -45,6 +46,14 @@ function iniciarSuscripcionesRealtime() {
         _loadAprBadge();
         if (pendientesActivo()) renderAprobaciones();
       }
+      // Reservaciones también se refresca aquí, y no solo con el canal de
+      // abajo: la guía de "siguiente paso" depende de `expedientes`, y esa
+      // tabla no está en la publicación de Realtime (a diferencia de
+      // reservaciones/notificaciones — ver docs/FLUJO-OPERATIVO.md §14). Sin
+      // esto, quien recibe «Documentación lista para revisar» ve la campana
+      // pero el botón resaltado se queda apuntando al paso de ayer hasta que
+      // recarga la vista a mano.
+      if (reservacionesActivo()) renderReserv();
     })
     .subscribe();
 
@@ -65,8 +74,9 @@ function iniciarSuscripcionesRealtime() {
   const esSA = currentUser.rol === 'superadmin';
 
   // Filtro de flota: a la empresa solo le interesan sus propios recursos, que
-  // es lo que dibuja renderAdmin. El cliente y el superadmin no lo llevan
-  // porque el catálogo y el panel de aprobaciones necesitan verlo todo.
+  // es lo que dibuja renderAdmin. El superadmin no lo lleva porque el catálogo
+  // y el panel de aprobaciones necesitan verlo todo. El cliente no se suscribe
+  // a flota (ver Q-10 más abajo).
   const filtroFlota = currentUser.rol === 'admin'
     ? { filter: `propietario_id=eq.${currentUser.id}` } : {};
 
@@ -83,17 +93,40 @@ function iniciarSuscripcionesRealtime() {
   //     el trabajo: nadie recibe eventos de ofertas ajenas.
   const _renderPedidos = _agrupado(() => { if (pedidosActivo()) renderPedidos(); });
 
-  sb.channel('portgo-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'camiones',  ...filtroFlota }, _flota(renderAdmin))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'custodios', ...filtroFlota }, _flota(renderAdminCustodios))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'patios',    ...filtroFlota }, _flota(renderAdminPatios))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'lavados',   ...filtroFlota }, _flota(renderAdminLavados))
+  const canal = sb.channel('portgo-changes');
+
+  // Q-10 (2026-09-30): el cliente NO se suscribe a flota. Desde H-10 no puede
+  // leer esas tablas —ve la flota por las vistas *_publico—, y Realtime aplica
+  // la RLS de quien escucha: nunca le llegaba un evento, pero el servidor
+  // evaluaba la politica de cada cambio de flota para cada cliente conectado.
+  // El catalogo del cliente ya no se refrescaba en vivo; esto no cambia lo que ve.
+  if (currentUser.rol !== 'cliente') {
+    canal
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'camiones',  ...filtroFlota }, _flota(renderAdmin))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'custodios', ...filtroFlota }, _flota(renderAdminCustodios))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'patios',    ...filtroFlota }, _flota(renderAdminPatios))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lavados',   ...filtroFlota }, _flota(renderAdminLavados));
+  }
+
+  canal
     .on('postgres_changes', { event: '*', schema: 'public', table: 'reservaciones', ...filtroReservas }, _agrupado(() => {
-      if (document.getElementById('view-reservaciones').classList.contains('active')) renderReserv();
+      if (reservacionesActivo()) renderReserv();
       // El superadmin necesita ver en vivo cuando cliente/empresa suben su
       // evidencia de cierre (no siempre dispara una notificación nueva).
       if (pendientesActivo()) renderAprobaciones();
     }))
+    .subscribe();
+
+  // Q-19 (2026-09-30): pedidos y ofertas van en su PROPIO canal. No estan en
+  // la publicacion de Realtime (decidido el 2026-08-28, hueco 14), y meter en
+  // un canal una tabla no publicada lo deja sordo ENTERO sin dar error: el
+  // canal dice SUBSCRIBED y no entrega nada. Medido en dev el 30/09 con dos
+  // canales de diagnostico: el mismo filtro de camiones recibia solo, y dejaba
+  // de recibir en cuanto se le sumaban pedidos y ofertas. Por eso la flota de
+  // la empresa y la lista de reservaciones nunca se refrescaron en vivo desde
+  // entonces. Aparte, este canal no bloquea a los demas; si algun dia se
+  // publican esas tablas, empieza a funcionar sin tocar nada.
+  sb.channel('portgo-negociacion')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, _renderPedidos)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'ofertas' }, _renderPedidos)
     .subscribe();

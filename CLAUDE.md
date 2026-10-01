@@ -156,6 +156,42 @@ Obligan a tocarlo: un estado nuevo o retirado, un permiso que cambia de rol, un 
 
 ---
 
+## 🛑 RULE #5 — NADA SE CONSTRUYE SIN LOS TRES ARCHIVOS MAESTROS DELANTE
+
+**Toda modificación y toda creación nueva —una función, una pantalla, una columna, una política, una migración, un botón— se diseña contra los tres archivos maestros, abiertos, antes de escribir una línea.** No de memoria y no «según recuerdo del código».
+
+| Archivo | Qué decide | Qué pasa si no se lee |
+|---|---|---|
+| **`CLAUDE.md`** (este) | Qué está prohibido, qué exige permiso explícito, cómo se despliega, qué convenciones son obligatorias | Se borra algo sin autorización, se toca producción sin permiso, o se despliega sin subir `?v=` y el usuario prueba el fichero viejo |
+| **[`docs/FLUJO-OPERATIVO.md`](docs/FLUJO-OPERATIVO.md)** | Qué hace el sistema: qué rol ejecuta, en qué estado está la fila y a cuál pasa, qué guard vigila la transición, y qué ya está decidido como hueco conocido | Se inventa un estado, un botón o un permiso; se propone «arreglar» algo que es una decisión tomada; se rompe una precedencia que está escrita porque el orden inverso falla |
+| **[`docs/AUDITORIA.md`](docs/AUDITORIA.md)** | Qué ya se rompió antes en este sistema, qué sigue abierto, qué está revisado y correcto, y qué regla concreta evita repetir cada fallo | Se reintroduce un fallo ya pagado, se «arregla» algo que estaba bien a propósito, o se reporta como hallazgo nuevo algo que lleva un mes con decisión tomada |
+
+### El orden de autoridad
+
+**`CLAUDE.md` manda sobre los otros dos.** Y sobre los tres manda el código:
+**si un documento y el código se contradicen, gana el código** — y el documento se corrige en el mismo commit, nunca al revés.
+
+### Las cuatro preguntas, antes de proponer nada
+
+1. **¿Qué rol lo ejecuta, en qué estado, y qué guard vigila esa transición?** → `FLUJO-OPERATIVO.md`. Casi nunca lo decide la interfaz.
+2. **¿Esto ya se rompió antes?** → `docs/AUDITORIA.md` §3 (abierto) y §8 (índice de hallazgos). Si está ahí, **no es un hallazgo nuevo**: es uno conocido, y se propone en vez de arreglarlo por iniciativa propia.
+3. **¿Está en la lista de lo que no se toca?** → `docs/AUDITORIA.md` §5. Cada entrada de esa lista costó una auditoría averiguar por qué está así; cambiarla es una regresión, no una mejora.
+4. **¿Qué reglas del §4 de la auditoría aplican a lo que voy a escribir?** Hay reglas para migraciones, permisos y RLS, consultas, código de cliente, estados, pruebas, despliegue y datos personales. **Si la respuesta es «ninguna», es casi seguro que no se leyeron.**
+
+### Después de cambiar, los tres se actualizan en el mismo commit
+
+No después, no en una tarea aparte. Obligan a tocarlos:
+
+- **`FLUJO-OPERATIVO.md`** — un estado nuevo o retirado, un permiso que cambia de rol, un guard nuevo o modificado, un paso que se añade o se salta, una pantalla que aparece o muere, y cualquier decisión de negocio tomada en una conversación.
+- **`docs/AUDITORIA.md`** — un hallazgo que se cierra, un defecto nuevo, una regla nueva, y **cualquier afirmación de ese archivo que resulte falsa al medirla**.
+- **`CLAUDE.md`** — cuando algo de lo que afirma deja de ser cierto. **Este es el que más se ha quedado atrás en silencio**, y es el peor sitio donde puede pasar porque va siempre en contexto y por eso se cree: ha afirmado que ninguna RPC se usaba, que tres tablas se repintaban por Realtime, que ambas partes tenían que subir evidencia, que `renderPedidos()` seguía escribiendo y que tres ficheros faltaban del `SHELL` del service worker. Las cinco eran falsas cuando se leyeron.
+
+### Por qué existe esta regla
+
+Porque el objetivo de los tres archivos juntos es **que un cambio nuevo no traiga un fallo viejo**. Las cuatro auditorías de este proyecto encontraron 97 hallazgos numerados, y **23 defectos más que ninguna de ellas vio**: aparecieron al arreglar otra cosa. La mitad de esos 23 son un fallo reintroducido, un arreglo peor que el defecto, o una comprobación que no podía fallar. Todos estaban a una lectura de distancia.
+
+---
+
 ## Project Overview
 
 **PortGo** is a PWA logistics platform for port transport services built as a fully client-side app with Supabase as the backend (PostgreSQL + Auth + Realtime + Storage).
@@ -237,7 +273,9 @@ The app is served from **Vercel**, same project for both branches (repo `papelez
 
 > ⚠️ **Auth redirect URLs:** the Vercel domain must be in Supabase → Authentication → URL Configuration (Site URL + Redirect URLs), or password-reset links won't redirect. Add any new domain (e.g. a custom domain) there too.
 
-> ⚠ **The `supabase/*.sh` scripts must be run from the Git Bash window (`MINGW64`), not PowerShell.** In PowerShell `bash` resolves to WSL — which is not installed on this machine — so the command dies with *«instale una distribución»* and nothing runs. Worse, a multi-line command with `\` continuations is **not** a continuation in PowerShell: it swallows each line as a separate command and prints nothing useful. That happened on 2026-09-28 with the five-migration promotion; no harm, because nothing executed — but the failure looks like the script misbehaving rather than the shell. **When handing over a script command, give it on ONE line.**
+> ⚠ **Two people work on PortGo at the same time** (both start in `dev` and promote later). The ledger records what ran where; **it does not prevent collisions** — if two migrations rewrite the same function, whichever is applied last wins, silently. Measured 2026-09-29/30: two migration numbers reused, and the shared hot spots (`perfiles`, `pedidos`, `ofertas`, `reservaciones` and their guards) touched by both within hours. So: (1) `supabase/choques-migraciones.sh <file>` runs automatically inside both apply scripts — read its warnings before confirming; (2) before writing a migration, `git pull` and check that its 14-digit number is free; (3) before editing a shared guard or table, tell the other person; (4) a migration that rewrites a function should substitute over the live definition and abort if it isn't the expected one (as Q-05 and Q-14 do), never re-type it.
+
+> ⚠ **The `supabase/*.sh` scripts must be run from the Git Bash window (`MINGW64`), not PowerShell.** In PowerShell `bash` resolves to WSL — which is not installed on this machine — so the command dies with *«instale una distribución»* and nothing runs. Worse, a multi-line command with `\` continuations is **not** a continuation in PowerShell: it swallows each line as a separate command and prints nothing useful. That happened on 2026-09-28 with the five-migration promotion; no harm, because nothing executed — but the failure looks like the script misbehaving rather than the shell. **When handing over a script command, give it on ONE line.** To avoid pasting the connection strings on every run, start the window with `source supabase/sesion-conexiones.sh` (both, or `pruebas` / `produccion` alone); `aplicar-a-produccion.sh` still demands typing `APLICAR A PRODUCCION`.
 
 To run locally: `npx serve .` (connects to the live Supabase project; credentials in `js/config.js`).
 
@@ -256,13 +294,22 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
 ├── terminos.html           # Términos y condiciones (static)
 ├── css/                    # base → layout → components → login → detalle → theme (load order matters)
 ├── js/                     # Classic scripts, global scope, order defined in app.html (30 files)
+├── docs/FLUJO-OPERATIVO.md # Master file #2 (Rule #4/#5): what the system does, by role,
+│                       #   state and guard. Plus the 14 known gaps, with their decision
+├── docs/AUDITORIA.md       # Master file #3 (Rule #5): the four audits consolidated —
+│                       #   what is still open, what must NOT be touched, and the
+│                       #   construction rules each finding produced
 ├── docs/CONTRATO-MOVIL.md  # Backend contract for the native iOS/Android clients
+├── Auditoriabd.md          # The 25-section brief the 4th audit answered (template for a 5th)
+├── auditoria-2.md          # 2nd audit, 2026-08-28 — the only one with EXPLAIN / pg_stat_statements
+├── auditoria-3.md          # 3rd audit, 2026-09-11 — whole web platform
+├── security-findings.md    # 1st audit, 2026-08-24 — authorized pentest, exercised
 ├── android/                # Native Android client (separate from the PWA)
 └── supabase/
     ├── functions/
     │   ├── gestionar-usuario/   # Privileged user CRUD (superadmin only, service role key)
     │   └── enviar-notificacion/ # Email notifications
-    ├── migrations/         # 63 SQL migrations — the source of truth for schema, RLS,
+    ├── migrations/         # 93 SQL migrations — the source of truth for schema, RLS,
     │                       #   guard triggers and the business RPCs
     ├── aplicadas.tsv       # Migration ledger: which .sql ran against which project,
     │                       #   when, and the sha256 of the file at that moment. Written
@@ -273,6 +320,16 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
     │                       #   (·). Touches no database. Entries start 2026-09-11 —
     │                       #   a `·` on anything older means "unknown", not "pending"
     ├── registrar-aplicada.sh  # Appends to the ledger. Called by the apply scripts
+    ├── sesion-conexiones.sh # `source` it once per Git Bash window: asks for both
+    │                       #   connection strings (hidden), validates each belongs to
+    │                       #   its project, and exports PORTGO_DB_URL_PROD/_PRUEBAS for
+    │                       #   that window only — nothing written to disk or history.
+    │                       #   Every supabase/*.sh then stops asking. `olvidar` clears them
+    ├── choques-migraciones.sh # Read-only. Lists the objects a migration touches and
+    │                       #   warns when another migration pending promotion (in
+    │                       #   pruebas, not production — or written and not in main)
+    │                       #   touches the same object or table, or reuses its number.
+    │                       #   Both aplicar-a-* scripts run it before asking to confirm
     ├── espejo/             # (gitignored) production dump + paridad.json stamp. Real
     │                       #   personal data — never commit, never share
     ├── replicar-produccion-a-pruebas.sh  # Rule #3: rebuilds portgo-pruebas as an exact
@@ -320,9 +377,11 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
 
 No state library. Globals refreshed via Supabase queries: `currentUser` (auth.js), `_pedidosAccum` (pedidos.js), per-module caches.
 
-**Realtime re-renders the active view — but only for six tables, and this line used to name three that do not work.** `main.js` subscribes to eight (`camiones`, `custodios`, `patios`, `lavados`, `reservaciones`, `notificaciones`, `pedidos`, `ofertas`), and production's `supabase_realtime` publication carries six: the fleet four, `reservaciones` and `notificaciones`. **`pedidos` and `ofertas` are not published, so those two subscriptions have never fired** and the Solicitudes list does not refresh live. There is no `mensajes` subscription at all.
+**Realtime re-renders the active view — but for most of its life it re-rendered NOTHING except the bell (Q-19, measured 2026-09-30).** `pedidos` and `ofertas` lived in the same channel as the fleet and `reservaciones`, and a channel that includes an unpublished table silently delivers **no events at all** while reporting `SUBSCRIBED`. Fixed in `dev` (`main.js?v=23`, reaches production with the next `dev` → `main` merge): `pedidos`/`ofertas` now have their own channel. **Never put an unpublished table in a shared channel.** And this line used to name three tables that do not work. `main.js` subscribes to eight (`camiones`, `custodios`, `patios`, `lavados`, `reservaciones`, `notificaciones`, `pedidos`, `ofertas`), and production's `supabase_realtime` publication carries six: the fleet four, `reservaciones` and `notificaciones`. **`pedidos` and `ofertas` are not published, so those two subscriptions have never fired** and the Solicitudes list does not refresh live. There is no `mensajes` subscription at all.
 
-That exclusion is **deliberate and decided** (2026-08-28, migration `20260828120000_publicacion_realtime_declarativa.sql`), not drift: `renderPedidos()` issues up to four `UPDATE`s on `pedidos` as a side effect of drawing the list, so publishing the table would wake every connected browser, each would write, and each write would emit more events — a feedback loop. **The precondition is not the pg_cron migration — that one is applied.** It is taking the five writes *out of the render*, which has not happened: adding the cron duplicated the work instead of moving it (hueco 4). Measured again on 2026-09-25: `renderPedidos()` still writes. See hueco 14 in [docs/FLUJO-OPERATIVO.md](docs/FLUJO-OPERATIVO.md).
+That exclusion is **deliberate and decided** (2026-08-28, migration `20260828120000_publicacion_realtime_declarativa.sql`), not drift: `renderPedidos()` *used to* issue five `UPDATE`s as a side effect of drawing the list, so publishing the table would wake every connected browser, each would write, and each write would emit more events — a feedback loop.
+
+**Both preconditions are now met, and this paragraph claimed otherwise until 2026-09-28.** The pg_cron migration is applied, and the five writes came **out of the render on 2026-09-25** (verified again 2026-09-28: `renderPedidos()` executes no `update`/`insert`/`delete`). Publishing `pedidos`/`ofertas` still isn't worth it, but for a different reason: `aprobarSolicitud()` already notifies only the companies with fleet of that type, `notificaciones` *is* published, and tapping the notice re-renders the view — the bell covers the case better than broadcasting to every session. See hueco 14 in [docs/FLUJO-OPERATIVO.md](docs/FLUJO-OPERATIVO.md) and `H-16` in [docs/AUDITORIA.md](docs/AUDITORIA.md).
 
 ### Auth & Roles
 
@@ -364,7 +423,10 @@ Store **paths** in the DB for private buckets and sign at display time (see `abr
 - Every table has RLS. If a query unexpectedly returns empty or an insert/update silently fails, **check RLS first**, then code.
 - `is_superadmin()` is a `SECURITY DEFINER` helper used in policies; executable by `authenticated` only.
 - `notificaciones` INSERT is relationship-restricted: you can only notify yourself, superadmins, or the counterparty of your reservación/oferta. New notification flows must fit one of those, or use a DB trigger.
-- `reservaciones` INSERT requires the creator to be the cliente, the propietario, or superadmin.
+- `reservaciones` INSERT: the policy admits the cliente, the propietario or the superadmin, but since 2026-09-30 (Q-05) `guard_reservacion_insert()` **rejects the propietario**: a company never creates a reservation directly. Agreements create it only through `cerrar_acuerdo()` (flag `portgo.cierre_acuerdo`), whoever accepts; the cliente can still book from the catalog as `Pendiente` with no price. `cerrarAcuerdo()` in `js/pedidos.js` is dead code (called from nowhere, in `dev` or `main`).
+- `pedidos` is **never deleted** since 2026-09-30 (Q-06, `20260930130000`, applied in both projects): `DELETE` is revoked from `authenticated` — clients and superadmin alike; `ped_delete` stays, inert. Removing from view will be an *archive* feature (not built yet).
+- `expediente_documentos`: no INSERT/DELETE for `authenticated` since 2026-09-30 (Q-06, second half, `20260930140000`, both projects) — rows are born only in `abrir_expediente()`; clients only UPDATE them (upload, approve, reject), which `trg_guard_expediente_documento` polices.
+- `calificaciones` has **no direct INSERT** for `authenticated` since 2026-09-29 (Q-03): ratings go only through `calificar_servicio()`. Its old INSERT policy is left in place, inert and commented.
 - `perfiles` is NOT readable by `anon` (fiscal data). Authenticated users can read all rows (for display names).
 - Always surface RLS errors: check `error` from every mutating call and `showToast(...)` it — silent failures cost hours of debugging.
 
@@ -402,7 +464,7 @@ Cargo-driven fields (the request is built from the load, not from the truck): `c
 > `renderPedidos()` **no longer writes.** It used to do the same five as a side effect of drawing the list, which is why `pedidos`/`ofertas` could not be published to Realtime. It keeps the equivalent normalization **in memory only** (cosmetic, so the screen shows the corrected state at once) while the row converges within 15 minutes. Consequence: a stale state now takes up to 15 minutes to settle in the DB instead of settling on render — and two open tabs no longer race to issue the same `UPDATE`.
 
 ### `ofertas` — company bids. PK `id` (uuid)
-`pedido_id`, `admin_id/_nombre`, `precio_oferta`, `contra_precio` (client counter), `ronda` (1|2), `camion_id`, `estado` (`enviada` | `contra_oferta` | `aceptada` | `rechazada`), `expira_en` (now + 2 days). The offered truck's `tipo` must match `pedidos.tipo_camion` (validated in `openHacerOferta` + `_enviarOfertaCore`).
+`pedido_id`, `admin_id/_nombre`, `precio_oferta`, `contra_precio` (client counter), `ronda` (≥ 1, no cap since Q-14 — `20260929191000`; 1|2 wherever that migration isn't applied yet), `camion_id`, `estado` (`enviada` | `contra_oferta` | `aceptada` | `rechazada`), `expira_en` (now + 2 days). The offered truck's `tipo` must match `pedidos.tipo_camion` (validated in `openHacerOferta` + `_enviarOfertaCore`). **One live offer per company per pedido** (`uq_ofertas_viva_por_empresa`, partial unique on `enviada`/`contra_oferta`/`aceptada`, Q-12) and amounts `> 0` in `precio_oferta`, `contra_precio`, `pedidos.precio_cliente` and `reservaciones.precio_acordado` (Q-13), since 2026-09-30.
 
 ### `reservaciones` — active bookings. PK `id` (uuid)
 `pedido_id` (links back for cancel-reopen), `propietario_id`, `cliente_user_id`, `cliente/_email`, `unidad`, `recurso_tipo` (`camion`|`custodio`|`patio`|`lavado`), `fecha_ini/_fin`, `precio_acordado`, `completado_en`, `calificado`.
@@ -429,6 +491,7 @@ Shared pattern: `propietario_id`, `estado` (`disponible`|`ocupado`|`no_disponibl
 
 ### Privacy & consent (`js/privacidad.js`)
 - `consentimientos`: `user_id`, `tipo` (`aviso_privacidad` | `terminos` | `datos_sensibles_operador`), `version`, `aceptado_en`, `contexto`, `referencia`. Written at registro and at alta de operador.
+- `consentimientos_bloqueados` (Q-11, `20260930160000`, in both projects since 2026-09-30): **legal hold**. A `BEFORE DELETE` trigger on `consentimientos` copies the minimum evidence here before the account-deletion cascade removes it. RLS on, **zero policies, no privileges for anon/authenticated/service_role** — never used for any operational purpose. Retention period still undefined (`conservar_hasta` NULL, no automatic purge); on expiry, anonymize (`titular`, `referencia` → NULL).
 - `solicitudes_arco`: ARCO rights requests. `tipo` (`acceso`|`rectificacion`|`cancelacion`|`oposicion`), `descripcion`, `estado` (`pendiente`|`en_proceso`|`atendida`|`rechazada`), `respuesta`, `atendida_por/_en`. Legal deadlines apply to responses.
 
 ### Other tables
@@ -445,7 +508,7 @@ Shared pattern: `propietario_id`, `estado` (`disponible`|`ocupado`|`no_disponibl
 **Helpers:** `is_superadmin()` (RLS), `mi_nombre()`, `tracking_pasos()`, `tabla_recurso()`, `es_servicio_camion()`, `recurso_tipo_de_servicio()`, `expire_stale_offers`, `check_reservacion_disponibilidad` (raises `RECURSO_NO_DISPONIBLE` / `P0001` on overlapping bookings — **`BEFORE`, so it fires before the `reservaciones_sin_solape` EXCLUDE is ever evaluated**; both compare `recurso_tipo` **and** `unidad` since 2026-09-25, and if you change one you must change the other, or the constraint silently stops matching what the user is told).
 **`updated_at` (H-19).** `trg_updated_at` → `set_updated_at()` on the ten tables with a state flow (pedidos, ofertas, reservaciones, perfiles, the four fleet tables, operadores, expedientes). Stamps **only when the row really changed** (`NEW IS DISTINCT FROM OLD`). **The name is load-bearing:** `BEFORE` triggers fire in alphabetical order and this one must run *after* the `trg_guard_*` — a guard can reject the update or revert `NEW`. A new `BEFORE` trigger starting with `v`…`z` would run after it; the migration's check fails if one appears. Queues still order by `created_at` — moving them is a separate client change.
 
-**Guard triggers — the transition police.** Beyond RLS (which decides *whether* you may write a row), these decide *which state changes are legal for you*: `trg_guard_perfil_self_update`, `trg_guard_reservacion_update`, `trg_guard_pedido_update`, `trg_guard_oferta_update`, `trg_guard_expediente_documento`, and one per fleet table (`camiones`, `custodios`, `patios`, `lavados`, `operadores`). They read `auth.uid()`, so **they still apply inside `SECURITY DEFINER` functions** — a bad transition rolls back the whole transaction.
+**Guard triggers — the transition police.** Beyond RLS (which decides *whether* you may write a row), these decide *which state changes are legal for you*: `trg_guard_perfil_self_update`, `trg_guard_perfil_insert` (since 2026-09-29, Q-01: a user can only create their own profile as `cliente`/`admin` + `pendiente`), `trg_guard_reservacion_update`, `trg_guard_pedido_update`, `trg_guard_oferta_update`, `trg_guard_oferta_insert` (since 2026-09-29, Q-04: a new offer is born `enviada`, round 1, ≤ 2-day expiry, only on an `abierto`/`en_negociacion` pedido; since 2026-09-30, Q-18: and never from a company the client rejected with `permite_reoferta = false`), `trg_guard_<fleet>_insert` on the five fleet tables (since 2026-09-29, Q-02: only a superadmin creates a resource already `aprobada`; `aprobacion` defaults to `'pendiente'` everywhere), `trg_guard_expediente_documento`, and one per fleet table (`camiones`, `custodios`, `patios`, `lavados`, `operadores`). They read `auth.uid()`, so **they still apply inside `SECURITY DEFINER` functions** — a bad transition rolls back the whole transaction.
 
 All `SECURITY DEFINER` with pinned `search_path`, not callable via REST.
 
@@ -483,7 +546,7 @@ Deploy with `mcp__supabase__deploy_edge_function` (or `supabase functions deploy
 ## PWA / Service Worker
 
 - `sw.js`: **network-first** for JS/CSS/HTML and for Supabase REST GETs (falls back to cache only when actually offline — a prior stale-while-revalidate strategy for REST GETs always served last-known data first, so the app looked "one step behind" until a second refresh; don't reintroduce it), network-only for auth/realtime/Edge Functions, cache-first for images.
-- New static assets → add to the `SHELL` list in `sw.js`. ⚠️ `js/detalle.js`, `js/notificaciones.js` and `css/detalle.css` are currently **missing** from `SHELL` — they load fine online (network-first) but are absent from the offline shell.
+- New static assets → add to the `SHELL` list in `sw.js`. ⚠️ This line said `js/detalle.js`, `js/notificaciones.js` and `css/detalle.css` were **missing** from `SHELL` until 2026-09-28; measured that day, the three are there (`sw.js:18,25,26`). It was `A3-B1`, and it is closed.
 - Bumping `CACHE` (`portgo-vXX`) purges all old caches on activate — required on every deploy.
 - `app.html` also loads **Leaflet 1.9.4 from unpkg** (CSS + JS) for the map picker — the only runtime CDN dependency besides the Supabase SDK. It is not in `SHELL`, so the map needs connectivity; `abrirMapa()` degrades with a toast when `L` is undefined.
 

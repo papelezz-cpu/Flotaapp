@@ -164,6 +164,8 @@ async function renderAdmin() {
   if (currentUser.rol === 'superadmin') await _cargarEmpresasDropdowns();
   else document.querySelectorAll('.sa-empresa-row').forEach(el => el.style.display = 'none');
 
+  await _poblarConfigVehicular();
+
   if (currentUser.rol !== 'superadmin') renderMisPendientes();
 
   // Render the currently active admin tab
@@ -211,6 +213,25 @@ async function _cargarEmpresasDropdowns() {
   document.querySelectorAll('.sa-empresa-row').forEach(el => el.style.display = '');
 }
 
+// Configuración vehicular (clave SAT del Complemento Carta Porte: C2, C3,
+// T3S2…) — mismo patrón que js/vigencias.js usa para 'vigencia_tipo': la
+// lista vive en `catalogos`, no en el código, así que agregar una clave
+// nueva es una fila, no un despliegue. No es una fecha de vigencia, así que
+// no entra al espejo (`vigencias`) — es un identificador estático.
+async function _poblarConfigVehicular() {
+  const altaSel  = document.getElementById('admin-config-vehicular');
+  const editSel  = document.getElementById('editar-config-vehicular');
+  if (!altaSel && !editSel) return;
+
+  const { data, error } = await sb.from('catalogos')
+    .select('valor, etiqueta').eq('clave', 'config_vehicular_sat').eq('activo', true).order('orden');
+  if (error || !data?.length) return;
+
+  const opts = data.map(c => `<option value="${esc(c.valor)}">${esc(c.valor)} — ${esc(c.etiqueta)}</option>`).join('');
+  if (altaSel) altaSel.innerHTML = `<option value="">— Seleccionar —</option>${opts}`;
+  if (editSel) editSel.innerHTML = `<option value="">— Seleccionar —</option>${opts}`;
+}
+
 function _getPropietarioId(tipo) {
   if (currentUser.rol !== 'superadmin') return currentUser.id;
   const val = document.getElementById(`sa-empresa-${tipo}`)?.value;
@@ -245,6 +266,11 @@ async function renderPerfilEmpresa() {
   set('pe-anos',     p.anos_operacion);
   set('pe-unidades', p.num_unidades);
   set('pe-desc',      p.descripcion);
+  set('pe-calle',    p.calle);
+  set('pe-colonia',  p.colonia);
+  set('pe-cp',       p.cp);
+  set('pe-ciudad',   p.ciudad);
+  set('pe-estado',   p.estado_mx);
 
   // Mostrar fechas pendientes o aprobadas en los campos de documentos.
   // permiso_sct baja aquí con su fecha y su documento: el número suelto no
@@ -279,6 +305,11 @@ async function guardarPerfilEmpresa() {
     anos_operacion: parseInt(document.getElementById('pe-anos').value)    || null,
     num_unidades:   parseInt(document.getElementById('pe-unidades').value) || null,
     descripcion:    document.getElementById('pe-desc').value.trim(),
+    calle:          document.getElementById('pe-calle').value.trim()   || null,
+    colonia:        document.getElementById('pe-colonia').value.trim() || null,
+    cp:             document.getElementById('pe-cp').value.trim()      || null,
+    ciudad:         document.getElementById('pe-ciudad').value.trim()  || null,
+    estado_mx:      document.getElementById('pe-estado').value.trim()  || null,
   };
   // permiso_sct, seguro_rc y seguro_carga NO se mandan desde aquí: dejaron de
   // ser algo que la empresa declara y pasaron a ser consecuencia de un
@@ -320,21 +351,42 @@ async function solicitarActualizacionDocs() {
   const uid = currentUser.id;
   const ts  = Date.now();
 
-  const _uploadDoc = async (inputId, nombre) => {
+  // Antes, si sb.storage...upload() fallaba, esta función devolvía null en
+  // silencio: el formulario seguía como si todo hubiera salido bien, la
+  // fecha de vencimiento quedaba guardada SIN su documento, y el usuario
+  // veía "✓ Documentos enviados" sin enterarse de que faltó el archivo.
+  // Encontrado el 2026-09-30 probando el flujo de Carta Porte: la tarjeta
+  // de aprobación mostraba la fecha del permiso SCT con "Sin archivo".
+  let _errorSubida = null;
+  const _uploadDoc = async (inputId, nombre, label) => {
     const file = document.getElementById(inputId)?.files?.[0];
     if (!file) return null;
     const ext  = file.name.split('.').pop();
     const path = `${uid}/${nombre}_${ts}.${ext}`;
     const { error } = await sb.storage.from('documentos-empresa').upload(path, file, { upsert: true });
-    if (error) return null;
+    if (error) {
+      console.error(`No se pudo subir ${label}:`, error);
+      _errorSubida = `No se pudo subir ${label}: ${error.message}`;
+      return null;
+    }
     return sb.storage.from('documentos-empresa').getPublicUrl(path).data?.publicUrl || null;
   };
 
   const [docSct, docRc, docCarga] = await Promise.all([
-    _uploadDoc('pe-doc-sct',   'permiso_sct'),
-    _uploadDoc('pe-doc-rc',    'seguro_rc'),
-    _uploadDoc('pe-doc-carga', 'seguro_carga'),
+    _uploadDoc('pe-doc-sct',   'permiso_sct', 'el permiso SCT'),
+    _uploadDoc('pe-doc-rc',    'seguro_rc', 'el seguro RC'),
+    _uploadDoc('pe-doc-carga', 'seguro_carga', 'el seguro de carga'),
   ]);
+
+  // Mismo criterio que la comprobación de arriba (un archivo sin fecha no
+  // se manda): una fecha cuyo archivo no se pudo subir tampoco se manda.
+  // Se detiene todo el envío, no solo el documento que falló, para no dejar
+  // "documentos pendientes" a medias.
+  if (_errorSubida) {
+    _done();
+    showToast(_errorSubida, 'error');
+    return;
+  }
 
   const payload = {
     perfil_docs_pendiente:                    true,
@@ -451,6 +503,8 @@ async function editarCamion(id) {
   set('editar-dim', c.dimensiones || '');
   set('editar-precio', c.precio_dia || '');
   set('editar-estado', c.estado);
+  set('editar-config-vehicular', c.configuracion_vehicular || '');
+  set('editar-numero-permiso-sct', c.numero_permiso_sct || '');
   set('editar-marca', c.marca || '');
   set('editar-num-serie', c.num_serie || '');
   set('editar-num-motor', c.num_motor || '');
@@ -501,6 +555,8 @@ async function guardarEdicion() {
     precio_dia:          parseFloat(document.getElementById('editar-precio').value) || null,
     estado:              document.getElementById('editar-estado').value,
     emoji:               { Torton:'🚛', Rabón:'🚚', Full:'🚛', Plataforma:'🏗️' }[tipo] || '🚛',
+    configuracion_vehicular: g('editar-config-vehicular'),
+    numero_permiso_sct:      g('editar-numero-permiso-sct'),
     marca:               g('editar-marca'),
     num_serie:           g('editar-num-serie'),
     num_motor:           g('editar-num-motor'),
@@ -1039,6 +1095,8 @@ async function agregarCamion() {
     ...(placas         && { placas }),
     ...(dim            && { dimensiones: dim }),
     ...(tipoCarga.length && { tipo_carga: tipoCarga }),
+    configuracion_vehicular: g('admin-config-vehicular'),
+    numero_permiso_sct:      g('admin-numero-permiso-sct'),
     marca:               g('admin-marca'),
     version:             g('admin-version'),
     modelo_anio:         parseInt(document.getElementById('admin-modelo-anio')?.value) || null,

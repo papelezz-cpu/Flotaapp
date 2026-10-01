@@ -799,10 +799,10 @@ function pedidoCardHTML(p, ofertas, vista, miOferta = null) {
         : ''}`;
   }
 
-  // Superadmin puede eliminar cualquier pedido
-  const btnEliminar = currentUser.rol === 'superadmin'
-    ? `<button class="btn-edit btn-rechazar" style="font-size:0.72rem" onclick="eliminarPedido('${p.id}')">🗑 Eliminar</button>`
-    : '';
+  // Q-06 (2026-09-30): los pedidos no se borran, ni el superadmin — la base ya
+  // no concede DELETE (20260930130000). Lo que se quiera quitar de la vista se
+  // archivará, con una función aparte que todavía no existe.
+  const btnEliminar = '';
 
   // Chips de detalles extra según tipo
   const esLavadoCard   = p.tipo_camion?.startsWith('Lavado') || p.tipo_camion === 'Desinfección';
@@ -1595,8 +1595,26 @@ async function crearPedido() {
     origen_lng:       esCamion ? (_mapaPuntos?.origen?.lng  ?? null) : null,
     destino_lat:      esCamion ? (_mapaPuntos?.destino?.lat ?? null) : null,
     destino_lng:      esCamion ? (_mapaPuntos?.destino?.lng ?? null) : null,
+    // Domicilio estructurado, gratis: js/mapa.js ya le pregunta a Nominatim
+    // por el punto marcado (para la etiqueta legible) y ahora también guarda
+    // el desglose que la misma respuesta trae — sin pedirle nada nuevo al
+    // cliente. Nominatim no siempre lo resuelve todo (zonas portuarias, por
+    // ejemplo): lo que falte queda nulo, nunca inventado.
+    origen_colonia:   esCamion ? (_mapaPuntos?.origen?.colonia  ?? null) : null,
+    origen_cp:        esCamion ? (_mapaPuntos?.origen?.cp       ?? null) : null,
+    origen_ciudad:    esCamion ? (_mapaPuntos?.origen?.ciudad   ?? null) : null,
+    origen_estado:    esCamion ? (_mapaPuntos?.origen?.estado   ?? null) : null,
+    destino_colonia:  esCamion ? (_mapaPuntos?.destino?.colonia ?? null) : null,
+    destino_cp:       esCamion ? (_mapaPuntos?.destino?.cp      ?? null) : null,
+    destino_ciudad:   esCamion ? (_mapaPuntos?.destino?.ciudad  ?? null) : null,
+    destino_estado:   esCamion ? (_mapaPuntos?.destino?.estado  ?? null) : null,
     capacidad_min:    esCamion ? vi('np-cap')    : null,
     tipo_carga:       esCamion ? v('np-carga')   : null,
+    // Opcional a propósito: el catálogo SAT de productos/servicios tiene
+    // decenas de miles de claves, no se importa completo (ver Etapa 5 del
+    // plan de Carta Porte). Quien ya hace comercio exterior normalmente
+    // conoce la suya; quien no, deja el campo vacío y no bloquea el pedido.
+    clave_prod_serv_sat: esCamion ? v('np-clave-sat') : null,
     peso_carga:       esCamion ? vn('np-peso')   : null,
     num_tarimas:      _campoAplica('tarimas') ? vi('np-tarimas') : null,
     // Volumen equivalente, derivado: sirve para reportes sin volver a pedirle
@@ -1995,10 +2013,16 @@ async function enviarContraoferta(ofertaId) {
   const msg    = document.getElementById(`contra-msg-${ofertaId}`).value.trim();
   if (!precio || precio <= 0) { showToast('Ingresa un precio válido.', 'error'); return; }
 
+  // Q-14: la negociación ya no tiene tope de rondas (la acota la caducidad de
+  // la oferta). La ronda avanza desde la actual; antes se fijaba en 2 y una
+  // segunda contraoferta del cliente la hacía retroceder.
+  const { data: actual, error: eLee } = await sb.from('ofertas').select('ronda').eq('id', ofertaId).single();
+  if (eLee || !actual) { showToast('No se pudo leer la oferta: ' + (eLee?.message || ''), 'error'); return; }
+
   const { error } = await sb.from('ofertas').update({
     contra_precio:  precio,
     contra_mensaje: msg || null,
-    ronda:          2,
+    ronda:          (actual.ronda || 1) + 1,
     estado:         'contra_oferta',
   }).eq('id', ofertaId);
   if (error) { showToast('Error al enviar contraoferta'); return; }
@@ -2690,6 +2714,8 @@ function cancelarPedido(pedidoId) {
 }
 
 // ── ELIMINAR PEDIDO (superadmin) ───────────────────────
+// SIN USO desde Q-06 (2026-09-30): ningún botón la llama y la base ya no
+// concede DELETE sobre pedidos. La sustituirá la función de archivar.
 
 function eliminarPedido(pedidoId) {
   showConfirm('¿Eliminar esta solicitud permanentemente? Esta acción no se puede deshacer.', async () => {

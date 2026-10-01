@@ -15,7 +15,7 @@ const MAPA_ZOOM_INICIAL = 6;
 let _mapa = null;
 let _mapaMarcador = null;
 let _mapaCampo = null;      // 'origen' | 'destino'
-let _mapaPunto = null;      // { lat, lng, etiqueta }
+let _mapaPunto = null;      // { lat, lng, etiqueta, colonia, cp, ciudad, estado }
 
 // Lo que quedó marcado para cada campo. Se lee al publicar la solicitud.
 const _mapaPuntos = { origen: null, destino: null };
@@ -67,8 +67,25 @@ function cerrarMapa() {
   document.getElementById('modal-mapa').classList.remove('open');
 }
 
-function _ponerPin(lat, lng, etiqueta) {
-  _mapaPunto = { lat, lng, etiqueta: etiqueta || null };
+// Nominatim ya trae el desglose de la dirección (colonia, CP, ciudad,
+// estado) en la misma respuesta que se pide para la etiqueta legible — se
+// aprovecha para la Carta Porte de referencia, sin pedirle nada nuevo al
+// cliente. Los nombres de campo varían según qué tan urbano sea el lugar
+// (`suburb` vs `neighbourhood`, `city` vs `town`/`village`), y a veces
+// Nominatim simplemente no los tiene (zonas portuarias, por ejemplo) — lo
+// que falte queda nulo, nunca inventado.
+function _direccionDeNominatim(address) {
+  if (!address) return {};
+  return {
+    colonia: address.suburb || address.neighbourhood || address.quarter || null,
+    cp:      address.postcode || null,
+    ciudad:  address.city || address.town || address.village || address.municipality || null,
+    estado:  address.state || null,
+  };
+}
+
+function _ponerPin(lat, lng, etiqueta, address) {
+  _mapaPunto = { lat, lng, etiqueta: etiqueta || null, ..._direccionDeNominatim(address) };
   if (_mapaMarcador) {
     _mapaMarcador.setLatLng([lat, lng]);
   } else {
@@ -96,11 +113,12 @@ function _pintarSeleccion() {
 // siendo válido porque lo que importa son las coordenadas.
 async function _reverseGeocode(lat, lng) {
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`;
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=es`;
     const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
     const d = await r.json();
     if (d?.display_name && _mapaPunto && _mapaPunto.lat === lat) {
       _mapaPunto.etiqueta = d.display_name;
+      Object.assign(_mapaPunto, _direccionDeNominatim(d.address));
       _pintarSeleccion();
     }
   } catch (e) { console.warn('Reverse geocode falló:', e); }
@@ -110,7 +128,7 @@ async function buscarEnMapa(texto) {
   const q = String(texto ?? document.getElementById('mapa-buscar-input')?.value ?? '').trim();
   if (!q || !_mapa) return;
   try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=mx&accept-language=es`;
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=mx&addressdetails=1&accept-language=es`;
     const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
     const d = await r.json();
     if (!d?.length) {
@@ -121,7 +139,7 @@ async function buscarEnMapa(texto) {
     _mapa.setView([lat, lng], 15);
     // Buscar ya deja el pin puesto ahí — el usuario solo lo arrastra si el
     // resultado no cayó exacto, en vez de tener que tocar el mapa aparte.
-    _ponerPin(lat, lng, d[0].display_name);
+    _ponerPin(lat, lng, d[0].display_name, d[0].address);
   } catch (e) {
     console.warn('Búsqueda en mapa falló:', e);
   }

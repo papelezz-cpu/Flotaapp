@@ -47,15 +47,14 @@ async function renderCatalogo() {
     sb.from('custodios_publico').select('id, tipo, estado, propietario_id').in('propietario_id', ids),
     sb.from('patios_publico'   ).select('id, tipo, estado, propietario_id').in('propietario_id', ids),
     sb.from('lavados_publico'  ).select('id, tipos_vehiculo, tipos_lavado, estado, propietario_id').in('propietario_id', ids),
-    sb.from('calificaciones').select('admin_id, rating, comentario, created_at').in('admin_id', ids).order('created_at', { ascending: false }),
+    // Q-09 (2026-09-30): solo total y promedio, calculados en la base. Antes se
+    // bajaban todas las calificaciones —con sus comentarios— para contarlas.
+    // Los comentarios se piden al abrir «Ver reseñas» (openVerCalificaciones).
+    sb.from('calificaciones_resumen').select('admin_id, total, promedio').in('admin_id', ids),
   ]);
 
-  // Agrupar calificaciones por empresa
   const califMap = {};
-  (califs || []).forEach(c => {
-    if (!califMap[c.admin_id]) califMap[c.admin_id] = [];
-    califMap[c.admin_id].push(c);
-  });
+  (califs || []).forEach(c => { califMap[c.admin_id] = c; });
 
   const empresas = perfiles.map(p => ({
     ...p,
@@ -63,7 +62,8 @@ async function renderCatalogo() {
     custodios: (custodios || []).filter(r => r.propietario_id === p.user_id),
     patios:    (patios    || []).filter(r => r.propietario_id === p.user_id),
     lavados:   (lavados   || []).filter(r => r.propietario_id === p.user_id),
-    califs:    califMap[p.user_id] || [],
+    calTotal:  califMap[p.user_id]?.total || 0,
+    calProm:   Number(califMap[p.user_id]?.promedio) || 0,
   })).filter(e =>
     e.camiones.length + e.custodios.length + e.patios.length + e.lavados.length > 0
   );
@@ -105,8 +105,8 @@ function _empresaCardHTML(e) {
   ).join('');
 
   // Rating promedio
-  const numCal = e.califs.length;
-  const avg    = numCal ? (e.califs.reduce((s, c) => s + c.rating, 0) / numCal) : 0;
+  const numCal = e.calTotal;
+  const avg    = numCal ? e.calProm : 0;
   const avgStr = avg.toFixed(1);
   const stars  = numCal
     ? `<div class="emp-rating">
@@ -191,7 +191,7 @@ function _tieneFicha(e) {
             e.permiso_sct  ||
             e.fecha_vencimiento_permiso_sct || e.fecha_vencimiento_seguro_rc ||
             e.fecha_vencimiento_seguro_carga ||
-            e.anos_operacion || e.num_unidades || e.califs?.length);
+            e.anos_operacion || e.num_unidades || e.calTotal);
 }
 
 // ─── Bloque genérico (camiones / custodios / patios) ────
@@ -299,14 +299,19 @@ async function abrirPerfilEmpresaCat(adminId, adminNombre) {
     '<div style="text-align:center;padding:24px;color:var(--text-muted)">Cargando…</div>';
   document.getElementById('modal-emp-cat').classList.add('open');
 
-  const [{ data: p }, { data: cals }] = await Promise.all([
+  const [{ data: p }, { data: cals }, { data: resumen }] = await Promise.all([
     sb.from('empresas_publico')
       .select('rfc, razon_social, anos_operacion, num_unidades, seguro_rc, seguro_carga, permiso_sct, descripcion, telefono, fecha_vencimiento_permiso_sct, fecha_vencimiento_seguro_rc, fecha_vencimiento_seguro_carga')
       .eq('user_id', adminId).maybeSingle(),
     sb.from('calificaciones').select('rating, comentario, created_at').eq('admin_id', adminId).order('created_at', { ascending: false }).limit(5),
+    sb.from('calificaciones_resumen').select('total, promedio').eq('admin_id', adminId).maybeSingle(),
   ]);
 
-  const avg = cals?.length ? (cals.reduce((s, c) => s + c.rating, 0) / cals.length).toFixed(1) : null;
+  // El promedio sale de TODAS las calificaciones (calificaciones_resumen, Q-09),
+  // igual que en la tarjeta del catálogo. Antes se calculaba con las 5 últimas,
+  // que son solo las que se piden para mostrar comentarios, y los dos números
+  // no coincidían en cuanto una empresa tenía más de 5.
+  const avg = resumen?.total ? Number(resumen.promedio).toFixed(1) : null;
 
   const hoyEpc = new Date().toISOString().slice(0, 10);
   const _fmtDoc = (fecha) => {

@@ -253,20 +253,27 @@ async function guardarEntregaFisica() {
   showToast('✓ Datos de entrega guardados');
 }
 
-// Depósito y fecha límite: es donde está el dinero de las demoras.
+// Depósito y fecha límite: es donde está el dinero de las demoras. Lo fija
+// el transportista, no el cliente — guard_expediente_update ya lo bloquea
+// del lado de la base (es trabajo del transportista, no del cliente: si el
+// cliente pudiera poner su propia fecha límite, podría fijarla cómoda para
+// él mismo y evitarse cargos). Esta condición tenía el `soyCliente` volteado
+// —copiado de _expEntregaFisicaHTML, donde sí es al revés— y dejaba ver el
+// formulario editable al cliente, que el guard rechazaba en silencio hasta
+// que dejó de estarlo. El guard nunca estuvo mal; esta función sí.
 function _expVaciosHTML(e, soyCliente) {
   return `
     <div class="exp-vacios">
       <div class="form-group">
         <label>Depósito de vacíos asignado</label>
         <input type="text" id="exp-deposito" value="${esc(e.deposito_vacios || '')}"
-               placeholder="Ej. Patio Ferromex, Av. Tepeyac 300" ${soyCliente ? '' : 'disabled'}>
+               placeholder="Ej. Patio Ferromex, Av. Tepeyac 300" ${soyCliente ? 'disabled' : ''}>
       </div>
       <div class="form-group">
         <label>Último día para devolver sin demoras</label>
-        <input type="date" id="exp-fecha-limite" value="${e.fecha_limite_vacios || ''}" ${soyCliente ? '' : 'disabled'}>
+        <input type="date" id="exp-fecha-limite" value="${e.fecha_limite_vacios || ''}" ${soyCliente ? 'disabled' : ''}>
       </div>
-      ${soyCliente ? `<button class="btn-add" onclick="guardarDatosVacios()">💾 Guardar</button>` : ''}
+      ${soyCliente ? '' : `<button class="btn-add" onclick="guardarDatosVacios()">💾 Guardar</button>`}
     </div>`;
 }
 
@@ -337,6 +344,19 @@ async function subirDocumento(docId, input) {
 }
 
 // Cuando ya está todo lo obligatorio, se avisa al transportista una sola vez.
+//
+// El UPDATE de abajo pasa por trg_guard_expediente_update (guard_expediente_
+// update en supabase/migrations/20260817190000_...): esa función bloquea
+// cualquier cambio de `estado` hecho por el cliente EXCEPTO esta transición
+// exacta 'solicitado' → 'en_revision', y solo si el propio guard confirma
+// contra `expediente_documentos` que no falta nada obligatorio — no confía
+// en el cálculo de arriba, lo repite del lado de la base.
+//
+// actualizarConfirmado() —y no un .update() suelto— porque este UPDATE SÍ
+// puede fallar (el guard puede rechazarlo) y antes de la migración
+// 20260929120000 el error se ignoraba: el expediente se quedaba en
+// 'solicitado' pero el aviso al transportista salía igual, como si el
+// cambio hubiera pasado. Ahora, si falla, no se avisa nada.
 async function _avisarSiCompleto() {
   const { expediente: e, docs } = _expActual;
   const oblig = docs.filter(d => d.obligatorio);
@@ -344,7 +364,9 @@ async function _avisarSiCompleto() {
   if (!oblig.length || listos.length < oblig.length) return;
   if (e.estado !== 'solicitado') return;
 
-  await sb.from('expedientes').update({ estado: 'en_revision' }).eq('id', e.id);
+  const ok = await actualizarConfirmado('expedientes', { id: e.id }, { estado: 'en_revision' }, 'el expediente');
+  if (!ok) return;
+
   const cfg = EXP_ETAPAS[e.etapa];
   await _avisarTransportista(e.reserva_id, e.etapa,
     '📄 Documentación lista para revisar',
@@ -511,12 +533,15 @@ async function abrirExpedienteVaciosSiAplica(reserva) {
 }
 
 // ── Botones dentro de la fila de la reservación ─────────
-// `siguiente` ('puerto' | 'vacios' | otro): la clave de _siguientePasoReserva;
-// si coincide con la etapa, la pastilla se resalta como "lo que toca ahora".
+// `siguiente`: claves de _siguientesPasosReserva pendientes AHORA — un
+// arreglo (puede traer 'puerto' y 'vacios' los dos a la vez) o, por
+// compatibilidad, una sola clave suelta. Si la etapa aparece, esa pastilla
+// se resalta como "lo que toca ahora" — puede haber más de una resaltada.
 function expedienteBotonesHTML(r, soyCliente, siguiente) {
+  const pendientes = Array.isArray(siguiente) ? siguiente : (siguiente ? [siguiente] : []);
   const btns = [];
   const pill = (etapa, exp) => {
-    const nx = siguiente === (etapa === 'entrega_vacios' ? 'vacios' : 'puerto') ? ' reserv-next' : '';
+    const nx = pendientes.includes(etapa === 'entrega_vacios' ? 'vacios' : 'puerto') ? ' reserv-next' : '';
     const cfg = EXP_ETAPAS[etapa];
     const nombre = etapa === 'entrega_vacios' ? 'Vacíos' : 'Puerto';
     if (!exp) {

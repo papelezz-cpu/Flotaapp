@@ -57,6 +57,12 @@ echo
 echo "  Todo esto va en UNA transacción: entra completo o no entra nada."
 echo
 
+# Choques con trabajo de otra persona pendiente de promover: lo que esta en
+# pruebas y aun no en produccion, fuera de esta tanda. Solo lee el
+# repositorio; avisa antes de la autorizacion, no decide por nadie.
+bash "$AQUI/choques-migraciones.sh" "$@"   || echo "  ⚠ Hay avisos de choque arriba: revísalos antes de autorizar."
+echo
+
 preguntar "  Escribe APLICAR A PRODUCCION para continuar: " || exit 2
 OK="$RESPUESTA"
 # El acento se quita ANTES de mayusculizar: tr trabaja por bytes y a la "ó"

@@ -28,7 +28,7 @@
   <!-- Estilos -->
   <link rel="stylesheet" href="css/base.css?v=8">
   <link rel="stylesheet" href="css/layout.css?v=4">
-  <link rel="stylesheet" href="css/components.css?v=37">
+  <link rel="stylesheet" href="css/components.css?v=41">
   <!-- Mapa para marcar origen y destino. Leaflet + OpenStreetMap: sin API key
        ni facturación, y ya usamos Nominatim (mismo proyecto) para geocodificar. -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -148,12 +148,12 @@
       <div class="ped-filtro-pills">
         <button class="ped-filtro-pill active" data-rest="Activa"     onclick="filtrarReservas('Activa')">Activas</button>
         <button class="ped-filtro-pill"        data-rest="Pendiente"  onclick="filtrarReservas('Pendiente')">Pendientes</button>
-        <button class="ped-filtro-pill"        data-rest="PorAprobar" onclick="filtrarReservas('PorAprobar')">Por aprobar</button>
+        <button class="ped-filtro-pill"        data-rest="PorAprobar" onclick="filtrarReservas('PorAprobar')">Por aprobar<span class="pill-count"></span></button>
         <button class="ped-filtro-pill"        data-rest="Completada" onclick="filtrarReservas('Completada')">Completadas</button>
         <button class="ped-filtro-pill"        data-rest="Cancelada"  onclick="filtrarReservas('Cancelada')">Canceladas</button>
-        <button class="ped-filtro-pill"        data-rest="CancelacionSolicitada" onclick="filtrarReservas('CancelacionSolicitada')">Cancelación en revisión</button>
-        <button class="ped-filtro-pill"        data-rest="PorCobrar"  onclick="filtrarReservas('PorCobrar')">Por cobrar</button>
-        <button class="ped-filtro-pill pill-alerta" data-rest="Vencido" onclick="filtrarReservas('Vencido')">Pago vencido</button>
+        <button class="ped-filtro-pill"        data-rest="CancelacionSolicitada" onclick="filtrarReservas('CancelacionSolicitada')">Cancelación en revisión<span class="pill-count"></span></button>
+        <button class="ped-filtro-pill"        data-rest="PorCobrar"  onclick="filtrarReservas('PorCobrar')"><span class="pill-label">Por cobrar</span><span class="pill-count"></span></button>
+        <button class="ped-filtro-pill pill-alerta" data-rest="Vencido" onclick="filtrarReservas('Vencido')">Pago vencido<span class="pill-count"></span></button>
         <button class="ped-filtro-pill"        data-rest="todas"      onclick="filtrarReservas('todas')">Todas</button>
       </div>
     </div>
@@ -262,6 +262,30 @@
           <div class="form-group" style="grid-column:1/-1">
             <label>Descripción de la empresa</label>
             <textarea id="pe-desc" rows="3" placeholder="¿Qué servicios ofrecen? ¿Zonas que cubren? ¿Especialidad?"></textarea>
+          </div>
+        </div>
+        <!-- ── Domicilio fiscal ─────────────────────────────── -->
+        <div class="op-form-section-title" style="margin-top:20px">📍 Domicilio fiscal</div>
+        <div class="admin-grid" style="margin-top:4px">
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Calle y número</label>
+            <input type="text" id="pe-calle" placeholder="Ej. Av. Industrial 450">
+          </div>
+          <div class="form-group">
+            <label>Colonia</label>
+            <input type="text" id="pe-colonia" placeholder="Ej. Zona Industrial">
+          </div>
+          <div class="form-group">
+            <label>Código postal</label>
+            <input type="text" id="pe-cp" placeholder="Ej. 64000" maxlength="5">
+          </div>
+          <div class="form-group">
+            <label>Ciudad</label>
+            <input type="text" id="pe-ciudad" placeholder="Ej. Monterrey">
+          </div>
+          <div class="form-group">
+            <label>Estado</label>
+            <input type="text" id="pe-estado" placeholder="Ej. Nuevo León">
           </div>
         </div>
         <button class="btn-add" style="margin-top:8px" onclick="guardarPerfilEmpresa()">💾 Guardar perfil</button>
@@ -384,6 +408,12 @@
           </select>
         </div>
         <div class="form-group">
+          <label>Configuración vehicular (SAT)</label>
+          <select id="admin-config-vehicular">
+            <option value="">— Seleccionar —</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>Marca</label>
           <select id="admin-marca">
             <option value="">— Seleccionar —</option>
@@ -469,6 +499,10 @@
         <div class="form-group">
           <label>Vencimiento del seguro</label>
           <input type="date" id="admin-vence-seguro">
+        </div>
+        <div class="form-group">
+          <label>Número de permiso SCT (de esta unidad)</label>
+          <input type="text" id="admin-numero-permiso-sct" placeholder="Ej. SCT/TPAF/MZ-0001/2024">
         </div>
         <div class="form-group">
           <label>Vencimiento del permiso SCT</label>
@@ -1159,6 +1193,59 @@
   </div>
 </div>
 
+<!-- ══ VISTA: MI PERFIL (cliente) ═══════════════════════ -->
+<div id="view-mi-perfil" class="view">
+  <div class="page">
+    <button class="btn-back-home" onclick="showView('home', null)">← Inicio</button>
+    <div class="section-title">🧾 Mi perfil</div>
+    <div class="admin-card">
+      <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px">
+        Estos son los datos fiscales con los que te diste de alta. Mantenlos
+        al día — se usan para identificarte ante el transportista y en tus
+        documentos de viaje.
+      </p>
+      <div class="admin-grid">
+        <div class="form-group">
+          <label>Razón social</label>
+          <input type="text" id="mp-razon" placeholder="Ej. Comercializadora ACME S.A. de C.V.">
+        </div>
+        <div class="form-group">
+          <label>RFC</label>
+          <input type="text" id="mp-rfc" placeholder="Ej. ACM900101ABC">
+        </div>
+        <div class="form-group">
+          <label>Teléfono de contacto</label>
+          <input type="tel" id="mp-telefono" placeholder="+52 314 000 0000">
+        </div>
+      </div>
+      <div class="op-form-section-title" style="margin-top:20px">📍 Domicilio fiscal</div>
+      <div class="admin-grid" style="margin-top:4px">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Calle y número</label>
+          <input type="text" id="mp-calle" placeholder="Ej. Av. Insurgentes 123">
+        </div>
+        <div class="form-group">
+          <label>Colonia</label>
+          <input type="text" id="mp-colonia" placeholder="Ej. Roma Norte">
+        </div>
+        <div class="form-group">
+          <label>Código postal</label>
+          <input type="text" id="mp-cp" placeholder="Ej. 06600" maxlength="5">
+        </div>
+        <div class="form-group">
+          <label>Ciudad</label>
+          <input type="text" id="mp-ciudad" placeholder="Ej. CDMX">
+        </div>
+        <div class="form-group">
+          <label>Estado</label>
+          <input type="text" id="mp-estado" placeholder="Ej. Ciudad de México">
+        </div>
+      </div>
+      <button class="btn-add" style="margin-top:8px" onclick="guardarMiPerfil()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ VISTA: VERIFICAR USUARIO (foto en persona) ══════ -->
 <div id="view-verificacion" class="view">
   <div class="page">
@@ -1317,6 +1404,10 @@
           <div class="form-group" style="grid-column:1/-1">
             <label>Descripción de la mercancía *</label>
             <input type="text" id="np-carga" placeholder="Ej. Electrónicos, refacciones automotrices">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Clave de producto/servicio SAT <small>(opcional)</small></label>
+            <input type="text" id="np-clave-sat" placeholder="Ej. 25171500" maxlength="8">
           </div>
 
           <!-- Contenedores: contenerizada y general -->
@@ -1989,6 +2080,12 @@
       </select>
     </div>
     <div class="form-group">
+      <label>Configuración vehicular (SAT)</label>
+      <select id="editar-config-vehicular">
+        <option value="">— Seleccionar —</option>
+      </select>
+    </div>
+    <div class="form-group">
       <label>Marca</label>
       <select id="editar-marca">
         <option value="">— Seleccionar —</option>
@@ -2059,6 +2156,10 @@
         <span id="editar-doc-seguro-label" class="file-upload-text">Adjuntar póliza de seguro</span>
       </label>
       <input type="file" id="editar-doc-seguro" accept="image/*,.pdf" style="display:none" onchange="updateFileLabel('editar-doc-seguro','editar-doc-seguro-label')">
+    </div>
+    <div class="form-group">
+      <label>Número de permiso SCT (de esta unidad)</label>
+      <input type="text" id="editar-numero-permiso-sct" placeholder="Ej. SCT/TPAF/MZ-0001/2024">
     </div>
     <div class="form-group">
       <label>Vence permiso SCT</label>
@@ -2710,30 +2811,32 @@
 <script src="js/notificaciones.js?v=21"></script>
 <script src="js/detalle.js?v=15"></script>
 <script src="js/config.js?v=13"></script>
-<script src="js/auth.js?v=24"></script>
+<script src="js/auth.js?v=25"></script>
 <script src="js/theme.js?v=11"></script>
-<script src="js/views.js?v=34"></script>
+<script src="js/views.js?v=36"></script>
 <script src="js/camiones.js?v=13"></script>
 <script src="js/recursos.js?v=13"></script>
-<script src="js/reservaciones.js?v=59"></script>
+<script src="js/reservaciones.js?v=67"></script>
+<script src="js/cartaporte.js?v=2"></script>
 <script src="js/modal.js?v=14"></script>
-<script src="js/mapa.js?v=4"></script>
-<script src="js/expedientes.js?v=8"></script>
-<script src="js/pedidos.js?v=86"></script>
+<script src="js/mapa.js?v=5"></script>
+<script src="js/expedientes.js?v=11"></script>
+<script src="js/pedidos.js?v=90"></script>
 <script src="js/plantillas.js?v=9"></script>
-<script src="js/aprobaciones.js?v=47"></script>
-<script src="js/admin.js?v=38"></script>
-<script src="js/operadores.js?v=18"></script>
+<script src="js/aprobaciones.js?v=48"></script>
+<script src="js/admin.js?v=41"></script>
+<script src="js/operadores.js?v=19"></script>
 <script src="js/usuarios.js?v=22"></script>
 <script src="js/verificacion.js?v=1"></script>
 <script src="js/privacidad.js?v=2"></script>
 <script src="js/preferencias.js?v=1"></script>
-<script src="js/cobros.js?v=4"></script>
+<script src="js/perfil.js?v=1"></script>
+<script src="js/cobros.js?v=6"></script>
 <script src="js/reportes.js?v=4"></script>
-<script src="js/catalogo.js?v=25"></script>
+<script src="js/catalogo.js?v=27"></script>
 <script src="js/tracking.js?v=14"></script>
-<script src="js/vigencias.js?v=8"></script>
-<script src="js/main.js?v=20"></script>
+<script src="js/vigencias.js?v=9"></script>
+<script src="js/main.js?v=23"></script>
 
 </body>
 </html>
