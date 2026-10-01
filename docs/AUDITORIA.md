@@ -152,6 +152,20 @@ de este archivo que hay que leer para trabajar hoy.
 Una auditoría dijo que estaba resuelto, y al medirlo no lo está. Es el motivo por el que
 este archivo existe.
 
+> **Actualización 01/10 (6ª auditoría): ejecutado y corregido en pruebas, producción pendiente.**
+> Ejecutado por primera vez en banco local con el esquema de producción: una empresa cambió
+> origen, destino, `precio_cliente = 1`, fechas y `cliente_email` de la solicitud abierta de
+> un cliente ajeno. `20261001150000_empresa_no_reescribe_pedidos_ajenos.sql` lo cierra en
+> el guard, no en la política (la empresa sí tiene que escribir `estado` en solicitudes
+> ajenas, y una política no compara `OLD` con `NEW`): en la rama de empresa solo puede
+> cambiar `estado`, y `oferta_pendiente_id` solo a `NULL`. Inventario previo de todos los
+> escritores con JWT de empresa (web, Android, las 7 funciones con `UPDATE pedidos`): solo
+> escriben esas dos. Bloque insertado sobre la definición viva; 8 casos; dos sabotajes en
+> banco local la abortan; `cancelar_reservacion()` como empresa sigue funcionando.
+> **Aplicada en pruebas el 01/10; medido por API con la empresa de pruebas:** cambiar precio
+> u origen de una solicitud ajena da HTTP 400 con hint `A2-C3` y la solicitud queda intacta.
+> Lo de abajo es el diagnóstico original y se conserva.
+
 - **La 2ª auditoría (28/08)** lo levantó: `ped_update` concede `UPDATE` a cualquier
   `admin`/`superadmin` sin `WITH CHECK`, y `guard_pedido_update` **solo vigila transiciones
   de `estado`**. Una empresa podría reescribir `origen`, `destino`, `precio_cliente`,
@@ -558,8 +572,8 @@ trabajo.
    de estado rechaza el segundo intento. El índice es la garantía real, no la prueba.
 6. **Cuántas sesiones concurrentes hay.** Sin ese dato no se puede justificar el umbral de
    reparto de Realtime, ni el particionado de `notificaciones`, ni el índice trigram.
-7. **`A2-C3` ejercitado con una sesión de empresa.** Ver §3.1: es lectura de esquema, no
-   ejecución.
+7. ~~**`A2-C3` ejercitado con una sesión de empresa.**~~ **Medido el 01/10**: ejecutado en
+   banco local y, tras el arreglo, por API en pruebas con la sesión de empresa. Ver §3.1.
 
 A los volúmenes actuales —la tabla mayor ronda las 900 filas— **ninguna consulta de este
 sistema puede ir lenta**, y PostgreSQL ignoraría la mitad de los índices que existen. Eso
