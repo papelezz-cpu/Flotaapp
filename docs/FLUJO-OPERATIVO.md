@@ -831,6 +831,31 @@ Reglas encadenadas:
 - Al llegar al último paso, `avanzar_tracking` **abre solo el expediente de
   vacíos** si el pedido era `Contenerizada` o traía contenedores.
 
+### Carta Porte de referencia
+
+Botón **«🧾 Carta Porte (ref.)»** en la reservación, para el cliente y para la
+empresa ([js/reservaciones.js](../js/reservaciones.js), vistas de cliente y de
+dueño). Arma en el navegador un documento imprimible con remitente,
+transportista, chofer, unidad, mercancía y domicilios de origen y destino
+([js/cartaporte.js](../js/cartaporte.js)). **No es el Complemento Carta Porte
+del CFDI**: no se timbra, no pasa por un PAC y no vale ante el SAT; lo que falte
+sale como «—», nunca inventado.
+
+Los datos salen de una sola RPC, `datos_carta_porte(p_reserva_id)`
+(`SECURITY DEFINER`, `20260930120000`): la puede llamar **el cliente, el
+propietario o un superadmin de esa reservación**, en cualquier estado; a
+cualquier otro le responde `No autorizado`. Tiene que ser `DEFINER` porque la
+empresa no puede leer el perfil del cliente por RLS.
+
+Desde `S-03` (`20261001140000`, en pruebas desde el 01/10, producción
+pendiente) devuelve **solo las columnas que imprime el documento**: 6 de la
+reservación, 17 del pedido, 8 de cada perfil (nombre o razón social, RFC,
+domicilio fiscal; la empresa además su permiso SCT), 3 del camión (placas,
+permiso SCT de la unidad, configuración vehicular SAT) y 6 del chofer (nombre,
+RFC, CURP, licencia). Antes entregaba las filas completas a la contraparte. **Si
+la Carta Porte necesita un campo nuevo, se añade en la RPC y en
+`js/cartaporte.js` a la vez**: si falta en la RPC no da error, sale «—».
+
 ---
 
 ## 7. Expedientes documentales
