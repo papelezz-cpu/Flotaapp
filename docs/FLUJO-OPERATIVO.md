@@ -372,6 +372,17 @@ Desde `20260915120000_los_seguros_se_acreditan_no_se_declaran`:
   —sin pasar por ninguna pantalla— para ponerse una vigencia inventada. Bloquea
   las seis columnas reales; las `*_pendiente` siguen abiertas, que es donde la
   empresa propone.
+  ⚠ **Para la empresa ya acreditada esto no fue cierto entre el 23/09 y `S-02`**
+  (`20261001130000`, en pruebas desde el 01/10, producción pendiente): el espejo
+  de `vigencias` reescribía en cada UPDATE sus documentos vigentes, el guard de
+  `vigencias` lo rechazaba, y cualquier guardado de su perfil —también proponer
+  una renovación o cambiar el interruptor de correos— fallaba con
+  `VIGENCIA_ACREDITADA`. Desde `S-02` el espejo solo escribe el documento que
+  cambió.
+- **Las rutas de los tres documentos no están protegidas** (`S-12`, abierto): una
+  empresa sin acreditar que escriba `doc_seguro_rc` se crea una fila `vigente` en
+  `vigencias`, sin fecha. No pinta distintivo (la vista mira la fecha), pero sí
+  aparece en el panel del superadmin.
 - **El booleano dice que hay documento aprobado. Que esté vigente lo dice la
   fecha**, que cambia sola con el calendario y por eso no cabe en un booleano.
 
