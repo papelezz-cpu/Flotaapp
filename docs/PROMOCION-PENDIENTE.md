@@ -1,5 +1,19 @@
 # Promoción pendiente `dev` → producción
 
+> **Actualización 2026-10-01 — las 7 migraciones ya estaban en producción, sin registrar.**
+> Al ir a aplicarlas (pegadas en el SQL Editor, dentro de un `BEGIN … COMMIT` con
+> candado), el candado abortó: `datos_carta_porte()` ya existía en
+> `xnyqsewaluezkkrlyhxg`. Se verificó por esquema, en producción y solo leyendo: las 16
+> columnas de Carta Porte, el guard de expedientes nuevo, `trg_vigencias_espejo`
+> encendido en sus 5 tablas, `datos_carta_porte()` `SECURITY DEFINER` con EXECUTE solo
+> para `authenticated`, `ofertas_ronda_check = CHECK ((ronda >= 1))` y
+> `responder_oferta()` sin `ronda = 2`. Todo coincide. **No consta quién ni cuándo las
+> aplicó**: las filas de producción del libro mayor llevan la fecha de esta
+> verificación, no la de la aplicación, y el sha256 es el del archivo, que coincide
+> con el aplicado en pruebas. Una migración pegada a mano no se registra sola — la
+> próxima vez, `aplicar-a-produccion.sh` o anotarla en el libro el mismo día.
+> Pasos 1 y 2: hechos. Lo que sigue es el paso 3.
+
 **Estado medido el 2026-09-30** contra el libro mayor (`supabase/aplicadas.tsv`), la
 comparación de paridad y `git diff origin/main origin/dev`. Si lees esto más tarde,
 vuelve a medirlo antes de seguir: este documento caduca en cuanto alguien aplique algo.
