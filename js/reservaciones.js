@@ -470,15 +470,15 @@ async function renderReserv(append = false) {
       const pagarBtn = ((r.estado === 'Activa' && !r.pagado) || debeCobro)
         ? `<button class="btn-prox" disabled title="Pago con tarjeta en línea — próximamente">💳 Pagar <span class="prox-badge">Prox.</span></button>`
         : '';
-      // Carta Porte / documentos de carga y maniobra: subida libre, sin
-      // checklist, disponible en cuanto hay match (la reservación existe).
-      const numDocsCarga = r.documentos_carga?.length || 0;
-      const cartaPorteBtn = `<button class="btn-edit" style="font-size:0.7rem" onclick="abrirDocumentosCarga('${r.id}')">📄 ${numDocsCarga ? `Documentos (${numDocsCarga})` : 'Carta Porte / documentos'}</button>`;
+      // El botón «📄 Carta Porte / documentos» (subida libre de documentos de
+      // carga, abrirDocumentosCarga) se retiró de la vista del cliente el
+      // 2026-10-01 por decisión del usuario. La empresa conserva «Documentos
+      // del cliente» y la petición por aviso.
       // Documento de referencia (no fiscal) — ver js/cartaporte.js. La RPC
       // datos_carta_porte ya verifica que el cliente sea parte de ESTA
       // reservación, así que puede generarla igual que la empresa.
       const cartaPorteRefBtnCli = typeof generarCartaPorte === 'function'
-        ? `<button class="btn-edit" style="font-size:0.7rem" onclick="generarCartaPorte('${r.id}')" title="Documento de referencia — no es válido ante el SAT">🧾 Carta Porte (ref.)</button>` : '';
+        ? `<button class="btn-edit" style="font-size:0.7rem" onclick="generarCartaPorte('${r.id}')" title="Documento de referencia — no es válido ante el SAT">🧾 Carta Porte</button>` : '';
       const expedientePills = typeof expedienteBotonesHTML === 'function' ? expedienteBotonesHTML(r, true, clavesPasosCli) : '';
       const abierta = _reservAbiertas.has(r.id);
       const chipsHTMLCli = pasosCli.map(p =>
@@ -507,7 +507,7 @@ async function renderReserv(append = false) {
       <div id="reserv-detalle-${r.id}" class="reserv-detail${abierta ? ' open' : ''}">
         ${pasosCli.length ? `<div class="reserv-next-hint">${pasosCli.map(p => `<span><strong>👉</strong> ${esc(p.detalle)}</span>`).join('')}</div>` : ''}
         ${grupo('Operación', gpsBtnCli)}
-        ${grupo('Documentos', cartaPorteBtn + expedientePills + cartaPorteRefBtnCli)}
+        ${grupo('Documentos', expedientePills + cartaPorteRefBtnCli)}
         ${grupo('Pago', precioLbl + pagarBtn)}
         ${grupo('Avisos', r.estado === 'Activa' ? `<button class="btn-edit" onclick="abrirReportarCambio('${r.id}')" title="Avisar a la empresa que algo cambió o hay un problema">⚠ Reportar cambio o problema</button>` : '')}
         ${grupo('Cierre', completarBtn + calBtn + cancelBtn)}
@@ -656,7 +656,7 @@ async function renderReserv(append = false) {
       // reservación (cliente, propietario o superadmin), así que cliente y
       // empresa lo ven igual — no es un privilegio del dueño.
       const cartaPorteRefBtn = typeof generarCartaPorte === 'function'
-        ? `<button class="btn-edit" onclick="generarCartaPorte('${r.id}')" title="Documento de referencia — no es válido ante el SAT">🧾 Carta Porte (ref.)</button>` : '';
+        ? `<button class="btn-edit" onclick="generarCartaPorte('${r.id}')" title="Documento de referencia — no es válido ante el SAT">🧾 Carta Porte</button>` : '';
       const expedientePillsActiva = typeof expedienteBotonesHTML === 'function'
         ? expedienteBotonesHTML(r, r.cliente_user_id === currentUser.id, clavesPasos) : '';
       // Completar solo se habilita al llegar al último paso del seguimiento:

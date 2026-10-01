@@ -833,9 +833,18 @@ Reglas encadenadas:
 
 ### Carta Porte de referencia
 
-Botón **«🧾 Carta Porte (ref.)»** en la reservación, para el cliente y para la
+Botón **«🧾 Carta Porte»** en la reservación, para el cliente y para la
 empresa ([js/reservaciones.js](../js/reservaciones.js), vistas de cliente y de
-dueño). Arma en el navegador un documento imprimible con remitente,
+dueño; se llamaba «Carta Porte (ref.)» hasta el 2026-10-01, `reservaciones.js?v=68`).
+El aviso de que no tiene validez fiscal queda en el `title` del botón y en el
+propio documento.
+
+> **El cliente ya no tiene «📄 Carta Porte / documentos»** (decisión del usuario,
+> 2026-10-01): era la subida libre de documentos de carga (`abrirDocumentosCarga`,
+> columna `reservaciones.documentos_carga`, bucket `unidades`). Se retiró solo su
+> botón. La empresa conserva **«📄 Documentos del cliente»**, que muestra lo ya
+> subido, y la petición por aviso (`documentos_carga_solicitados`, también desde
+> Android); el cliente ya no tiene desde la web dónde atenderla. Arma en el navegador un documento imprimible con remitente,
 transportista, chofer, unidad, mercancía y domicilios de origen y destino
 ([js/cartaporte.js](../js/cartaporte.js)). **No es el Complemento Carta Porte
 del CFDI**: no se timbra, no pasa por un PAC y no vale ante el SAT; lo que falte
