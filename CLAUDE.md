@@ -62,6 +62,10 @@ State it plainly, then wait:
 
 Then apply **only** what they approved, and nothing adjacent.
 
+### The only way into production's database
+
+**Migrations reach production ONLY through `supabase/aplicar-a-produccion.sh`** — never the Supabase dashboard's SQL Editor, never `psql` by hand, never `execute_sql`/`apply_migration` from an MCP or agent session, never `supabase db push` (the CLI on this machine is linked to production). That script is what writes the ledger, runs the collision warning, refuses a non-production connection string and demands the typed `APLICAR A PRODUCCION`. **Why this is a rule (Q-20, 2026-10-01):** seven migrations — Carta Porte and Q-14, which drops and re-creates a constraint — reached production between 2026-09-30 ~23:30 and 2026-10-01 ~17:00 UTC with **no record of who, when or how**; one of them in a version that is not in the repository. Nothing broke, by luck. Read-only queries in the SQL Editor are fine; any write is not.
+
 ### Order, when promotion is approved
 
 Migrations first, code after — the deployed code may depend on schema or grants that must already exist. Pushing code first breaks production for the length of that gap.
