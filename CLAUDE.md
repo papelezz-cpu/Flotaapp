@@ -419,7 +419,7 @@ Any user-controlled value interpolated into `onclick="...'${...}'..."` MUST use 
 | `documentos-viaje` | ❌ private | Trip file documents (`expediente_documentos.archivo_path`); signed URLs only |
 | `operadores` | ✅ public | `getPublicUrl` OK. List/upload/delete only in your own `<uid>/` folder or as superadmin (S-01, `20261001120000`: in pruebas and production since 2026-10-01) — it holds drivers' medical and toxicology exams. Public URLs still open for anyone holding one (S-01 step 2, pending) |
 | `custodios` | ✅ public | `getPublicUrl` OK |
-| `documentos-empresa` | ✅ public | `getPublicUrl` OK. Upload and list only in your own `<uid>/` folder or as superadmin (S-05, `20261002120000`: in pruebas since 2026-10-02, **not yet in production**) — it holds companies' insurance policies and SCT permits |
+| `documentos-empresa` | ✅ public | `getPublicUrl` OK. Upload and list only in your own `<uid>/` folder or as superadmin (S-05, `20261002120000`: in pruebas and production since 2026-10-02) — it holds companies' insurance policies and SCT permits |
 
 Store **paths** in the DB for private buckets and sign at display time (see `abrirEvidencias` in `reservaciones.js`).
 
