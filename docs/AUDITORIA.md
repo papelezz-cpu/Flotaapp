@@ -147,12 +147,14 @@ de este archivo que hay que leer para trabajar hoy.
 
 ### 3.1 Los cuatro que conviene mirar antes que nada
 
-#### ⚠ `A2-C3` — La política de `pedidos` fue declarada cerrada y **no lo está**
+#### ✓ `A2-C3` — La política de `pedidos` fue declarada cerrada y **no lo estaba** · **cerrado el 02/10**
 
 Una auditoría dijo que estaba resuelto, y al medirlo no lo está. Es el motivo por el que
 este archivo existe.
 
-> **Actualización 01/10 (6ª auditoría): ejecutado y corregido en pruebas, producción pendiente.**
+> **Actualización 01–02/10 (6ª auditoría): CERRADO. En producción el 02/10 21:25 UTC** (con permiso
+> explícito; el bloque pasó allí; antes se comprobó por hash que el guard de producción era el
+> mismo que se transformó en pruebas).
 > Ejecutado por primera vez en banco local con el esquema de producción: una empresa cambió
 > origen, destino, `precio_cliente = 1`, fechas y `cliente_email` de la solicitud abierta de
 > un cliente ajeno. `20261001150000_empresa_no_reescribe_pedidos_ajenos.sql` lo cierra en
