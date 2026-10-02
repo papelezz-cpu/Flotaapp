@@ -164,6 +164,8 @@ este archivo existe.
 > banco local la abortan; `cancelar_reservacion()` como empresa sigue funcionando.
 > **Aplicada en pruebas el 01/10; medido por API con la empresa de pruebas:** cambiar precio
 > u origen de una solicitud ajena da HTTP 400 con hint `A2-C3` y la solicitud queda intacta.
+> **Probada en pantalla en `dev` el 02/10:** la empresa oferta, contraoferta, se cierra el
+> acuerdo, la empresa cancela la reservación y el cliente edita la suya, sin errores.
 > Lo de abajo es el diagnóstico original y se conserva.
 
 - **La 2ª auditoría (28/08)** lo levantó: `ped_update` concede `UPDATE` a cualquier

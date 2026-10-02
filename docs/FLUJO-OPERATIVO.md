@@ -975,8 +975,16 @@ diferencia decide quién paga qué**. Si la empresa siguiera avanzando el
 seguimiento, el superadmin ya no sabría dónde estaba.
 
 Cancelar un acuerdo cerrado **invalida las ofertas** y marca
-`permite_reoferta = false` para quien canceló: no puede volver a ofertar en esa
-misma solicitud.
+`permite_reoferta = false` en **la oferta aceptada**, es decir, a **la empresa del
+acuerdo**, cancele quien cancele: no puede volver a ofertar en esa misma
+solicitud (`cancelar_reservacion()`, `20260901140000`; la lista la oculta en
+`pedidos.js:578` y, desde Q-18, la base rechaza la oferta nueva). Las demás
+empresas sí pueden volver a ofertar en la solicitud reabierta.
+⚠ Este párrafo decía «para quien canceló» hasta el 2026-10-02, y el comentario de
+la función dice lo mismo, pero el código no mira quién cancela: si cancela el
+cliente, o el superadmin al resolver una cancelación pedida, la empresa queda
+bloqueada igual aunque no haya sido ella. **Pendiente de decisión del usuario**
+si eso es lo que se quiere.
 
 ---
 
