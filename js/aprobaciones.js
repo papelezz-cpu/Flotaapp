@@ -750,6 +750,10 @@ function _renderCamionCard(c) {
     caat:'CAAT', vigencia_caat:'Vigencia CAAT', precio_dia:'Precio/día',
     fecha_vencimiento_tc:'Vence TC', fecha_vencimiento_seguro:'Vence Seguro',
     fecha_vencimiento_permiso_sct:'Vence SCT', fecha_vencimiento_verificacion:'Vence Verificación',
+    // S-13: campos que el formulario de edición manda y que no tenían
+    // etiqueta, así que el superadmin no veía el cambio (Carta Porte, 29/09).
+    configuracion_vehicular:'Configuración vehicular (SAT)', numero_permiso_sct:'Núm. permiso SCT',
+    operador:'Operador', tipo_carga:'Tipo de carga', estado:'Disponibilidad',
   });
   return `
     <div class="apr-card" id="aprcam-${c.id}">
@@ -1029,11 +1033,16 @@ function _diffHtml(recurso, labels) {
     return esc(String(val));
   };
 
+  // S-13: antes se descartaba en silencio todo campo editado sin etiqueta, y
+  // el superadmin aprobaba sin ver el cambio. Ahora un campo sin etiqueta se
+  // muestra con el nombre de su columna; solo se omiten los derivados de otro
+  // campo que ya se muestra (emoji sale del tipo).
+  const _DIFF_OMITIR = new Set(['emoji']);
   const rows = recurso.campos_editados
-    .filter(k => labels[k])
+    .filter(k => !_DIFF_OMITIR.has(k))
     .map(k => `
       <div class="apr-diff-row">
-        <div class="apr-diff-field">${labels[k]}</div>
+        <div class="apr-diff-field">${labels[k] || esc(k.replace(/_/g, ' '))}</div>
         <div class="apr-diff-antes">${fmt(k, recurso.snapshot_anterior[k])}</div>
         <div class="apr-diff-flecha">→</div>
         <div class="apr-diff-nuevo">${fmt(k, recurso[k])}</div>
