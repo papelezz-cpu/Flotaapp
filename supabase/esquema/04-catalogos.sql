@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict mqEKP7yMqopT5orJrmeQoXbl1T73zwat0FELOxQXVesT0ZoekyV1hsHi3KKkk9D
+\restrict k8X1GV5ly01Z9SjyJiRSP6OFhos4ht9O7Sh9EIiLFaTyjXAefn9VAnSvJ8mtj85
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -86,6 +86,38 @@ tracking_lavado	Recibido	Vehículo recibido	\N	2	t	{"icono": "🚗"}
 tracking_lavado	En lavado	En proceso de lavado	\N	3	t	{"icono": "🚿"}
 tracking_lavado	Control	Control de calidad	\N	4	t	{"icono": "🔍"}
 tracking_lavado	Listo	Listo para entrega	\N	5	t	{"icono": "✓"}
+vigencia_tipo	permiso_sct	Permiso SCT	\N	10	t	{"entidad_tipo": "perfil", "vigencia_meses": null}
+vigencia_tipo	seguro_rc	Seguro de responsabilidad civil	\N	20	t	{"entidad_tipo": "perfil", "vigencia_meses": null}
+vigencia_tipo	seguro_carga	Seguro de carga	\N	30	t	{"entidad_tipo": "perfil", "vigencia_meses": null}
+vigencia_tipo	tarjeta_circulacion	Tarjeta de circulación	\N	40	t	{"entidad_tipo": "camion", "vigencia_meses": null}
+vigencia_tipo	seguro_unidad	Seguro de la unidad	\N	50	t	{"entidad_tipo": "camion", "vigencia_meses": null}
+vigencia_tipo	permiso_sct_unidad	Permiso SCT de la unidad	\N	60	t	{"entidad_tipo": "camion", "vigencia_meses": null}
+vigencia_tipo	verificacion	Verificación	\N	70	t	{"entidad_tipo": "camion", "vigencia_meses": null}
+vigencia_tipo	permiso_peligrosa	Permiso de materiales peligrosos	\N	80	t	{"entidad_tipo": "camion", "vigencia_meses": null}
+vigencia_tipo	caat	CAAT	\N	90	t	{"entidad_tipo": "camion", "vigencia_meses": null}
+vigencia_tipo	licencia	Licencia de conducir	\N	100	t	{"entidad_tipo": "operador", "vigencia_meses": null}
+vigencia_tipo	licencia_peligrosa	Licencia de materiales peligrosos	\N	110	t	{"entidad_tipo": "operador", "vigencia_meses": null}
+vigencia_tipo	examen_medico	Examen médico	\N	120	t	{"entidad_tipo": "operador", "vigencia_meses": 12}
+vigencia_tipo	examen_toxicologico	Examen toxicológico	\N	130	t	{"entidad_tipo": "operador", "vigencia_meses": 12}
+vigencia_tipo	carta_antecedentes	Carta de no antecedentes	\N	140	t	{"entidad_tipo": "operador", "vigencia_meses": 12}
+vigencia_tipo	certificacion	Certificación	\N	150	t	{"entidad_tipo": "custodio", "vigencia_meses": null}
+vigencia_tipo	licencia_sedena	Licencia SEDENA	\N	160	t	{"entidad_tipo": "custodio", "vigencia_meses": null}
+vigencia_tipo	permiso_patio	Permiso de operación del patio	\N	170	t	{"entidad_tipo": "patio", "vigencia_meses": null}
+config_vehicular_sat	VL	Vehículo ligero de carga	\N	10	t	\N
+config_vehicular_sat	C2	Camión unitario (2 ejes)	\N	20	t	\N
+config_vehicular_sat	C3	Camión unitario (3 ejes)	\N	30	t	\N
+config_vehicular_sat	C2R2	Camión-remolque (2+2 ejes)	\N	40	t	\N
+config_vehicular_sat	C3R2	Camión-remolque (3+2 ejes)	\N	50	t	\N
+config_vehicular_sat	C3R3	Camión-remolque (3+3 ejes)	\N	60	t	\N
+config_vehicular_sat	T2S1	Tractocamión articulado (2+1 ejes)	\N	70	t	\N
+config_vehicular_sat	T2S2	Tractocamión articulado (2+2 ejes)	\N	80	t	\N
+config_vehicular_sat	T2S3	Tractocamión articulado (2+3 ejes)	\N	90	t	\N
+config_vehicular_sat	T3S1	Tractocamión articulado (3+1 ejes)	\N	100	t	\N
+config_vehicular_sat	T3S2	Tractocamión articulado (3+2 ejes)	\N	110	t	\N
+config_vehicular_sat	T3S3	Tractocamión articulado (3+3 ejes)	\N	120	t	\N
+config_vehicular_sat	T3S2R4	Tractocamión articulado-remolque (3+2+4 ejes)	\N	130	t	\N
+config_vehicular_sat	T3S3R4	Tractocamión articulado-remolque (3+3+4 ejes)	\N	140	t	\N
+config_vehicular_sat	OTROS	Otra configuración no listada	\N	990	t	\N
 \.
 
 
@@ -110,5 +142,5 @@ eddea40f-2927-4876-9fce-530923b6f69a	ingreso_puerto	Factura comercial	Factura de
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mqEKP7yMqopT5orJrmeQoXbl1T73zwat0FELOxQXVesT0ZoekyV1hsHi3KKkk9D
+\unrestrict k8X1GV5ly01Z9SjyJiRSP6OFhos4ht9O7Sh9EIiLFaTyjXAefn9VAnSvJ8mtj85
 

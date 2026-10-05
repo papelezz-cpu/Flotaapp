@@ -315,6 +315,10 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
     │   └── enviar-notificacion/ # Email notifications
     ├── migrations/         # 93 SQL migrations — the source of truth for schema, RLS,
     │                       #   guard triggers and the business RPCs
+    ├── esquema/            # The PLAN: production's full schema (public + storage), buckets and
+    │                       #   reference catalogs, no personal data. The ONLY way to rebuild the
+    │                       #   database (replaying migrations from scratch fails). Regenerate with
+    │                       #   volcar-esquema.sh after every promotion that changes the schema (S-10)
     ├── aplicadas.tsv       # Migration ledger: which .sql ran against which project,
     │                       #   when, and the sha256 of the file at that moment. Written
     │                       #   automatically by the two aplicar-a-* scripts; committed.

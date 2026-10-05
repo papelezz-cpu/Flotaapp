@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qWlui5QX5pF87wBomBlViJXnU2Q9VXko7kfvQrYh4g8tcCWGYhIXVjXbTFxbUqk
+\restrict 8UghRke3saIdb6uKGy2FhOmo7GLKq1CxKited51DknCXdAr2qyd9UmLYnFGkvk7
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -111,6 +111,134 @@ $$;
 
 
 ALTER FUNCTION public.abrir_expediente(p_reserva_id uuid, p_etapa text, p_solo_si_aplica boolean) OWNER TO postgres;
+
+--
+-- Name: aceptar_y_cerrar_acuerdo(uuid, text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.aceptar_y_cerrar_acuerdo(p_oferta_id uuid, p_via text DEFAULT 'cliente_acepta_oferta'::text) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+DECLARE
+  v_oferta     public.ofertas%ROWTYPE;
+  v_pedido     public.pedidos%ROWTYPE;
+  v_reserva_id uuid;
+  v_docs_venc  boolean := false;
+  v_motivo     text;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'No autenticado';
+  END IF;
+  IF p_via NOT IN ('cliente_acepta_oferta', 'empresa_acepta_contra') THEN
+    RAISE EXCEPTION 'Vía no reconocida: %', p_via;
+  END IF;
+
+  SELECT * INTO v_oferta FROM public.ofertas WHERE id = p_oferta_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'La oferta ya no existe.';
+  END IF;
+
+  SELECT * INTO v_pedido FROM public.pedidos WHERE id = v_oferta.pedido_id
+    FOR UPDATE;   -- C2: serializa el cierre sobre el mismo pedido
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'La solicitud ya no existe.';
+  END IF;
+
+  -- Autorización según la vía. SECURITY DEFINER salta la RLS de SELECT/UPDATE,
+  -- así que quién llama se verifica a mano; los guard triggers rematan.
+  IF p_via = 'cliente_acepta_oferta' THEN
+    IF v_pedido.cliente_id IS DISTINCT FROM auth.uid() THEN
+      RAISE EXCEPTION 'No autorizado: esta solicitud no es tuya.';
+    END IF;
+    IF v_oferta.estado <> 'enviada' THEN
+      RAISE EXCEPTION 'Esta oferta ya fue respondida.';
+    END IF;
+  ELSE  -- empresa_acepta_contra
+    IF v_oferta.admin_id IS DISTINCT FROM auth.uid() THEN
+      RAISE EXCEPTION 'No autorizado: esta oferta no es tuya.';
+    END IF;
+    IF v_oferta.estado <> 'contra_oferta' THEN
+      RAISE EXCEPTION 'Esta oferta no tiene una contraoferta pendiente.';
+    END IF;
+  END IF;
+
+  IF v_oferta.expira_en IS NOT NULL AND v_oferta.expira_en < now() THEN
+    RAISE EXCEPTION 'Esta oferta ya venció.';
+  END IF;
+  IF v_pedido.estado NOT IN ('abierto', 'en_negociacion') THEN
+    RAISE EXCEPTION 'Esta solicitud ya no está en negociación.';
+  END IF;
+
+  -- ── Paso 1: aceptar la oferta ──────────────────────────────────────────
+  -- guard_oferta_update revalida la transición y bloquea con DOCUMENTOS_VENCIDOS
+  -- si la empresa tiene permiso SCT / seguro RC / seguro de carga vencidos. Si
+  -- eso ocurre, el subbloque revierte solo el UPDATE y seguimos por la rama de
+  -- "esperar al superadmin".
+  BEGIN
+    IF p_via = 'empresa_acepta_contra' THEN
+      UPDATE public.ofertas
+         SET estado        = 'aceptada',
+             precio_oferta  = COALESCE(v_oferta.contra_precio, v_oferta.precio_oferta)
+       WHERE id = p_oferta_id;
+    ELSE
+      UPDATE public.ofertas SET estado = 'aceptada' WHERE id = p_oferta_id;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE 'DOCUMENTOS_VENCIDOS%' THEN
+      v_docs_venc := true;
+      -- Sin el prefijo tecnico: esto lo lee una persona.
+      v_motivo := regexp_replace(SQLERRM, '^DOCUMENTOS_VENCIDOS:\s*', '');
+    ELSE
+      RAISE;   -- cualquier otro error: propagar y revertir todo
+    END IF;
+  END;
+
+  IF v_docs_venc THEN
+    -- No se puede cerrar solo: el pedido queda a la espera del superadmin, que
+    -- es el único que puede forzar el acuerdo con documentos vencidos.
+    UPDATE public.pedidos
+       SET estado = 'pendiente_acuerdo', oferta_pendiente_id = p_oferta_id
+     WHERE id = v_pedido.id;
+
+    PERFORM public.notificar_superadmins(
+      'revision_acuerdo', 'Acuerdo pendiente — documentos vencidos',
+      public.mi_nombre() || ' aceptó ' ||
+      CASE p_via WHEN 'empresa_acepta_contra' THEN 'una contraoferta' ELSE 'una oferta' END
+      || ' de ' || COALESCE(v_pedido.tipo_camion, 'servicio')
+      || ', pero ' || COALESCE(v_motivo, 'hay documentos vencidos')
+      || '. Revísalo en Pendientes de aprobación.');
+
+    RETURN jsonb_build_object('resultado', 'pendiente_docs',
+                              'reserva_id', NULL,
+                              'motivo', v_motivo);
+  END IF;
+
+  -- ── Paso 2: marcar el pedido y cerrar, en la misma transacción ─────────
+  UPDATE public.pedidos
+     SET estado = 'pendiente_acuerdo', oferta_pendiente_id = p_oferta_id
+   WHERE id = v_pedido.id;
+
+  -- cerrar_acuerdo rechaza las demás ofertas, marca el pedido 'acordado', crea
+  -- la reservación y ocupa el recurso. Si algo revienta acá (típico:
+  -- RECURSO_NO_DISPONIBLE por un solape de fechas que apareció entre la oferta
+  -- y la aceptación), la excepción sube y revierte TODO, incluida la
+  -- aceptación del paso 1 — que es justo lo que hoy no ocurre.
+  v_reserva_id := public.cerrar_acuerdo(p_oferta_id);
+
+  RETURN jsonb_build_object('resultado', 'cerrado', 'reserva_id', v_reserva_id);
+END;
+$$;
+
+
+ALTER FUNCTION public.aceptar_y_cerrar_acuerdo(p_oferta_id uuid, p_via text) OWNER TO postgres;
+
+--
+-- Name: FUNCTION aceptar_y_cerrar_acuerdo(p_oferta_id uuid, p_via text); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.aceptar_y_cerrar_acuerdo(p_oferta_id uuid, p_via text) IS 'Acepta una oferta y cierra el acuerdo en una transaccion. El Paso 2 —marcar el pedido pendiente_acuerdo con su oferta_pendiente_id— NO es opcional: cerrar_acuerdo() tiene una salida temprana que devuelve NULL sin crear nada si el pedido no llega en ese estado. Se perdio en 20260924150000 y estuvo roto en produccion del 2026-09-24T23:06Z al 2026-09-25. Si hay que reescribir este cuerpo, se deriva de pg_get_functiondef, nunca se teclea.';
+
 
 --
 -- Name: arranque_app(text, text); Type: FUNCTION; Schema: public; Owner: postgres
@@ -227,6 +355,47 @@ $$;
 ALTER FUNCTION public.avanzar_tracking(p_reserva_id uuid) OWNER TO postgres;
 
 --
+-- Name: bloquear_consentimiento(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.bloquear_consentimiento() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_motivo text := 'cuenta_eliminada';
+begin
+  -- En la cascada, la cuenta ya no existe cuando se dispara este trigger. Si
+  -- no se pudiera consultar auth.users, NO se deja fallar: este trigger corre
+  -- dentro del borrado de la cuenta, y un error aqui la haria imposible.
+  begin
+    if exists (select 1 from auth.users u where u.id = old.user_id) then
+      v_motivo := 'borrado_directo';
+    end if;
+  exception when others then
+    v_motivo := 'cuenta_eliminada';
+  end;
+
+  insert into public.consentimientos_bloqueados
+    (id, titular, tipo, version, aceptado_en, mecanismo, referencia, motivo)
+  values
+    (old.id, old.user_id, old.tipo, old.version, old.aceptado_en, old.contexto, old.referencia, v_motivo)
+  on conflict (id) do nothing;
+  return old;
+end;
+$$;
+
+
+ALTER FUNCTION public.bloquear_consentimiento() OWNER TO postgres;
+
+--
+-- Name: FUNCTION bloquear_consentimiento(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.bloquear_consentimiento() IS 'Q-11: copia el consentimiento a consentimientos_bloqueados antes de borrarlo (cascada al eliminar la cuenta, o borrado directo). Ver 20260930160000.';
+
+
+--
 -- Name: calificar_servicio(uuid, integer, text); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -277,6 +446,59 @@ $$;
 ALTER FUNCTION public.calificar_servicio(p_reserva_id uuid, p_rating integer, p_comentario text) OWNER TO postgres;
 
 --
+-- Name: cambiar_rol(uuid, text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.cambiar_rol(p_user_id uuid, p_rol text) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+DECLARE
+  v_rol_actual text;
+BEGIN
+  IF p_rol NOT IN ('cliente', 'admin', 'superadmin') THEN
+    RAISE EXCEPTION 'Rol no valido: %. Debe ser cliente, admin o superadmin.', p_rol;
+  END IF;
+
+  SELECT rol INTO v_rol_actual FROM public.perfiles WHERE user_id = p_user_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Ese usuario no tiene perfil. No se puede cambiar su rol.';
+  END IF;
+
+  IF v_rol_actual = p_rol THEN
+    RETURN;   -- nada que hacer, y sin encender la marca
+  END IF;
+
+  -- Sin superadmin no se aprueban cuentas, ni recursos, ni solicitudes, y no
+  -- hay vuelta desde la aplicacion. gestionar-usuario ya lo comprueba, pero
+  -- esta es la comprobacion que manda: la de la base.
+  IF v_rol_actual = 'superadmin' AND p_rol <> 'superadmin' THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM public.perfiles
+       WHERE rol = 'superadmin' AND user_id <> p_user_id
+    ) THEN
+      RAISE EXCEPTION 'Es el unico superadmin. Cambiarle el rol dejaria la '
+                      'plataforma sin quien apruebe cuentas, recursos ni '
+                      'solicitudes. Nombra otro antes.';
+    END IF;
+  END IF;
+
+  PERFORM set_config('portgo.cambio_rol', 'on', true);
+  UPDATE public.perfiles SET rol = p_rol WHERE user_id = p_user_id;
+END;
+$$;
+
+
+ALTER FUNCTION public.cambiar_rol(p_user_id uuid, p_rol text) OWNER TO postgres;
+
+--
+-- Name: FUNCTION cambiar_rol(p_user_id uuid, p_rol text); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.cambiar_rol(p_user_id uuid, p_rol text) IS 'Cambia el rol de un perfil saltando guard_perfil_self_update por una marca local a la transaccion. Solo service_role: la autorizacion vive en la Edge Function gestionar-usuario, que verifica el JWT del llamante.';
+
+
+--
 -- Name: cancelar_reservacion(uuid, text); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -296,7 +518,7 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'La reservación ya no existe.';
   END IF;
-  IF v_r.propietario_id IS DISTINCT FROM auth.uid() THEN
+  IF NOT public.is_superadmin() AND v_r.propietario_id IS DISTINCT FROM auth.uid() THEN
     RAISE EXCEPTION 'No autorizado: esta reservación no es tuya.';
   END IF;
   IF v_r.estado IN ('Completada', 'Cancelada') THEN
@@ -385,7 +607,8 @@ BEGIN
     RAISE EXCEPTION 'Esta oferta todavia no esta aceptada.';
   END IF;
 
-  SELECT * INTO v_pedido FROM public.pedidos WHERE id = v_oferta.pedido_id;
+  SELECT * INTO v_pedido FROM public.pedidos WHERE id = v_oferta.pedido_id
+    FOR UPDATE;   -- C2: serializa el cierre sobre el mismo pedido
   IF v_pedido.estado <> 'pendiente_acuerdo' OR v_pedido.oferta_pendiente_id IS DISTINCT FROM p_oferta_id THEN
     SELECT id INTO v_reserva_id FROM public.reservaciones WHERE pedido_id = v_pedido.id ORDER BY created_at DESC LIMIT 1;
     RETURN v_reserva_id;
@@ -394,6 +617,10 @@ BEGIN
   IF NOT public.is_superadmin() AND auth.uid() NOT IN (v_pedido.cliente_id, v_oferta.admin_id) THEN
     RAISE EXCEPTION 'No autorizado: no eres parte de este acuerdo.';
   END IF;
+
+  -- A partir de aqui esta confirmado que hay acuerdo mutuo y que quien llama
+  -- es parte de el. El guard de INSERT puede apartarse.
+  PERFORM set_config('portgo.cierre_acuerdo', 'on', true);
 
   UPDATE public.ofertas SET estado = 'rechazada'
    WHERE pedido_id = v_pedido.id AND id <> p_oferta_id AND estado IN ('enviada', 'contra_oferta');
@@ -455,6 +682,10 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM reservaciones
     WHERE unidad = NEW.unidad
+      -- H-06: sin esto, un patio y un camión que compartan cadena de id se
+      -- estorban entre ellos. `recurso_tipo` es NOT NULL con CHECK, así que
+      -- esta comparación nunca se vuelve NULL y nunca desactiva la protección.
+      AND recurso_tipo = NEW.recurso_tipo
       AND estado IN ('Pendiente', 'Activa')
       AND id <> COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::uuid)
       AND tstzrange(fecha_ini::timestamptz, fecha_fin::timestamptz, '[]')
@@ -468,6 +699,181 @@ $$;
 
 
 ALTER FUNCTION public.check_reservacion_disponibilidad() OWNER TO postgres;
+
+--
+-- Name: FUNCTION check_reservacion_disponibilidad(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.check_reservacion_disponibilidad() IS 'H-06: impide solapar reservas del MISMO recurso, comparando recurso_tipo ademas de unidad. Es la capa que lanza RECURSO_NO_DISPONIBLE y es BEFORE, asi que salta antes que reservaciones_sin_solape; las dos tienen que mirar lo mismo o la restriccion nunca se evalua.';
+
+
+--
+-- Name: cola_superadmin(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.cola_superadmin() RETURNS jsonb
+    LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare
+  v jsonb;
+begin
+  if not public.is_superadmin() then
+    raise exception 'No autorizado';
+  end if;
+
+  select jsonb_build_object(
+    'camiones',        (select count(*) from public.camiones      where aprobacion = 'pendiente'),
+    'operadores',      (select count(*) from public.operadores    where aprobacion = 'pendiente'),
+    'custodios',       (select count(*) from public.custodios     where aprobacion = 'pendiente'),
+    'patios',          (select count(*) from public.patios        where aprobacion = 'pendiente'),
+    'lavados',         (select count(*) from public.lavados       where aprobacion = 'pendiente'),
+    'pedidos_revision',(select count(*) from public.pedidos       where estado = 'pendiente_revision'),
+    'pedidos_acuerdo', (select count(*) from public.pedidos       where estado = 'pendiente_acuerdo'),
+    -- Un usuario, no dos filas: UNION quita el duplicado cuando las dos tablas
+    -- coinciden, que es el caso normal.
+    'cuentas',         (select count(*) from (
+                          select user_id from public.perfiles           where aprobacion_cuenta = 'pendiente'
+                          union
+                          select user_id from public.solicitudes_cuenta where estado = 'pendiente'
+                        ) u),
+    'docs_empresa',    (select count(*) from public.perfiles      where perfil_docs_pendiente),
+    'cierres',         (select count(*) from public.reservaciones where estado = 'PorAprobar'),
+    'cancelaciones',   (select count(*) from public.reservaciones where estado = 'CancelacionSolicitada')
+  ) into v;
+
+  -- El total se calcula aqui y no en el navegador: sumar las claves de un jsonb
+  -- en JS es facil de desincronizar cuando se anada la duodecima cola.
+  return v || jsonb_build_object(
+    'total', (select coalesce(sum(value::bigint), 0) from jsonb_each_text(v))
+  );
+end;
+$$;
+
+
+ALTER FUNCTION public.cola_superadmin() OWNER TO postgres;
+
+--
+-- Name: FUNCTION cola_superadmin(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.cola_superadmin() IS 'Lo que le falta por revisar al superadmin, desglosado y con total, en una sola ida y vuelta. Las once colas que lista renderAprobaciones(), sin faltar ninguna. Ver H-09 y R-05.';
+
+
+--
+-- Name: datos_carta_porte(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.datos_carta_porte(p_reserva_id uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_r public.reservaciones%rowtype;
+begin
+  select * into v_r from public.reservaciones where id = p_reserva_id;
+  if v_r.id is null then
+    raise exception 'RESERVACION_NO_ENCONTRADA';
+  end if;
+
+  if not (
+    public.is_superadmin()
+    or v_r.cliente_user_id = auth.uid()
+    or v_r.propietario_id  = auth.uid()
+  ) then
+    raise exception 'No autorizado';
+  end if;
+
+  return jsonb_build_object(
+    'reservacion',   jsonb_build_object('id', v_r.id, 'cliente', v_r.cliente, 'unidad', v_r.unidad, 'fecha_ini', v_r.fecha_ini, 'fecha_fin', v_r.fecha_fin, 'operador_nombre', v_r.operador_nombre),
+    'pedido',        (select jsonb_build_object('tipo_carga', p.tipo_carga, 'categoria_carga', p.categoria_carga, 'peso_carga', p.peso_carga, 'num_contenedores', p.num_contenedores, 'hazmat_clase', p.hazmat_clase, 'hazmat_un', p.hazmat_un, 'clave_prod_serv_sat', p.clave_prod_serv_sat, 'origen', p.origen, 'origen_colonia', p.origen_colonia, 'origen_cp', p.origen_cp, 'origen_ciudad', p.origen_ciudad, 'origen_estado', p.origen_estado, 'destino', p.destino, 'destino_colonia', p.destino_colonia, 'destino_cp', p.destino_cp, 'destino_ciudad', p.destino_ciudad, 'destino_estado', p.destino_estado)   from public.pedidos p     where p.id      = v_r.pedido_id),
+    'cliente',       (select jsonb_build_object('nombre', c.nombre, 'rfc', c.rfc, 'razon_social', c.razon_social, 'calle', c.calle, 'colonia', c.colonia, 'cp', c.cp, 'ciudad', c.ciudad, 'estado_mx', c.estado_mx)   from public.perfiles c    where c.user_id = v_r.cliente_user_id),
+    'transportista', (select jsonb_build_object('rfc', t.rfc, 'razon_social', t.razon_social, 'permiso_sct', t.permiso_sct, 'calle', t.calle, 'colonia', t.colonia, 'cp', t.cp, 'ciudad', t.ciudad, 'estado_mx', t.estado_mx)   from public.perfiles t    where t.user_id = v_r.propietario_id),
+    -- Sin filtrar por recurso_tipo a propósito: si la unidad no es un
+    -- camión, v_r.unidad no coincide con ningún id de `camiones` y esto da
+    -- null solo, sin necesitar una rama aparte.
+    'camion',        (select jsonb_build_object('placas', cam.placas, 'numero_permiso_sct', cam.numero_permiso_sct, 'configuracion_vehicular', cam.configuracion_vehicular) from public.camiones cam  where cam.id    = v_r.unidad),
+    'operador',      (select jsonb_build_object('nombre', op.nombre, 'primer_apellido', op.primer_apellido, 'segundo_apellido', op.segundo_apellido, 'rfc', op.rfc, 'curp', op.curp, 'num_licencia', op.num_licencia)  from public.operadores op where op.id     = v_r.operador_id)
+  );
+end;
+$$;
+
+
+ALTER FUNCTION public.datos_carta_porte(p_reserva_id uuid) OWNER TO postgres;
+
+--
+-- Name: FUNCTION datos_carta_porte(p_reserva_id uuid); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.datos_carta_porte(p_reserva_id uuid) IS 'Junta reservación+pedido+perfiles de cliente y propietario+camión+operador para la Carta Porte de referencia (js/cartaporte.js). Verifica que el llamador sea el cliente, el propietario o el superadmin de ESA reservación — SECURITY DEFINER salta RLS, así que la autorización la hace esta función, no la política de perfiles.';
+
+
+--
+-- Name: desempeno_empresa(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.desempeno_empresa() RETURNS jsonb
+    LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_uid   uuid := auth.uid();
+  v_of    jsonb;
+  v_res   jsonb;
+  v_cal   jsonb;
+  v_meses jsonb;
+begin
+  -- Sin sesion no hay desempeno que ensenar. Y el id NO se recibe: se deriva,
+  -- para que nadie pida el de otra empresa.
+  if v_uid is null then
+    raise exception 'No autorizado';
+  end if;
+
+  select jsonb_build_object(
+    'total_ofertas', count(*),
+    'aceptadas',     count(*) filter (where estado = 'aceptada')
+  ) into v_of
+    from public.ofertas where admin_id = v_uid;
+
+  select jsonb_build_object(
+    'total_reservas', count(*),
+    'completadas',    count(*) filter (where estado = 'Completada'),
+    'ingreso_total',  coalesce(sum(coalesce(precio_acordado, 0)), 0)
+  ) into v_res
+    from public.reservaciones where propietario_id = v_uid;
+
+  -- Suma y cuenta, no promedio: el navegador hace el (suma/n).toFixed(1) que
+  -- ya hacia, y asi el redondeo no puede divergir.
+  select jsonb_build_object(
+    'rating_n',    count(*),
+    'rating_suma', coalesce(sum(rating), 0)
+  ) into v_cal
+    from public.calificaciones where admin_id = v_uid;
+
+  -- Todos los meses con ingreso, no solo seis: es una fila por mes y el
+  -- navegador ya elige su ventana. Asi la funcion no tiene que adivinar que
+  -- seis meses son, que en la frontera del mes no coinciden entre la zona
+  -- local del navegador y UTC.
+  select coalesce(jsonb_object_agg(m, ing), '{}'::jsonb) into v_meses
+    from (select to_char(created_at at time zone 'UTC', 'YYYY-MM') as m,
+                 coalesce(sum(coalesce(precio_acordado, 0)), 0) as ing
+            from public.reservaciones
+           where propietario_id = v_uid
+           group by 1) s;
+
+  return v_of || v_res || v_cal || jsonb_build_object('meses', v_meses);
+end;
+$$;
+
+
+ALTER FUNCTION public.desempeno_empresa() OWNER TO postgres;
+
+--
+-- Name: FUNCTION desempeno_empresa(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.desempeno_empresa() IS 'Los agregados de «Mi desempeno» para la empresa que llama. El id sale de auth.uid(), nunca de un parametro. Ver H-07.';
+
 
 --
 -- Name: enviar_mensaje(text, uuid[], uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -595,6 +1001,21 @@ $$;
 ALTER FUNCTION public.enviar_oferta(p_pedido_id uuid, p_camion_id text, p_precio numeric, p_operador_id text, p_operador_nombre text, p_mensaje text) OWNER TO postgres;
 
 --
+-- Name: es_mi_pedido(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.es_mi_pedido(p_pedido_id uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+  SELECT EXISTS (SELECT 1 FROM public.pedidos p
+                  WHERE p.id = p_pedido_id AND p.cliente_id = auth.uid());
+$$;
+
+
+ALTER FUNCTION public.es_mi_pedido(p_pedido_id uuid) OWNER TO postgres;
+
+--
 -- Name: es_servicio_camion(text); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -693,6 +1114,30 @@ $$;
 ALTER FUNCTION public.fn_notificar_nuevo_mensaje() OWNER TO postgres;
 
 --
+-- Name: guard_camion_config_vehicular(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.guard_camion_config_vehicular() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+begin
+  -- S-09 (20261005160000): la clave SAT tiene que salir del catálogo.
+  if new.configuracion_vehicular is not null
+     and (tg_op = 'INSERT' or new.configuracion_vehicular is distinct from old.configuracion_vehicular)
+     and not exists (select 1 from public.catalogos k
+                      where k.clave = 'config_vehicular_sat'
+                        and k.valor = new.configuracion_vehicular) then
+    raise exception 'La configuración vehicular «%» no está en el catálogo SAT. Elige una de la lista.', new.configuracion_vehicular
+      using hint = 'S-09';
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION public.guard_camion_config_vehicular() OWNER TO postgres;
+
+--
 -- Name: guard_expediente_documento(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -746,20 +1191,43 @@ begin
   where r.id = new.reserva_id;
 
   if es_cliente then
-    if new.estado is distinct from old.estado
-       or new.completado_en is distinct from old.completado_en
-       or new.incidente_motivo is distinct from old.incidente_motivo
-       or new.incidente_reportado_en is distinct from old.incidente_reportado_en
+    if new.estado is distinct from old.estado then
+      if old.estado = 'solicitado' and new.estado = 'en_revision' then
+        -- La única transición que dispara el cliente, y se verifica aquí
+        -- —no en el navegador—: que no quede ningún documento obligatorio
+        -- sin subir. Si alguno falta, ni el propio JS debería haber
+        -- llegado hasta aquí, pero el guard no confía en eso.
+        if exists (
+          select 1 from public.expediente_documentos d
+          where d.expediente_id = new.id
+            and d.obligatorio
+            and d.estado not in ('subido', 'aceptado')
+        ) then
+          raise exception 'No autorizado: todavía falta subir un documento obligatorio';
+        end if;
+      else
+        raise exception 'No autorizado: eso lo gestiona el transportista';
+      end if;
+    end if;
+
+    -- El cliente solo declara la entrega en físico; cerrar el expediente,
+    -- fechar el cierre, reportar incidentes o fijar los datos del depósito
+    -- de vacíos es trabajo del transportista.
+    if new.completado_en        is distinct from old.completado_en
+       or new.incidente_motivo     is distinct from old.incidente_motivo
+       or new.incidente_reportado_en  is distinct from old.incidente_reportado_en
        or new.incidente_reportado_por is distinct from old.incidente_reportado_por
-       or new.deposito_vacios is distinct from old.deposito_vacios
-       or new.fecha_limite_vacios is distinct from old.fecha_limite_vacios then
+       or new.deposito_vacios      is distinct from old.deposito_vacios
+       or new.fecha_limite_vacios  is distinct from old.fecha_limite_vacios then
       raise exception 'No autorizado: eso lo gestiona el transportista';
     end if;
   else
-    if new.entrega_fisica is distinct from old.entrega_fisica
+    -- El transportista no declara en nombre del cliente que la entrega va a
+    -- ser en físico.
+    if new.entrega_fisica            is distinct from old.entrega_fisica
        or new.entrega_fisica_direccion is distinct from old.entrega_fisica_direccion
-       or new.entrega_fisica_contacto is distinct from old.entrega_fisica_contacto then
-      raise exception 'No autorizado: la entrega en fisico la declara el cliente';
+       or new.entrega_fisica_contacto  is distinct from old.entrega_fisica_contacto then
+      raise exception 'No autorizado: la entrega en físico la declara el cliente';
     end if;
   end if;
 
@@ -771,6 +1239,43 @@ $$;
 ALTER FUNCTION public.guard_expediente_update() OWNER TO postgres;
 
 --
+-- Name: guard_fleet_resource_insert(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.guard_fleet_resource_insert() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+begin
+  -- Sin usuario final: clave de servicio o postgres. Ver cabecera y bloque 3.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if public.is_superadmin() then
+    return new;
+  end if;
+
+  if new.aprobacion is distinct from 'pendiente' then
+    raise exception 'No autorizado: un recurso nuevo nace pendiente de aprobacion; solo un superadmin puede aprobarlo'
+      using hint = 'Q-02';
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.guard_fleet_resource_insert() OWNER TO postgres;
+
+--
+-- Name: FUNCTION guard_fleet_resource_insert(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.guard_fleet_resource_insert() IS 'Q-02: un usuario final que no es superadmin solo puede crear recursos de flota en aprobacion = pendiente. Pareja de guard_fleet_resource_update. auth.uid() NULL pasa: ver 20260929140000.';
+
+
+--
 -- Name: guard_fleet_resource_update(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -780,6 +1285,13 @@ CREATE FUNCTION public.guard_fleet_resource_update() RETURNS trigger
     AS $$
 BEGIN
   IF public.is_superadmin() THEN
+    RETURN NEW;
+  END IF;
+
+  -- Orfandad por borrado de cuenta: el dueño anterior ya no existe.
+  IF NEW.propietario_id IS NULL
+     AND OLD.propietario_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM public.perfiles WHERE user_id = OLD.propietario_id) THEN
     RETURN NEW;
   END IF;
 
@@ -799,6 +1311,92 @@ $$;
 ALTER FUNCTION public.guard_fleet_resource_update() OWNER TO postgres;
 
 --
+-- Name: guard_mensaje_texto(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.guard_mensaje_texto() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+begin
+  if new.texto ~ '(\+?[0-9][ .\-()]*){10,}' then
+    raise exception 'Por seguridad no se permiten números de teléfono en el chat. Mantén el trato dentro de PortGo.';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.guard_mensaje_texto() OWNER TO postgres;
+
+--
+-- Name: guard_oferta_insert(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.guard_oferta_insert() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_estado_pedido text;
+begin
+  -- Sin usuario final: clave de servicio o postgres. Ver cabecera y bloque 3.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if public.is_superadmin() then
+    return new;
+  end if;
+
+  if new.estado is distinct from 'enviada' then
+    raise exception 'No autorizado: una oferta nueva nace enviada'
+      using hint = 'Q-04';
+  end if;
+
+  if new.ronda is distinct from 1
+     or new.contra_precio  is not null
+     or new.contra_mensaje is not null then
+    raise exception 'No autorizado: la ronda 2 y la contraoferta se hacen sobre la oferta existente, no creando otra'
+      using hint = 'Q-04';
+  end if;
+
+  -- El DEFAULT es now() + 2 dias, con el mismo now() de esta transaccion.
+  if new.expira_en is null or new.expira_en > now() + interval '2 days' then
+    raise exception 'No autorizado: una oferta caduca a los 2 dias como maximo'
+      using hint = 'Q-04';
+  end if;
+
+  select estado into v_estado_pedido from public.pedidos where id = new.pedido_id;
+  if v_estado_pedido is null or v_estado_pedido not in ('abierto', 'en_negociacion') then
+    raise exception 'Esta solicitud ya no admite ofertas.'
+      using hint = 'Q-04';
+  end if;
+
+  -- Q-18 (20260930183000): el cliente rechazo una oferta de esta empresa en
+  -- esta solicitud sin permitir otra (permite_reoferta = false).
+  if exists (select 1 from public.ofertas o
+              where o.pedido_id = new.pedido_id and o.admin_id = new.admin_id
+                and o.estado = 'rechazada' and o.permite_reoferta = false) then
+    raise exception 'No puedes volver a ofertar en esta solicitud: el cliente rechazo tu oferta anterior sin permitir otra.'
+      using hint = 'Q-18';
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.guard_oferta_insert() OWNER TO postgres;
+
+--
+-- Name: FUNCTION guard_oferta_insert(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.guard_oferta_insert() IS 'Q-04: un usuario final que no es superadmin solo puede crear ofertas enviadas, en ronda 1, sin contraoferta, con caducidad <= 2 dias y sobre un pedido abierto o en_negociacion. auth.uid() NULL pasa: ver 20260929160000.';
+
+
+--
 -- Name: guard_oferta_update(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -808,22 +1406,51 @@ CREATE FUNCTION public.guard_oferta_update() RETURNS trigger
     AS $$
 DECLARE
   es_cliente_pedido boolean;
+  v_hazmat          boolean;
 BEGIN
+  -- orfandad por borrado de cuenta: el titular anterior ya no existe
+  IF NEW.admin_id IS NULL AND OLD.admin_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM public.perfiles WHERE user_id = OLD.admin_id) THEN
+    RETURN NEW;
+  END IF;
+
   IF public.is_superadmin() THEN
     RETURN NEW;
   END IF;
 
   IF NEW.estado IS DISTINCT FROM OLD.estado AND NEW.estado = 'aceptada' THEN
+    -- H-04 etapa 5: los documentos acreditados de la empresa se leen de
+    -- `vigencias`, en estado 'vigente'. Una propuesta pendiente de revisión no
+    -- desbloquea nada, que es justo lo que H-02 quería garantizar.
     IF EXISTS (
-      SELECT 1 FROM public.perfiles p
-      WHERE p.user_id = OLD.admin_id
-        AND (
-          (p.fecha_vencimiento_permiso_sct  IS NOT NULL AND p.fecha_vencimiento_permiso_sct  < current_date) OR
-          (p.fecha_vencimiento_seguro_rc    IS NOT NULL AND p.fecha_vencimiento_seguro_rc    < current_date) OR
-          (p.fecha_vencimiento_seguro_carga IS NOT NULL AND p.fecha_vencimiento_seguro_carga < current_date)
-        )
+      SELECT 1 FROM public.vigencias v
+      WHERE v.entidad_tipo   = 'perfil'
+        AND v.entidad_id     = OLD.admin_id::text
+        AND v.estado         = 'vigente'
+        AND v.tipo_documento IN ('permiso_sct', 'seguro_rc', 'seguro_carga')
+        AND public.vigencia_vence_el(v.tipo_documento, v.fecha_documento) < current_date
     ) THEN
       RAISE EXCEPTION 'DOCUMENTOS_VENCIDOS: la empresa tiene documentos vencidos (permiso SCT, seguro RC o seguro de carga)';
+    END IF;
+
+    -- Carga peligrosa: el permiso del CAMIÓN. Aquí un permiso que no existe
+    -- bloquea igual que uno vencido (ver cabecera), y solo se comprueba si el
+    -- recurso ofertado es de verdad un camión.
+    SELECT p.carga_peligrosa INTO v_hazmat
+      FROM public.pedidos p WHERE p.id = OLD.pedido_id;
+
+    IF coalesce(v_hazmat, false)
+       AND OLD.camion_id IS NOT NULL
+       AND EXISTS (SELECT 1 FROM public.camiones c WHERE c.id = OLD.camion_id)
+       AND NOT EXISTS (
+         SELECT 1 FROM public.vigencias v
+          WHERE v.entidad_tipo   = 'camion'
+            AND v.entidad_id     = OLD.camion_id
+            AND v.estado         = 'vigente'
+            AND v.tipo_documento = 'permiso_peligrosa'
+            AND public.vigencia_vence_el('permiso_peligrosa', v.fecha_documento) >= current_date
+       ) THEN
+      RAISE EXCEPTION 'DOCUMENTOS_VENCIDOS: la unidad % no tiene permiso de materiales peligrosos vigente, y este pedido es de carga peligrosa', OLD.camion_id;
     END IF;
 
     IF auth.uid() = OLD.admin_id THEN
@@ -849,6 +1476,35 @@ $$;
 
 
 ALTER FUNCTION public.guard_oferta_update() OWNER TO postgres;
+
+--
+-- Name: guard_operador_delete(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.guard_operador_delete() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_reserva uuid;
+begin
+  -- S-08 (20261005150000): el chofer de un viaje vivo no se borra.
+  select r.id into v_reserva
+    from public.reservaciones r
+   where r.operador_id = old.id
+     and r.estado in ('Pendiente', 'Activa', 'PorAprobar', 'CancelacionSolicitada')
+   limit 1;
+
+  if v_reserva is not null then
+    raise exception 'No se puede eliminar al operador %: está asignado a un servicio en curso (reservación %). Asigna otro chofer a ese servicio y vuelve a intentarlo.', old.id, v_reserva
+      using hint = 'S-08';
+  end if;
+
+  return old;
+end $$;
+
+
+ALTER FUNCTION public.guard_operador_delete() OWNER TO postgres;
 
 --
 -- Name: guard_operador_hazmat(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -900,6 +1556,19 @@ CREATE FUNCTION public.guard_pedido_update() RETURNS trigger
 DECLARE
   es_admin boolean;
 BEGIN
+  -- NUEVO: mantenimiento programado. El GUC es local a la transaccion y solo
+  -- lo enciende sincronizar_estados_pedidos(), no ejecutable por anon ni por
+  -- authenticated.
+  IF current_setting('portgo.sync', true) = 'on' THEN
+    RETURN NEW;
+  END IF;
+
+  -- orfandad por borrado de cuenta: el titular anterior ya no existe
+  IF NEW.cliente_id IS NULL AND OLD.cliente_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM public.perfiles WHERE user_id = OLD.cliente_id) THEN
+    RETURN NEW;
+  END IF;
+
   IF public.is_superadmin() THEN
     RETURN NEW;
   END IF;
@@ -921,6 +1590,16 @@ BEGIN
   SELECT (rol = 'admin') INTO es_admin FROM public.perfiles WHERE user_id = auth.uid();
 
   IF es_admin THEN
+    -- A2-C3 (20261001150000): una empresa solo cambia el estado de una solicitud
+    -- ajena (y suelta oferta_pendiente_id al cancelar). Todo lo demas, igual.
+    IF (to_jsonb(NEW) - 'estado' - 'oferta_pendiente_id' - 'updated_at')
+       IS DISTINCT FROM (to_jsonb(OLD) - 'estado' - 'oferta_pendiente_id' - 'updated_at')
+       OR (NEW.oferta_pendiente_id IS DISTINCT FROM OLD.oferta_pendiente_id
+           AND NEW.oferta_pendiente_id IS NOT NULL) THEN
+      RAISE EXCEPTION 'No autorizado: una empresa solo puede cambiar el estado de una solicitud'
+        USING HINT = 'A2-C3';
+    END IF;
+
     IF OLD.estado IN ('abierto', 'en_negociacion') THEN
       IF NEW.estado IS DISTINCT FROM OLD.estado AND NEW.estado IN ('acordado', 'rechazado', 'cancelado') THEN
         RAISE EXCEPTION 'No autorizado: esa transicion de estado no la puede hacer un admin';
@@ -957,6 +1636,69 @@ $$;
 ALTER FUNCTION public.guard_pedido_update() OWNER TO postgres;
 
 --
+-- Name: guard_perfil_insert(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.guard_perfil_insert() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+begin
+  -- Sin usuario final: clave de servicio (gestionar-usuario) o postgres
+  -- (migraciones, replica). Ver la cabecera: el bloque 3 vigila que un
+  -- usuario final no pueda llegar aqui con auth.uid() NULL.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if public.is_superadmin() then
+    return new;
+  end if;
+
+  if new.rol is distinct from 'cliente' and new.rol is distinct from 'admin' then
+    raise exception 'No autorizado: una cuenta nueva solo puede ser cliente o empresa';
+  end if;
+
+  if new.aprobacion_cuenta is distinct from 'pendiente' then
+    raise exception 'No autorizado: una cuenta nueva nace pendiente de aprobacion';
+  end if;
+
+  if new.verificado          is true
+     or new.docs_aprobados_en   is not null
+     or new.docs_aprobados_por  is not null
+     or new.metodo_verificacion is not null then
+    raise exception 'No autorizado: campos de verificacion solo modificables por superadmin';
+  end if;
+
+  -- H-02: la acreditacion no se autodeclara, tampoco al nacer.
+  if new.permiso_sct  is not null
+     or new.seguro_rc    is true
+     or new.seguro_carga is true
+     or new.fecha_vencimiento_permiso_sct  is not null
+     or new.fecha_vencimiento_seguro_rc    is not null
+     or new.fecha_vencimiento_seguro_carga is not null
+     -- S-12 (20261005120000): tampoco la ruta del documento acreditado.
+     or new.doc_permiso_sct  is not null
+     or new.doc_seguro_rc    is not null
+     or new.doc_seguro_carga is not null then
+    raise exception 'No autorizado: los seguros y el permiso SCT se acreditan con documento aprobado, no se declaran. Subelos en Perfil de empresa -> Documentos legales.';
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.guard_perfil_insert() OWNER TO postgres;
+
+--
+-- Name: FUNCTION guard_perfil_insert(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.guard_perfil_insert() IS 'Q-01: un usuario final solo puede crear su perfil como cliente/admin, pendiente, sin verificacion ni acreditacion. Protege al nacer las mismas columnas que guard_perfil_self_update en UPDATE. auth.uid() NULL (clave de servicio, postgres) pasa: ver 20260929130000.';
+
+
+--
 -- Name: guard_perfil_self_update(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -965,6 +1707,13 @@ CREATE FUNCTION public.guard_perfil_self_update() RETURNS trigger
     SET search_path TO 'public', 'pg_temp'
     AS $$
 BEGIN
+  -- Cambio de rol hecho por cambiar_rol(), que ya comprobo lo que habia que
+  -- comprobar. La marca es local a la transaccion y solo la enciende esa
+  -- funcion: set_config vive en pg_catalog y PostgREST no lo expone.
+  IF current_setting('portgo.cambio_rol', true) = 'on' THEN
+    RETURN NEW;
+  END IF;
+
   IF public.is_superadmin() THEN
     RETURN NEW;
   END IF;
@@ -986,12 +1735,84 @@ BEGIN
     RAISE EXCEPTION 'No autorizado: campos de verificacion solo modificables por superadmin';
   END IF;
 
+  -- H-02: la acreditacion no se autodeclara.
+  --
+  -- Estas seis son las que el cliente ve como "Seguro RC ✓" o "Permiso SCT".
+  -- Solo las escribe aprobarDocsEmpresa(), que corre como superadmin y sale
+  -- por el IF de arriba. La empresa propone en las columnas *_pendiente, que
+  -- siguen abiertas para ella a proposito.
+  IF NEW.permiso_sct  IS DISTINCT FROM OLD.permiso_sct
+     OR NEW.seguro_rc    IS DISTINCT FROM OLD.seguro_rc
+     OR NEW.seguro_carga IS DISTINCT FROM OLD.seguro_carga
+     OR NEW.fecha_vencimiento_permiso_sct  IS DISTINCT FROM OLD.fecha_vencimiento_permiso_sct
+     OR NEW.fecha_vencimiento_seguro_rc    IS DISTINCT FROM OLD.fecha_vencimiento_seguro_rc
+     OR NEW.fecha_vencimiento_seguro_carga IS DISTINCT FROM OLD.fecha_vencimiento_seguro_carga
+     -- S-12 (20261005120000): tampoco la ruta del documento acreditado.
+     OR NEW.doc_permiso_sct  IS DISTINCT FROM OLD.doc_permiso_sct
+     OR NEW.doc_seguro_rc    IS DISTINCT FROM OLD.doc_seguro_rc
+     OR NEW.doc_seguro_carga IS DISTINCT FROM OLD.doc_seguro_carga THEN
+    RAISE EXCEPTION 'No autorizado: los seguros y el permiso SCT se acreditan con documento aprobado, no se declaran. Subelos en Perfil de empresa -> Documentos legales.';
+  END IF;
+
   RETURN NEW;
 END;
 $$;
 
 
 ALTER FUNCTION public.guard_perfil_self_update() OWNER TO postgres;
+
+--
+-- Name: guard_reservacion_insert(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.guard_reservacion_insert() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+begin
+  -- NUEVO: cierre de un acuerdo mutuo. Solo lo enciende cerrar_acuerdo(), que
+  -- ya comprobo que hay oferta aceptada y que quien llama es parte del trato.
+  if current_setting('portgo.cierre_acuerdo', true) = 'on' then
+    return new;
+  end if;
+
+  -- El superadmin cierra los acuerdos: js/aprobaciones.js llama a
+  -- cerrarAcuerdo(), y ahí la reserva nace 'Activa' con el precio pactado.
+  if public.is_superadmin() then
+    return new;
+  end if;
+
+  -- Q-05 (20260930120000): la empresa no crea reservaciones directamente.
+  -- Desde el 2026-09-09 el acuerdo lo cierra cerrar_acuerdo() (marca de
+  -- arriba), tambien cuando acepta la empresa. Esta rama la dejaba crear
+  -- una reserva en cualquier estado, con cualquier precio y a nombre de
+  -- cualquier cliente.
+  if new.propietario_id = auth.uid() then
+    raise exception 'No autorizado: una empresa no crea reservaciones; nacen al cerrar el acuerdo con el cliente'
+      using hint = 'Q-05';
+  end if;
+
+  -- Un cliente agendando por su cuenta desde el catalogo: la reserva nace
+  -- Pendiente y sin precio, y la confirma la empresa. Esto NO cambia.
+  if new.cliente_user_id = auth.uid() then
+    if new.estado is distinct from 'Pendiente' then
+      raise exception 'No autorizado: una reserva que tu creas nace Pendiente; la confirma la empresa';
+    end if;
+    if new.precio_acordado is not null then
+      raise exception 'No autorizado: el precio lo fija la empresa al aceptar, no quien agenda';
+    end if;
+    if new.pedido_id is not null and not public.es_mi_pedido(new.pedido_id) then
+      raise exception 'No autorizado: esa solicitud no es tuya';
+    end if;
+    return new;
+  end if;
+
+  raise exception 'No autorizado: solo puedes crear reservaciones a tu nombre';
+end;
+$$;
+
+
+ALTER FUNCTION public.guard_reservacion_insert() OWNER TO postgres;
 
 --
 -- Name: guard_reservacion_update(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1092,6 +1913,123 @@ $$;
 ALTER FUNCTION public.guard_reservacion_update() OWNER TO postgres;
 
 --
+-- Name: guard_unidad_existe(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.guard_unidad_existe() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $_$
+DECLARE
+  v_tabla text;
+  v_hay   boolean;
+BEGIN
+  IF NEW.unidad IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Solo cuando cambia la referencia. En INSERT, OLD es NULL y siempre entra.
+  IF TG_OP = 'UPDATE'
+     AND NEW.unidad IS NOT DISTINCT FROM OLD.unidad
+     AND NEW.recurso_tipo IS NOT DISTINCT FROM OLD.recurso_tipo THEN
+    RETURN NEW;
+  END IF;
+
+  v_tabla := CASE COALESCE(NEW.recurso_tipo, 'camion')
+               WHEN 'camion'   THEN 'camiones'
+               WHEN 'custodio' THEN 'custodios'
+               WHEN 'patio'    THEN 'patios'
+               WHEN 'lavado'   THEN 'lavados'
+             END;
+
+  IF v_tabla IS NULL THEN
+    RAISE EXCEPTION 'recurso_tipo invalido: %', NEW.recurso_tipo;
+  END IF;
+
+  EXECUTE format('SELECT EXISTS (SELECT 1 FROM public.%I WHERE id = $1)', v_tabla)
+     INTO v_hay USING NEW.unidad;
+
+  IF NOT v_hay THEN
+    RAISE EXCEPTION 'La unidad % no existe en %', NEW.unidad, v_tabla;
+  END IF;
+
+  RETURN NEW;
+END;
+$_$;
+
+
+ALTER FUNCTION public.guard_unidad_existe() OWNER TO postgres;
+
+--
+-- Name: guard_vigencia_update(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.guard_vigencia_update() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+begin
+  if public.is_superadmin() then return new; end if;
+
+  -- El perfil de empresa: H-02. La empresa propone, el superadmin acredita.
+  -- Sin esto, quitar la casilla de la interfaz no protegería nada, porque RLS
+  -- deja a la empresa actualizar su propia fila.
+  if old.entidad_tipo = 'perfil' then
+    if old.estado = 'vigente' then
+      raise exception 'VIGENCIA_ACREDITADA: solo el superadmin puede modificar un documento acreditado de empresa';
+    end if;
+    if new.estado is distinct from old.estado then
+      raise exception 'VIGENCIA_SIN_AUTOACREDITAR: solo el superadmin acredita un documento de empresa';
+    end if;
+  else
+    -- Flota y operadores: el dueño mantiene los papeles de su recurso, igual
+    -- que hoy hace sobre las columnas. Lo que NO puede es acreditarse solo:
+    -- pasar una propuesta a `vigente` sigue siendo del superadmin.
+    if new.estado is distinct from old.estado and new.estado = 'vigente' then
+      raise exception 'VIGENCIA_SIN_AUTOACREDITAR: solo el superadmin pasa un documento a vigente';
+    end if;
+  end if;
+
+  -- Para todos: la revisión la firma quien revisa.
+  if new.revisado_por is distinct from old.revisado_por
+     or new.revisado_en is distinct from old.revisado_en then
+    raise exception 'VIGENCIA_SIN_AUTOREVISAR: la revisión la firma el superadmin';
+  end if;
+
+  -- Y nadie se cuelga un documento de una entidad que no es suya.
+  if new.entidad_tipo is distinct from old.entidad_tipo
+     or new.entidad_id is distinct from old.entidad_id then
+    raise exception 'VIGENCIA_SIN_MUDANZA: un documento no cambia de dueño';
+  end if;
+
+  return new;
+end $$;
+
+
+ALTER FUNCTION public.guard_vigencia_update() OWNER TO postgres;
+
+--
+-- Name: ids_superadmins(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.ids_superadmins() RETURNS SETOF uuid
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  select user_id from public.perfiles where rol = 'superadmin';
+$$;
+
+
+ALTER FUNCTION public.ids_superadmins() OWNER TO postgres;
+
+--
+-- Name: FUNCTION ids_superadmins(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.ids_superadmins() IS 'Ids de los superadmins para armar destinatarios de notificacion. No expone ninguna columna de datos personales. Ver H-01.';
+
+
+--
 -- Name: is_superadmin(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -1100,7 +2038,8 @@ CREATE FUNCTION public.is_superadmin() RETURNS boolean
     SET search_path TO 'public', 'pg_temp'
     AS $$
   SELECT EXISTS (
-    SELECT 1 FROM perfiles WHERE user_id = auth.uid() AND rol = 'superadmin'
+    SELECT 1 FROM public.perfiles_roles_interno
+     WHERE user_id = auth.uid() AND rol = 'superadmin'
   );
 $$;
 
@@ -1296,16 +2235,49 @@ ALTER FUNCTION public.notificar_respuesta_oferta() OWNER TO postgres;
 --
 
 CREATE FUNCTION public.notificar_superadmins(p_tipo text, p_titulo text, p_mensaje text) RETURNS void
-    LANGUAGE sql SECURITY DEFINER
+    LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public', 'pg_temp'
     AS $$
-  INSERT INTO public.notificaciones (user_id, tipo, titulo, mensaje, leido)
-  SELECT user_id, p_tipo, p_titulo, p_mensaje, false
-    FROM public.perfiles WHERE rol = 'superadmin';
-$$;
+declare
+  v_uid   uuid := auth.uid();
+  v_techo constant integer := 60;   -- llamadas/hora por autor; ver cabecera
+  v_n     integer;
+begin
+  -- Sin `auth.uid()` no hay a quién contarle nada: es el camino de
+  -- `service_role` (Edge Functions, psql), que ya está por encima del RLS y no
+  -- es el actor del que protege este techo. Pasa sin límite, a propósito.
+  if v_uid is not null then
+    select count(*) into v_n
+      from public.avisos_superadmin a
+     where a.autor = v_uid
+       and a.created_at > now() - interval '1 hour';
+
+    if v_n >= v_techo then
+      -- Volver, NO lanzar: cuatro RPC de negocio llaman a esta función dentro
+      -- de su transacción y una excepción se las llevaría por delante.
+      raise warning 'notificar_superadmins: % lleva % avisos en la ultima hora (techo %). Aviso "%" descartado.',
+        v_uid, v_n, v_techo, p_tipo;
+      return;
+    end if;
+
+    insert into public.avisos_superadmin (autor, tipo) values (v_uid, p_tipo);
+  end if;
+
+  insert into public.notificaciones (user_id, tipo, titulo, mensaje, leido)
+  select p.user_id, p_tipo, p_titulo, p_mensaje, false
+    from public.perfiles p
+   where p.rol = 'superadmin';
+end $$;
 
 
 ALTER FUNCTION public.notificar_superadmins(p_tipo text, p_titulo text, p_mensaje text) OWNER TO postgres;
+
+--
+-- Name: FUNCTION notificar_superadmins(p_tipo text, p_titulo text, p_mensaje text); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.notificar_superadmins(p_tipo text, p_titulo text, p_mensaje text) IS 'H-20: avisa a los superadmins con un techo de 60 llamadas/hora por autor (auth.uid()), contadas en public.avisos_superadmin. Por encima del techo DESCARTA el aviso y vuelve, sin excepcion: cuatro RPC de negocio la llaman con PERFORM dentro de su transaccion y una excepcion las abortaria. El techo sale de medir el volcado de produccion del 2026-09-21: maximo 17 llamadas/hora en todo el historico.';
+
 
 --
 -- Name: participa_en_expediente(uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1328,6 +2300,36 @@ $$;
 ALTER FUNCTION public.participa_en_expediente(exp_id uuid) OWNER TO postgres;
 
 --
+-- Name: pedidos_disponibles_para_mi(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.pedidos_disponibles_para_mi() RETURNS integer
+    LANGUAGE sql STABLE
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+  select count(*)::int
+    from public.pedidos p
+   where p.estado = 'abierto'
+     and not exists (
+       select 1
+         from public.ofertas o
+        where o.pedido_id = p.id
+          and o.admin_id  = (select auth.uid())
+          and (o.estado <> 'rechazada' or o.permite_reoferta is false)
+     );
+$$;
+
+
+ALTER FUNCTION public.pedidos_disponibles_para_mi() OWNER TO postgres;
+
+--
+-- Name: FUNCTION pedidos_disponibles_para_mi(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.pedidos_disponibles_para_mi() IS 'R-09: cuenta las solicitudes abiertas en las que esta empresa todavia puede ofertar, con la MISMA condicion que la seccion "Solicitudes disponibles" de js/pedidos.js. Sustituye a un contador que traia todos los pedidos abiertos y todas las ofertas propias para contar en JavaScript (890 llamadas medidas). SECURITY INVOKER a proposito: la visibilidad es la del usuario que llama.';
+
+
+--
 -- Name: puede_notificar(uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -1336,29 +2338,82 @@ CREATE FUNCTION public.puede_notificar(p_target uuid) RETURNS boolean
     SET search_path TO 'public', 'pg_temp'
     AS $$
 DECLARE
-  v_ok boolean;
+  v_uid uuid := auth.uid();
 BEGIN
-  SELECT
-    (p_target = auth.uid())
-    OR is_superadmin()
-    OR EXISTS (SELECT 1 FROM perfiles pf WHERE pf.user_id = p_target AND pf.rol = 'superadmin')
-    OR EXISTS (
-      SELECT 1 FROM reservaciones r
-      WHERE (r.propietario_id = auth.uid() AND r.cliente_user_id = p_target)
-         OR (r.cliente_user_id = auth.uid() AND r.propietario_id = p_target)
-    )
-    OR EXISTS (
-      SELECT 1 FROM ofertas o JOIN pedidos p ON p.id = o.pedido_id
-      WHERE (o.admin_id = auth.uid() AND p.cliente_id = p_target)
-         OR (p.cliente_id = auth.uid() AND o.admin_id = p_target)
-    )
-  INTO v_ok;
-  RETURN coalesce(v_ok, false);
+  IF v_uid IS NULL OR p_target IS NULL THEN
+    RETURN false;
+  END IF;
+
+  -- 1. A mi mismo.
+  IF p_target = v_uid THEN
+    RETURN true;
+  END IF;
+
+  -- 2. Soy superadmin: puedo notificar a cualquiera.
+  IF public.is_superadmin() THEN
+    RETURN true;
+  END IF;
+
+  -- 3. El destinatario es superadmin. Es el caso mas comun de todos.
+  IF EXISTS (SELECT 1 FROM perfiles pf
+              WHERE pf.user_id = p_target AND pf.rol = 'superadmin') THEN
+    RETURN true;
+  END IF;
+
+  -- 4. Somos las dos partes de una misma reservacion.
+  IF EXISTS (SELECT 1 FROM reservaciones r
+              WHERE (r.propietario_id  = v_uid AND r.cliente_user_id = p_target)
+                 OR (r.cliente_user_id = v_uid AND r.propietario_id  = p_target)) THEN
+    RETURN true;
+  END IF;
+
+  -- 5. Somos las dos partes de una negociacion. La mas cara: va al final.
+  IF EXISTS (SELECT 1 FROM ofertas o JOIN pedidos p ON p.id = o.pedido_id
+              WHERE (o.admin_id = v_uid AND p.cliente_id = p_target)
+                 OR (p.cliente_id = v_uid AND o.admin_id = p_target)) THEN
+    RETURN true;
+  END IF;
+
+  RETURN false;
 END;
 $$;
 
 
 ALTER FUNCTION public.puede_notificar(p_target uuid) OWNER TO postgres;
+
+--
+-- Name: purgar_notificaciones_leidas(integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.purgar_notificaciones_leidas(p_dias integer DEFAULT 180, p_tope integer DEFAULT 50000) RETURNS integer
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+DECLARE
+  v_borradas integer;
+BEGIN
+  IF p_dias < 30 THEN
+    RAISE EXCEPTION 'Retencion demasiado corta (% dias). El minimo son 30.', p_dias;
+  END IF;
+
+  WITH candidatas AS (
+    SELECT id FROM public.notificaciones
+     WHERE leido = true
+       AND created_at < now() - make_interval(days => p_dias)
+     ORDER BY created_at
+     LIMIT p_tope
+  )
+  DELETE FROM public.notificaciones n
+   USING candidatas c
+   WHERE n.id = c.id;
+
+  GET DIAGNOSTICS v_borradas = ROW_COUNT;
+  RETURN v_borradas;
+END;
+$$;
+
+
+ALTER FUNCTION public.purgar_notificaciones_leidas(p_dias integer, p_tope integer) OWNER TO postgres;
 
 --
 -- Name: recomendar_unidad(text, numeric, integer, integer, numeric); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1595,6 +2650,102 @@ $$;
 ALTER FUNCTION public.registrar_evidencias(p_reserva_id uuid, p_paths text[]) OWNER TO postgres;
 
 --
+-- Name: reporte_kpis(date, date); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.reporte_kpis(p_desde date, p_hasta date) RETURNS jsonb
+    LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_ini   timestamptz;
+  v_fin   timestamptz;
+  v_ped   jsonb;
+  v_res   jsonb;
+  v_meses jsonb;
+  v_top   jsonb;
+  v_tipos jsonb;
+begin
+  if not public.is_superadmin() then
+    raise exception 'No autorizado';
+  end if;
+
+  if p_desde is null or p_hasta is null then
+    raise exception 'Hacen falta las dos fechas del rango';
+  end if;
+  if p_hasta < p_desde then
+    raise exception 'El rango termina antes de empezar: % a %', p_desde, p_hasta;
+  end if;
+
+  -- Los mismos limites que arma el cliente hoy, ni un microsegundo mas.
+  v_ini := p_desde::text::timestamptz;
+  v_fin := (p_hasta::text || 'T23:59:59')::timestamptz;
+
+  select jsonb_build_object(
+    'total_pedidos', count(*),
+    'acordados',     count(*) filter (where estado in ('acordado','finalizado','expirado')),
+    'cancelados',    count(*) filter (where estado = 'cancelado'),
+    'abiertos',      count(*) filter (where estado = 'abierto')
+  ) into v_ped
+    from public.pedidos
+   where created_at >= v_ini and created_at <= v_fin;
+
+  select jsonb_build_object(
+    'total_reservas', count(*),
+    'ingreso',        coalesce(sum(coalesce(precio_acordado, 0)), 0)
+  ) into v_res
+    from public.reservaciones
+   where created_at >= v_ini and created_at <= v_fin;
+
+  -- Mapa mes -> pedidos. El navegador construye el rango y las etiquetas.
+  select coalesce(jsonb_object_agg(m, n), '{}'::jsonb) into v_meses
+    from (select to_char(created_at at time zone 'UTC', 'YYYY-MM') as m, count(*) as n
+            from public.pedidos
+           where created_at >= v_ini and created_at <= v_fin
+           group by 1) s;
+
+  -- El ORDER BY va DENTRO del jsonb_agg, no solo en la subconsulta: una
+  -- agregacion no tiene por que respetar el orden de lo que recibe, y aqui el
+  -- orden es el resultado, no un adorno.
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'nombre', nombre, 'reservas', n, 'ingreso', ing)
+           order by n desc, ing desc, nombre), '[]'::jsonb) into v_top
+    from (select coalesce(e.nombre, 'Empresa') as nombre,
+                 count(*) as n,
+                 coalesce(sum(coalesce(r.precio_acordado, 0)), 0) as ing
+            from public.reservaciones r
+            left join public.empresas_publico e on e.user_id = r.propietario_id
+           where r.created_at >= v_ini and r.created_at <= v_fin
+             and r.propietario_id is not null
+           group by r.propietario_id, e.nombre
+           order by n desc, ing desc, nombre
+           limit 5) s;
+
+  select coalesce(jsonb_agg(jsonb_build_object('tipo', t, 'n', n)
+           order by n desc, t), '[]'::jsonb) into v_tipos
+    from (select coalesce(nullif(tipo_camion, ''), 'Otro') as t, count(*) as n
+            from public.pedidos
+           where created_at >= v_ini and created_at <= v_fin
+           group by 1
+           order by n desc, t
+           limit 5) s;
+
+  return v_ped || v_res || jsonb_build_object(
+    'meses', v_meses, 'top_admins', v_top, 'top_tipos', v_tipos);
+end;
+$$;
+
+
+ALTER FUNCTION public.reporte_kpis(p_desde date, p_hasta date) OWNER TO postgres;
+
+--
+-- Name: FUNCTION reporte_kpis(p_desde date, p_hasta date); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.reporte_kpis(p_desde date, p_hasta date) IS 'Los agregados de la pantalla Reportes, calculados en la base. Devuelve conteos y sumas; la tasa de cierre la sigue redondeando el navegador. Ver H-07.';
+
+
+--
 -- Name: responder_contraoferta(uuid, text); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -1624,25 +2775,10 @@ BEGIN
   SELECT * INTO v_pedido FROM public.pedidos WHERE id = v_oferta.pedido_id;
 
   IF p_accion = 'aceptar' THEN
-    -- El guard permite al admin poner 'aceptada' solo viniendo de
-    -- 'contra_oferta' — exactamente este caso.
-    UPDATE public.ofertas
-       SET estado = 'aceptada', precio_oferta = COALESCE(v_oferta.contra_precio, v_oferta.precio_oferta)
-     WHERE id = p_oferta_id;
-
-    UPDATE public.pedidos
-       SET estado = 'pendiente_acuerdo', oferta_pendiente_id = p_oferta_id
-     WHERE id = v_pedido.id;
-
-    INSERT INTO public.notificaciones (user_id, tipo, titulo, mensaje, leido)
-    VALUES (v_pedido.cliente_id, 'respuesta_contra_oferta', '✓ Aceptaron tu contraoferta',
-            public.mi_nombre() || ' aceptó tu contraoferta. Queda pendiente la aprobación del administrador.',
-            false);
-
-    PERFORM public.notificar_superadmins(
-      'revision_acuerdo', '🤝 Acuerdo por aprobar',
-      'Se cerró una negociación de ' || COALESCE(v_pedido.tipo_camion, 'servicio')
-      || '. Revísalo en Pendientes de aprobación.');
+    -- Misma razon que en responder_oferta: aceptar cierra el acuerdo desde el
+    -- 2026-09-09. aceptar_y_cerrar_acuerdo se encarga tambien de copiar el
+    -- contra_precio a precio_oferta, que es lo que hacia el UPDATE de aqui.
+    PERFORM public.aceptar_y_cerrar_acuerdo(p_oferta_id, 'empresa_acepta_contra');
 
   ELSIF p_accion = 'rechazar' THEN
     UPDATE public.ofertas SET estado = 'rechazada' WHERE id = p_oferta_id;
@@ -1710,25 +2846,16 @@ BEGIN
                  ELSE '' END;
 
   IF p_accion = 'aceptar' THEN
-    -- El guard exige que la oferta venga de 'enviada' para que el cliente la
-    -- acepte; ya está verificado arriba.
-    UPDATE public.ofertas SET estado = 'aceptada' WHERE id = p_oferta_id;
-
-    -- Queda pendiente de que el superadmin apruebe el acuerdo. Es él quien
-    -- luego crea la reservación (cerrarAcuerdo), no este flujo.
-    UPDATE public.pedidos
-       SET estado = 'pendiente_acuerdo', oferta_pendiente_id = p_oferta_id
-     WHERE id = v_pedido.id;
-
-    INSERT INTO public.notificaciones (user_id, tipo, titulo, mensaje, leido)
-    VALUES (v_oferta.admin_id, 'respuesta_oferta', '✓ Tu oferta fue aceptada',
-            'El cliente aceptó tu oferta de ' || v_ruta
-            || '. Queda pendiente la aprobación del administrador.', false);
-
-    PERFORM public.notificar_superadmins(
-      'revision_acuerdo', '🤝 Acuerdo por aprobar',
-      public.mi_nombre() || ' aceptó una oferta de ' || v_ruta
-      || '. Revísalo en Pendientes de aprobación.');
+    -- Desde el 2026-09-09 aceptar CIERRA el acuerdo: las dos partes aceptan y
+    -- la reserva se crea, sin superadmin. Esta rama escribia el flujo anterior
+    -- —dejar el pedido en 'pendiente_acuerdo' sin reservacion— y era una
+    -- segunda maquina de estados viva que contradecia la regla vigente.
+    --
+    -- Delega en la unica implementacion, en vez de repetirla. Ahi dentro se
+    -- vuelve a comprobar quien llama, se bloquea el pedido (FOR UPDATE) y se
+    -- trata el desvio por documentos vencidos, que aqui no existia: una empresa
+    -- con el permiso SCT vencido cerraba por esta via sin que nadie lo mirara.
+    PERFORM public.aceptar_y_cerrar_acuerdo(p_oferta_id, 'cliente_acepta_oferta');
 
   ELSIF p_accion = 'contraofertar' THEN
     IF p_contra_precio IS NULL OR p_contra_precio <= 0 THEN
@@ -1736,7 +2863,7 @@ BEGIN
     END IF;
 
     UPDATE public.ofertas
-       SET estado = 'contra_oferta', contra_precio = p_contra_precio, ronda = 2
+       SET estado = 'contra_oferta', contra_precio = p_contra_precio, ronda = ronda + 1
      WHERE id = p_oferta_id;
 
     INSERT INTO public.notificaciones (user_id, tipo, titulo, mensaje, leido)
@@ -1771,6 +2898,125 @@ $_$;
 
 
 ALTER FUNCTION public.responder_oferta(p_oferta_id uuid, p_accion text, p_contra_precio numeric, p_nota text) OWNER TO postgres;
+
+--
+-- Name: set_updated_at(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.set_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+begin
+  -- Solo si la fila cambió de verdad. `IS DISTINCT FROM` sobre el registro
+  -- entero compara columna a columna tratando NULL como un valor, que es lo que
+  -- hace falta aquí: dos NULL son «lo mismo».
+  if new is distinct from old then
+    new.updated_at := now();
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION public.set_updated_at() OWNER TO postgres;
+
+--
+-- Name: FUNCTION set_updated_at(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.set_updated_at() IS 'H-19: sella updated_at en un BEFORE UPDATE, solo si la fila cambio de verdad (NEW IS DISTINCT FROM OLD). El trigger se llama trg_updated_at para que el orden alfabetico lo deje correr DESPUES de los trg_guard_*: sellar antes de saber si el cambio es legal es sellar una mentira.';
+
+
+--
+-- Name: sincronizar_estados_pedidos(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.sincronizar_estados_pedidos() RETURNS TABLE(ofertas_expiradas integer, pedidos_reabiertos integer, acuerdos_pendientes integer, acuerdos_expirados integer, solicitudes_vencidas integer)
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+DECLARE
+  n1 int := 0; n2 int := 0; n3 int := 0; n4 int := 0; n5 int := 0;
+BEGIN
+  PERFORM set_config('portgo.sync', 'on', true);  -- true = solo esta transaccion
+
+  -- (a) Ofertas vencidas -> rechazada.
+  -- Duplica lo que ya hace el cron expire-stale-offers cada hora, y esta bien
+  -- que lo duplique: es idempotente, y hace falta AQUI para que las reglas
+  -- siguientes vean el estado ya normalizado sin esperar a la hora en punto.
+  WITH x AS (
+    UPDATE public.ofertas SET estado = 'rechazada'
+     WHERE estado = 'enviada' AND expira_en IS NOT NULL AND expira_en < now()
+    RETURNING 1)
+  SELECT count(*) INTO n1 FROM x;
+
+  -- (b) Pedido en negociacion cuyas ofertas estan TODAS rechazadas -> abierto.
+  -- "Todas rechazadas" y no "sin ofertas vivas": asi un pedido con una oferta
+  -- aceptada no se reabre por error y queda para la regla (c). El JS hace
+  -- exactamente esta comprobacion.
+  WITH x AS (
+    UPDATE public.pedidos p SET estado = 'abierto'
+     WHERE p.estado = 'en_negociacion'
+       AND EXISTS (SELECT 1 FROM public.ofertas o WHERE o.pedido_id = p.id)
+       AND NOT EXISTS (
+         SELECT 1 FROM public.ofertas o
+          WHERE o.pedido_id = p.id AND o.estado <> 'rechazada')
+    RETURNING 1)
+  SELECT count(*) INTO n2 FROM x;
+
+  -- (c) Pedido en negociacion con una oferta aceptada -> pendiente_acuerdo.
+  -- Restos de cuando aceptar una oferta eran tres escrituras sueltas. Desde
+  -- aceptar_y_cerrar_acuerdo (20260903120000) ya no deberia producirse, pero
+  -- se conserva para el historico que quedo a medias.
+  WITH x AS (
+    UPDATE public.pedidos p
+       SET estado = 'pendiente_acuerdo',
+           oferta_pendiente_id = (
+             SELECT o.id FROM public.ofertas o
+              WHERE o.pedido_id = p.id AND o.estado = 'aceptada'
+              ORDER BY o.created_at DESC LIMIT 1)
+     WHERE p.estado = 'en_negociacion'
+       AND EXISTS (SELECT 1 FROM public.ofertas o WHERE o.pedido_id = p.id AND o.estado = 'aceptada')
+    RETURNING 1)
+  SELECT count(*) INTO n3 FROM x;
+
+  -- (d) Acuerdo cuya fecha_fin ya paso y nunca se completo -> expirado.
+  -- Los completados pasan a 'finalizado' al aprobarse la finalizacion.
+  WITH x AS (
+    UPDATE public.pedidos SET estado = 'expirado'
+     WHERE estado = 'acordado' AND fecha_fin IS NOT NULL AND fecha_fin < current_date
+    RETURNING 1)
+  SELECT count(*) INTO n4 FROM x;
+
+  -- (e) Solicitud cuya fecha de carga ya llego y no tiene ninguna oferta viva
+  --     -> expirado. Nadie va a poder atenderla a tiempo.
+  -- FALTABA en 20260810130000: esta regla se anadio al navegador despues.
+  -- Incluye las que no tienen NINGUNA fila en ofertas: en JS eso sale de que
+  -- .every() sobre un array vacio devuelve true.
+  WITH x AS (
+    UPDATE public.pedidos p SET estado = 'expirado'
+     WHERE p.estado IN ('abierto', 'pendiente_revision')
+       AND p.fecha_ini IS NOT NULL
+       AND p.fecha_ini <= current_date
+       AND NOT EXISTS (
+         SELECT 1 FROM public.ofertas o
+          WHERE o.pedido_id = p.id AND o.estado <> 'rechazada')
+    RETURNING 1)
+  SELECT count(*) INTO n5 FROM x;
+
+  RETURN QUERY SELECT n1, n2, n3, n4, n5;
+END;
+$$;
+
+
+ALTER FUNCTION public.sincronizar_estados_pedidos() OWNER TO postgres;
+
+--
+-- Name: FUNCTION sincronizar_estados_pedidos(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.sincronizar_estados_pedidos() IS 'Mantenimiento programado: replica en el servidor las cinco transiciones que js/pedidos.js hacia al dibujar la lista. Ver H-17.';
+
 
 --
 -- Name: solicitar_cancelacion(uuid, text, text); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1936,6 +3182,173 @@ $$;
 
 ALTER FUNCTION public.version_al_menos(p_version text, p_minima text) OWNER TO postgres;
 
+--
+-- Name: vigencia_propietario(text, text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.vigencia_propietario(p_tipo text, p_id text) RETURNS uuid
+    LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare v uuid;
+begin
+  case p_tipo
+    when 'perfil'   then select user_id        into v from public.perfiles   where user_id = p_id::uuid;
+    when 'camion'   then select propietario_id into v from public.camiones   where id = p_id;
+    when 'operador' then select propietario_id into v from public.operadores where id = p_id;
+    when 'custodio' then select propietario_id into v from public.custodios  where id = p_id;
+    when 'patio'    then select propietario_id into v from public.patios     where id = p_id;
+    else v := null;
+  end case;
+  return v;
+end $$;
+
+
+ALTER FUNCTION public.vigencia_propietario(p_tipo text, p_id text) OWNER TO postgres;
+
+--
+-- Name: vigencia_vence_el(text, date); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.vigencia_vence_el(p_tipo text, p_fecha date) RETURNS date
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+  select case
+    when p_fecha is null then null
+    when (c.meta->>'vigencia_meses') is null then p_fecha
+    else p_fecha + make_interval(months => (c.meta->>'vigencia_meses')::int)
+  end::date
+  from public.catalogos c
+  where c.clave = 'vigencia_tipo' and c.valor = p_tipo;
+$$;
+
+
+ALTER FUNCTION public.vigencia_vence_el(p_tipo text, p_fecha date) OWNER TO postgres;
+
+--
+-- Name: vigencias_espejo(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.vigencias_espejo() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare
+  j        jsonb;
+  m        record;
+  v_ent    text;
+  v_id     text;
+  v_arch   text;
+  v_fecha  date;
+begin
+  if tg_op = 'DELETE' then j := to_jsonb(old); else j := to_jsonb(new); end if;
+
+  for m in
+    select * from (values
+      ('perfiles',   'perfil',   'permiso_sct',         'doc_permiso_sct',            'fecha_vencimiento_permiso_sct',        'vigente'),
+      ('perfiles',   'perfil',   'seguro_rc',           'doc_seguro_rc',              'fecha_vencimiento_seguro_rc',          'vigente'),
+      ('perfiles',   'perfil',   'seguro_carga',        'doc_seguro_carga',           'fecha_vencimiento_seguro_carga',       'vigente'),
+      ('perfiles',   'perfil',   'permiso_sct',         'doc_permiso_sct_pendiente',  'fecha_vencimiento_permiso_sct_pendiente',  'pendiente'),
+      ('perfiles',   'perfil',   'seguro_rc',           'doc_seguro_rc_pendiente',    'fecha_vencimiento_seguro_rc_pendiente',    'pendiente'),
+      ('perfiles',   'perfil',   'seguro_carga',        'doc_seguro_carga_pendiente', 'fecha_vencimiento_seguro_carga_pendiente', 'pendiente'),
+      ('camiones',   'camion',   'tarjeta_circulacion', 'imagen_tc',                  'fecha_vencimiento_tc',                 'vigente'),
+      ('camiones',   'camion',   'seguro_unidad',       'doc_seguro',                 'fecha_vencimiento_seguro',             'vigente'),
+      ('camiones',   'camion',   'permiso_sct_unidad',  'doc_sct',                    'fecha_vencimiento_permiso_sct',        'vigente'),
+      ('camiones',   'camion',   'verificacion',        'doc_verificacion',           'fecha_vencimiento_verificacion',       'vigente'),
+      ('camiones',   'camion',   'permiso_peligrosa',   'doc_permiso_peligrosa',      'fecha_vencimiento_permiso_peligrosa',  'vigente'),
+      ('camiones',   'camion',   'caat',                'doc_caat',                   'vigencia_caat',                        'vigente'),
+      ('operadores', 'operador', 'licencia',            'foto_licencia',              'fecha_vencimiento',                    'vigente'),
+      ('operadores', 'operador', 'licencia_peligrosa',  'doc_licencia_peligrosa',     'fecha_vencimiento_licencia_peligrosa', 'vigente'),
+      ('operadores', 'operador', 'examen_medico',       'doc_examen_medico',          'fecha_examen_medico',                  'vigente'),
+      ('operadores', 'operador', 'examen_toxicologico', 'doc_examen_toxicologico',    'fecha_examen_toxicologico',            'vigente'),
+      ('operadores', 'operador', 'carta_antecedentes',  'doc_carta_antecedentes',     'fecha_carta_antecedentes',             'vigente'),
+      ('custodios',  'custodio', 'certificacion',       null,                         'fecha_vencimiento_cert',               'vigente'),
+      ('custodios',  'custodio', 'licencia_sedena',     'doc_licencia_sedena',        'fecha_vencimiento_licencia_sedena',    'vigente'),
+      ('patios',     'patio',    'permiso_patio',       'doc_permiso',                'fecha_vencimiento_permiso',            'vigente')
+    ) t(tabla, entidad, tipo, col_arch, col_fecha, estado)
+    where t.tabla = tg_table_name
+  loop
+    -- Sin bloque exception: si un documento falla, toda la transacción de
+    -- origen falla con él. A partir de aquí una pantalla pública depende de
+    -- lo que este trigger escriba, así que un fallo callado ya no es
+    -- aceptable (ver cabecera). Comprobado ruidosamente a propósito: un
+    -- espejo roto ahora tumba el guardado, exactamente como antes de 3b.
+    v_ent   := m.entidad;
+    v_id    := case when m.tabla = 'perfiles' then j->>'user_id' else j->>'id' end;
+    v_arch  := case when m.col_arch is null then null else j->>(m.col_arch) end;
+    v_fecha := nullif(j->>(m.col_fecha), '')::date;
+
+    -- S-02 (20261001130000): en un UPDATE, lo que no cambio ya esta reflejado.
+    -- Reescribirlo disparaba guard_vigencia_update sobre filas vigentes y
+    -- dejaba a la empresa acreditada sin poder tocar su propio perfil.
+    if tg_op = 'UPDATE'
+       and (m.col_arch is null or to_jsonb(old)->>(m.col_arch) is not distinct from v_arch)
+       and to_jsonb(old)->>(m.col_fecha) is not distinct from j->>(m.col_fecha) then
+      continue;
+    end if;
+
+    if tg_op = 'DELETE' then
+      delete from public.vigencias
+       where entidad_tipo = v_ent and entidad_id = v_id
+         and tipo_documento = m.tipo;
+
+    elsif v_arch is null and v_fecha is null then
+      delete from public.vigencias
+       where entidad_tipo = v_ent and entidad_id = v_id
+         and tipo_documento = m.tipo and estado = m.estado;
+
+    elsif m.estado = 'vigente' then
+      insert into public.vigencias (entidad_tipo, entidad_id, tipo_documento, archivo_path, fecha_documento, estado)
+      values (v_ent, v_id, m.tipo, v_arch, v_fecha, 'vigente')
+      on conflict (entidad_tipo, entidad_id, tipo_documento) where estado = 'vigente'
+      do update set archivo_path = excluded.archivo_path,
+                    fecha_documento = excluded.fecha_documento;
+    else
+      insert into public.vigencias (entidad_tipo, entidad_id, tipo_documento, archivo_path, fecha_documento, estado)
+      values (v_ent, v_id, m.tipo, v_arch, v_fecha, 'pendiente')
+      on conflict (entidad_tipo, entidad_id, tipo_documento) where estado = 'pendiente'
+      do update set archivo_path = excluded.archivo_path,
+                    fecha_documento = excluded.fecha_documento;
+    end if;
+  end loop;
+
+  if tg_op = 'DELETE' then return old; else return new; end if;
+end $$;
+
+
+ALTER FUNCTION public.vigencias_espejo() OWNER TO postgres;
+
+--
+-- Name: FUNCTION vigencias_espejo(); Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON FUNCTION public.vigencias_espejo() IS 'H-04 Etapa 4: ESTRICTO. Un documento que no se pueda reflejar tumba la transaccion de origen entera — dejo de ser tolerante en la Etapa 3b/3c porque catalogo.js ya lee de vigencias via empresas_publico. No tocar sin releer docs/PLAN-H04-VIGENCIAS.md.';
+
+
+--
+-- Name: vigencias_tipo_coincide(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.vigencias_tipo_coincide() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare v_esperado text;
+begin
+  select meta->>'entidad_tipo' into v_esperado
+    from public.catalogos
+   where clave = 'vigencia_tipo' and valor = new.tipo_documento;
+  if v_esperado is distinct from new.entidad_tipo then
+    raise exception 'VIGENCIA_TIPO_AJENO: % es de % y se intentó colgar de %',
+      new.tipo_documento, coalesce(v_esperado,'(sin entidad)'), new.entidad_tipo;
+  end if;
+  return new;
+end $$;
+
+
+ALTER FUNCTION public.vigencias_tipo_coincide() OWNER TO postgres;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -1962,6 +3375,41 @@ COMMENT ON TABLE public.app_config IS 'Interruptores y versión mínima de las a
 
 
 --
+-- Name: avisos_superadmin; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.avisos_superadmin (
+    id bigint NOT NULL,
+    autor uuid NOT NULL,
+    tipo text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.avisos_superadmin OWNER TO postgres;
+
+--
+-- Name: TABLE avisos_superadmin; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.avisos_superadmin IS 'H-20: una fila por llamada ACEPTADA a notificar_superadmins(), para contar el techo de 60/hora por autor. Vive aparte de notificaciones porque el autor no se puede guardar en una columna que el cliente escriba: la politica de INSERT de notificaciones solo restringe el destinatario, asi que cualquiera podria falsificar el autor y consumirle el techo a otro. RLS activo y SIN politicas: no hay acceso desde PostgREST.';
+
+
+--
+-- Name: avisos_superadmin_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.avisos_superadmin ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.avisos_superadmin_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: calificaciones; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -1969,7 +3417,7 @@ CREATE TABLE public.calificaciones (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     reservacion_id uuid,
     admin_id uuid NOT NULL,
-    cliente_id uuid NOT NULL,
+    cliente_id uuid,
     rating integer NOT NULL,
     comentario text,
     created_at timestamp with time zone DEFAULT now(),
@@ -1978,6 +3426,27 @@ CREATE TABLE public.calificaciones (
 
 
 ALTER TABLE public.calificaciones OWNER TO postgres;
+
+--
+-- Name: calificaciones_resumen; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.calificaciones_resumen WITH (security_invoker='true') AS
+ SELECT admin_id,
+    (count(*))::integer AS total,
+    round(avg(rating), 2) AS promedio
+   FROM public.calificaciones
+  GROUP BY admin_id;
+
+
+ALTER VIEW public.calificaciones_resumen OWNER TO postgres;
+
+--
+-- Name: VIEW calificaciones_resumen; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON VIEW public.calificaciones_resumen IS 'Q-09 (20260930193000): total y promedio de calificaciones por empresa, para las tarjetas del catalogo. security_invoker=true A PROPOSITO: hereda la RLS de calificaciones de quien consulta. Solo lectura.';
+
 
 --
 -- Name: camiones; Type: TABLE; Schema: public; Owner: postgres
@@ -1991,9 +3460,9 @@ CREATE TABLE public.camiones (
     estado text DEFAULT 'disponible'::text NOT NULL,
     emoji text DEFAULT '🚛'::text,
     created_at timestamp with time zone DEFAULT now(),
-    propietario_id uuid,
+    propietario_id uuid NOT NULL,
     calificacion numeric(2,1),
-    aprobacion text DEFAULT 'aprobada'::text NOT NULL,
+    aprobacion text DEFAULT 'pendiente'::text NOT NULL,
     archivos jsonb DEFAULT '[]'::jsonb,
     precio_dia numeric(14,2),
     origen text,
@@ -2032,12 +3501,60 @@ CREATE TABLE public.camiones (
     doc_verificacion text,
     doc_permiso_peligrosa text,
     fecha_vencimiento_permiso_peligrosa date,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    configuracion_vehicular text,
+    numero_permiso_sct text,
     CONSTRAINT camiones_aprobacion_check CHECK ((aprobacion = ANY (ARRAY['pendiente'::text, 'aprobada'::text, 'rechazada'::text]))),
     CONSTRAINT camiones_calificacion_check CHECK (((calificacion >= (1)::numeric) AND (calificacion <= (5)::numeric)))
 );
 
+ALTER TABLE ONLY public.camiones REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.camiones OWNER TO postgres;
+
+--
+-- Name: COLUMN camiones.tiempo_respuesta; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.camiones.tiempo_respuesta IS 'Heredada de una version anterior: 6 camiones creados entre abril y junio de 2026 tienen valor, y el codigo actual ni la lee ni la escribe. No confundir con "vacia": tiene datos, no tiene uso.';
+
+
+--
+-- Name: COLUMN camiones.configuracion_vehicular; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.camiones.configuracion_vehicular IS 'Clave SAT de configuración vehicular del Complemento Carta Porte (C2, C3, T3S2…) — catálogo en catalogos, clave=''config_vehicular_sat''.';
+
+
+--
+-- Name: COLUMN camiones.numero_permiso_sct; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.camiones.numero_permiso_sct IS 'Número de permiso SCT de ESTA unidad — distinto de perfiles.permiso_sct, que es el permiso general de la empresa.';
+
+
+--
+-- Name: camiones_publico; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.camiones_publico AS
+ SELECT id,
+    tipo,
+    estado,
+    propietario_id
+   FROM public.camiones
+  WHERE (aprobacion = 'aprobada'::text);
+
+
+ALTER VIEW public.camiones_publico OWNER TO postgres;
+
+--
+-- Name: VIEW camiones_publico; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON VIEW public.camiones_publico IS 'Lo que el catalogo ensena de un camion ajeno: nada del expediente. Ver H-10.';
+
 
 --
 -- Name: catalogos; Type: TABLE; Schema: public; Owner: postgres
@@ -2064,12 +3581,61 @@ COMMENT ON TABLE public.catalogos IS 'Listas de negocio que las apps móviles le
 
 
 --
+-- Name: consentimientos; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.consentimientos (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    tipo text NOT NULL,
+    version text NOT NULL,
+    aceptado_en timestamp with time zone DEFAULT now() NOT NULL,
+    contexto text,
+    referencia text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT consentimientos_tipo_check CHECK ((tipo = ANY (ARRAY['aviso_privacidad'::text, 'terminos'::text, 'datos_sensibles_operador'::text])))
+);
+
+
+ALTER TABLE public.consentimientos OWNER TO postgres;
+
+--
+-- Name: consentimientos_bloqueados; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.consentimientos_bloqueados (
+    id uuid NOT NULL,
+    titular uuid,
+    tipo text NOT NULL,
+    version text NOT NULL,
+    aceptado_en timestamp with time zone NOT NULL,
+    mecanismo text,
+    referencia text,
+    motivo text NOT NULL,
+    bloqueado_en timestamp with time zone DEFAULT now() NOT NULL,
+    conservar_hasta date,
+    anonimizado_en timestamp with time zone,
+    CONSTRAINT consentimientos_bloqueados_motivo_check CHECK ((motivo = ANY (ARRAY['cuenta_eliminada'::text, 'revocado'::text, 'borrado_directo'::text]))),
+    CONSTRAINT consentimientos_bloqueados_tipo_check CHECK ((tipo = ANY (ARRAY['aviso_privacidad'::text, 'terminos'::text, 'datos_sensibles_operador'::text])))
+);
+
+
+ALTER TABLE public.consentimientos_bloqueados OWNER TO postgres;
+
+--
+-- Name: TABLE consentimientos_bloqueados; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.consentimientos_bloqueados IS 'Bloqueo legal (Q-11, 20260930160000): evidencia minima de consentimientos cuya fila original se borro. NO se usa para ningun proposito operativo. RLS sin politicas y sin privilegios para anon/authenticated/service_role: solo el administrador de la base, ante un requerimiento legal. Al vencer conservar_hasta se anonimiza (titular y referencia a NULL).';
+
+
+--
 -- Name: custodios; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.custodios (
     id text NOT NULL,
-    propietario_id uuid,
+    propietario_id uuid NOT NULL,
     nombre text NOT NULL,
     tipo text NOT NULL,
     descripcion text,
@@ -2077,7 +3643,7 @@ CREATE TABLE public.custodios (
     disponibilidad text DEFAULT '24/7'::text,
     precio_dia numeric(14,2),
     estado text DEFAULT 'disponible'::text,
-    aprobacion text DEFAULT 'aprobada'::text,
+    aprobacion text DEFAULT 'pendiente'::text,
     created_at timestamp with time zone DEFAULT now(),
     rechazo_nota text,
     rechazo_campos text[],
@@ -2088,11 +3654,37 @@ CREATE TABLE public.custodios (
     porta_arma boolean DEFAULT false,
     num_licencia_sedena text,
     fecha_vencimiento_licencia_sedena date,
-    doc_licencia_sedena text
+    doc_licencia_sedena text,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.custodios REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.custodios OWNER TO postgres;
+
+--
+-- Name: custodios_publico; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.custodios_publico AS
+ SELECT id,
+    tipo,
+    nombre,
+    estado,
+    propietario_id
+   FROM public.custodios
+  WHERE (aprobacion = 'aprobada'::text);
+
+
+ALTER VIEW public.custodios_publico OWNER TO postgres;
+
+--
+-- Name: VIEW custodios_publico; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON VIEW public.custodios_publico IS 'Lo que el catalogo ensena de un custodio ajeno. Ver H-10.';
+
 
 --
 -- Name: custodios_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -2163,6 +3755,169 @@ CREATE TABLE public.documentos_fiscales (
 ALTER TABLE public.documentos_fiscales OWNER TO postgres;
 
 --
+-- Name: perfiles; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.perfiles (
+    user_id uuid NOT NULL,
+    nombre text NOT NULL,
+    rol text NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    rfc text,
+    razon_social text,
+    anos_operacion integer,
+    num_unidades integer,
+    seguro_rc boolean DEFAULT false,
+    seguro_carga boolean DEFAULT false,
+    permiso_sct text,
+    descripcion text,
+    telefono text,
+    aprobacion_cuenta text,
+    nota_rechazo_cuenta text,
+    regimen_fiscal text,
+    cp_fiscal text,
+    tipo_persona text,
+    fecha_vencimiento_permiso_sct date,
+    fecha_vencimiento_seguro_rc date,
+    fecha_vencimiento_seguro_carga date,
+    perfil_docs_pendiente boolean DEFAULT false,
+    fecha_vencimiento_permiso_sct_pendiente date,
+    fecha_vencimiento_seguro_rc_pendiente date,
+    fecha_vencimiento_seguro_carga_pendiente date,
+    doc_permiso_sct text,
+    doc_seguro_rc text,
+    doc_seguro_carga text,
+    doc_permiso_sct_pendiente text,
+    doc_seguro_rc_pendiente text,
+    doc_seguro_carga_pendiente text,
+    docs_aprobados_en timestamp with time zone,
+    docs_aprobados_por uuid,
+    verificado boolean DEFAULT false,
+    metodo_verificacion text,
+    fotos_verificacion jsonb DEFAULT '[]'::jsonb NOT NULL,
+    notif_email boolean DEFAULT true NOT NULL,
+    permiso_sct_pendiente text,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    calle text,
+    colonia text,
+    cp text,
+    ciudad text,
+    estado_mx text,
+    CONSTRAINT perfiles_aprobacion_cuenta_check CHECK (((aprobacion_cuenta IS NULL) OR (aprobacion_cuenta = ANY (ARRAY['pendiente'::text, 'rechazada'::text, 'suspendida'::text])))),
+    CONSTRAINT perfiles_metodo_verificacion_check CHECK (((metodo_verificacion IS NULL) OR (metodo_verificacion = ANY (ARRAY['fisica'::text, 'documental'::text])))),
+    CONSTRAINT perfiles_rol_check CHECK ((rol = ANY (ARRAY['superadmin'::text, 'admin'::text, 'cliente'::text]))),
+    CONSTRAINT perfiles_tipo_persona_check CHECK ((tipo_persona = ANY (ARRAY['fisica'::text, 'moral'::text])))
+);
+
+
+ALTER TABLE public.perfiles OWNER TO postgres;
+
+--
+-- Name: COLUMN perfiles.regimen_fiscal; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.perfiles.regimen_fiscal IS 'SIN USO. 0 filas con valor, 0 referencias en el proyecto. El dato vive en solicitudes_cuenta.';
+
+
+--
+-- Name: COLUMN perfiles.cp_fiscal; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.perfiles.cp_fiscal IS 'SUPERADA por perfiles.cp (S-07, 20261005140000). Sin uso y vacía: 0 referencias en web, Android, Edge Functions, vistas y funciones (medido el 2026-10-05). No usar: el código postal del domicilio fiscal vive en perfiles.cp. Se conserva sin DROP por la regla 9 de docs/AUDITORIA.md.';
+
+
+--
+-- Name: COLUMN perfiles.notif_email; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.perfiles.notif_email IS 'Si el usuario quiere recibir los correos frecuentes (oportunidades, ofertas, cola de revisión). Los correos transaccionales se envían siempre. Default true.';
+
+
+--
+-- Name: COLUMN perfiles.permiso_sct_pendiente; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.perfiles.permiso_sct_pendiente IS 'Numero de permiso SCT propuesto por la empresa, a la espera de revision. Lo promueve aprobarDocsEmpresa() junto con su documento y su vigencia.';
+
+
+--
+-- Name: COLUMN perfiles.calle; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.perfiles.calle IS 'Domicilio fiscal, capturado en el registro (solicitudes_cuenta) y copiado aquí al aprobar la cuenta — ver _CAMPOS_FICHA en js/aprobaciones.js. Editable después desde Mi perfil (cliente) o Perfil de empresa (admin).';
+
+
+--
+-- Name: COLUMN perfiles.cp; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.perfiles.cp IS 'Código postal del domicilio fiscal (Carta Porte, 20260929140000). Se captura en el registro (solicitudes_cuenta.cp), se copia aquí al aprobar la cuenta (_CAMPOS_FICHA en js/aprobaciones.js) y es editable desde Mi perfil y Perfil de empresa. Sustituye a perfiles.cp_fiscal, que está vacía y no se usa (S-07).';
+
+
+--
+-- Name: vigencias; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.vigencias (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entidad_tipo text NOT NULL,
+    entidad_id text NOT NULL,
+    tipo_documento text NOT NULL,
+    archivo_path text,
+    fecha_documento date,
+    estado text DEFAULT 'vigente'::text NOT NULL,
+    nota_rechazo text,
+    subido_en timestamp with time zone DEFAULT now() NOT NULL,
+    subido_por uuid,
+    revisado_en timestamp with time zone,
+    revisado_por uuid,
+    cat_clave text GENERATED ALWAYS AS ('vigencia_tipo'::text) STORED,
+    CONSTRAINT vigencias_algo_que_guardar CHECK (((archivo_path IS NOT NULL) OR (fecha_documento IS NOT NULL))),
+    CONSTRAINT vigencias_entidad_tipo_check CHECK ((entidad_tipo = ANY (ARRAY['perfil'::text, 'camion'::text, 'operador'::text, 'custodio'::text, 'patio'::text]))),
+    CONSTRAINT vigencias_estado_check CHECK ((estado = ANY (ARRAY['vigente'::text, 'pendiente'::text, 'rechazado'::text]))),
+    CONSTRAINT vigencias_rechazo_con_motivo CHECK (((estado <> 'rechazado'::text) OR (nota_rechazo IS NOT NULL)))
+);
+
+
+ALTER TABLE public.vigencias OWNER TO postgres;
+
+--
+-- Name: empresas_publico; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.empresas_publico AS
+ SELECT p.user_id,
+    p.nombre,
+    p.razon_social,
+    p.rfc,
+    p.descripcion,
+    p.telefono,
+    p.anos_operacion,
+    p.num_unidades,
+    p.seguro_rc,
+    p.seguro_carga,
+    p.permiso_sct,
+    p.verificado,
+    v_sct.fecha_documento AS fecha_vencimiento_permiso_sct,
+    v_rc.fecha_documento AS fecha_vencimiento_seguro_rc,
+    v_carga.fecha_documento AS fecha_vencimiento_seguro_carga
+   FROM (((public.perfiles p
+     LEFT JOIN public.vigencias v_sct ON (((v_sct.entidad_tipo = 'perfil'::text) AND (v_sct.entidad_id = (p.user_id)::text) AND (v_sct.tipo_documento = 'permiso_sct'::text) AND (v_sct.estado = 'vigente'::text))))
+     LEFT JOIN public.vigencias v_rc ON (((v_rc.entidad_tipo = 'perfil'::text) AND (v_rc.entidad_id = (p.user_id)::text) AND (v_rc.tipo_documento = 'seguro_rc'::text) AND (v_rc.estado = 'vigente'::text))))
+     LEFT JOIN public.vigencias v_carga ON (((v_carga.entidad_tipo = 'perfil'::text) AND (v_carga.entidad_id = (p.user_id)::text) AND (v_carga.tipo_documento = 'seguro_carga'::text) AND (v_carga.estado = 'vigente'::text))))
+  WHERE (p.rol = 'admin'::text);
+
+
+ALTER VIEW public.empresas_publico OWNER TO postgres;
+
+--
+-- Name: VIEW empresas_publico; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON VIEW public.empresas_publico IS 'Ficha publica del transportista. H-04 Etapa 4: las tres fechas de vigencia ya no leen perfiles, leen la fila vigente de vigencias. Solo filas rol=admin. Ver H-01.';
+
+
+--
 -- Name: expediente_documentos; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2206,6 +3961,7 @@ CREATE TABLE public.expedientes (
     incidente_motivo text,
     incidente_reportado_en timestamp with time zone,
     incidente_reportado_por uuid,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT expedientes_estado_check CHECK ((estado = ANY (ARRAY['solicitado'::text, 'en_revision'::text, 'completo'::text]))),
     CONSTRAINT expedientes_etapa_check CHECK ((etapa = ANY (ARRAY['ingreso_puerto'::text, 'entrega_vacios'::text])))
 );
@@ -2243,12 +3999,39 @@ CREATE TABLE public.lavados (
     campos_editados text[],
     snapshot_anterior jsonb,
     created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT lavados_aprobacion_check CHECK ((aprobacion = ANY (ARRAY['pendiente'::text, 'aprobada'::text, 'rechazada'::text]))),
     CONSTRAINT lavados_estado_check CHECK ((estado = ANY (ARRAY['disponible'::text, 'ocupado'::text, 'no_disponible'::text])))
 );
 
+ALTER TABLE ONLY public.lavados REPLICA IDENTITY FULL;
+
 
 ALTER TABLE public.lavados OWNER TO postgres;
+
+--
+-- Name: lavados_publico; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.lavados_publico AS
+ SELECT id,
+    nombre,
+    tipos_vehiculo,
+    tipos_lavado,
+    estado,
+    propietario_id
+   FROM public.lavados
+  WHERE (aprobacion = 'aprobada'::text);
+
+
+ALTER VIEW public.lavados_publico OWNER TO postgres;
+
+--
+-- Name: VIEW lavados_publico; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON VIEW public.lavados_publico IS 'Lo que el catalogo ensena de un lavado ajeno. Ver H-10.';
+
 
 --
 -- Name: mensajes; Type: TABLE; Schema: public; Owner: postgres
@@ -2279,10 +4062,12 @@ CREATE TABLE public.notificaciones (
     tipo text DEFAULT 'reserva'::text NOT NULL,
     titulo text NOT NULL,
     mensaje text,
-    leido boolean DEFAULT false,
+    leido boolean DEFAULT false NOT NULL,
     meta jsonb DEFAULT '{}'::jsonb,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.notificaciones REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.notificaciones OWNER TO postgres;
@@ -2294,7 +4079,7 @@ ALTER TABLE public.notificaciones OWNER TO postgres;
 CREATE TABLE public.ofertas (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     pedido_id uuid NOT NULL,
-    admin_id uuid NOT NULL,
+    admin_id uuid,
     admin_nombre text NOT NULL,
     camion_id text,
     precio_oferta numeric NOT NULL,
@@ -2308,8 +4093,12 @@ CREATE TABLE public.ofertas (
     operador_id text,
     operador_nombre text,
     permite_reoferta boolean DEFAULT true NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ofertas_admin_presente CHECK (((estado = ANY (ARRAY['aceptada'::text, 'rechazada'::text])) OR (admin_id IS NOT NULL))),
+    CONSTRAINT ofertas_contra_precio_positivo CHECK (((contra_precio IS NULL) OR (contra_precio > (0)::numeric))),
     CONSTRAINT ofertas_estado_check CHECK ((estado = ANY (ARRAY['enviada'::text, 'contra_oferta'::text, 'aceptada'::text, 'rechazada'::text]))),
-    CONSTRAINT ofertas_ronda_check CHECK ((ronda = ANY (ARRAY[1, 2])))
+    CONSTRAINT ofertas_precio_oferta_positivo CHECK ((precio_oferta > (0)::numeric)),
+    CONSTRAINT ofertas_ronda_check CHECK ((ronda >= 1))
 );
 
 
@@ -2321,7 +4110,7 @@ ALTER TABLE public.ofertas OWNER TO postgres;
 
 CREATE TABLE public.operadores (
     id text NOT NULL,
-    propietario_id uuid,
+    propietario_id uuid NOT NULL,
     curp text,
     nombre text NOT NULL,
     primer_apellido text,
@@ -2358,6 +4147,7 @@ CREATE TABLE public.operadores (
     doc_examen_medico text,
     doc_licencia_peligrosa text,
     fecha_vencimiento_licencia_peligrosa date,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT operadores_aprobacion_check CHECK ((aprobacion = ANY (ARRAY['pendiente'::text, 'aprobada'::text, 'rechazada'::text])))
 );
 
@@ -2397,7 +4187,7 @@ ALTER TABLE public.pagos OWNER TO postgres;
 
 CREATE TABLE public.patios (
     id text NOT NULL,
-    propietario_id uuid,
+    propietario_id uuid NOT NULL,
     nombre text NOT NULL,
     tipo text NOT NULL,
     ubicacion text,
@@ -2406,7 +4196,7 @@ CREATE TABLE public.patios (
     servicios text[],
     precio_dia numeric(14,2),
     estado text DEFAULT 'disponible'::text,
-    aprobacion text DEFAULT 'aprobada'::text,
+    aprobacion text DEFAULT 'pendiente'::text,
     created_at timestamp with time zone DEFAULT now(),
     rechazo_nota text,
     rechazo_campos text[],
@@ -2414,11 +4204,37 @@ CREATE TABLE public.patios (
     campos_editados text[],
     snapshot_anterior jsonb,
     fecha_vencimiento_permiso date,
-    doc_permiso text
+    doc_permiso text,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.patios REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.patios OWNER TO postgres;
+
+--
+-- Name: patios_publico; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.patios_publico AS
+ SELECT id,
+    tipo,
+    nombre,
+    estado,
+    propietario_id
+   FROM public.patios
+  WHERE (aprobacion = 'aprobada'::text);
+
+
+ALTER VIEW public.patios_publico OWNER TO postgres;
+
+--
+-- Name: VIEW patios_publico; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON VIEW public.patios_publico IS 'Lo que el catalogo ensena de un patio ajeno. Ver H-10.';
+
 
 --
 -- Name: patios_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -2453,7 +4269,7 @@ CREATE TABLE public.pedidos (
     descripcion text,
     precio_cliente numeric,
     estado text DEFAULT 'abierto'::text NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
     peso_carga numeric,
     num_bultos integer,
     hora_carga text,
@@ -2502,7 +4318,20 @@ CREATE TABLE public.pedidos (
     destino_lng numeric,
     fecha_arribo_puerto date,
     patio_externo boolean DEFAULT false NOT NULL,
-    CONSTRAINT pedidos_estado_check CHECK ((estado = ANY (ARRAY['abierto'::text, 'en_negociacion'::text, 'acordado'::text, 'cancelado'::text, 'pendiente_revision'::text, 'pendiente_acuerdo'::text, 'rechazado'::text, 'finalizado'::text, 'expirado'::text])))
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    origen_colonia text,
+    origen_cp text,
+    origen_ciudad text,
+    origen_estado text,
+    destino_colonia text,
+    destino_cp text,
+    destino_ciudad text,
+    destino_estado text,
+    clave_prod_serv_sat text,
+    CONSTRAINT pedidos_cliente_presente CHECK (((estado = ANY (ARRAY['finalizado'::text, 'cancelado'::text, 'expirado'::text, 'rechazado'::text])) OR (cliente_id IS NOT NULL))),
+    CONSTRAINT pedidos_estado_check CHECK ((estado = ANY (ARRAY['abierto'::text, 'en_negociacion'::text, 'acordado'::text, 'cancelado'::text, 'pendiente_revision'::text, 'pendiente_acuerdo'::text, 'rechazado'::text, 'finalizado'::text, 'expirado'::text]))),
+    CONSTRAINT pedidos_num_contenedores_check CHECK (((num_contenedores IS NULL) OR ((num_contenedores >= 0) AND (num_contenedores <= 2)))),
+    CONSTRAINT pedidos_precio_cliente_positivo CHECK (((precio_cliente IS NULL) OR (precio_cliente > (0)::numeric)))
 );
 
 
@@ -2558,60 +4387,36 @@ COMMENT ON COLUMN public.pedidos.patio_externo IS 'El contenedor vacio se devuel
 
 
 --
--- Name: perfiles; Type: TABLE; Schema: public; Owner: postgres
+-- Name: COLUMN pedidos.destino_cp; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.perfiles (
-    user_id uuid NOT NULL,
-    nombre text NOT NULL,
-    rol text NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    rfc text,
-    razon_social text,
-    anos_operacion integer,
-    num_unidades integer,
-    seguro_rc boolean DEFAULT false,
-    seguro_carga boolean DEFAULT false,
-    permiso_sct text,
-    descripcion text,
-    telefono text,
-    aprobacion_cuenta text,
-    nota_rechazo_cuenta text,
-    regimen_fiscal text,
-    cp_fiscal text,
-    tipo_persona text,
-    fecha_vencimiento_permiso_sct date,
-    fecha_vencimiento_seguro_rc date,
-    fecha_vencimiento_seguro_carga date,
-    perfil_docs_pendiente boolean DEFAULT false,
-    fecha_vencimiento_permiso_sct_pendiente date,
-    fecha_vencimiento_seguro_rc_pendiente date,
-    fecha_vencimiento_seguro_carga_pendiente date,
-    doc_permiso_sct text,
-    doc_seguro_rc text,
-    doc_seguro_carga text,
-    doc_permiso_sct_pendiente text,
-    doc_seguro_rc_pendiente text,
-    doc_seguro_carga_pendiente text,
-    docs_aprobados_en timestamp with time zone,
-    docs_aprobados_por uuid,
-    verificado boolean DEFAULT false,
-    metodo_verificacion text,
-    fotos_verificacion jsonb DEFAULT '[]'::jsonb NOT NULL,
-    notif_email boolean DEFAULT true NOT NULL,
-    CONSTRAINT perfiles_metodo_verificacion_check CHECK (((metodo_verificacion IS NULL) OR (metodo_verificacion = ANY (ARRAY['fisica'::text, 'documental'::text])))),
-    CONSTRAINT perfiles_rol_check CHECK ((rol = ANY (ARRAY['superadmin'::text, 'admin'::text, 'cliente'::text]))),
-    CONSTRAINT perfiles_tipo_persona_check CHECK ((tipo_persona = ANY (ARRAY['fisica'::text, 'moral'::text])))
-);
+COMMENT ON COLUMN public.pedidos.destino_cp IS 'Código postal del destino, si Nominatim lo resolvió al marcar el punto en el mapa (js/mapa.js). Nulo cuando no lo tenía — nunca inventado. Para el domicilio del Complemento Carta Porte de referencia.';
 
-
-ALTER TABLE public.perfiles OWNER TO postgres;
 
 --
--- Name: COLUMN perfiles.notif_email; Type: COMMENT; Schema: public; Owner: postgres
+-- Name: COLUMN pedidos.clave_prod_serv_sat; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON COLUMN public.perfiles.notif_email IS 'Si el usuario quiere recibir los correos frecuentes (oportunidades, ofertas, cola de revisión). Los correos transaccionales se envían siempre. Default true.';
+COMMENT ON COLUMN public.pedidos.clave_prod_serv_sat IS 'Clave del catálogo SAT "c_ClaveProdServ" para la mercancía del pedido — texto libre, opcional. Para el Complemento Carta Porte de referencia (Etapa 5). El catálogo completo no vive en este sistema: decenas de miles de claves, y quien ya hace comercio exterior conoce la suya.';
+
+
+--
+-- Name: perfiles_roles_interno; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.perfiles_roles_interno AS
+ SELECT user_id,
+    rol
+   FROM public.perfiles;
+
+
+ALTER VIEW public.perfiles_roles_interno OWNER TO postgres;
+
+--
+-- Name: VIEW perfiles_roles_interno; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON VIEW public.perfiles_roles_interno IS 'Uso interno de is_superadmin(). Evita el RLS de perfiles para romper la recursion de politicas. NO exponer a anon ni a authenticated.';
 
 
 --
@@ -2666,11 +4471,24 @@ CREATE TABLE public.plantillas_pedido (
     hazmat_un text,
     num_tarimas smallint,
     volumen_m3 numeric,
-    patio_externo boolean DEFAULT false NOT NULL
+    patio_externo boolean DEFAULT false NOT NULL,
+    origen_lat numeric,
+    origen_lng numeric,
+    destino_lat numeric,
+    destino_lng numeric,
+    datos jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT plantillas_num_contenedores_check CHECK (((num_contenedores IS NULL) OR ((num_contenedores >= 0) AND (num_contenedores <= 2))))
 );
 
 
 ALTER TABLE public.plantillas_pedido OWNER TO postgres;
+
+--
+-- Name: COLUMN plantillas_pedido.datos; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.plantillas_pedido.datos IS 'Valores del formulario de la solicitud, tal cual. Es el unico sitio donde jsonb esta justificado en este esquema: no se filtra ni se agrega por ellos, se recuperan enteros por id para rellenar el formulario. Las fechas NO se guardan, a proposito.';
+
 
 --
 -- Name: reservaciones; Type: TABLE; Schema: public; Owner: postgres
@@ -2684,8 +4502,8 @@ CREATE TABLE public.reservaciones (
     fecha_ini date NOT NULL,
     fecha_fin date NOT NULL,
     descripcion text,
-    estado text DEFAULT 'Activa'::text,
-    created_at timestamp with time zone DEFAULT now(),
+    estado text DEFAULT 'Activa'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
     cliente_email text,
     cliente_user_id uuid,
     tracking_estado text DEFAULT 'Confirmado'::text,
@@ -2726,11 +4544,67 @@ CREATE TABLE public.reservaciones (
     operador_id text,
     operador_nombre text,
     documentos_carga text[],
-    gps_link text
+    gps_link text,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT reservaciones_estado_check CHECK ((estado = ANY (ARRAY['Pendiente'::text, 'Activa'::text, 'PorAprobar'::text, 'CancelacionSolicitada'::text, 'Completada'::text, 'Cancelada'::text, 'Rechazada'::text]))),
+    CONSTRAINT reservaciones_partes_presentes CHECK (((estado = ANY (ARRAY['Completada'::text, 'Cancelada'::text, 'Rechazada'::text])) OR ((cliente_user_id IS NOT NULL) AND (propietario_id IS NOT NULL)))),
+    CONSTRAINT reservaciones_precio_acordado_positivo CHECK (((precio_acordado IS NULL) OR (precio_acordado > (0)::numeric))),
+    CONSTRAINT reservaciones_recurso_tipo_check CHECK ((recurso_tipo = ANY (ARRAY['camion'::text, 'custodio'::text, 'patio'::text, 'lavado'::text])))
 );
+
+ALTER TABLE ONLY public.reservaciones REPLICA IDENTITY FULL;
 
 
 ALTER TABLE public.reservaciones OWNER TO postgres;
+
+--
+-- Name: COLUMN reservaciones.telefono; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.reservaciones.telefono IS 'Duplica perfiles.telefono. La interfaz la lee pero nada la escribe: cero filas con valor (18/09/2026). Pendiente de decidir si se rellena al cerrar el acuerdo o se retira de la interfaz.';
+
+
+--
+-- Name: COLUMN reservaciones.peso_kg; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.reservaciones.peso_kg IS 'Carta Porte (SAT) — sin implementar. Cero referencias en el codigo y cero filas con valor (18/09/2026).';
+
+
+--
+-- Name: COLUMN reservaciones.descripcion_mercancia; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.reservaciones.descripcion_mercancia IS 'Carta Porte (SAT) — sin implementar. Cero referencias en el codigo y cero filas con valor (18/09/2026).';
+
+
+--
+-- Name: COLUMN reservaciones.clave_sat_mercancia; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.reservaciones.clave_sat_mercancia IS 'Carta Porte (SAT) — sin implementar. Cero referencias en el codigo y cero filas con valor (18/09/2026).';
+
+
+--
+-- Name: COLUMN reservaciones.unidad_medida_sat; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.reservaciones.unidad_medida_sat IS 'Carta Porte (SAT) — sin implementar. Cero referencias en el codigo y cero filas con valor (18/09/2026).';
+
+
+--
+-- Name: COLUMN reservaciones.num_piezas; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.reservaciones.num_piezas IS 'Carta Porte (SAT) — sin implementar. Cero referencias en el codigo y cero filas con valor (18/09/2026).';
+
+
+--
+-- Name: COLUMN reservaciones.num_pedido_factura; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.reservaciones.num_pedido_factura IS 'Carta Porte (SAT) — sin implementar. Cero referencias en el codigo y cero filas con valor (18/09/2026).';
+
 
 --
 -- Name: reservaciones_historico; Type: TABLE; Schema: public; Owner: postgres
@@ -2750,12 +4624,42 @@ CREATE TABLE public.reservaciones_historico (
     estado text,
     tracking_estado text,
     created_at timestamp with time zone,
-    archivado_at timestamp with time zone DEFAULT now(),
+    archivado_en timestamp with time zone DEFAULT now(),
     archivado_por uuid
 );
 
 
 ALTER TABLE public.reservaciones_historico OWNER TO postgres;
+
+--
+-- Name: COLUMN reservaciones_historico.archivado_en; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.reservaciones_historico.archivado_en IS 'H-22: se llamaba archivado_at y rompia la convencion _en del resto del esquema. La escribe el DEFAULT now() del servidor, no el cliente: asi el renombrado no tuvo ventana de rotura. Nadie la lee.';
+
+
+--
+-- Name: solicitudes_arco; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.solicitudes_arco (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid,
+    nombre text NOT NULL,
+    email text NOT NULL,
+    tipo text NOT NULL,
+    descripcion text NOT NULL,
+    estado text DEFAULT 'pendiente'::text NOT NULL,
+    respuesta text,
+    atendida_por uuid,
+    atendida_en timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT solicitudes_arco_estado_check CHECK ((estado = ANY (ARRAY['pendiente'::text, 'en_proceso'::text, 'atendida'::text, 'rechazada'::text]))),
+    CONSTRAINT solicitudes_arco_tipo_check CHECK ((tipo = ANY (ARRAY['acceso'::text, 'rectificacion'::text, 'cancelacion'::text, 'oposicion'::text])))
+);
+
+
+ALTER TABLE public.solicitudes_arco OWNER TO postgres;
 
 --
 -- Name: solicitudes_cuenta; Type: TABLE; Schema: public; Owner: postgres
@@ -2816,11 +4720,49 @@ CREATE TABLE public.solicitudes_cuenta (
 ALTER TABLE public.solicitudes_cuenta OWNER TO postgres;
 
 --
+-- Name: vigencias_caducidad; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.vigencias_caducidad WITH (security_invoker='true') AS
+ SELECT id,
+    entidad_tipo,
+    entidad_id,
+    tipo_documento,
+    archivo_path,
+    fecha_documento,
+    estado,
+    nota_rechazo,
+    subido_en,
+    subido_por,
+    revisado_en,
+    revisado_por,
+    public.vigencia_vence_el(tipo_documento, fecha_documento) AS vence_el
+   FROM public.vigencias v;
+
+
+ALTER VIEW public.vigencias_caducidad OWNER TO postgres;
+
+--
+-- Name: VIEW vigencias_caducidad; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON VIEW public.vigencias_caducidad IS 'H-04: vigencias mas la caducidad efectiva (vence_el), que aplica la regla vigencia_meses del catalogo. security_invoker=true A PROPOSITO: el panel de vigencias es privado y la RLS de vigencias tiene que seguir aplicandose por usuario. No cambiar a false.';
+
+
+--
 -- Name: app_config app_config_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_config
     ADD CONSTRAINT app_config_pkey PRIMARY KEY (clave);
+
+
+--
+-- Name: avisos_superadmin avisos_superadmin_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.avisos_superadmin
+    ADD CONSTRAINT avisos_superadmin_pkey PRIMARY KEY (id);
 
 
 --
@@ -2845,6 +4787,22 @@ ALTER TABLE ONLY public.camiones
 
 ALTER TABLE ONLY public.catalogos
     ADD CONSTRAINT catalogos_pkey PRIMARY KEY (clave, valor);
+
+
+--
+-- Name: consentimientos_bloqueados consentimientos_bloqueados_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.consentimientos_bloqueados
+    ADD CONSTRAINT consentimientos_bloqueados_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: consentimientos consentimientos_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.consentimientos
+    ADD CONSTRAINT consentimientos_pkey PRIMARY KEY (id);
 
 
 --
@@ -2992,11 +4950,98 @@ ALTER TABLE ONLY public.reservaciones
 
 
 --
+-- Name: reservaciones reservaciones_sin_solape; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reservaciones
+    ADD CONSTRAINT reservaciones_sin_solape EXCLUDE USING gist (recurso_tipo WITH =, unidad WITH =, daterange(fecha_ini, fecha_fin, '[]'::text) WITH &&) WHERE ((estado = ANY (ARRAY['Pendiente'::text, 'Activa'::text])));
+
+
+--
+-- Name: CONSTRAINT reservaciones_sin_solape ON reservaciones; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON CONSTRAINT reservaciones_sin_solape ON public.reservaciones IS 'H-06: solape prohibido para el mismo recurso_tipo Y la misma unidad. recurso_tipo va PRIMERO porque es el mas selectivo de los dos en el indice GiST. Red contra la carrera de check_reservacion_disponibilidad(), que es BEFORE y no ve inserciones simultaneas.';
+
+
+--
+-- Name: solicitudes_arco solicitudes_arco_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.solicitudes_arco
+    ADD CONSTRAINT solicitudes_arco_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: solicitudes_cuenta solicitudes_cuenta_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.solicitudes_cuenta
     ADD CONSTRAINT solicitudes_cuenta_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: vigencias vigencias_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.vigencias
+    ADD CONSTRAINT vigencias_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_arco_atendida_por; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_arco_atendida_por ON public.solicitudes_arco USING btree (atendida_por) WHERE (atendida_por IS NOT NULL);
+
+
+--
+-- Name: idx_arco_estado; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_arco_estado ON public.solicitudes_arco USING btree (estado, created_at DESC);
+
+
+--
+-- Name: idx_arco_user; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_arco_user ON public.solicitudes_arco USING btree (user_id);
+
+
+--
+-- Name: idx_avisos_superadmin_autor_hora; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_avisos_superadmin_autor_hora ON public.avisos_superadmin USING btree (autor, created_at DESC);
+
+
+--
+-- Name: idx_calificaciones_admin; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_calificaciones_admin ON public.calificaciones USING btree (admin_id, created_at DESC);
+
+
+--
+-- Name: idx_calificaciones_cliente; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_calificaciones_cliente ON public.calificaciones USING btree (cliente_id) WHERE (cliente_id IS NOT NULL);
+
+
+--
+-- Name: idx_camiones_pendientes; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_camiones_pendientes ON public.camiones USING btree (created_at DESC) WHERE (aprobacion = 'pendiente'::text);
+
+
+--
+-- Name: idx_camiones_propietario; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_camiones_propietario ON public.camiones USING btree (propietario_id);
 
 
 --
@@ -3007,10 +5052,66 @@ CREATE INDEX idx_catalogos_clave ON public.catalogos USING btree (clave, orden) 
 
 
 --
+-- Name: idx_consentimientos_tipo; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_consentimientos_tipo ON public.consentimientos USING btree (tipo, version);
+
+
+--
+-- Name: idx_consentimientos_user; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_consentimientos_user ON public.consentimientos USING btree (user_id);
+
+
+--
+-- Name: idx_custodios_pendientes; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_custodios_pendientes ON public.custodios USING btree (created_at DESC) WHERE (aprobacion = 'pendiente'::text);
+
+
+--
+-- Name: idx_custodios_propietario; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_custodios_propietario ON public.custodios USING btree (propietario_id);
+
+
+--
+-- Name: idx_docfiscales_cancelado_por; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_docfiscales_cancelado_por ON public.documentos_fiscales USING btree (cancelado_por) WHERE (cancelado_por IS NOT NULL);
+
+
+--
+-- Name: idx_docfiscales_emitido_por; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_docfiscales_emitido_por ON public.documentos_fiscales USING btree (emitido_por) WHERE (emitido_por IS NOT NULL);
+
+
+--
+-- Name: idx_docfiscales_reservacion; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_docfiscales_reservacion ON public.documentos_fiscales USING btree (reservacion_id);
+
+
+--
 -- Name: idx_expdocs_expediente; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_expdocs_expediente ON public.expediente_documentos USING btree (expediente_id);
+
+
+--
+-- Name: idx_expedientes_incidente_por; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_expedientes_incidente_por ON public.expedientes USING btree (incidente_reportado_por) WHERE (incidente_reportado_por IS NOT NULL);
 
 
 --
@@ -3021,10 +5122,213 @@ CREATE INDEX idx_expedientes_reserva ON public.expedientes USING btree (reserva_
 
 
 --
+-- Name: idx_historico_archivado_por; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_historico_archivado_por ON public.reservaciones_historico USING btree (archivado_por) WHERE (archivado_por IS NOT NULL);
+
+
+--
+-- Name: idx_lavados_pendientes; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_lavados_pendientes ON public.lavados USING btree (id) WHERE (aprobacion = 'pendiente'::text);
+
+
+--
+-- Name: idx_lavados_propietario; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_lavados_propietario ON public.lavados USING btree (propietario_id);
+
+
+--
+-- Name: idx_mensajes_de_user; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_mensajes_de_user ON public.mensajes USING btree (de_user_id);
+
+
+--
+-- Name: idx_notificaciones_purga; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_notificaciones_purga ON public.notificaciones USING btree (created_at) WHERE leido;
+
+
+--
+-- Name: INDEX idx_notificaciones_purga; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON INDEX public.idx_notificaciones_purga IS 'Para purgar_notificaciones_leidas(): filtra por leido y ordena por created_at. Parcial porque la purga solo mira las leidas.';
+
+
+--
+-- Name: idx_notificaciones_user_fecha; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_notificaciones_user_fecha ON public.notificaciones USING btree (user_id, created_at DESC);
+
+
+--
+-- Name: idx_ofertas_admin; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_ofertas_admin ON public.ofertas USING btree (admin_id);
+
+
+--
+-- Name: idx_ofertas_operador; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_ofertas_operador ON public.ofertas USING btree (operador_id) WHERE (operador_id IS NOT NULL);
+
+
+--
+-- Name: idx_ofertas_pedido; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_ofertas_pedido ON public.ofertas USING btree (pedido_id);
+
+
+--
+-- Name: idx_ofertas_por_vencer; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_ofertas_por_vencer ON public.ofertas USING btree (expira_en) WHERE (estado = ANY (ARRAY['enviada'::text, 'contra_oferta'::text]));
+
+
+--
+-- Name: INDEX idx_ofertas_por_vencer; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON INDEX public.idx_ofertas_por_vencer IS 'Para expire_stale_offers(), que corre cada hora. Parcial: las ofertas cerradas no se vuelven a mirar.';
+
+
+--
+-- Name: idx_operadores_pendientes; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_operadores_pendientes ON public.operadores USING btree (created_at) WHERE (aprobacion = 'pendiente'::text);
+
+
+--
+-- Name: idx_operadores_propietario; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_operadores_propietario ON public.operadores USING btree (propietario_id);
+
+
+--
+-- Name: idx_pagos_registrado_por; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_pagos_registrado_por ON public.pagos USING btree (registrado_por) WHERE (registrado_por IS NOT NULL);
+
+
+--
+-- Name: idx_pagos_reservacion; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_pagos_reservacion ON public.pagos USING btree (reservacion_id);
+
+
+--
+-- Name: idx_patios_pendientes; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_patios_pendientes ON public.patios USING btree (created_at DESC) WHERE (aprobacion = 'pendiente'::text);
+
+
+--
+-- Name: idx_patios_propietario; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_patios_propietario ON public.patios USING btree (propietario_id);
+
+
+--
+-- Name: idx_pedidos_abiertos; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_pedidos_abiertos ON public.pedidos USING btree (created_at DESC) WHERE (estado = 'abierto'::text);
+
+
+--
+-- Name: idx_pedidos_acordados_fin; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_pedidos_acordados_fin ON public.pedidos USING btree (fecha_fin) WHERE (estado = 'acordado'::text);
+
+
+--
+-- Name: INDEX idx_pedidos_acordados_fin; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON INDEX public.idx_pedidos_acordados_fin IS 'Para la regla (d) de sincronizar_estados_pedidos(), que corre cada 15 minutos.';
+
+
+--
 -- Name: idx_pedidos_categoria_carga; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_pedidos_categoria_carga ON public.pedidos USING btree (categoria_carga) WHERE (categoria_carga IS NOT NULL);
+
+
+--
+-- Name: idx_pedidos_cliente; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_pedidos_cliente ON public.pedidos USING btree (cliente_id);
+
+
+--
+-- Name: idx_pedidos_cola_revision; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_pedidos_cola_revision ON public.pedidos USING btree (estado, created_at) WHERE (estado = ANY (ARRAY['pendiente_revision'::text, 'pendiente_acuerdo'::text]));
+
+
+--
+-- Name: idx_pedidos_fecha; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_pedidos_fecha ON public.pedidos USING btree (created_at DESC);
+
+
+--
+-- Name: idx_pedidos_fecha_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_pedidos_fecha_id ON public.pedidos USING btree (created_at DESC, id DESC);
+
+
+--
+-- Name: idx_pedidos_oferta_pendiente; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_pedidos_oferta_pendiente ON public.pedidos USING btree (oferta_pendiente_id) WHERE (oferta_pendiente_id IS NOT NULL);
+
+
+--
+-- Name: idx_perfiles_cuenta_pendiente; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_perfiles_cuenta_pendiente ON public.perfiles USING btree (user_id) WHERE (aprobacion_cuenta = 'pendiente'::text);
+
+
+--
+-- Name: idx_perfiles_docs_pendientes; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_perfiles_docs_pendientes ON public.perfiles USING btree (user_id) WHERE perfil_docs_pendiente;
+
+
+--
+-- Name: idx_perfiles_superadmin; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_perfiles_superadmin ON public.perfiles USING btree (user_id) WHERE (rol = 'superadmin'::text);
 
 
 --
@@ -3035,6 +5339,20 @@ CREATE INDEX idx_plantillas_cliente ON public.plantillas_pedido USING btree (cli
 
 
 --
+-- Name: idx_reservaciones_canc_resuelta_por; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_reservaciones_canc_resuelta_por ON public.reservaciones USING btree (cancelacion_resuelta_por) WHERE (cancelacion_resuelta_por IS NOT NULL);
+
+
+--
+-- Name: idx_reservaciones_canc_solicitada_por; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_reservaciones_canc_solicitada_por ON public.reservaciones USING btree (cancelacion_solicitada_por) WHERE (cancelacion_solicitada_por IS NOT NULL);
+
+
+--
 -- Name: idx_reservaciones_cancelacion; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -3042,10 +5360,87 @@ CREATE INDEX idx_reservaciones_cancelacion ON public.reservaciones USING btree (
 
 
 --
+-- Name: idx_reservaciones_cliente; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_reservaciones_cliente ON public.reservaciones USING btree (cliente_user_id);
+
+
+--
 -- Name: idx_reservaciones_cobro; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_reservaciones_cobro ON public.reservaciones USING btree (pagado, fecha_vencimiento_pago) WHERE (estado = 'Completada'::text);
+
+
+--
+-- Name: idx_reservaciones_disponibilidad; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_reservaciones_disponibilidad ON public.reservaciones USING btree (unidad, fecha_ini, fecha_fin) WHERE (estado = ANY (ARRAY['Pendiente'::text, 'Activa'::text]));
+
+
+--
+-- Name: idx_reservaciones_fecha; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_reservaciones_fecha ON public.reservaciones USING btree (created_at DESC, id DESC);
+
+
+--
+-- Name: idx_reservaciones_operador; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_reservaciones_operador ON public.reservaciones USING btree (operador_id) WHERE (operador_id IS NOT NULL);
+
+
+--
+-- Name: idx_reservaciones_pagado_por; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_reservaciones_pagado_por ON public.reservaciones USING btree (pagado_por) WHERE (pagado_por IS NOT NULL);
+
+
+--
+-- Name: idx_reservaciones_pedido; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_reservaciones_pedido ON public.reservaciones USING btree (pedido_id);
+
+
+--
+-- Name: idx_reservaciones_por_aprobar; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_reservaciones_por_aprobar ON public.reservaciones USING btree (completado_en) WHERE (estado = 'PorAprobar'::text);
+
+
+--
+-- Name: idx_reservaciones_propietario; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_reservaciones_propietario ON public.reservaciones USING btree (propietario_id);
+
+
+--
+-- Name: idx_solicitudes_cuenta_user; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_solicitudes_cuenta_user ON public.solicitudes_cuenta USING btree (user_id);
+
+
+--
+-- Name: idx_vigencias_revisado_por; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_vigencias_revisado_por ON public.vigencias USING btree (revisado_por) WHERE (revisado_por IS NOT NULL);
+
+
+--
+-- Name: idx_vigencias_subido_por; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_vigencias_subido_por ON public.vigencias USING btree (subido_por) WHERE (subido_por IS NOT NULL);
 
 
 --
@@ -3070,6 +5465,90 @@ CREATE INDEX mensajes_reserva_idx ON public.mensajes USING btree (reserva_id) WH
 
 
 --
+-- Name: uq_calificaciones_reservacion; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX uq_calificaciones_reservacion ON public.calificaciones USING btree (reservacion_id) WHERE (reservacion_id IS NOT NULL);
+
+
+--
+-- Name: uq_camiones_placas; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX uq_camiones_placas ON public.camiones USING btree (placas) WHERE (placas IS NOT NULL);
+
+
+--
+-- Name: uq_ofertas_viva_por_empresa; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX uq_ofertas_viva_por_empresa ON public.ofertas USING btree (pedido_id, admin_id) WHERE (estado = ANY (ARRAY['enviada'::text, 'contra_oferta'::text, 'aceptada'::text]));
+
+
+--
+-- Name: INDEX uq_ofertas_viva_por_empresa; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON INDEX public.uq_ofertas_viva_por_empresa IS 'Q-12: una empresa solo puede tener una oferta viva (enviada, contra_oferta o aceptada) por solicitud. Mismos estados que la interfaz trata como «oferta activa». Ver 20260930173000.';
+
+
+--
+-- Name: uq_operadores_curp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX uq_operadores_curp ON public.operadores USING btree (propietario_id, curp) WHERE (curp IS NOT NULL);
+
+
+--
+-- Name: uq_operadores_num_trabajador; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX uq_operadores_num_trabajador ON public.operadores USING btree (propietario_id, num_trabajador) WHERE (num_trabajador IS NOT NULL);
+
+
+--
+-- Name: uq_reservaciones_pedido_vivo; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX uq_reservaciones_pedido_vivo ON public.reservaciones USING btree (pedido_id) WHERE ((pedido_id IS NOT NULL) AND (estado <> ALL (ARRAY['Cancelada'::text, 'Rechazada'::text])));
+
+
+--
+-- Name: INDEX uq_reservaciones_pedido_vivo; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON INDEX public.uq_reservaciones_pedido_vivo IS 'Un pedido no puede tener dos reservaciones vivas a la vez. Parcial a proposito: cancelar reabre el pedido y otra empresa puede ganarlo despues. Ver C2.';
+
+
+--
+-- Name: vigencias_por_entidad; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX vigencias_por_entidad ON public.vigencias USING btree (entidad_tipo, entidad_id);
+
+
+--
+-- Name: vigencias_por_fecha; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX vigencias_por_fecha ON public.vigencias USING btree (fecha_documento) WHERE (fecha_documento IS NOT NULL);
+
+
+--
+-- Name: vigencias_uno_pendiente; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX vigencias_uno_pendiente ON public.vigencias USING btree (entidad_tipo, entidad_id, tipo_documento) WHERE (estado = 'pendiente'::text);
+
+
+--
+-- Name: vigencias_uno_vigente; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX vigencias_uno_vigente ON public.vigencias USING btree (entidad_tipo, entidad_id, tipo_documento) WHERE (estado = 'vigente'::text);
+
+
+--
 -- Name: ofertas tr_oferta_nueva; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -3081,6 +5560,13 @@ CREATE TRIGGER tr_oferta_nueva AFTER INSERT ON public.ofertas FOR EACH ROW EXECU
 --
 
 CREATE TRIGGER tr_oferta_respuesta AFTER UPDATE ON public.ofertas FOR EACH ROW EXECUTE FUNCTION public.notificar_respuesta_oferta();
+
+
+--
+-- Name: consentimientos trg_bloquear_consentimiento; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_bloquear_consentimiento BEFORE DELETE ON public.consentimientos FOR EACH ROW EXECUTE FUNCTION public.bloquear_consentimiento();
 
 
 --
@@ -3098,10 +5584,31 @@ CREATE TRIGGER trg_check_reservacion_disponibilidad BEFORE INSERT OR UPDATE ON p
 
 
 --
+-- Name: camiones trg_guard_camion_config_vehicular; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_camion_config_vehicular BEFORE INSERT OR UPDATE OF configuracion_vehicular ON public.camiones FOR EACH ROW EXECUTE FUNCTION public.guard_camion_config_vehicular();
+
+
+--
+-- Name: camiones trg_guard_camiones_insert; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_camiones_insert BEFORE INSERT ON public.camiones FOR EACH ROW EXECUTE FUNCTION public.guard_fleet_resource_insert();
+
+
+--
 -- Name: camiones trg_guard_camiones_update; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
 CREATE TRIGGER trg_guard_camiones_update BEFORE UPDATE ON public.camiones FOR EACH ROW EXECUTE FUNCTION public.guard_fleet_resource_update();
+
+
+--
+-- Name: custodios trg_guard_custodios_insert; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_custodios_insert BEFORE INSERT ON public.custodios FOR EACH ROW EXECUTE FUNCTION public.guard_fleet_resource_insert();
 
 
 --
@@ -3126,6 +5633,13 @@ CREATE TRIGGER trg_guard_expediente_update BEFORE UPDATE ON public.expedientes F
 
 
 --
+-- Name: lavados trg_guard_lavados_insert; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_lavados_insert BEFORE INSERT ON public.lavados FOR EACH ROW EXECUTE FUNCTION public.guard_fleet_resource_insert();
+
+
+--
 -- Name: lavados trg_guard_lavados_update; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -3133,10 +5647,31 @@ CREATE TRIGGER trg_guard_lavados_update BEFORE UPDATE ON public.lavados FOR EACH
 
 
 --
+-- Name: mensajes trg_guard_mensaje_texto; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_mensaje_texto BEFORE INSERT OR UPDATE OF texto ON public.mensajes FOR EACH ROW EXECUTE FUNCTION public.guard_mensaje_texto();
+
+
+--
+-- Name: ofertas trg_guard_oferta_insert; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_oferta_insert BEFORE INSERT ON public.ofertas FOR EACH ROW EXECUTE FUNCTION public.guard_oferta_insert();
+
+
+--
 -- Name: ofertas trg_guard_oferta_update; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
 CREATE TRIGGER trg_guard_oferta_update BEFORE UPDATE ON public.ofertas FOR EACH ROW EXECUTE FUNCTION public.guard_oferta_update();
+
+
+--
+-- Name: operadores trg_guard_operador_delete; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_operador_delete BEFORE DELETE ON public.operadores FOR EACH ROW EXECUTE FUNCTION public.guard_operador_delete();
 
 
 --
@@ -3154,10 +5689,24 @@ CREATE TRIGGER trg_guard_operador_hazmat_reservaciones BEFORE UPDATE ON public.r
 
 
 --
+-- Name: operadores trg_guard_operadores_insert; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_operadores_insert BEFORE INSERT ON public.operadores FOR EACH ROW EXECUTE FUNCTION public.guard_fleet_resource_insert();
+
+
+--
 -- Name: operadores trg_guard_operadores_update; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
 CREATE TRIGGER trg_guard_operadores_update BEFORE UPDATE ON public.operadores FOR EACH ROW EXECUTE FUNCTION public.guard_fleet_resource_update();
+
+
+--
+-- Name: patios trg_guard_patios_insert; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_patios_insert BEFORE INSERT ON public.patios FOR EACH ROW EXECUTE FUNCTION public.guard_fleet_resource_insert();
 
 
 --
@@ -3175,6 +5724,13 @@ CREATE TRIGGER trg_guard_pedido_update BEFORE UPDATE ON public.pedidos FOR EACH 
 
 
 --
+-- Name: perfiles trg_guard_perfil_insert; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_perfil_insert BEFORE INSERT ON public.perfiles FOR EACH ROW EXECUTE FUNCTION public.guard_perfil_insert();
+
+
+--
 -- Name: perfiles trg_guard_perfil_self_update; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -3182,10 +5738,31 @@ CREATE TRIGGER trg_guard_perfil_self_update BEFORE UPDATE ON public.perfiles FOR
 
 
 --
+-- Name: reservaciones trg_guard_reservacion_insert; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_reservacion_insert BEFORE INSERT ON public.reservaciones FOR EACH ROW EXECUTE FUNCTION public.guard_reservacion_insert();
+
+
+--
 -- Name: reservaciones trg_guard_reservacion_update; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
 CREATE TRIGGER trg_guard_reservacion_update BEFORE UPDATE ON public.reservaciones FOR EACH ROW EXECUTE FUNCTION public.guard_reservacion_update();
+
+
+--
+-- Name: reservaciones trg_guard_unidad_existe; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_unidad_existe BEFORE INSERT OR UPDATE ON public.reservaciones FOR EACH ROW EXECUTE FUNCTION public.guard_unidad_existe();
+
+
+--
+-- Name: vigencias trg_guard_vigencia_update; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_vigencia_update BEFORE UPDATE ON public.vigencias FOR EACH ROW EXECUTE FUNCTION public.guard_vigencia_update();
 
 
 --
@@ -3217,11 +5794,139 @@ CREATE TRIGGER trg_sync_datos_pago BEFORE UPDATE ON public.reservaciones FOR EAC
 
 
 --
+-- Name: camiones trg_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_updated_at BEFORE UPDATE ON public.camiones FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: custodios trg_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_updated_at BEFORE UPDATE ON public.custodios FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: expedientes trg_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_updated_at BEFORE UPDATE ON public.expedientes FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: lavados trg_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_updated_at BEFORE UPDATE ON public.lavados FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: ofertas trg_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_updated_at BEFORE UPDATE ON public.ofertas FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: operadores trg_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_updated_at BEFORE UPDATE ON public.operadores FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: patios trg_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_updated_at BEFORE UPDATE ON public.patios FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: pedidos trg_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_updated_at BEFORE UPDATE ON public.pedidos FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: perfiles trg_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_updated_at BEFORE UPDATE ON public.perfiles FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: reservaciones trg_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_updated_at BEFORE UPDATE ON public.reservaciones FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: camiones trg_vigencias_espejo; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_vigencias_espejo AFTER INSERT OR DELETE OR UPDATE ON public.camiones FOR EACH ROW EXECUTE FUNCTION public.vigencias_espejo();
+
+
+--
+-- Name: custodios trg_vigencias_espejo; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_vigencias_espejo AFTER INSERT OR DELETE OR UPDATE ON public.custodios FOR EACH ROW EXECUTE FUNCTION public.vigencias_espejo();
+
+
+--
+-- Name: operadores trg_vigencias_espejo; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_vigencias_espejo AFTER INSERT OR DELETE OR UPDATE ON public.operadores FOR EACH ROW EXECUTE FUNCTION public.vigencias_espejo();
+
+
+--
+-- Name: patios trg_vigencias_espejo; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_vigencias_espejo AFTER INSERT OR DELETE OR UPDATE ON public.patios FOR EACH ROW EXECUTE FUNCTION public.vigencias_espejo();
+
+
+--
+-- Name: perfiles trg_vigencias_espejo; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_vigencias_espejo AFTER INSERT OR DELETE OR UPDATE ON public.perfiles FOR EACH ROW EXECUTE FUNCTION public.vigencias_espejo();
+
+
+--
+-- Name: vigencias trg_vigencias_tipo_coincide; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_vigencias_tipo_coincide BEFORE INSERT OR UPDATE OF tipo_documento, entidad_tipo ON public.vigencias FOR EACH ROW EXECUTE FUNCTION public.vigencias_tipo_coincide();
+
+
+--
+-- Name: calificaciones calificaciones_admin_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.calificaciones
+    ADD CONSTRAINT calificaciones_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.perfiles(user_id) ON DELETE CASCADE;
+
+
+--
+-- Name: calificaciones calificaciones_cliente_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.calificaciones
+    ADD CONSTRAINT calificaciones_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES public.perfiles(user_id) ON DELETE SET NULL;
+
+
+--
 -- Name: calificaciones calificaciones_reservacion_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.calificaciones
-    ADD CONSTRAINT calificaciones_reservacion_id_fkey FOREIGN KEY (reservacion_id) REFERENCES public.reservaciones(id) ON DELETE CASCADE;
+    ADD CONSTRAINT calificaciones_reservacion_id_fkey FOREIGN KEY (reservacion_id) REFERENCES public.reservaciones(id) ON DELETE SET NULL;
 
 
 --
@@ -3233,19 +5938,19 @@ ALTER TABLE ONLY public.camiones
 
 
 --
+-- Name: consentimientos consentimientos_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.consentimientos
+    ADD CONSTRAINT consentimientos_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: custodios custodios_propietario_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.custodios
-    ADD CONSTRAINT custodios_propietario_fk FOREIGN KEY (propietario_id) REFERENCES public.perfiles(user_id) ON DELETE SET NULL NOT VALID;
-
-
---
--- Name: custodios custodios_propietario_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.custodios
-    ADD CONSTRAINT custodios_propietario_id_fkey FOREIGN KEY (propietario_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+    ADD CONSTRAINT custodios_propietario_fk FOREIGN KEY (propietario_id) REFERENCES public.perfiles(user_id) ON DELETE SET NULL;
 
 
 --
@@ -3253,7 +5958,7 @@ ALTER TABLE ONLY public.custodios
 --
 
 ALTER TABLE ONLY public.documentos_fiscales
-    ADD CONSTRAINT documentos_fiscales_cancelado_por_fkey FOREIGN KEY (cancelado_por) REFERENCES auth.users(id);
+    ADD CONSTRAINT documentos_fiscales_cancelado_por_fkey FOREIGN KEY (cancelado_por) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 
 --
@@ -3261,7 +5966,7 @@ ALTER TABLE ONLY public.documentos_fiscales
 --
 
 ALTER TABLE ONLY public.documentos_fiscales
-    ADD CONSTRAINT documentos_fiscales_emitido_por_fkey FOREIGN KEY (emitido_por) REFERENCES auth.users(id);
+    ADD CONSTRAINT documentos_fiscales_emitido_por_fkey FOREIGN KEY (emitido_por) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 
 --
@@ -3301,15 +6006,7 @@ ALTER TABLE ONLY public.expedientes
 --
 
 ALTER TABLE ONLY public.lavados
-    ADD CONSTRAINT lavados_propietario_fk FOREIGN KEY (propietario_id) REFERENCES public.perfiles(user_id) ON DELETE SET NULL NOT VALID;
-
-
---
--- Name: lavados lavados_propietario_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.lavados
-    ADD CONSTRAINT lavados_propietario_id_fkey FOREIGN KEY (propietario_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+    ADD CONSTRAINT lavados_propietario_fk FOREIGN KEY (propietario_id) REFERENCES public.perfiles(user_id) ON DELETE SET NULL;
 
 
 --
@@ -3337,11 +6034,27 @@ ALTER TABLE ONLY public.mensajes
 
 
 --
+-- Name: notificaciones notificaciones_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.notificaciones
+    ADD CONSTRAINT notificaciones_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.perfiles(user_id) ON DELETE CASCADE;
+
+
+--
 -- Name: ofertas ofertas_admin_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.ofertas
-    ADD CONSTRAINT ofertas_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES auth.users(id);
+    ADD CONSTRAINT ofertas_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.perfiles(user_id) ON DELETE SET NULL;
+
+
+--
+-- Name: ofertas ofertas_operador_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.ofertas
+    ADD CONSTRAINT ofertas_operador_id_fkey FOREIGN KEY (operador_id) REFERENCES public.operadores(id) ON DELETE SET NULL;
 
 
 --
@@ -3357,7 +6070,7 @@ ALTER TABLE ONLY public.ofertas
 --
 
 ALTER TABLE ONLY public.operadores
-    ADD CONSTRAINT operadores_propietario_id_fkey FOREIGN KEY (propietario_id) REFERENCES public.perfiles(user_id) ON DELETE CASCADE;
+    ADD CONSTRAINT operadores_propietario_id_fkey FOREIGN KEY (propietario_id) REFERENCES public.perfiles(user_id) ON DELETE SET NULL;
 
 
 --
@@ -3365,7 +6078,7 @@ ALTER TABLE ONLY public.operadores
 --
 
 ALTER TABLE ONLY public.pagos
-    ADD CONSTRAINT pagos_registrado_por_fkey FOREIGN KEY (registrado_por) REFERENCES auth.users(id);
+    ADD CONSTRAINT pagos_registrado_por_fkey FOREIGN KEY (registrado_por) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 
 --
@@ -3381,15 +6094,7 @@ ALTER TABLE ONLY public.pagos
 --
 
 ALTER TABLE ONLY public.patios
-    ADD CONSTRAINT patios_propietario_fk FOREIGN KEY (propietario_id) REFERENCES public.perfiles(user_id) ON DELETE SET NULL NOT VALID;
-
-
---
--- Name: patios patios_propietario_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.patios
-    ADD CONSTRAINT patios_propietario_id_fkey FOREIGN KEY (propietario_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+    ADD CONSTRAINT patios_propietario_fk FOREIGN KEY (propietario_id) REFERENCES public.perfiles(user_id) ON DELETE SET NULL;
 
 
 --
@@ -3397,7 +6102,7 @@ ALTER TABLE ONLY public.patios
 --
 
 ALTER TABLE ONLY public.pedidos
-    ADD CONSTRAINT pedidos_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES auth.users(id);
+    ADD CONSTRAINT pedidos_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES public.perfiles(user_id) ON DELETE SET NULL;
 
 
 --
@@ -3441,11 +6146,27 @@ ALTER TABLE ONLY public.reservaciones
 
 
 --
+-- Name: reservaciones reservaciones_cliente_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reservaciones
+    ADD CONSTRAINT reservaciones_cliente_user_id_fkey FOREIGN KEY (cliente_user_id) REFERENCES public.perfiles(user_id) ON DELETE SET NULL;
+
+
+--
 -- Name: reservaciones_historico reservaciones_historico_archivado_por_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.reservaciones_historico
-    ADD CONSTRAINT reservaciones_historico_archivado_por_fkey FOREIGN KEY (archivado_por) REFERENCES auth.users(id);
+    ADD CONSTRAINT reservaciones_historico_archivado_por_fkey FOREIGN KEY (archivado_por) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: reservaciones reservaciones_operador_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reservaciones
+    ADD CONSTRAINT reservaciones_operador_id_fkey FOREIGN KEY (operador_id) REFERENCES public.operadores(id) ON DELETE SET NULL;
 
 
 --
@@ -3465,6 +6186,30 @@ ALTER TABLE ONLY public.reservaciones
 
 
 --
+-- Name: reservaciones reservaciones_propietario_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reservaciones
+    ADD CONSTRAINT reservaciones_propietario_id_fkey FOREIGN KEY (propietario_id) REFERENCES public.perfiles(user_id) ON DELETE SET NULL;
+
+
+--
+-- Name: solicitudes_arco solicitudes_arco_atendida_por_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.solicitudes_arco
+    ADD CONSTRAINT solicitudes_arco_atendida_por_fkey FOREIGN KEY (atendida_por) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: solicitudes_arco solicitudes_arco_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.solicitudes_arco
+    ADD CONSTRAINT solicitudes_arco_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: solicitudes_cuenta solicitudes_cuenta_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -3473,61 +6218,76 @@ ALTER TABLE ONLY public.solicitudes_cuenta
 
 
 --
+-- Name: vigencias vigencias_revisado_por_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.vigencias
+    ADD CONSTRAINT vigencias_revisado_por_fkey FOREIGN KEY (revisado_por) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: vigencias vigencias_subido_por_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.vigencias
+    ADD CONSTRAINT vigencias_subido_por_fkey FOREIGN KEY (subido_por) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: vigencias vigencias_tipo_del_catalogo; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.vigencias
+    ADD CONSTRAINT vigencias_tipo_del_catalogo FOREIGN KEY (cat_clave, tipo_documento) REFERENCES public.catalogos(clave, valor);
+
+
+--
 -- Name: camiones Actualizar camiones; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "Actualizar camiones" ON public.camiones FOR UPDATE USING (((propietario_id = auth.uid()) OR public.is_superadmin()));
+CREATE POLICY "Actualizar camiones" ON public.camiones FOR UPDATE TO authenticated USING (((propietario_id = ( SELECT auth.uid() AS uid)) OR ( SELECT public.is_superadmin() AS is_superadmin)));
 
 
 --
 -- Name: calificaciones Clientes pueden insertar calificaciones; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "Clientes pueden insertar calificaciones" ON public.calificaciones FOR INSERT TO authenticated WITH CHECK ((cliente_id = auth.uid()));
+CREATE POLICY "Clientes pueden insertar calificaciones" ON public.calificaciones FOR INSERT TO authenticated WITH CHECK ((cliente_id = ( SELECT auth.uid() AS uid)));
+
+
+--
+-- Name: POLICY "Clientes pueden insertar calificaciones" ON calificaciones; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON POLICY "Clientes pueden insertar calificaciones" ON public.calificaciones IS 'INERTE desde 20260929150000 (Q-03): authenticated ya no tiene INSERT en calificaciones; se califica solo por calificar_servicio(). Se conserva para no borrar sin autorizacion (Regla #1).';
 
 
 --
 -- Name: camiones Eliminar camiones; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "Eliminar camiones" ON public.camiones FOR DELETE USING (((propietario_id = auth.uid()) OR public.is_superadmin()));
+CREATE POLICY "Eliminar camiones" ON public.camiones FOR DELETE TO authenticated USING (((propietario_id = ( SELECT auth.uid() AS uid)) OR ( SELECT public.is_superadmin() AS is_superadmin)));
 
 
 --
 -- Name: perfiles Insert own profile; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "Insert own profile" ON public.perfiles FOR INSERT TO authenticated WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Insert own profile" ON public.perfiles FOR INSERT TO authenticated WITH CHECK ((( SELECT auth.uid() AS uid) = user_id));
 
 
 --
 -- Name: camiones Insertar camiones; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "Insertar camiones" ON public.camiones FOR INSERT WITH CHECK (((auth.uid() IS NOT NULL) AND ((propietario_id = auth.uid()) OR public.is_superadmin())));
-
-
---
--- Name: perfiles Leer nombre de empresa; Type: POLICY; Schema: public; Owner: postgres
---
-
-CREATE POLICY "Leer nombre de empresa" ON public.perfiles FOR SELECT USING ((auth.uid() IS NOT NULL));
-
-
---
--- Name: perfiles Leer propio perfil; Type: POLICY; Schema: public; Owner: postgres
---
-
-CREATE POLICY "Leer propio perfil" ON public.perfiles FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Insertar camiones" ON public.camiones FOR INSERT TO authenticated WITH CHECK (((( SELECT auth.uid() AS uid) IS NOT NULL) AND ((propietario_id = ( SELECT auth.uid() AS uid)) OR ( SELECT public.is_superadmin() AS is_superadmin))));
 
 
 --
 -- Name: perfiles Superadmin update any profile; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "Superadmin update any profile" ON public.perfiles FOR UPDATE TO authenticated USING ((EXISTS ( SELECT 1
-   FROM public.perfiles p
-  WHERE ((p.user_id = auth.uid()) AND (p.rol = 'superadmin'::text)))));
+CREATE POLICY "Superadmin update any profile" ON public.perfiles FOR UPDATE TO authenticated USING (( SELECT public.is_superadmin() AS is_superadmin));
 
 
 --
@@ -3541,32 +6301,32 @@ CREATE POLICY "Todos pueden ver calificaciones" ON public.calificaciones FOR SEL
 -- Name: perfiles Update own profile; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY "Update own profile" ON public.perfiles FOR UPDATE TO authenticated USING ((auth.uid() = user_id)) WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Update own profile" ON public.perfiles FOR UPDATE TO authenticated USING ((( SELECT auth.uid() AS uid) = user_id)) WITH CHECK ((( SELECT auth.uid() AS uid) = user_id));
 
 
 --
 -- Name: pagos admin_registra_pago_manual; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY admin_registra_pago_manual ON public.pagos FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
+CREATE POLICY admin_registra_pago_manual ON public.pagos FOR INSERT TO authenticated WITH CHECK ((EXISTS ( SELECT 1
    FROM public.reservaciones r
-  WHERE ((r.id = pagos.reservacion_id) AND (r.propietario_id = auth.uid())))));
+  WHERE ((r.id = pagos.reservacion_id) AND (r.propietario_id = ( SELECT auth.uid() AS uid))))));
 
 
 --
 -- Name: documentos_fiscales admin_ve_sus_docs; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY admin_ve_sus_docs ON public.documentos_fiscales FOR SELECT USING ((emitido_por = auth.uid()));
+CREATE POLICY admin_ve_sus_docs ON public.documentos_fiscales FOR SELECT TO authenticated USING ((emitido_por = ( SELECT auth.uid() AS uid)));
 
 
 --
 -- Name: pagos admin_ve_sus_pagos; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY admin_ve_sus_pagos ON public.pagos FOR SELECT USING ((EXISTS ( SELECT 1
+CREATE POLICY admin_ve_sus_pagos ON public.pagos FOR SELECT TO authenticated USING ((EXISTS ( SELECT 1
    FROM public.reservaciones r
-  WHERE ((r.id = pagos.reservacion_id) AND (r.propietario_id = auth.uid())))));
+  WHERE ((r.id = pagos.reservacion_id) AND (r.propietario_id = ( SELECT auth.uid() AS uid))))));
 
 
 --
@@ -3586,8 +6346,35 @@ CREATE POLICY app_config_select ON public.app_config FOR SELECT TO authenticated
 -- Name: app_config app_config_write; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY app_config_write ON public.app_config TO authenticated USING (public.is_superadmin()) WITH CHECK (public.is_superadmin());
+CREATE POLICY app_config_write ON public.app_config TO authenticated USING (( SELECT public.is_superadmin() AS is_superadmin)) WITH CHECK (( SELECT public.is_superadmin() AS is_superadmin));
 
+
+--
+-- Name: solicitudes_arco arco_insert_propio; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY arco_insert_propio ON public.solicitudes_arco FOR INSERT TO authenticated WITH CHECK ((user_id = ( SELECT auth.uid() AS uid)));
+
+
+--
+-- Name: solicitudes_arco arco_select_propio; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY arco_select_propio ON public.solicitudes_arco FOR SELECT TO authenticated USING (((user_id = ( SELECT auth.uid() AS uid)) OR ( SELECT public.is_superadmin() AS is_superadmin)));
+
+
+--
+-- Name: solicitudes_arco arco_update_superadmin; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY arco_update_superadmin ON public.solicitudes_arco FOR UPDATE TO authenticated USING (( SELECT public.is_superadmin() AS is_superadmin)) WITH CHECK (( SELECT public.is_superadmin() AS is_superadmin));
+
+
+--
+-- Name: avisos_superadmin; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.avisos_superadmin ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: calificaciones; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -3605,14 +6392,7 @@ ALTER TABLE public.camiones ENABLE ROW LEVEL SECURITY;
 -- Name: camiones camiones_owner_read; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY camiones_owner_read ON public.camiones FOR SELECT USING (((propietario_id = auth.uid()) OR public.is_superadmin()));
-
-
---
--- Name: camiones camiones_public_read; Type: POLICY; Schema: public; Owner: postgres
---
-
-CREATE POLICY camiones_public_read ON public.camiones FOR SELECT USING ((aprobacion = 'aprobada'::text));
+CREATE POLICY camiones_owner_read ON public.camiones FOR SELECT TO authenticated USING (((propietario_id = ( SELECT auth.uid() AS uid)) OR ( SELECT public.is_superadmin() AS is_superadmin)));
 
 
 --
@@ -3632,25 +6412,51 @@ CREATE POLICY catalogos_select ON public.catalogos FOR SELECT TO authenticated U
 -- Name: catalogos catalogos_write; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY catalogos_write ON public.catalogos TO authenticated USING (public.is_superadmin()) WITH CHECK (public.is_superadmin());
+CREATE POLICY catalogos_write ON public.catalogos TO authenticated USING (( SELECT public.is_superadmin() AS is_superadmin)) WITH CHECK (( SELECT public.is_superadmin() AS is_superadmin));
 
 
 --
 -- Name: documentos_fiscales cliente_ve_sus_docs; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY cliente_ve_sus_docs ON public.documentos_fiscales FOR SELECT USING ((EXISTS ( SELECT 1
+CREATE POLICY cliente_ve_sus_docs ON public.documentos_fiscales FOR SELECT TO authenticated USING ((EXISTS ( SELECT 1
    FROM public.reservaciones r
-  WHERE ((r.id = documentos_fiscales.reservacion_id) AND (r.cliente_user_id = auth.uid())))));
+  WHERE ((r.id = documentos_fiscales.reservacion_id) AND (r.cliente_user_id = ( SELECT auth.uid() AS uid))))));
 
 
 --
 -- Name: pagos cliente_ve_sus_pagos; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY cliente_ve_sus_pagos ON public.pagos FOR SELECT USING ((EXISTS ( SELECT 1
+CREATE POLICY cliente_ve_sus_pagos ON public.pagos FOR SELECT TO authenticated USING ((EXISTS ( SELECT 1
    FROM public.reservaciones r
-  WHERE ((r.id = pagos.reservacion_id) AND (r.cliente_user_id = auth.uid())))));
+  WHERE ((r.id = pagos.reservacion_id) AND (r.cliente_user_id = ( SELECT auth.uid() AS uid))))));
+
+
+--
+-- Name: consentimientos; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.consentimientos ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: consentimientos_bloqueados; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.consentimientos_bloqueados ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: consentimientos consentimientos_insert_propio; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY consentimientos_insert_propio ON public.consentimientos FOR INSERT TO authenticated WITH CHECK ((user_id = ( SELECT auth.uid() AS uid)));
+
+
+--
+-- Name: consentimientos consentimientos_select_propio; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY consentimientos_select_propio ON public.consentimientos FOR SELECT TO authenticated USING (((user_id = ( SELECT auth.uid() AS uid)) OR ( SELECT public.is_superadmin() AS is_superadmin)));
 
 
 --
@@ -3663,32 +6469,25 @@ ALTER TABLE public.custodios ENABLE ROW LEVEL SECURITY;
 -- Name: custodios custodios_owner_all; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY custodios_owner_all ON public.custodios USING ((auth.uid() = propietario_id));
-
-
---
--- Name: custodios custodios_public_read; Type: POLICY; Schema: public; Owner: postgres
---
-
-CREATE POLICY custodios_public_read ON public.custodios FOR SELECT USING ((aprobacion = 'aprobada'::text));
+CREATE POLICY custodios_owner_all ON public.custodios TO authenticated USING ((( SELECT auth.uid() AS uid) = propietario_id));
 
 
 --
 -- Name: custodios custodios_superadmin; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY custodios_superadmin ON public.custodios USING ((EXISTS ( SELECT 1
+CREATE POLICY custodios_superadmin ON public.custodios TO authenticated USING ((EXISTS ( SELECT 1
    FROM public.perfiles
-  WHERE ((perfiles.user_id = auth.uid()) AND (perfiles.rol = 'superadmin'::text)))));
+  WHERE ((perfiles.user_id = ( SELECT auth.uid() AS uid)) AND (perfiles.rol = 'superadmin'::text)))));
 
 
 --
 -- Name: operadores del_operadores; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY del_operadores ON public.operadores FOR DELETE TO authenticated USING (((auth.uid() = propietario_id) OR (EXISTS ( SELECT 1
+CREATE POLICY del_operadores ON public.operadores FOR DELETE TO authenticated USING (((( SELECT auth.uid() AS uid) = propietario_id) OR (EXISTS ( SELECT 1
    FROM public.perfiles
-  WHERE ((perfiles.user_id = auth.uid()) AND (perfiles.rol = 'superadmin'::text))))));
+  WHERE ((perfiles.user_id = ( SELECT auth.uid() AS uid)) AND (perfiles.rol = 'superadmin'::text))))));
 
 
 --
@@ -3702,7 +6501,7 @@ CREATE POLICY docs_catalogo_select ON public.documentos_catalogo FOR SELECT TO a
 -- Name: documentos_catalogo docs_catalogo_write; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY docs_catalogo_write ON public.documentos_catalogo TO authenticated USING (public.is_superadmin()) WITH CHECK (public.is_superadmin());
+CREATE POLICY docs_catalogo_write ON public.documentos_catalogo TO authenticated USING (( SELECT public.is_superadmin() AS is_superadmin)) WITH CHECK (( SELECT public.is_superadmin() AS is_superadmin));
 
 
 --
@@ -3725,6 +6524,13 @@ CREATE POLICY expdocs_all ON public.expediente_documentos TO authenticated USING
 
 
 --
+-- Name: POLICY expdocs_all ON expediente_documentos; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON POLICY expdocs_all ON public.expediente_documentos IS 'Desde 20260930140000 (Q-06) solo gobierna SELECT y UPDATE: authenticated ya no tiene INSERT ni DELETE. Los renglones nacen en abrir_expediente() desde documentos_catalogo y no se borran desde la app.';
+
+
+--
 -- Name: expediente_documentos; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -3742,7 +6548,7 @@ ALTER TABLE public.expedientes ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY expedientes_insert ON public.expedientes FOR INSERT TO authenticated WITH CHECK (((EXISTS ( SELECT 1
    FROM public.reservaciones r
-  WHERE ((r.id = expedientes.reserva_id) AND ((r.cliente_user_id = auth.uid()) OR (r.propietario_id = auth.uid()))))) OR public.is_superadmin()));
+  WHERE ((r.id = expedientes.reserva_id) AND ((r.cliente_user_id = ( SELECT auth.uid() AS uid)) OR (r.propietario_id = ( SELECT auth.uid() AS uid)))))) OR ( SELECT public.is_superadmin() AS is_superadmin)));
 
 
 --
@@ -3751,7 +6557,7 @@ CREATE POLICY expedientes_insert ON public.expedientes FOR INSERT TO authenticat
 
 CREATE POLICY expedientes_select ON public.expedientes FOR SELECT TO authenticated USING (((EXISTS ( SELECT 1
    FROM public.reservaciones r
-  WHERE ((r.id = expedientes.reserva_id) AND ((r.cliente_user_id = auth.uid()) OR (r.propietario_id = auth.uid()))))) OR public.is_superadmin()));
+  WHERE ((r.id = expedientes.reserva_id) AND ((r.cliente_user_id = ( SELECT auth.uid() AS uid)) OR (r.propietario_id = ( SELECT auth.uid() AS uid)))))) OR ( SELECT public.is_superadmin() AS is_superadmin)));
 
 
 --
@@ -3760,16 +6566,16 @@ CREATE POLICY expedientes_select ON public.expedientes FOR SELECT TO authenticat
 
 CREATE POLICY expedientes_update ON public.expedientes FOR UPDATE TO authenticated USING (((EXISTS ( SELECT 1
    FROM public.reservaciones r
-  WHERE ((r.id = expedientes.reserva_id) AND ((r.cliente_user_id = auth.uid()) OR (r.propietario_id = auth.uid()))))) OR public.is_superadmin()));
+  WHERE ((r.id = expedientes.reserva_id) AND ((r.cliente_user_id = ( SELECT auth.uid() AS uid)) OR (r.propietario_id = ( SELECT auth.uid() AS uid)))))) OR ( SELECT public.is_superadmin() AS is_superadmin)));
 
 
 --
 -- Name: operadores ins_operadores; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY ins_operadores ON public.operadores FOR INSERT TO authenticated WITH CHECK (((auth.uid() = propietario_id) OR (EXISTS ( SELECT 1
+CREATE POLICY ins_operadores ON public.operadores FOR INSERT TO authenticated WITH CHECK (((( SELECT auth.uid() AS uid) = propietario_id) OR (EXISTS ( SELECT 1
    FROM public.perfiles
-  WHERE ((perfiles.user_id = auth.uid()) AND (perfiles.rol = 'superadmin'::text))))));
+  WHERE ((perfiles.user_id = ( SELECT auth.uid() AS uid)) AND (perfiles.rol = 'superadmin'::text))))));
 
 
 --
@@ -3789,30 +6595,23 @@ ALTER TABLE public.lavados ENABLE ROW LEVEL SECURITY;
 -- Name: lavados lavados_owner_all; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY lavados_owner_all ON public.lavados USING ((auth.uid() = propietario_id)) WITH CHECK ((auth.uid() = propietario_id));
-
-
---
--- Name: lavados lavados_public_read; Type: POLICY; Schema: public; Owner: postgres
---
-
-CREATE POLICY lavados_public_read ON public.lavados FOR SELECT USING ((aprobacion = 'aprobada'::text));
+CREATE POLICY lavados_owner_all ON public.lavados TO authenticated USING ((( SELECT auth.uid() AS uid) = propietario_id)) WITH CHECK ((( SELECT auth.uid() AS uid) = propietario_id));
 
 
 --
 -- Name: lavados lavados_superadmin; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY lavados_superadmin ON public.lavados USING ((EXISTS ( SELECT 1
+CREATE POLICY lavados_superadmin ON public.lavados TO authenticated USING ((EXISTS ( SELECT 1
    FROM public.perfiles
-  WHERE ((perfiles.user_id = auth.uid()) AND (perfiles.rol = 'superadmin'::text)))));
+  WHERE ((perfiles.user_id = ( SELECT auth.uid() AS uid)) AND (perfiles.rol = 'superadmin'::text)))));
 
 
 --
 -- Name: notificaciones marcar_leida; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY marcar_leida ON public.notificaciones FOR UPDATE TO authenticated USING ((user_id = auth.uid()));
+CREATE POLICY marcar_leida ON public.notificaciones FOR UPDATE TO authenticated USING ((user_id = ( SELECT auth.uid() AS uid)));
 
 
 --
@@ -3825,28 +6624,28 @@ ALTER TABLE public.mensajes ENABLE ROW LEVEL SECURITY;
 -- Name: mensajes mensajes_insert; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY mensajes_insert ON public.mensajes FOR INSERT WITH CHECK (((auth.uid() = de_user_id) AND (auth.uid() = ANY (participantes))));
+CREATE POLICY mensajes_insert ON public.mensajes FOR INSERT TO authenticated WITH CHECK (((( SELECT auth.uid() AS uid) = de_user_id) AND (( SELECT auth.uid() AS uid) = ANY (participantes))));
 
 
 --
 -- Name: mensajes mensajes_select; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY mensajes_select ON public.mensajes FOR SELECT USING ((auth.uid() = ANY (participantes)));
+CREATE POLICY mensajes_select ON public.mensajes FOR SELECT TO authenticated USING ((( SELECT auth.uid() AS uid) = ANY (participantes)));
 
 
 --
 -- Name: mensajes mensajes_update; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY mensajes_update ON public.mensajes FOR UPDATE USING ((auth.uid() = ANY (participantes)));
+CREATE POLICY mensajes_update ON public.mensajes FOR UPDATE TO authenticated USING ((( SELECT auth.uid() AS uid) = ANY (participantes)));
 
 
 --
 -- Name: mensajes msg_select_superadmin; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY msg_select_superadmin ON public.mensajes FOR SELECT TO authenticated USING (public.is_superadmin());
+CREATE POLICY msg_select_superadmin ON public.mensajes FOR SELECT TO authenticated USING (( SELECT public.is_superadmin() AS is_superadmin));
 
 
 --
@@ -3859,27 +6658,25 @@ ALTER TABLE public.notificaciones ENABLE ROW LEVEL SECURITY;
 -- Name: ofertas of_insert; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY of_insert ON public.ofertas FOR INSERT WITH CHECK (((auth.uid() = admin_id) AND (EXISTS ( SELECT 1
+CREATE POLICY of_insert ON public.ofertas FOR INSERT TO authenticated WITH CHECK (((( SELECT auth.uid() AS uid) = admin_id) AND (EXISTS ( SELECT 1
    FROM public.perfiles
-  WHERE ((perfiles.user_id = auth.uid()) AND (perfiles.rol = ANY (ARRAY['admin'::text, 'superadmin'::text])))))));
+  WHERE ((perfiles.user_id = ( SELECT auth.uid() AS uid)) AND (perfiles.rol = ANY (ARRAY['admin'::text, 'superadmin'::text])))))));
 
 
 --
 -- Name: ofertas of_select; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY of_select ON public.ofertas FOR SELECT USING (true);
+CREATE POLICY of_select ON public.ofertas FOR SELECT TO authenticated USING (((admin_id = ( SELECT auth.uid() AS uid)) OR ( SELECT public.es_mi_pedido(ofertas.pedido_id) AS es_mi_pedido) OR ( SELECT public.is_superadmin() AS is_superadmin)));
 
 
 --
 -- Name: ofertas of_update; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY of_update ON public.ofertas FOR UPDATE USING (((auth.uid() = admin_id) OR (auth.uid() IN ( SELECT pedidos.cliente_id
-   FROM public.pedidos
-  WHERE (pedidos.id = ofertas.pedido_id))) OR (EXISTS ( SELECT 1
+CREATE POLICY of_update ON public.ofertas FOR UPDATE TO authenticated USING (((( SELECT auth.uid() AS uid) = admin_id) OR ( SELECT public.es_mi_pedido(ofertas.pedido_id) AS es_mi_pedido) OR (EXISTS ( SELECT 1
    FROM public.perfiles
-  WHERE ((perfiles.user_id = auth.uid()) AND (perfiles.rol = 'superadmin'::text))))));
+  WHERE ((perfiles.user_id = ( SELECT auth.uid() AS uid)) AND (perfiles.rol = 'superadmin'::text))))));
 
 
 --
@@ -3910,57 +6707,57 @@ ALTER TABLE public.patios ENABLE ROW LEVEL SECURITY;
 -- Name: patios patios_owner_all; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY patios_owner_all ON public.patios USING ((auth.uid() = propietario_id));
-
-
---
--- Name: patios patios_public_read; Type: POLICY; Schema: public; Owner: postgres
---
-
-CREATE POLICY patios_public_read ON public.patios FOR SELECT USING ((aprobacion = 'aprobada'::text));
+CREATE POLICY patios_owner_all ON public.patios TO authenticated USING ((( SELECT auth.uid() AS uid) = propietario_id));
 
 
 --
 -- Name: patios patios_superadmin; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY patios_superadmin ON public.patios USING ((EXISTS ( SELECT 1
+CREATE POLICY patios_superadmin ON public.patios TO authenticated USING ((EXISTS ( SELECT 1
    FROM public.perfiles
-  WHERE ((perfiles.user_id = auth.uid()) AND (perfiles.rol = 'superadmin'::text)))));
+  WHERE ((perfiles.user_id = ( SELECT auth.uid() AS uid)) AND (perfiles.rol = 'superadmin'::text)))));
 
 
 --
 -- Name: pedidos ped_delete; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY ped_delete ON public.pedidos FOR DELETE USING (((auth.uid() = cliente_id) OR (EXISTS ( SELECT 1
+CREATE POLICY ped_delete ON public.pedidos FOR DELETE TO authenticated USING (((( SELECT auth.uid() AS uid) = cliente_id) OR (EXISTS ( SELECT 1
    FROM public.perfiles
-  WHERE ((perfiles.user_id = auth.uid()) AND (perfiles.rol = 'superadmin'::text))))));
+  WHERE ((perfiles.user_id = ( SELECT auth.uid() AS uid)) AND (perfiles.rol = 'superadmin'::text))))));
+
+
+--
+-- Name: POLICY ped_delete ON pedidos; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON POLICY ped_delete ON public.pedidos IS 'INERTE desde 20260930130000 (Q-06): authenticated ya no tiene DELETE en pedidos; no se borra ningun pedido (se archivaran, funcion aparte). Se conserva para no borrar sin autorizacion (Regla #1).';
 
 
 --
 -- Name: pedidos ped_insert_own; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY ped_insert_own ON public.pedidos FOR INSERT WITH CHECK ((auth.uid() = cliente_id));
+CREATE POLICY ped_insert_own ON public.pedidos FOR INSERT TO authenticated WITH CHECK ((((( SELECT auth.uid() AS uid) = cliente_id) AND (estado = 'pendiente_revision'::text)) OR ( SELECT public.is_superadmin() AS is_superadmin)));
 
 
 --
 -- Name: pedidos ped_select; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY ped_select ON public.pedidos FOR SELECT TO authenticated USING ((public.is_superadmin() OR (estado = ANY (ARRAY['abierto'::text, 'en_negociacion'::text])) OR (cliente_id = auth.uid()) OR (EXISTS ( SELECT 1
+CREATE POLICY ped_select ON public.pedidos FOR SELECT TO authenticated USING ((( SELECT public.is_superadmin() AS is_superadmin) OR (estado = ANY (ARRAY['abierto'::text, 'en_negociacion'::text])) OR (cliente_id = ( SELECT auth.uid() AS uid)) OR (EXISTS ( SELECT 1
    FROM public.ofertas o
-  WHERE ((o.pedido_id = pedidos.id) AND (o.admin_id = auth.uid()))))));
+  WHERE ((o.pedido_id = pedidos.id) AND (o.admin_id = ( SELECT auth.uid() AS uid)))))));
 
 
 --
 -- Name: pedidos ped_update; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY ped_update ON public.pedidos FOR UPDATE USING (((auth.uid() = cliente_id) OR (EXISTS ( SELECT 1
+CREATE POLICY ped_update ON public.pedidos FOR UPDATE TO authenticated USING (((( SELECT auth.uid() AS uid) = cliente_id) OR (EXISTS ( SELECT 1
    FROM public.perfiles
-  WHERE ((perfiles.user_id = auth.uid()) AND (perfiles.rol = ANY (ARRAY['admin'::text, 'superadmin'::text])))))));
+  WHERE ((perfiles.user_id = ( SELECT auth.uid() AS uid)) AND (perfiles.rol = ANY (ARRAY['admin'::text, 'superadmin'::text])))))));
 
 
 --
@@ -3976,17 +6773,31 @@ ALTER TABLE public.pedidos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.perfiles ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: perfiles perfiles_lectura_propia; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY perfiles_lectura_propia ON public.perfiles FOR SELECT TO authenticated USING ((user_id = ( SELECT auth.uid() AS uid)));
+
+
+--
+-- Name: perfiles perfiles_superadmin_select; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY perfiles_superadmin_select ON public.perfiles FOR SELECT TO authenticated USING (( SELECT public.is_superadmin() AS is_superadmin));
+
+
+--
 -- Name: plantillas_pedido plantillas_delete_propias; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY plantillas_delete_propias ON public.plantillas_pedido FOR DELETE TO authenticated USING ((cliente_id = auth.uid()));
+CREATE POLICY plantillas_delete_propias ON public.plantillas_pedido FOR DELETE TO authenticated USING ((cliente_id = ( SELECT auth.uid() AS uid)));
 
 
 --
 -- Name: plantillas_pedido plantillas_insert_propias; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY plantillas_insert_propias ON public.plantillas_pedido FOR INSERT TO authenticated WITH CHECK ((cliente_id = auth.uid()));
+CREATE POLICY plantillas_insert_propias ON public.plantillas_pedido FOR INSERT TO authenticated WITH CHECK ((cliente_id = ( SELECT auth.uid() AS uid)));
 
 
 --
@@ -3999,14 +6810,14 @@ ALTER TABLE public.plantillas_pedido ENABLE ROW LEVEL SECURITY;
 -- Name: plantillas_pedido plantillas_select_propias; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY plantillas_select_propias ON public.plantillas_pedido FOR SELECT TO authenticated USING ((cliente_id = auth.uid()));
+CREATE POLICY plantillas_select_propias ON public.plantillas_pedido FOR SELECT TO authenticated USING ((cliente_id = ( SELECT auth.uid() AS uid)));
 
 
 --
 -- Name: plantillas_pedido plantillas_update_propias; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY plantillas_update_propias ON public.plantillas_pedido FOR UPDATE TO authenticated USING ((cliente_id = auth.uid())) WITH CHECK ((cliente_id = auth.uid()));
+CREATE POLICY plantillas_update_propias ON public.plantillas_pedido FOR UPDATE TO authenticated USING ((cliente_id = ( SELECT auth.uid() AS uid))) WITH CHECK ((cliente_id = ( SELECT auth.uid() AS uid)));
 
 
 --
@@ -4019,7 +6830,7 @@ ALTER TABLE public.reservaciones ENABLE ROW LEVEL SECURITY;
 -- Name: reservaciones reservaciones_delete; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY reservaciones_delete ON public.reservaciones FOR DELETE USING (public.is_superadmin());
+CREATE POLICY reservaciones_delete ON public.reservaciones FOR DELETE TO authenticated USING (( SELECT public.is_superadmin() AS is_superadmin));
 
 
 --
@@ -4032,61 +6843,67 @@ ALTER TABLE public.reservaciones_historico ENABLE ROW LEVEL SECURITY;
 -- Name: reservaciones reservaciones_insert; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY reservaciones_insert ON public.reservaciones FOR INSERT TO authenticated WITH CHECK (((cliente_user_id = auth.uid()) OR (propietario_id = auth.uid()) OR public.is_superadmin()));
+CREATE POLICY reservaciones_insert ON public.reservaciones FOR INSERT TO authenticated WITH CHECK (((cliente_user_id = ( SELECT auth.uid() AS uid)) OR (propietario_id = ( SELECT auth.uid() AS uid)) OR ( SELECT public.is_superadmin() AS is_superadmin)));
 
 
 --
 -- Name: reservaciones reservaciones_select; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY reservaciones_select ON public.reservaciones FOR SELECT USING (((cliente_user_id = auth.uid()) OR (propietario_id = auth.uid()) OR public.is_superadmin()));
+CREATE POLICY reservaciones_select ON public.reservaciones FOR SELECT TO authenticated USING (((cliente_user_id = ( SELECT auth.uid() AS uid)) OR (propietario_id = ( SELECT auth.uid() AS uid)) OR ( SELECT public.is_superadmin() AS is_superadmin)));
 
 
 --
 -- Name: reservaciones reservaciones_update; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY reservaciones_update ON public.reservaciones FOR UPDATE USING (((propietario_id = auth.uid()) OR (cliente_user_id = auth.uid()) OR public.is_superadmin()));
+CREATE POLICY reservaciones_update ON public.reservaciones FOR UPDATE TO authenticated USING (((propietario_id = ( SELECT auth.uid() AS uid)) OR (cliente_user_id = ( SELECT auth.uid() AS uid)) OR ( SELECT public.is_superadmin() AS is_superadmin)));
 
 
 --
 -- Name: solicitudes_cuenta sc_insert; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY sc_insert ON public.solicitudes_cuenta FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY sc_insert ON public.solicitudes_cuenta FOR INSERT TO authenticated WITH CHECK ((( SELECT auth.uid() AS uid) = user_id));
 
 
 --
 -- Name: solicitudes_cuenta sc_select; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY sc_select ON public.solicitudes_cuenta FOR SELECT USING (((auth.uid() = user_id) OR (( SELECT perfiles.rol
+CREATE POLICY sc_select ON public.solicitudes_cuenta FOR SELECT TO authenticated USING (((( SELECT auth.uid() AS uid) = user_id) OR (( SELECT perfiles.rol
    FROM public.perfiles
-  WHERE (perfiles.user_id = auth.uid())) = 'superadmin'::text)));
+  WHERE (perfiles.user_id = ( SELECT auth.uid() AS uid))) = 'superadmin'::text)));
 
 
 --
 -- Name: solicitudes_cuenta sc_update_own_rejected; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY sc_update_own_rejected ON public.solicitudes_cuenta FOR UPDATE TO authenticated USING (((auth.uid() = user_id) AND (estado = 'rechazada'::text))) WITH CHECK (((auth.uid() = user_id) AND (estado = 'pendiente'::text)));
+CREATE POLICY sc_update_own_rejected ON public.solicitudes_cuenta FOR UPDATE TO authenticated USING (((( SELECT auth.uid() AS uid) = user_id) AND (estado = 'rechazada'::text))) WITH CHECK (((( SELECT auth.uid() AS uid) = user_id) AND (estado = 'pendiente'::text)));
 
 
 --
 -- Name: solicitudes_cuenta sc_update_super; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY sc_update_super ON public.solicitudes_cuenta FOR UPDATE USING ((( SELECT perfiles.rol
+CREATE POLICY sc_update_super ON public.solicitudes_cuenta FOR UPDATE TO authenticated USING ((( SELECT perfiles.rol
    FROM public.perfiles
-  WHERE (perfiles.user_id = auth.uid())) = 'superadmin'::text));
+  WHERE (perfiles.user_id = ( SELECT auth.uid() AS uid))) = 'superadmin'::text));
 
 
 --
 -- Name: operadores sel_operadores; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY sel_operadores ON public.operadores FOR SELECT USING (((propietario_id = auth.uid()) OR public.is_superadmin()));
+CREATE POLICY sel_operadores ON public.operadores FOR SELECT TO authenticated USING (((propietario_id = ( SELECT auth.uid() AS uid)) OR ( SELECT public.is_superadmin() AS is_superadmin)));
 
+
+--
+-- Name: solicitudes_arco; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.solicitudes_arco ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: solicitudes_cuenta; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -4098,45 +6915,72 @@ ALTER TABLE public.solicitudes_cuenta ENABLE ROW LEVEL SECURITY;
 -- Name: pagos superadmin_gestiona_pagos; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY superadmin_gestiona_pagos ON public.pagos USING ((EXISTS ( SELECT 1
+CREATE POLICY superadmin_gestiona_pagos ON public.pagos TO authenticated USING ((EXISTS ( SELECT 1
    FROM public.perfiles
-  WHERE ((perfiles.user_id = auth.uid()) AND (perfiles.rol = 'superadmin'::text)))));
+  WHERE ((perfiles.user_id = ( SELECT auth.uid() AS uid)) AND (perfiles.rol = 'superadmin'::text)))));
 
 
 --
 -- Name: reservaciones_historico superadmin_historico_all; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY superadmin_historico_all ON public.reservaciones_historico USING ((EXISTS ( SELECT 1
+CREATE POLICY superadmin_historico_all ON public.reservaciones_historico TO authenticated USING ((EXISTS ( SELECT 1
    FROM public.perfiles
-  WHERE ((perfiles.user_id = auth.uid()) AND (perfiles.rol = 'superadmin'::text))))) WITH CHECK ((EXISTS ( SELECT 1
+  WHERE ((perfiles.user_id = ( SELECT auth.uid() AS uid)) AND (perfiles.rol = 'superadmin'::text))))) WITH CHECK ((EXISTS ( SELECT 1
    FROM public.perfiles
-  WHERE ((perfiles.user_id = auth.uid()) AND (perfiles.rol = 'superadmin'::text)))));
+  WHERE ((perfiles.user_id = ( SELECT auth.uid() AS uid)) AND (perfiles.rol = 'superadmin'::text)))));
 
 
 --
 -- Name: documentos_fiscales superadmin_ve_todo_docs; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY superadmin_ve_todo_docs ON public.documentos_fiscales USING ((EXISTS ( SELECT 1
+CREATE POLICY superadmin_ve_todo_docs ON public.documentos_fiscales TO authenticated USING ((EXISTS ( SELECT 1
    FROM public.perfiles
-  WHERE ((perfiles.user_id = auth.uid()) AND (perfiles.rol = 'superadmin'::text)))));
+  WHERE ((perfiles.user_id = ( SELECT auth.uid() AS uid)) AND (perfiles.rol = 'superadmin'::text)))));
 
 
 --
 -- Name: operadores upd_operadores; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY upd_operadores ON public.operadores FOR UPDATE TO authenticated USING (((auth.uid() = propietario_id) OR (EXISTS ( SELECT 1
+CREATE POLICY upd_operadores ON public.operadores FOR UPDATE TO authenticated USING (((( SELECT auth.uid() AS uid) = propietario_id) OR (EXISTS ( SELECT 1
    FROM public.perfiles
-  WHERE ((perfiles.user_id = auth.uid()) AND (perfiles.rol = 'superadmin'::text))))));
+  WHERE ((perfiles.user_id = ( SELECT auth.uid() AS uid)) AND (perfiles.rol = 'superadmin'::text))))));
 
 
 --
 -- Name: notificaciones ver_propias; Type: POLICY; Schema: public; Owner: postgres
 --
 
-CREATE POLICY ver_propias ON public.notificaciones FOR SELECT TO authenticated USING ((user_id = auth.uid()));
+CREATE POLICY ver_propias ON public.notificaciones FOR SELECT TO authenticated USING ((user_id = ( SELECT auth.uid() AS uid)));
+
+
+--
+-- Name: vigencias; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.vigencias ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: vigencias vigencias_lee_dueno_o_sa; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY vigencias_lee_dueno_o_sa ON public.vigencias FOR SELECT TO authenticated USING ((public.is_superadmin() OR (public.vigencia_propietario(entidad_tipo, entidad_id) = auth.uid())));
+
+
+--
+-- Name: vigencias vigencias_propone_el_dueno; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY vigencias_propone_el_dueno ON public.vigencias FOR INSERT TO authenticated WITH CHECK (((public.vigencia_propietario(entidad_tipo, entidad_id) = auth.uid()) AND (estado = 'pendiente'::text)));
+
+
+--
+-- Name: vigencias vigencias_sa_todo; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY vigencias_sa_todo ON public.vigencias TO authenticated USING (public.is_superadmin()) WITH CHECK (public.is_superadmin());
 
 
 --
@@ -4159,6 +7003,15 @@ GRANT ALL ON FUNCTION public.abrir_expediente(p_reserva_id uuid, p_etapa text, p
 
 
 --
+-- Name: FUNCTION aceptar_y_cerrar_acuerdo(p_oferta_id uuid, p_via text); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.aceptar_y_cerrar_acuerdo(p_oferta_id uuid, p_via text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.aceptar_y_cerrar_acuerdo(p_oferta_id uuid, p_via text) TO authenticated;
+GRANT ALL ON FUNCTION public.aceptar_y_cerrar_acuerdo(p_oferta_id uuid, p_via text) TO service_role;
+
+
+--
 -- Name: FUNCTION arranque_app(p_plataforma text, p_version text); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -4177,12 +7030,27 @@ GRANT ALL ON FUNCTION public.avanzar_tracking(p_reserva_id uuid) TO service_role
 
 
 --
+-- Name: FUNCTION bloquear_consentimiento(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.bloquear_consentimiento() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION calificar_servicio(p_reserva_id uuid, p_rating integer, p_comentario text); Type: ACL; Schema: public; Owner: postgres
 --
 
 REVOKE ALL ON FUNCTION public.calificar_servicio(p_reserva_id uuid, p_rating integer, p_comentario text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.calificar_servicio(p_reserva_id uuid, p_rating integer, p_comentario text) TO authenticated;
 GRANT ALL ON FUNCTION public.calificar_servicio(p_reserva_id uuid, p_rating integer, p_comentario text) TO service_role;
+
+
+--
+-- Name: FUNCTION cambiar_rol(p_user_id uuid, p_rol text); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.cambiar_rol(p_user_id uuid, p_rol text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.cambiar_rol(p_user_id uuid, p_rol text) TO service_role;
 
 
 --
@@ -4212,6 +7080,33 @@ GRANT ALL ON FUNCTION public.check_reservacion_disponibilidad() TO service_role;
 
 
 --
+-- Name: FUNCTION cola_superadmin(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.cola_superadmin() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.cola_superadmin() TO authenticated;
+GRANT ALL ON FUNCTION public.cola_superadmin() TO service_role;
+
+
+--
+-- Name: FUNCTION datos_carta_porte(p_reserva_id uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.datos_carta_porte(p_reserva_id uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.datos_carta_porte(p_reserva_id uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.datos_carta_porte(p_reserva_id uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION desempeno_empresa(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.desempeno_empresa() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.desempeno_empresa() TO authenticated;
+GRANT ALL ON FUNCTION public.desempeno_empresa() TO service_role;
+
+
+--
 -- Name: FUNCTION enviar_mensaje(p_texto text, p_participantes uuid[], p_reserva_id uuid, p_pedido_id uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -4227,6 +7122,15 @@ GRANT ALL ON FUNCTION public.enviar_mensaje(p_texto text, p_participantes uuid[]
 REVOKE ALL ON FUNCTION public.enviar_oferta(p_pedido_id uuid, p_camion_id text, p_precio numeric, p_operador_id text, p_operador_nombre text, p_mensaje text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.enviar_oferta(p_pedido_id uuid, p_camion_id text, p_precio numeric, p_operador_id text, p_operador_nombre text, p_mensaje text) TO authenticated;
 GRANT ALL ON FUNCTION public.enviar_oferta(p_pedido_id uuid, p_camion_id text, p_precio numeric, p_operador_id text, p_operador_nombre text, p_mensaje text) TO service_role;
+
+
+--
+-- Name: FUNCTION es_mi_pedido(p_pedido_id uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.es_mi_pedido(p_pedido_id uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.es_mi_pedido(p_pedido_id uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.es_mi_pedido(p_pedido_id uuid) TO service_role;
 
 
 --
@@ -4255,11 +7159,18 @@ GRANT ALL ON FUNCTION public.fn_notificar_nuevo_mensaje() TO service_role;
 
 
 --
+-- Name: FUNCTION guard_camion_config_vehicular(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.guard_camion_config_vehicular() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.guard_camion_config_vehicular() TO service_role;
+
+
+--
 -- Name: FUNCTION guard_expediente_documento(); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.guard_expediente_documento() TO anon;
-GRANT ALL ON FUNCTION public.guard_expediente_documento() TO authenticated;
+REVOKE ALL ON FUNCTION public.guard_expediente_documento() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.guard_expediente_documento() TO service_role;
 
 
@@ -4267,35 +7178,63 @@ GRANT ALL ON FUNCTION public.guard_expediente_documento() TO service_role;
 -- Name: FUNCTION guard_expediente_update(); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.guard_expediente_update() TO anon;
-GRANT ALL ON FUNCTION public.guard_expediente_update() TO authenticated;
+REVOKE ALL ON FUNCTION public.guard_expediente_update() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.guard_expediente_update() TO service_role;
+
+
+--
+-- Name: FUNCTION guard_fleet_resource_insert(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.guard_fleet_resource_insert() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.guard_fleet_resource_insert() TO service_role;
 
 
 --
 -- Name: FUNCTION guard_fleet_resource_update(); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.guard_fleet_resource_update() TO anon;
-GRANT ALL ON FUNCTION public.guard_fleet_resource_update() TO authenticated;
+REVOKE ALL ON FUNCTION public.guard_fleet_resource_update() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.guard_fleet_resource_update() TO service_role;
+
+
+--
+-- Name: FUNCTION guard_mensaje_texto(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.guard_mensaje_texto() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.guard_mensaje_texto() TO service_role;
+
+
+--
+-- Name: FUNCTION guard_oferta_insert(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.guard_oferta_insert() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.guard_oferta_insert() TO service_role;
 
 
 --
 -- Name: FUNCTION guard_oferta_update(); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.guard_oferta_update() TO anon;
-GRANT ALL ON FUNCTION public.guard_oferta_update() TO authenticated;
+REVOKE ALL ON FUNCTION public.guard_oferta_update() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.guard_oferta_update() TO service_role;
+
+
+--
+-- Name: FUNCTION guard_operador_delete(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.guard_operador_delete() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.guard_operador_delete() TO service_role;
 
 
 --
 -- Name: FUNCTION guard_operador_hazmat(); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.guard_operador_hazmat() TO anon;
-GRANT ALL ON FUNCTION public.guard_operador_hazmat() TO authenticated;
+REVOKE ALL ON FUNCTION public.guard_operador_hazmat() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.guard_operador_hazmat() TO service_role;
 
 
@@ -4303,27 +7242,65 @@ GRANT ALL ON FUNCTION public.guard_operador_hazmat() TO service_role;
 -- Name: FUNCTION guard_pedido_update(); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.guard_pedido_update() TO anon;
-GRANT ALL ON FUNCTION public.guard_pedido_update() TO authenticated;
+REVOKE ALL ON FUNCTION public.guard_pedido_update() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.guard_pedido_update() TO service_role;
+
+
+--
+-- Name: FUNCTION guard_perfil_insert(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.guard_perfil_insert() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.guard_perfil_insert() TO service_role;
 
 
 --
 -- Name: FUNCTION guard_perfil_self_update(); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.guard_perfil_self_update() TO anon;
-GRANT ALL ON FUNCTION public.guard_perfil_self_update() TO authenticated;
+REVOKE ALL ON FUNCTION public.guard_perfil_self_update() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.guard_perfil_self_update() TO service_role;
+
+
+--
+-- Name: FUNCTION guard_reservacion_insert(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.guard_reservacion_insert() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.guard_reservacion_insert() TO service_role;
 
 
 --
 -- Name: FUNCTION guard_reservacion_update(); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.guard_reservacion_update() TO anon;
-GRANT ALL ON FUNCTION public.guard_reservacion_update() TO authenticated;
+REVOKE ALL ON FUNCTION public.guard_reservacion_update() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.guard_reservacion_update() TO service_role;
+
+
+--
+-- Name: FUNCTION guard_unidad_existe(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.guard_unidad_existe() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.guard_unidad_existe() TO service_role;
+
+
+--
+-- Name: FUNCTION guard_vigencia_update(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.guard_vigencia_update() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.guard_vigencia_update() TO service_role;
+
+
+--
+-- Name: FUNCTION ids_superadmins(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.ids_superadmins() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.ids_superadmins() TO authenticated;
+GRANT ALL ON FUNCTION public.ids_superadmins() TO service_role;
 
 
 --
@@ -4339,8 +7316,7 @@ GRANT ALL ON FUNCTION public.is_superadmin() TO service_role;
 -- Name: FUNCTION limitar_plantillas(); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.limitar_plantillas() TO anon;
-GRANT ALL ON FUNCTION public.limitar_plantillas() TO authenticated;
+REVOKE ALL ON FUNCTION public.limitar_plantillas() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.limitar_plantillas() TO service_role;
 
 
@@ -4391,6 +7367,7 @@ GRANT ALL ON FUNCTION public.notificar_respuesta_oferta() TO service_role;
 
 REVOKE ALL ON FUNCTION public.notificar_superadmins(p_tipo text, p_titulo text, p_mensaje text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.notificar_superadmins(p_tipo text, p_titulo text, p_mensaje text) TO service_role;
+GRANT ALL ON FUNCTION public.notificar_superadmins(p_tipo text, p_titulo text, p_mensaje text) TO authenticated;
 
 
 --
@@ -4403,12 +7380,29 @@ GRANT ALL ON FUNCTION public.participa_en_expediente(exp_id uuid) TO service_rol
 
 
 --
+-- Name: FUNCTION pedidos_disponibles_para_mi(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.pedidos_disponibles_para_mi() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.pedidos_disponibles_para_mi() TO authenticated;
+GRANT ALL ON FUNCTION public.pedidos_disponibles_para_mi() TO service_role;
+
+
+--
 -- Name: FUNCTION puede_notificar(p_target uuid); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.puede_notificar(p_target uuid) TO anon;
+REVOKE ALL ON FUNCTION public.puede_notificar(p_target uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.puede_notificar(p_target uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.puede_notificar(p_target uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION purgar_notificaciones_leidas(p_dias integer, p_tope integer); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.purgar_notificaciones_leidas(p_dias integer, p_tope integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.purgar_notificaciones_leidas(p_dias integer, p_tope integer) TO service_role;
 
 
 --
@@ -4439,6 +7433,15 @@ GRANT ALL ON FUNCTION public.registrar_evidencias(p_reserva_id uuid, p_paths tex
 
 
 --
+-- Name: FUNCTION reporte_kpis(p_desde date, p_hasta date); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.reporte_kpis(p_desde date, p_hasta date) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.reporte_kpis(p_desde date, p_hasta date) TO authenticated;
+GRANT ALL ON FUNCTION public.reporte_kpis(p_desde date, p_hasta date) TO service_role;
+
+
+--
 -- Name: FUNCTION responder_contraoferta(p_oferta_id uuid, p_accion text); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -4457,6 +7460,22 @@ GRANT ALL ON FUNCTION public.responder_oferta(p_oferta_id uuid, p_accion text, p
 
 
 --
+-- Name: FUNCTION set_updated_at(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.set_updated_at() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.set_updated_at() TO service_role;
+
+
+--
+-- Name: FUNCTION sincronizar_estados_pedidos(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.sincronizar_estados_pedidos() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.sincronizar_estados_pedidos() TO service_role;
+
+
+--
 -- Name: FUNCTION solicitar_cancelacion(p_reserva_id uuid, p_motivo text, p_detalle text); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -4469,8 +7488,7 @@ GRANT ALL ON FUNCTION public.solicitar_cancelacion(p_reserva_id uuid, p_motivo t
 -- Name: FUNCTION sync_datos_pago(); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.sync_datos_pago() TO anon;
-GRANT ALL ON FUNCTION public.sync_datos_pago() TO authenticated;
+REVOKE ALL ON FUNCTION public.sync_datos_pago() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.sync_datos_pago() TO service_role;
 
 
@@ -4502,55 +7520,115 @@ GRANT ALL ON FUNCTION public.version_al_menos(p_version text, p_minima text) TO 
 
 
 --
+-- Name: FUNCTION vigencia_propietario(p_tipo text, p_id text); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.vigencia_propietario(p_tipo text, p_id text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.vigencia_propietario(p_tipo text, p_id text) TO authenticated;
+GRANT ALL ON FUNCTION public.vigencia_propietario(p_tipo text, p_id text) TO service_role;
+
+
+--
+-- Name: FUNCTION vigencia_vence_el(p_tipo text, p_fecha date); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.vigencia_vence_el(p_tipo text, p_fecha date) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.vigencia_vence_el(p_tipo text, p_fecha date) TO authenticated;
+GRANT ALL ON FUNCTION public.vigencia_vence_el(p_tipo text, p_fecha date) TO service_role;
+
+
+--
+-- Name: FUNCTION vigencias_espejo(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.vigencias_espejo() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.vigencias_espejo() TO service_role;
+
+
+--
+-- Name: FUNCTION vigencias_tipo_coincide(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.vigencias_tipo_coincide() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.vigencias_tipo_coincide() TO service_role;
+
+
+--
 -- Name: TABLE app_config; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.app_config TO anon;
-GRANT ALL ON TABLE public.app_config TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.app_config TO authenticated;
 GRANT ALL ON TABLE public.app_config TO service_role;
+GRANT SELECT ON TABLE public.app_config TO anon;
 
 
 --
 -- Name: TABLE calificaciones; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.calificaciones TO anon;
-GRANT ALL ON TABLE public.calificaciones TO authenticated;
+GRANT SELECT,DELETE,MAINTAIN,UPDATE ON TABLE public.calificaciones TO authenticated;
 GRANT ALL ON TABLE public.calificaciones TO service_role;
+
+
+--
+-- Name: TABLE calificaciones_resumen; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT ON TABLE public.calificaciones_resumen TO authenticated;
 
 
 --
 -- Name: TABLE camiones; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.camiones TO anon;
-GRANT ALL ON TABLE public.camiones TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.camiones TO authenticated;
 GRANT ALL ON TABLE public.camiones TO service_role;
+
+
+--
+-- Name: TABLE camiones_publico; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE ON TABLE public.camiones_publico TO service_role;
+GRANT SELECT ON TABLE public.camiones_publico TO authenticated;
 
 
 --
 -- Name: TABLE catalogos; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.catalogos TO anon;
-GRANT ALL ON TABLE public.catalogos TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.catalogos TO authenticated;
 GRANT ALL ON TABLE public.catalogos TO service_role;
+
+
+--
+-- Name: TABLE consentimientos; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.consentimientos TO authenticated;
+GRANT ALL ON TABLE public.consentimientos TO service_role;
 
 
 --
 -- Name: TABLE custodios; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.custodios TO anon;
-GRANT ALL ON TABLE public.custodios TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.custodios TO authenticated;
 GRANT ALL ON TABLE public.custodios TO service_role;
+
+
+--
+-- Name: TABLE custodios_publico; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE ON TABLE public.custodios_publico TO service_role;
+GRANT SELECT ON TABLE public.custodios_publico TO authenticated;
 
 
 --
 -- Name: SEQUENCE custodios_seq; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON SEQUENCE public.custodios_seq TO anon;
 GRANT ALL ON SEQUENCE public.custodios_seq TO authenticated;
 GRANT ALL ON SEQUENCE public.custodios_seq TO service_role;
 
@@ -4559,8 +7637,7 @@ GRANT ALL ON SEQUENCE public.custodios_seq TO service_role;
 -- Name: TABLE documentos_catalogo; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.documentos_catalogo TO anon;
-GRANT ALL ON TABLE public.documentos_catalogo TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.documentos_catalogo TO authenticated;
 GRANT ALL ON TABLE public.documentos_catalogo TO service_role;
 
 
@@ -4568,17 +7645,39 @@ GRANT ALL ON TABLE public.documentos_catalogo TO service_role;
 -- Name: TABLE documentos_fiscales; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.documentos_fiscales TO anon;
-GRANT ALL ON TABLE public.documentos_fiscales TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.documentos_fiscales TO authenticated;
 GRANT ALL ON TABLE public.documentos_fiscales TO service_role;
+
+
+--
+-- Name: TABLE perfiles; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.perfiles TO authenticated;
+GRANT ALL ON TABLE public.perfiles TO service_role;
+
+
+--
+-- Name: TABLE vigencias; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.vigencias TO authenticated;
+GRANT ALL ON TABLE public.vigencias TO service_role;
+
+
+--
+-- Name: TABLE empresas_publico; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT ON TABLE public.empresas_publico TO authenticated;
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE ON TABLE public.empresas_publico TO service_role;
 
 
 --
 -- Name: TABLE expediente_documentos; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.expediente_documentos TO anon;
-GRANT ALL ON TABLE public.expediente_documentos TO authenticated;
+GRANT SELECT,MAINTAIN,UPDATE ON TABLE public.expediente_documentos TO authenticated;
 GRANT ALL ON TABLE public.expediente_documentos TO service_role;
 
 
@@ -4586,8 +7685,7 @@ GRANT ALL ON TABLE public.expediente_documentos TO service_role;
 -- Name: TABLE expedientes; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.expedientes TO anon;
-GRANT ALL ON TABLE public.expedientes TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.expedientes TO authenticated;
 GRANT ALL ON TABLE public.expedientes TO service_role;
 
 
@@ -4595,17 +7693,23 @@ GRANT ALL ON TABLE public.expedientes TO service_role;
 -- Name: TABLE lavados; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.lavados TO anon;
-GRANT ALL ON TABLE public.lavados TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.lavados TO authenticated;
 GRANT ALL ON TABLE public.lavados TO service_role;
+
+
+--
+-- Name: TABLE lavados_publico; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE ON TABLE public.lavados_publico TO service_role;
+GRANT SELECT ON TABLE public.lavados_publico TO authenticated;
 
 
 --
 -- Name: TABLE mensajes; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.mensajes TO anon;
-GRANT ALL ON TABLE public.mensajes TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.mensajes TO authenticated;
 GRANT ALL ON TABLE public.mensajes TO service_role;
 
 
@@ -4613,8 +7717,7 @@ GRANT ALL ON TABLE public.mensajes TO service_role;
 -- Name: TABLE notificaciones; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.notificaciones TO anon;
-GRANT ALL ON TABLE public.notificaciones TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.notificaciones TO authenticated;
 GRANT ALL ON TABLE public.notificaciones TO service_role;
 
 
@@ -4622,8 +7725,7 @@ GRANT ALL ON TABLE public.notificaciones TO service_role;
 -- Name: TABLE ofertas; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.ofertas TO anon;
-GRANT ALL ON TABLE public.ofertas TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.ofertas TO authenticated;
 GRANT ALL ON TABLE public.ofertas TO service_role;
 
 
@@ -4631,8 +7733,7 @@ GRANT ALL ON TABLE public.ofertas TO service_role;
 -- Name: TABLE operadores; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.operadores TO anon;
-GRANT ALL ON TABLE public.operadores TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.operadores TO authenticated;
 GRANT ALL ON TABLE public.operadores TO service_role;
 
 
@@ -4640,8 +7741,7 @@ GRANT ALL ON TABLE public.operadores TO service_role;
 -- Name: TABLE pagos; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.pagos TO anon;
-GRANT ALL ON TABLE public.pagos TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.pagos TO authenticated;
 GRANT ALL ON TABLE public.pagos TO service_role;
 
 
@@ -4649,16 +7749,22 @@ GRANT ALL ON TABLE public.pagos TO service_role;
 -- Name: TABLE patios; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.patios TO anon;
-GRANT ALL ON TABLE public.patios TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.patios TO authenticated;
 GRANT ALL ON TABLE public.patios TO service_role;
+
+
+--
+-- Name: TABLE patios_publico; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE ON TABLE public.patios_publico TO service_role;
+GRANT SELECT ON TABLE public.patios_publico TO authenticated;
 
 
 --
 -- Name: SEQUENCE patios_seq; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON SEQUENCE public.patios_seq TO anon;
 GRANT ALL ON SEQUENCE public.patios_seq TO authenticated;
 GRANT ALL ON SEQUENCE public.patios_seq TO service_role;
 
@@ -4667,26 +7773,22 @@ GRANT ALL ON SEQUENCE public.patios_seq TO service_role;
 -- Name: TABLE pedidos; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.pedidos TO anon;
-GRANT ALL ON TABLE public.pedidos TO authenticated;
+GRANT SELECT,INSERT,MAINTAIN,UPDATE ON TABLE public.pedidos TO authenticated;
 GRANT ALL ON TABLE public.pedidos TO service_role;
 
 
 --
--- Name: TABLE perfiles; Type: ACL; Schema: public; Owner: postgres
+-- Name: TABLE perfiles_roles_interno; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.perfiles TO anon;
-GRANT ALL ON TABLE public.perfiles TO authenticated;
-GRANT ALL ON TABLE public.perfiles TO service_role;
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE ON TABLE public.perfiles_roles_interno TO service_role;
 
 
 --
 -- Name: TABLE plantillas_pedido; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.plantillas_pedido TO anon;
-GRANT ALL ON TABLE public.plantillas_pedido TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.plantillas_pedido TO authenticated;
 GRANT ALL ON TABLE public.plantillas_pedido TO service_role;
 
 
@@ -4694,8 +7796,7 @@ GRANT ALL ON TABLE public.plantillas_pedido TO service_role;
 -- Name: TABLE reservaciones; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.reservaciones TO anon;
-GRANT ALL ON TABLE public.reservaciones TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.reservaciones TO authenticated;
 GRANT ALL ON TABLE public.reservaciones TO service_role;
 
 
@@ -4703,18 +7804,32 @@ GRANT ALL ON TABLE public.reservaciones TO service_role;
 -- Name: TABLE reservaciones_historico; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.reservaciones_historico TO anon;
-GRANT ALL ON TABLE public.reservaciones_historico TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.reservaciones_historico TO authenticated;
 GRANT ALL ON TABLE public.reservaciones_historico TO service_role;
+
+
+--
+-- Name: TABLE solicitudes_arco; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.solicitudes_arco TO authenticated;
+GRANT ALL ON TABLE public.solicitudes_arco TO service_role;
 
 
 --
 -- Name: TABLE solicitudes_cuenta; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.solicitudes_cuenta TO anon;
-GRANT ALL ON TABLE public.solicitudes_cuenta TO authenticated;
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.solicitudes_cuenta TO authenticated;
 GRANT ALL ON TABLE public.solicitudes_cuenta TO service_role;
+
+
+--
+-- Name: TABLE vigencias_caducidad; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE ON TABLE public.vigencias_caducidad TO authenticated;
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE ON TABLE public.vigencias_caducidad TO service_role;
 
 
 --
@@ -4762,7 +7877,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON F
 --
 
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO postgres;
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO authenticated;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO service_role;
 
@@ -4781,5 +7895,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qWlui5QX5pF87wBomBlViJXnU2Q9VXko7kfvQrYh4g8tcCWGYhIXVjXbTFxbUqk
+\unrestrict 8UghRke3saIdb6uKGy2FhOmo7GLKq1CxKited51DknCXdAr2qyd9UmLYnFGkvk7
 
