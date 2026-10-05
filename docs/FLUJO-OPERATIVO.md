@@ -379,10 +379,11 @@ Desde `20260915120000_los_seguros_se_acreditan_no_se_declaran`:
   una renovación o cambiar el interruptor de correos— fallaba con
   `VIGENCIA_ACREDITADA`. Desde `S-02` el espejo solo escribe el documento que
   cambió.
-- **Las rutas de los tres documentos no están protegidas** (`S-12`, abierto): una
-  empresa sin acreditar que escriba `doc_seguro_rc` se crea una fila `vigente` en
-  `vigencias`, sin fecha. No pinta distintivo (la vista mira la fecha), pero sí
-  aparece en el panel del superadmin.
+- **Las rutas de los tres documentos acreditados** (`doc_permiso_sct`, `doc_seguro_rc`,
+  `doc_seguro_carga`) **también las protegen los dos guards**, al actualizar y al dar de
+  alta, desde `S-12` (`20261005120000`; en pruebas desde el 05/10). Hasta entonces una
+  empresa sin acreditar que escribía una de ellas se creaba una fila `vigente` en
+  `vigencias`, sin fecha. Solo las escribe `aprobarDocsEmpresa()`, como superadmin.
 - **El booleano dice que hay documento aprobado. Que esté vigente lo dice la
   fecha**, que cambia sola con el calendario y por eso no cabe en un booleano.
 
