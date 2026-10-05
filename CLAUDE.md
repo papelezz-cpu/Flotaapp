@@ -315,6 +315,10 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
     │   └── enviar-notificacion/ # Email notifications
     ├── migrations/         # 93 SQL migrations — the source of truth for schema, RLS,
     │                       #   guard triggers and the business RPCs
+    ├── esquema/            # The PLAN: production's full schema (public + storage), buckets and
+    │                       #   reference catalogs, no personal data. The ONLY way to rebuild the
+    │                       #   database (replaying migrations from scratch fails). Regenerate with
+    │                       #   volcar-esquema.sh after every promotion that changes the schema (S-10)
     ├── aplicadas.tsv       # Migration ledger: which .sql ran against which project,
     │                       #   when, and the sha256 of the file at that moment. Written
     │                       #   automatically by the two aplicar-a-* scripts; committed.
@@ -417,7 +421,7 @@ Any user-controlled value interpolated into `onclick="...'${...}'..."` MUST use 
 | `unidades` | ❌ private | First path segment must be `auth.uid()`. Read with `createSignedUrl(path, 3600)` — **never `getPublicUrl`** |
 | `registros` | ❌ private | Same path rule; signed URLs only. Also holds `perfiles.fotos_verificacion` |
 | `documentos-viaje` | ❌ private | Trip file documents (`expediente_documentos.archivo_path`); signed URLs only |
-| `operadores` | ✅ public | `getPublicUrl` OK. List/upload/delete only in your own `<uid>/` folder or as superadmin (S-01, `20261001120000`: in pruebas and production since 2026-10-01) — it holds drivers' medical and toxicology exams. Public URLs still open for anyone holding one (S-01 step 2, pending) |
+| `operadores` | ✅ public | `getPublicUrl` OK. List/upload/delete only in your own `<uid>/` folder or as superadmin (S-01, `20261001120000`: in pruebas and production since 2026-10-01) — it holds drivers' medical and toxicology exams. S-01 step 2 in progress: the web now stores **paths** and always opens with a **signed URL** (`attrsDoc`/`imgDoc` in `js/utils.js`), accepting old public URLs too; the bucket goes private once stored URLs are converted. Never use `getPublicUrl` on this bucket again |
 | `custodios` | ✅ public | `getPublicUrl` OK. Upload and list only in your own `<uid>/` folder or as superadmin (S-04, `20261005130000`: in pruebas and production since 2026-10-05; before that the bucket had no policies and every upload was rejected. The `admin.js` error toast reaches production with the next `dev` → `main` merge) |
 | `documentos-empresa` | ✅ public | `getPublicUrl` OK. Upload and list only in your own `<uid>/` folder or as superadmin (S-05, `20261002120000`: in pruebas and production since 2026-10-02) — it holds companies' insurance policies and SCT permits |
 

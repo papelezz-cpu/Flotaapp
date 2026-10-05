@@ -202,7 +202,7 @@ async function renderAprobaciones() {
   if (docsEmpresa?.length) {
     html += `<div class="apr-bloque-title">📋 Documentos de empresa <span class="apr-count">${docsEmpresa.length}</span></div>`;
     const _verDoc = (url, label) => url
-      ? `<a href="${url}" target="_blank" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:2px 4px 2px 0">📄 ${label}</a>`
+      ? `<a href="#" ${attrsDoc('documentos-empresa', url)} class="btn-edit" style="font-size:0.75rem;display:inline-block;margin:2px 4px 2px 0">📄 ${label}</a>`
       : `<span style="font-size:0.75rem;color:var(--text-muted)">Sin archivo</span>`;
     const _fecha = (act, pend) => {
       const linea = `${fmtFecha(pend) || '—'}`;
@@ -776,7 +776,7 @@ function _renderOperadorCard(op) {
   const hoy    = new Date().toISOString().slice(0, 10);
   const nombre = [op.nombre, op.primer_apellido, op.segundo_apellido].filter(Boolean).join(' ');
   const foto   = op.foto_operador
-    ? `<img src="${esc(op.foto_operador)}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--border)" alt="foto">`
+    ? imgDoc('operadores', op.foto_operador, 'style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--border)" alt="foto"')
     : `<div style="width:48px;height:48px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700">${(op.nombre||'?')[0].toUpperCase()}</div>`;
 
 
@@ -816,11 +816,11 @@ function _renderOperadorCard(op) {
         </div>
         <div class="apr-op-section-title" style="margin-top:10px">Documentos</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
-          ${op.foto_operador         ? `<a href="${esc(op.foto_operador)}"              target="_blank" class="btn-edit" style="font-size:0.75rem">📷 Foto operador</a>`       : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin foto operador</span>'}
-          ${op.foto_licencia         ? `<a href="${esc(op.foto_licencia)}"              target="_blank" class="btn-edit" style="font-size:0.75rem">🪪 Licencia</a>`            : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin foto licencia</span>'}
-          ${op.doc_examen_medico     ? `<a href="${esc(op.doc_examen_medico)}"          target="_blank" class="btn-edit" style="font-size:0.75rem">📄 Examen médico</a>`       : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin examen médico</span>'}
-          ${op.doc_examen_toxicologico ? `<a href="${esc(op.doc_examen_toxicologico)}"  target="_blank" class="btn-edit" style="font-size:0.75rem">🧪 Examen toxicológico</a>` : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin examen tox.</span>'}
-          ${op.doc_carta_antecedentes  ? `<a href="${esc(op.doc_carta_antecedentes)}"   target="_blank" class="btn-edit" style="font-size:0.75rem">📋 No antecedentes</a>`     : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin carta antecedentes</span>'}
+          ${op.foto_operador         ? `<a href="#" ${attrsDoc('operadores', op.foto_operador)} class="btn-edit" style="font-size:0.75rem">📷 Foto operador</a>`       : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin foto operador</span>'}
+          ${op.foto_licencia         ? `<a href="#" ${attrsDoc('operadores', op.foto_licencia)} class="btn-edit" style="font-size:0.75rem">🪪 Licencia</a>`            : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin foto licencia</span>'}
+          ${op.doc_examen_medico     ? `<a href="#" ${attrsDoc('operadores', op.doc_examen_medico)} class="btn-edit" style="font-size:0.75rem">📄 Examen médico</a>`       : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin examen médico</span>'}
+          ${op.doc_examen_toxicologico ? `<a href="#" ${attrsDoc('operadores', op.doc_examen_toxicologico)} class="btn-edit" style="font-size:0.75rem">🧪 Examen toxicológico</a>` : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin examen tox.</span>'}
+          ${op.doc_carta_antecedentes  ? `<a href="#" ${attrsDoc('operadores', op.doc_carta_antecedentes)} class="btn-edit" style="font-size:0.75rem">📋 No antecedentes</a>`     : '<span style="font-size:0.72rem;color:var(--danger)">⚠ Sin carta antecedentes</span>'}
         </div>
       </div>
       <div class="apr-actions">
@@ -855,7 +855,7 @@ function _renderCustodioCard(c) {
           ${c.porta_arma ? _aprFilaVigencia('custodio', c.id, 'licencia_sedena', 'Licencia SEDENA', hoy) : ''}
           ${c.porta_arma && c.num_licencia_sedena ? `<div class="apr-op-row"><span>Núm. lic. SEDENA</span><strong>${esc(c.num_licencia_sedena)}</strong></div>` : ''}
         </div>
-        ${c.doc_licencia_sedena ? `<a href="${esc(c.doc_licencia_sedena)}" target="_blank" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Licencia SEDENA</a>` : ''}
+        ${c.doc_licencia_sedena ? `<a href="#" ${attrsDoc('custodios', c.doc_licencia_sedena)} class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Licencia SEDENA</a>` : ''}
         ${(c.certificaciones||[]).length ? `<div class="apr-op-section-title">Certificaciones</div><div class="pedido-chips">${(c.certificaciones||[]).map(x=>`<span class="cargo-chip">${esc(x)}</span>`).join('')}</div>` : ''}
       </div>
       <div class="apr-actions">
@@ -888,7 +888,7 @@ function _renderPatioCard(p) {
           ${_aprFilaVigencia('patio', p.id, 'permiso_patio', 'Permiso operativo', hoy)}
         </div>
         ${p.doc_permiso ? (p.doc_permiso.startsWith('http')
-          ? `<a href="${esc(p.doc_permiso)}" target="_blank" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Ver permiso operativo</a>`
+          ? `<a href="#" ${attrsDoc('unidades', p.doc_permiso)} class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Ver permiso operativo</a>`
           : `<a href="#" onclick="verArchivoPublico('${escJs(p.doc_permiso)}');return false" class="btn-edit" style="font-size:0.75rem;display:inline-block;margin-top:6px">📄 Ver permiso operativo</a>`) : ''}
       </div>
       <div class="apr-actions">

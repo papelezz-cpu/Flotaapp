@@ -224,3 +224,87 @@ function setupAllGeoInputs() {
     setupGeoAutocomplete(el);
   });
 }
+
+// ── DOCUMENTOS DE BUCKETS QUE PASAN A PRIVADOS (S-01, paso 2) ──────────────
+//
+// `operadores`, `documentos-empresa` y `custodios` son hoy buckets públicos,
+// y sus columnas guardaban la URL pública: quien la tuviera abría el
+// documento —examen toxicológico, antecedentes, pólizas— sin sesión y para
+// siempre. El plan (docs/AUDITORIA.md, S-01 paso 2) es: A) la web abre
+// siempre con URL firmada y guarda rutas; B) convertir las URL guardadas en
+// rutas; C) volver privados los buckets. Esto es la etapa A, y por eso
+// acepta las dos formas: la URL vieja y la ruta.
+//
+// Uso:  `<a href="#" ${attrsDoc('operadores', op.doc_examen_medico)} class="…">…</a>`
+//       `<button ${attrsDoc('operadores', op.foto_licencia)} class="…">…</button>`
+//       `${imgDoc('operadores', op.foto_operador, 'class="op-foto-img" alt="foto"')}`
+// El clic y la carga de la imagen los resuelven los manejadores de abajo: no
+// hay que llamar nada después de pintar.
+
+const _DOC_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+// URL pública de este bucket → ruta; ruta → ruta; cualquier otra URL → null.
+function rutaDocStorage(bucket, valor) {
+  if (!valor) return null;
+  const marca = `/storage/v1/object/public/${bucket}/`;
+  const i = valor.indexOf(marca);
+  if (i >= 0) return decodeURIComponent(valor.slice(i + marca.length).split('?')[0]);
+  if (/^https?:\/\//i.test(valor)) return null;
+  return valor;
+}
+
+async function urlDocFirmada(bucket, valor, segundos = 3600) {
+  const ruta = rutaDocStorage(bucket, valor);
+  if (!ruta) return null;
+  const { data, error } = await sb.storage.from(bucket).createSignedUrl(ruta, segundos);
+  if (error) { console.error('No se pudo firmar', bucket, ruta, error); return null; }
+  return data?.signedUrl || null;
+}
+
+// La pestaña se abre DENTRO del clic, antes de esperar a la firma: abrirla
+// después de un await hace que el navegador la bloquee como ventana emergente.
+async function abrirDocStorage(bucket, valor) {
+  const w = window.open('', '_blank');
+  if (w) w.opener = null;
+  const url = await urlDocFirmada(bucket, valor);
+  if (!url) {
+    if (w) w.close();
+    showToast('No se pudo abrir el documento. Si el problema sigue, avisa a soporte.', 'error');
+    return;
+  }
+  if (w) w.location.href = url; else window.open(url, '_blank', 'noopener');
+}
+
+function attrsDoc(bucket, valor) {
+  return `data-doc-bucket="${esc(bucket)}" data-doc="${esc(valor)}"`;
+}
+
+function imgDoc(bucket, valor, attrs = '') {
+  return `<img src="${_DOC_PIXEL}" data-doc-img="1" data-doc-bucket="${esc(bucket)}" data-doc="${esc(valor)}" ${attrs}>`;
+}
+
+function _firmarImgsDoc(raiz) {
+  const imgs = raiz.matches?.('img[data-doc-img]') ? [raiz] : [...(raiz.querySelectorAll?.('img[data-doc-img]') || [])];
+  imgs.filter(img => !img.dataset.docFirmada).forEach(async img => {
+    img.dataset.docFirmada = '1';
+    const url = await urlDocFirmada(img.dataset.docBucket, img.dataset.doc);
+    if (url) img.src = url;
+  });
+}
+
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-doc][data-doc-bucket]:not(img)');
+  if (!a) return;
+  e.preventDefault();
+  abrirDocStorage(a.dataset.docBucket, a.dataset.doc);
+});
+
+(function _vigilarImgsDoc() {
+  const arrancar = () => {
+    _firmarImgsDoc(document.body);
+    new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
+      if (n.nodeType === 1) _firmarImgsDoc(n);
+    }))).observe(document.body, { childList: true, subtree: true });
+  };
+  if (document.body) arrancar(); else document.addEventListener('DOMContentLoaded', arrancar);
+})();

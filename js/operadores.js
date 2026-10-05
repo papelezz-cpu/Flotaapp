@@ -28,7 +28,7 @@ function _pintarDocsExistentes() {
     const nota = document.createElement('div');
     nota.id = `${input}-actual`;
     nota.style.cssText = 'font-size:0.72rem;color:var(--text-muted);margin-top:4px';
-    nota.innerHTML = `✓ Ya cargado — <a href="${esc(url)}" target="_blank" rel="noopener">ver el actual</a>. Elige un archivo solo si quieres reemplazarlo.`;
+    nota.innerHTML = `✓ Ya cargado — <a href="#" ${attrsDoc('operadores', url)}>ver el actual</a>. Elige un archivo solo si quieres reemplazarlo.`;
     el.insertAdjacentElement('afterend', nota);
   });
 }
@@ -117,7 +117,7 @@ async function renderAdminOperadores() {
 function _operadorCardHTML(op, venceLicencia) {
   const nombre = [op.nombre, op.primer_apellido, op.segundo_apellido].filter(Boolean).join(' ');
   const foto   = op.foto_operador
-    ? `<img src="${esc(op.foto_operador)}" class="op-foto-img" alt="foto operador">`
+    ? imgDoc('operadores', op.foto_operador, 'class="op-foto-img" alt="foto operador"')
     : `<div class="op-foto-inicial">${(op.nombre || '?')[0].toUpperCase()}</div>`;
 
   const licInfo = op.num_licencia
@@ -131,7 +131,7 @@ function _operadorCardHTML(op, venceLicencia) {
     vence = `<div class="op-sub" style="color:${color}">Licencia vence: ${fmtFecha(venceLicencia)}${aviso}</div>`;
   }
   const licFotoBtn = op.foto_licencia
-    ? `<button class="btn-edit" style="font-size:0.7rem" onclick="window.open('${escJs(op.foto_licencia)}','_blank')">🪪 Ver licencia</button>`
+    ? `<button class="btn-edit" style="font-size:0.7rem" ${attrsDoc('operadores', op.foto_licencia)}>🪪 Ver licencia</button>`
     : '';
 
   return `
@@ -153,7 +153,7 @@ function _operadorCardHTML(op, venceLicencia) {
 function _operadorCardRechazadoHTML(op) {
   const nombre = [op.nombre, op.primer_apellido, op.segundo_apellido].filter(Boolean).join(' ');
   const foto   = op.foto_operador
-    ? `<img src="${esc(op.foto_operador)}" class="op-foto-img" alt="foto">`
+    ? imgDoc('operadores', op.foto_operador, 'class="op-foto-img" alt="foto"')
     : `<div class="op-foto-inicial" style="background:var(--danger)">${(op.nombre||'?')[0].toUpperCase()}</div>`;
 
   const camposHtml = op.rechazo_campos?.length
@@ -390,15 +390,17 @@ async function agregarOperador() {
   // payload, así que dejarlas en null cuando no se elige archivo BORRA la ruta
   // guardada. Por eso cada una cae de vuelta a _operadorEditDocs, que en un
   // alta nueva está vacío y no estorba.
+  // S-01 paso 2: se guarda la RUTA, no la URL pública, y un fallo de subida
+  // detiene el guardado con aviso. Antes se ignoraba: la foto nueva no
+  // quedaba y nadie se enteraba (regla 24).
+  let _errSubidaOp = null;
   let fotoOperadorUrl = _operadorEditDocs.foto_operador || null;
   if (fotoFile) {
     const ext  = fotoFile.name.split('.').pop();
     const path = `${propietarioId}/${id}/foto_${Date.now()}.${ext}`;
     const { error: upErr } = await sb.storage.from('operadores').upload(path, fotoFile, { upsert: true });
-    if (!upErr) {
-      const { data: pub } = sb.storage.from('operadores').getPublicUrl(path);
-      fotoOperadorUrl = pub?.publicUrl || null;
-    }
+    if (upErr) _errSubidaOp = `la foto del operador (${upErr.message})`;
+    else fotoOperadorUrl = path;
   }
 
   // Subir foto de licencia
@@ -407,10 +409,8 @@ async function agregarOperador() {
     const ext  = licFile.name.split('.').pop();
     const path = `${propietarioId}/${id}/licencia_${Date.now()}.${ext}`;
     const { error: upErr } = await sb.storage.from('operadores').upload(path, licFile, { upsert: true });
-    if (!upErr) {
-      const { data: pub } = sb.storage.from('operadores').getPublicUrl(path);
-      fotoLicenciaUrl = pub?.publicUrl || null;
-    }
+    if (upErr) _errSubidaOp = _errSubidaOp || `la foto de la licencia (${upErr.message})`;
+    else fotoLicenciaUrl = path;
   }
 
   // Subir documentos legales opcionales
@@ -422,8 +422,10 @@ async function agregarOperador() {
     const ext  = file.name.split('.').pop();
     const path = `${propietarioId}/${id}/${nombre}_${Date.now()}.${ext}`;
     const { error } = await sb.storage.from('operadores').upload(path, file, { upsert: true });
-    if (error) return null;
-    return sb.storage.from('operadores').getPublicUrl(path).data?.publicUrl || null;
+    // Antes devolvía null, y ese null BORRABA la ruta que ya estaba guardada
+    // al editar. Ahora se conserva la anterior y el guardado se detiene.
+    if (error) { _errSubidaOp = _errSubidaOp || `un documento (${error.message})`; return _operadorEditDocs[colActual] || null; }
+    return path;
   };
   const [docMedUrl, docToxUrl, docAntUrl, docPeligrosaUrl] = await Promise.all([
     _uploadOpDoc('op-doc-medico',       'examen_medico',      'doc_examen_medico'),
@@ -431,6 +433,10 @@ async function agregarOperador() {
     _uploadOpDoc('op-doc-antecedentes', 'antecedentes',       'doc_carta_antecedentes'),
     _uploadOpDoc('op-doc-peligrosa',    'licencia_peligrosa', 'doc_licencia_peligrosa'),
   ]);
+  if (_errSubidaOp) {
+    showToast(`No se pudo subir ${_errSubidaOp}. No se guardó nada; inténtalo de nuevo.`, 'error');
+    restore(); return;
+  }
 
   const payload = {
     id,
