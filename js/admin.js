@@ -289,7 +289,7 @@ async function renderPerfilEmpresa() {
     const el = document.getElementById(elId);
     if (!el) return;
     el.innerHTML = url
-      ? `<a href="${url}" target="_blank" style="font-size:0.78rem;color:var(--primary)">📄 Ver ${label}${hayPend ? ' (pendiente)' : ''}</a>`
+      ? `<a href="#" ${attrsDoc('documentos-empresa', url)} style="font-size:0.78rem;color:var(--primary)">📄 Ver ${label}${hayPend ? ' (pendiente)' : ''}</a>`
       : '';
   };
   _docLink('pe-doc-sct-actual',   hayPend ? p.doc_permiso_sct_pendiente  : p.doc_permiso_sct,   'permiso SCT');
@@ -369,7 +369,8 @@ async function solicitarActualizacionDocs() {
       _errorSubida = `No se pudo subir ${label}: ${error.message}`;
       return null;
     }
-    return sb.storage.from('documentos-empresa').getPublicUrl(path).data?.publicUrl || null;
+    // S-01 paso 2: se guarda la ruta; se abre con URL firmada (attrsDoc).
+    return path;
   };
 
   const [docSct, docRc, docCarga] = await Promise.all([
@@ -754,7 +755,9 @@ function eliminarMiRecurso(tabla, id) {
   }
   if (tabla === 'operadores') {
     const { data: op } = await sb.from('operadores').select('foto_operador, foto_licencia').eq('id', id).single();
-    const files = [op?.foto_operador, op?.foto_licencia].filter(Boolean);
+    // Storage espera RUTAS: con las URL guardadas antes, este remove nunca
+    // borró nada. rutaDocStorage acepta las dos formas.
+    const files = [op?.foto_operador, op?.foto_licencia].map(v => rutaDocStorage('operadores', v)).filter(Boolean);
     if (files.length) await sb.storage.from('operadores').remove(files);
   }
   const { error } = await sb.from(tabla).delete().eq('id', id).eq('propietario_id', currentUser.id);
@@ -1244,7 +1247,7 @@ async function agregarCustodio() {
       // S-04: antes se ignoraba el error y el custodio se guardaba sin su
       // licencia SEDENA, sin que nadie se enterara (regla 24).
       if (upErr) { console.error(upErr); _done(); showToast('No se pudo subir la licencia SEDENA: ' + upErr.message, 'error'); return; }
-      docSedenaUrl = sb.storage.from('custodios').getPublicUrl(path).data?.publicUrl || null;
+      docSedenaUrl = path;   // S-01 paso 2: ruta, no URL pública
     }
   }
 
@@ -1301,7 +1304,7 @@ async function editarCustodio(id) {
   const docEl = document.getElementById('ec-doc-sedena-actual');
   if (docEl) {
     docEl.innerHTML = c.doc_licencia_sedena
-      ? `<a href="${c.doc_licencia_sedena}" target="_blank" style="font-size:0.78rem;color:var(--primary)">📄 Ver licencia SEDENA actual</a>`
+      ? `<a href="#" ${attrsDoc('custodios', c.doc_licencia_sedena)} style="font-size:0.78rem;color:var(--primary)">📄 Ver licencia SEDENA actual</a>`
       : '';
   }
 
@@ -1329,7 +1332,7 @@ async function guardarEdicionCustodio() {
       // S-04: antes se ignoraba el error y la edición se guardaba sin el
       // documento nuevo, sin avisar (regla 24).
       if (upErr) { console.error(upErr); showToast('No se pudo subir la licencia SEDENA: ' + upErr.message, 'error'); return; }
-      docSedenaUrl = sb.storage.from('custodios').getPublicUrl(path).data?.publicUrl || null;
+      docSedenaUrl = path;   // S-01 paso 2: ruta, no URL pública
     }
   }
 
