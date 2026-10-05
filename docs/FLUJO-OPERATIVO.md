@@ -381,7 +381,7 @@ Desde `20260915120000_los_seguros_se_acreditan_no_se_declaran`:
   cambió.
 - **Las rutas de los tres documentos acreditados** (`doc_permiso_sct`, `doc_seguro_rc`,
   `doc_seguro_carga`) **también las protegen los dos guards**, al actualizar y al dar de
-  alta, desde `S-12` (`20261005120000`; en pruebas desde el 05/10). Hasta entonces una
+  alta, desde `S-12` (`20261005120000`; en pruebas y en producción desde el 05/10). Hasta entonces una
   empresa sin acreditar que escribía una de ellas se creaba una fila `vigente` en
   `vigencias`, sin fecha. Solo las escribe `aprobarDocsEmpresa()`, como superadmin.
 - **El booleano dice que hay documento aprobado. Que esté vigente lo dice la
