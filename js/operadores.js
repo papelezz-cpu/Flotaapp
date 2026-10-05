@@ -534,7 +534,11 @@ async function agregarOperador() {
 
 function eliminarOperador(id) {
   showConfirm(`¿Eliminar al operador ${id}? Esta acción no se puede deshacer.`, async () => {
-    await sb.from('operadores').delete().eq('id', id);
+    // S-08: antes no se miraba el error y se anunciaba «eliminado» aunque la
+    // base lo rechazara. Desde 20261005150000 la base rechaza borrar al chofer
+    // de un servicio en curso, y el motivo tiene que llegarle a la empresa.
+    const { error } = await sb.from('operadores').delete().eq('id', id);
+    if (error) { console.error(error); showToast(error.message, 'error'); return; }
     document.getElementById(`opcard-${id}`)?.remove();
     _poblarSelectOperadores();
     _prefillNumTrabajador();
