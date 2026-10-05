@@ -421,9 +421,9 @@ Any user-controlled value interpolated into `onclick="...'${...}'..."` MUST use 
 | `unidades` | ❌ private | First path segment must be `auth.uid()`. Read with `createSignedUrl(path, 3600)` — **never `getPublicUrl`** |
 | `registros` | ❌ private | Same path rule; signed URLs only. Also holds `perfiles.fotos_verificacion` |
 | `documentos-viaje` | ❌ private | Trip file documents (`expediente_documentos.archivo_path`); signed URLs only |
-| `operadores` | ✅ public | `getPublicUrl` OK. List/upload/delete only in your own `<uid>/` folder or as superadmin (S-01, `20261001120000`: in pruebas and production since 2026-10-01) — it holds drivers' medical and toxicology exams. S-01 step 2 in progress: the web now stores **paths** and always opens with a **signed URL** (`attrsDoc`/`imgDoc` in `js/utils.js`), accepting old public URLs too; the bucket goes private once stored URLs are converted. Never use `getPublicUrl` on this bucket again |
-| `custodios` | ✅ public | `getPublicUrl` OK. Upload and list only in your own `<uid>/` folder or as superadmin (S-04, `20261005130000`: in pruebas and production since 2026-10-05; before that the bucket had no policies and every upload was rejected. The `admin.js` error toast reaches production with the next `dev` → `main` merge) |
-| `documentos-empresa` | ✅ public | `getPublicUrl` OK. Upload and list only in your own `<uid>/` folder or as superadmin (S-05, `20261002120000`: in pruebas and production since 2026-10-02) — it holds companies' insurance policies and SCT permits |
+| `operadores` | ❌ private (since 2026-10-05, S-01) | Same rules as `unidades`: store **paths**, open only with a **signed URL** via `attrsDoc`/`imgDoc`/`urlDocFirmada` in `js/utils.js` — **never `getPublicUrl`**. List/upload/delete only in your own `<uid>/` folder or as superadmin. Holds drivers' medical and toxicology exams and background checks |
+| `custodios` | ❌ private (since 2026-10-05, S-01) | Paths + signed URLs only (`attrsDoc`). Upload/list own `<uid>/` folder or superadmin (S-04) |
+| `documentos-empresa` | ❌ private (since 2026-10-05, S-01) | Paths + signed URLs only (`attrsDoc`). Upload/list own `<uid>/` folder or superadmin (S-05). Holds companies' insurance policies and SCT permits |
 
 Store **paths** in the DB for private buckets and sign at display time (see `abrirEvidencias` in `reservaciones.js`).
 
@@ -564,7 +564,7 @@ Deploy with `mcp__supabase__deploy_edge_function` (or `supabase functions deploy
 
 - **Don't use `localStorage` for auth** — `sessionStorage` is intentional (theme preference is the only `localStorage` use).
 - **Don't add `type="module"` to script tags** — the codebase is classic globals; modules would break cross-file calls.
-- **Don't use `getPublicUrl` on `unidades`/`registros`** — private buckets, signed URLs only.
+- **Don't use `getPublicUrl` on any document bucket** — `unidades`, `registros`, `documentos-viaje`, `operadores`, `documentos-empresa` and `custodios` are all private; store paths and sign at display time.
 - **Don't interpolate user data into `onclick` with plain `esc()`** — use `escJs()`.
 - **Don't gate roles with inline styles** — use the `<body>` class system.
 - **Don't use `alert()`/`confirm()`** — `showToast()` / `showConfirm()`.
