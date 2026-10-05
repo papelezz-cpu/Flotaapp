@@ -1241,7 +1241,10 @@ async function agregarCustodio() {
       const ext  = sedenaFile.name.split('.').pop();
       const path = `${propietarioId}/${id}/licencia_sedena_${Date.now()}.${ext}`;
       const { error: upErr } = await sb.storage.from('custodios').upload(path, sedenaFile, { upsert: true });
-      if (!upErr) docSedenaUrl = sb.storage.from('custodios').getPublicUrl(path).data?.publicUrl || null;
+      // S-04: antes se ignoraba el error y el custodio se guardaba sin su
+      // licencia SEDENA, sin que nadie se enterara (regla 24).
+      if (upErr) { console.error(upErr); _done(); showToast('No se pudo subir la licencia SEDENA: ' + upErr.message, 'error'); return; }
+      docSedenaUrl = sb.storage.from('custodios').getPublicUrl(path).data?.publicUrl || null;
     }
   }
 
@@ -1323,7 +1326,10 @@ async function guardarEdicionCustodio() {
       const ext  = sedenaFile.name.split('.').pop();
       const path = `${currentUser.id}/${id}/licencia_sedena_${Date.now()}.${ext}`;
       const { error: upErr } = await sb.storage.from('custodios').upload(path, sedenaFile, { upsert: true });
-      if (!upErr) docSedenaUrl = sb.storage.from('custodios').getPublicUrl(path).data?.publicUrl || null;
+      // S-04: antes se ignoraba el error y la edición se guardaba sin el
+      // documento nuevo, sin avisar (regla 24).
+      if (upErr) { console.error(upErr); showToast('No se pudo subir la licencia SEDENA: ' + upErr.message, 'error'); return; }
+      docSedenaUrl = sb.storage.from('custodios').getPublicUrl(path).data?.publicUrl || null;
     }
   }
 

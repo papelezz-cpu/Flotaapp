@@ -372,6 +372,18 @@ Desde `20260915120000_los_seguros_se_acreditan_no_se_declaran`:
   —sin pasar por ninguna pantalla— para ponerse una vigencia inventada. Bloquea
   las seis columnas reales; las `*_pendiente` siguen abiertas, que es donde la
   empresa propone.
+  ⚠ **Para la empresa ya acreditada esto no fue cierto entre el 23/09 y `S-02`**
+  (`20261001130000`, en pruebas y en producción desde el 01/10): el espejo
+  de `vigencias` reescribía en cada UPDATE sus documentos vigentes, el guard de
+  `vigencias` lo rechazaba, y cualquier guardado de su perfil —también proponer
+  una renovación o cambiar el interruptor de correos— fallaba con
+  `VIGENCIA_ACREDITADA`. Desde `S-02` el espejo solo escribe el documento que
+  cambió.
+- **Las rutas de los tres documentos acreditados** (`doc_permiso_sct`, `doc_seguro_rc`,
+  `doc_seguro_carga`) **también las protegen los dos guards**, al actualizar y al dar de
+  alta, desde `S-12` (`20261005120000`; en pruebas y en producción desde el 05/10). Hasta entonces una
+  empresa sin acreditar que escribía una de ellas se creaba una fila `vigente` en
+  `vigencias`, sin fecha. Solo las escribe `aprobarDocsEmpresa()`, como superadmin.
 - **El booleano dice que hay documento aprobado. Que esté vigente lo dice la
   fecha**, que cambia sola con el calendario y por eso no cabe en un booleano.
 
@@ -820,6 +832,40 @@ Reglas encadenadas:
 - Al llegar al último paso, `avanzar_tracking` **abre solo el expediente de
   vacíos** si el pedido era `Contenerizada` o traía contenedores.
 
+### Carta Porte de referencia
+
+Botón **«🧾 Carta Porte»** en la reservación, para el cliente y para la
+empresa ([js/reservaciones.js](../js/reservaciones.js), vistas de cliente y de
+dueño; se llamaba «Carta Porte (ref.)» hasta el 2026-10-01, `reservaciones.js?v=68`).
+El aviso de que no tiene validez fiscal queda en el `title` del botón y en el
+propio documento.
+
+> **El cliente ya no tiene «📄 Carta Porte / documentos»** (decisión del usuario,
+> 2026-10-01): era la subida libre de documentos de carga (`abrirDocumentosCarga`,
+> columna `reservaciones.documentos_carga`, bucket `unidades`). Se retiró solo su
+> botón. La empresa conserva **«📄 Documentos del cliente»**, que muestra lo ya
+> subido, y la petición por aviso (`documentos_carga_solicitados`, también desde
+> Android); el cliente ya no tiene desde la web dónde atenderla. Arma en el navegador un documento imprimible con remitente,
+transportista, chofer, unidad, mercancía y domicilios de origen y destino
+([js/cartaporte.js](../js/cartaporte.js)). **No es el Complemento Carta Porte
+del CFDI**: no se timbra, no pasa por un PAC y no vale ante el SAT; lo que falte
+sale como «—», nunca inventado.
+
+Los datos salen de una sola RPC, `datos_carta_porte(p_reserva_id)`
+(`SECURITY DEFINER`, `20260930120000`): la puede llamar **el cliente, el
+propietario o un superadmin de esa reservación**, en cualquier estado; a
+cualquier otro le responde `No autorizado`. Tiene que ser `DEFINER` porque la
+empresa no puede leer el perfil del cliente por RLS.
+
+Desde `S-03` (`20261001140000`, en pruebas y en producción desde el 01/10)
+devuelve **solo las columnas que imprime el documento**: 6 de la
+reservación, 17 del pedido, 8 de cada perfil (nombre o razón social, RFC,
+domicilio fiscal; la empresa además su permiso SCT), 3 del camión (placas,
+permiso SCT de la unidad, configuración vehicular SAT) y 6 del chofer (nombre,
+RFC, CURP, licencia). Antes entregaba las filas completas a la contraparte. **Si
+la Carta Porte necesita un campo nuevo, se añade en la RPC y en
+`js/cartaporte.js` a la vez**: si falta en la RPC no da error, sale «—».
+
 ---
 
 ## 7. Expedientes documentales
@@ -930,8 +976,16 @@ diferencia decide quién paga qué**. Si la empresa siguiera avanzando el
 seguimiento, el superadmin ya no sabría dónde estaba.
 
 Cancelar un acuerdo cerrado **invalida las ofertas** y marca
-`permite_reoferta = false` para quien canceló: no puede volver a ofertar en esa
-misma solicitud.
+`permite_reoferta = false` en **la oferta aceptada**, es decir, a **la empresa del
+acuerdo**, cancele quien cancele: no puede volver a ofertar en esa misma
+solicitud (`cancelar_reservacion()`, `20260901140000`; la lista la oculta en
+`pedidos.js:578` y, desde Q-18, la base rechaza la oferta nueva). Las demás
+empresas sí pueden volver a ofertar en la solicitud reabierta.
+⚠ Este párrafo decía «para quien canceló» hasta el 2026-10-02, y el comentario de
+la función dice lo mismo, pero el código no mira quién cancela: si cancela el
+cliente, o el superadmin al resolver una cancelación pedida, la empresa queda
+bloqueada igual aunque no haya sido ella. **Pendiente de decisión del usuario**
+si eso es lo que se quiere.
 
 ---
 
@@ -1100,7 +1154,7 @@ escribir una fila; los guards deciden *qué transición* es legal para ti.
 
 | Guard | Sobre | Qué impide |
 |---|---|---|
-| `guard_pedido_update` | pedidos | Que un cliente marque `acordado`/`rechazado` sin pasar por el flujo; que un admin toque un pedido fuera de negociación |
+| `guard_pedido_update` | pedidos | Que un cliente marque `acordado`/`rechazado` sin pasar por el flujo; que un admin toque un pedido fuera de negociación; y, desde `A2-C3` (`20261001150000`, en pruebas y en producción desde el 02/10), que un admin cambie en una solicitud ajena algo que no sea `estado` (y `oferta_pendiente_id`, solo a `NULL`, al cancelar) — origen, destino, precio, fechas o datos del cliente |
 | *(sin guard: REVOKE)* | pedidos | **Escrito en `dev` el 2026-09-30 (`20260930130000`, Q-06); en producción y en pruebas desde el 30/09 (producción 20:32 UTC).** Nadie borra pedidos: ni el cliente (que podía hacerlo por la API en cualquier estado) ni el superadmin (el botón «🗑 Eliminar» se retira). Lo que se quiera quitar de la vista se archivará, con una función aparte que todavía no existe |
 | `guard_oferta_update` | ofertas | Aceptar con documentos de empresa vencidos; **aceptar un pedido de carga peligrosa con una unidad sin permiso hazmat vigente**; aceptar la oferta propia salvo respondiendo una contraoferta |
 | `guard_oferta_insert` | ofertas | **En producción y en pruebas desde el 2026-09-29** (`20260929160000`, Q-04; producción 23:48 UTC). Que una empresa cree una oferta que no sea `enviada` en ronda 1 sin contraoferta, con caducidad de más de 2 días, o sobre un pedido que no esté `abierto`/`en_negociacion`. La ronda 2 y la contraoferta siguen siendo UPDATE sobre la oferta existente. **Y, desde `20260930183000` (Q-18; en producción y en pruebas desde el 30/09), que vuelva a ofertar una empresa a la que el cliente rechazó sin permitir otra oferta** (`permite_reoferta = false`); hasta ahora solo lo impedía la interfaz |

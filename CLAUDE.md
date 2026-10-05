@@ -62,6 +62,10 @@ State it plainly, then wait:
 
 Then apply **only** what they approved, and nothing adjacent.
 
+### The only way into production's database
+
+**Migrations reach production ONLY through `supabase/aplicar-a-produccion.sh`** — never the Supabase dashboard's SQL Editor, never `psql` by hand, never `execute_sql`/`apply_migration` from an MCP or agent session, never `supabase db push` (the CLI on this machine is linked to production). That script is what writes the ledger, runs the collision warning, refuses a non-production connection string and demands the typed `APLICAR A PRODUCCION`. **Why this is a rule (Q-20, 2026-10-01):** seven migrations — Carta Porte and Q-14, which drops and re-creates a constraint — reached production between 2026-09-30 ~23:30 and 2026-10-01 ~17:00 UTC with **no record of who, when or how**; one of them in a version that is not in the repository. Nothing broke, by luck. Read-only queries in the SQL Editor are fine; any write is not.
+
 ### Order, when promotion is approved
 
 Migrations first, code after — the deployed code may depend on schema or grants that must already exist. Pushing code first breaks production for the length of that gap.
@@ -413,9 +417,9 @@ Any user-controlled value interpolated into `onclick="...'${...}'..."` MUST use 
 | `unidades` | ❌ private | First path segment must be `auth.uid()`. Read with `createSignedUrl(path, 3600)` — **never `getPublicUrl`** |
 | `registros` | ❌ private | Same path rule; signed URLs only. Also holds `perfiles.fotos_verificacion` |
 | `documentos-viaje` | ❌ private | Trip file documents (`expediente_documentos.archivo_path`); signed URLs only |
-| `operadores` | ✅ public | `getPublicUrl` OK |
-| `custodios` | ✅ public | `getPublicUrl` OK |
-| `documentos-empresa` | ✅ public | `getPublicUrl` OK |
+| `operadores` | ✅ public | `getPublicUrl` OK. List/upload/delete only in your own `<uid>/` folder or as superadmin (S-01, `20261001120000`: in pruebas and production since 2026-10-01) — it holds drivers' medical and toxicology exams. Public URLs still open for anyone holding one (S-01 step 2, pending) |
+| `custodios` | ✅ public | `getPublicUrl` OK. Upload and list only in your own `<uid>/` folder or as superadmin (S-04, `20261005130000`: in pruebas and production since 2026-10-05; before that the bucket had no policies and every upload was rejected. The `admin.js` error toast reaches production with the next `dev` → `main` merge) |
+| `documentos-empresa` | ✅ public | `getPublicUrl` OK. Upload and list only in your own `<uid>/` folder or as superadmin (S-05, `20261002120000`: in pruebas and production since 2026-10-02) — it holds companies' insurance policies and SCT permits |
 
 Store **paths** in the DB for private buckets and sign at display time (see `abrirEvidencias` in `reservaciones.js`).
 

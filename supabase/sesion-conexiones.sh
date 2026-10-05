@@ -90,5 +90,15 @@ _portgo_sesion() {
   echo "  Se borran al cerrar la ventana, o con: source supabase/sesion-conexiones.sh olvidar"
 }
 
+# Alias fuera mientras dura esto. En una ventana de Git Bash (mintty),
+# /etc/profile.d/aliases.sh convierte `psql` en `winpty psql.exe`, y como este
+# archivo se carga con `source`, ese alias se aplica dentro de lib-conexion.sh:
+# la prueba de conexion `salida=$(psql …)` falla con «stdout is not a tty».
+# Medido el 2026-10-01. Con `bash guion.sh` no pasa porque un guion no hereda
+# los alias. Se apagan solo durante esta llamada y se dejan como estaban.
+if shopt -q expand_aliases; then _portgo_alias=1; else _portgo_alias=0; fi
+shopt -u expand_aliases
 _portgo_sesion "$@"
+[ "$_portgo_alias" = 1 ] && shopt -s expand_aliases
 unset -f _portgo_sesion
+unset _portgo_alias
