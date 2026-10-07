@@ -122,8 +122,9 @@ correcciones al 07/10 y la nota recalculada (76 → 79; seguridad 58 → 80):
 Porque cada uno midió con instrumentos distintos y **lo que puede afirmar depende de eso**:
 
 - La **2ª** es la única con medición de ejecución real de la base. Su hallazgo dominante
-  —Realtime consumiendo el 84 % del CPU— **no se ha podido volver a medir desde entonces**,
-  y ninguna auditoría posterior tiene con qué contradecirlo ni confirmarlo.
+  —Realtime consumiendo el 84 % del CPU— no se volvió a medir hasta el **07/10**: la
+  proporción se confirma (84,5 %), pero en valor absoluto es **medio minuto de trabajo de la
+  base al día** (§6.1).
 - La **3ª**, la **4ª**, la **5ª** y la **6ª** leyeron un volcado. Son fuertes en esquema,
   permisos, RLS, triggers y funciones, y **no pueden decir nada sobre coste real**. Todas lo
   declaran. La 6ª, además, ejercitó cada hallazgo por API en pruebas con sesiones de cliente,
@@ -310,14 +311,14 @@ pentest lo puso en cuarto lugar de su orden de corrección con la nota de que
 | `S-10` 🟡 | **La base no se podía reconstruir desde el repositorio.** El plano `supabase/esquema/` (último commit 31/08) tenía 22 de 27 tablas: faltaban `vigencias`, `avisos_superadmin`, `consentimientos_bloqueados` y lo de septiembre. Y rehacer la base aplicando las migraciones desde cero tampoco sirve: varias abortan en una base sin datos («no hay ningún perfil para la prueba»), y 14 tablas centrales nacieron en el panel, no en una migración. 6ª auditoría | **Cerrado el 05/10.** Plano regenerado con `volcar-esquema.sh` (solo lectura de producción): 27 tablas, 8 vistas, 73 políticas, 51 triggers, 15 políticas de Storage, catálogos sin datos personales. **Reconstruido en banco local desde cero:** carga sin errores y coincide con producción en tablas, vistas, funciones (66), índices, FK, CHECK, políticas y triggers. **Regla:** el plano se regenera después de cada promoción a producción que cambie el esquema, y el camino para reconstruir la base es el plano, no reaplicar las migraciones |
 | `S-11` 🟢 | **Dos FK de `vigencias` hacia `auth.users` sin índice** (`revisado_por`, `subido_por`, `ON DELETE SET NULL`): borrar una cuenta recorría `vigencias` entera por cada usuario, la misma ruta (con plazo ARCO) por la que `H-13` indexó otras ocho. La tabla nació después de `H-13`. El informe contaba una tercera, `(cat_clave, tipo_documento)` → `catalogos`: **al medirla se decidió no indexarla**, porque solo la recorre editar un valor del catálogo `vigencia_tipo` (raro, manual) y `vigencias` se escribe en cada guardado por el espejo. 6ª auditoría | **Cerrado el 02/10.** `20261002140000_vigencias_indices_de_fk.sql`: dos índices parciales `WHERE … IS NOT NULL`, como el precedente (hoy 0 de 60 filas con valor: nacen vacíos). El plan del `SET NULL` usa el índice (banco local); un sabotaje sin uno de los dos lo aborta. Pruebas y **producción el 02/10 21:57 UTC** (con permiso explícito). El aviso de zona con `20260922130000_vigencias_espejo_tolerante` es el falso positivo de `PROMOCION-PENDIENTE.md` |
 | `S-12` 🟢 | **Una empresa sin acreditar se crea sola una fila `vigente` en `vigencias`.** `guard_perfil_self_update` protege las fechas de los tres documentos pero no sus rutas (`doc_permiso_sct`, `doc_seguro_rc`, `doc_seguro_carga`); al escribir una, el espejo inserta la fila como `vigente` y el guard de `vigencias` solo vigila UPDATE. Ejecutado en banco local el 01/10. Sin fecha, `empresas_publico` no pinta ningún distintivo (medido); sí aparece en `vigencias_caducidad`, que lee el panel del superadmin | **Cerrado el 05/10.** Pruebas el 05/10, probada en pantalla en `dev` (envío de documentos, aprobación del superadmin y registro de cuenta, sin errores) y **en producción el 05/10 17:48 UTC** (con permiso explícito; el bloque pasó allí). `20261005120000_rutas_de_documentos_acreditados_protegidas.sql`: las tres rutas se suman a las fechas en **los dos** guards — `guard_perfil_self_update` y también `guard_perfil_insert` (Q-01), que tenía el mismo hueco al alta. Solo las escribe `aprobarDocsEmpresa()`, como superadmin (inventario del 05/10); sin datos autodeclarados que limpiar. Inserción sobre las definiciones vivas; 6 casos (las altas con el método de Q-01: uid inventado, FK frente a P0001); contra los guards sin cambiar, la comprobación caza los casos 1, 2 y 5. **Medido por API en pruebas:** escribir `doc_seguro_rc` en el perfil propio da HTTP 400 «No autorizado» |
-| `H-17` | 1 índice redundante (`idx_pedidos_fecha`) y 2 incoherentes con sus hermanos (`idx_lavados_pendientes`, `idx_operadores_pendientes`) | **Abierto.** Los tres siguen igual que el 14/09. El `DROP` se condicionó a leer `pg_stat_user_indexes`, que sigue sin leerse; alinear los dos no depende de ese dato |
+| `H-17` | 1 índice redundante (`idx_pedidos_fecha`) y 2 incoherentes con sus hermanos (`idx_lavados_pendientes`, `idx_operadores_pendientes`) | **Abierto, ya con el dato** (07/10, `idx_scan` desde el 30/03): `idx_pedidos_fecha` 16 lecturas frente a 82 de `idx_pedidos_fecha_id`, que lo cubre; `idx_lavados_pendientes` 0 e `idx_operadores_pendientes` 109. El `DROP` del primero ya no espera a nada más que al sí (Regla #1); alinear los otros dos nunca dependió del dato |
 | `H-18` (mitad) | Dinero con dos tipos: catálogo `numeric(14,2)`, flujo `numeric` sin escala | **Abierto, y estaba dado por cerrado.** Medido: `precio_cliente`, `precio_oferta`, `contra_precio`, `precio_acordado` y `pagos.monto` siguen sin escala. El `CHECK` de `aprobacion_cuenta` sí se puso |
 | `H-14` | Grupo repetitivo `contenedor_1/_2` | **Acotado.** Hay `CHECK` de coherencia; la estructura sigue. Decidido no normalizar: añadiría un `JOIN` a la consulta más caliente para modelar un máximo de dos |
 | `H-15` | 7 columnas sin uso ni datos (vocabulario de Carta Porte) + `reservaciones.telefono` | **Acotado.** Documentadas con `COMMENT`, **ningún `DROP`**. `telefono` sigue leída por la interfaz y nunca escrita |
 | `A3-A5` | El `ALTER DEFAULT PRIVILEGES` de `supabase_admin` | **No aplicable.** Exige ser miembro de ese rol; el rol que aplica migraciones no lo es (`ERROR 42501`). Riesgo aceptado y **vigilado** por `supabase/sondas/exposicion-anon.sql`. Cerrarlo de verdad requiere soporte de Supabase |
 | `R-20` | El libro mayor marca 5 migraciones «editadas tras aplicarse» y 3 no lo fueron: el hash anotado es del mismo archivo con CRLF | **Abierto a propósito.** Arreglarlo exige decidir qué identifica el libro (hash normalizado a LF, o el `blob` de git) e invalida las 26 líneas ya escritas. Es decisión del usuario |
 | `A2-M6` · hueco 1 | Nada marca la unidad `ocupado` al llegar su fecha; el estado es derivado y se mantiene a mano | **Abierto.** No existe trigger sobre `reservaciones` que lo haga |
-| `A2-M11` | Índices sin valor (`idx_pedidos_categoria_carga`, `idx_consentimientos_tipo`) y redundante (`idx_expedientes_reserva`) | **Abierto.** Los tres siguen. Es un `DROP`: Regla #1 |
+| `A2-M11` | Índices sin valor (`idx_pedidos_categoria_carga`, `idx_consentimientos_tipo`) y redundante (`idx_expedientes_reserva`) | **Abierto, ya con el dato** (07/10): `idx_pedidos_categoria_carga` **0** lecturas, `idx_consentimientos_tipo` **1**, `idx_expedientes_reserva` 154 —pero `expedientes_reserva_id_etapa_key` (`UNIQUE (reserva_id, etapa)`) empieza por la misma columna y lo cubre—. Los tres son `DROP`: Regla #1. Beneficio pequeño a este volumen: es orden, no rendimiento |
 | `A2-M13` | IDs de recurso de 32 bits generados en el cliente (~1,2 % de colisión a 10 000 unidades) | **Abierto.** Decidido en la 4ª no migrar las PK de texto a `uuid`: son legibles, se enseñan al usuario y arrastrarían las políticas de Storage |
 | `A2-M14` | Falta el `UNIQUE` de `solicitudes_cuenta.user_id` que el código asume | **Abierto.** Los de `operadores` sí se añadieron |
 | `A2-M10` · `A2-M5` | Las cinco tablas de flota son la misma entidad | **Abierto**, y ya no arrastra lo peor: la parte de «documento con vigencia» se cerró con `H-04` (tabla `vigencias`) |
@@ -333,9 +334,9 @@ pentest lo puso en cuarto lugar de su orden de corrección con la nota de que
 
 - **`A2-C1` · Realtime.** La publicación se corrigió: hoy lleva las seis correctas
   (`camiones`, `custodios`, `lavados`, `patios`, `notificaciones`, `reservaciones`), con
-  `mensajes` y `calificaciones` fuera. **Pero el 84 % del CPU que aquella auditoría midió no
-  se ha vuelto a medir nunca**, y no hay forma de saber desde un volcado si bajó. Es la
-  medición pendiente más grande del proyecto (§6).
+  `mensajes` y `calificaciones` fuera. **Medido el 07/10 (§6.1): corregir la publicación no
+  bajó el coste** —el ritmo diario subió un 19 %—, y **el coste no importa hoy**: unos
+  34 segundos de base al día. Es un riesgo de escala, no un problema presente.
 - **`H-16`.** Su aritmética («800 consultas por solicitud con 200 empresas») era falsa: esos
   eventos no llegan. Si algún día se publican `pedidos`/`ofertas`, el problema vuelve — y el
   impedimento que lo bloqueaba (las cinco escrituras del render) ya no está.
@@ -645,22 +646,54 @@ Esto no es una lista de pendientes menores: es el hueco de método que las seis 
 arrastran, y lo que mantiene abiertos varios hallazgos por falta de dato, no por falta de
 trabajo.
 
-1. **Realtime, desde el 2026-08-28.** Era el hallazgo dominante de la 2ª auditoría —84 % del
-   CPU de la base, 680 007 llamadas al decodificador WAL— y **ninguna auditoría posterior ha
-   podido volver a medirlo**. La publicación se corrigió; si eso bajó el consumo, nadie lo
-   sabe. Es la medición pendiente más grande, y ninguna otra optimización se le acerca en
-   tamaño.
+1. ~~**Realtime, desde el 2026-08-28.**~~ **Medido el 07/10** con `supabase/medir-produccion.sh`
+   (solo lectura; salida en `supabase/espejo/medicion-20261007-2146.txt`, fuera de Git).
+   `pg_stat_statements` acumula desde el **13/04**, así que la cifra de la 2ª y la de hoy son
+   dos fotos del mismo contador, y la diferencia entre ellas es lo que pasó después del 28/08:
+
+   | Decodificador WAL de Realtime | Llamadas | Tiempo | Al día |
+   |---|---:|---:|---:|
+   | 13/04 → 28/08 (2ª auditoría, 137 días) | 680 007 | 3 888 705 ms | 4 964 llamadas · 28,4 s |
+   | 13/04 → 07/10 (acumulado) | 918 852 | 5 238 403 ms | — |
+   | **28/08 → 07/10** (diferencia, 40 días) | 238 845 | 1 349 698 ms | **5 971 llamadas · 33,7 s** |
+
+   Tres conclusiones:
+   - **La proporción se confirma: 84,5 %** del tiempo de la base sigue siendo Realtime.
+   - **Corregir la publicación no lo bajó**; el ritmo diario subió un 19 %. Hipótesis, no
+     medida: el número de llamadas sigue al tiempo con sesiones conectadas (septiembre fue
+     el mes de pruebas, y desde `Q-19` los canales sí se suscriben), no al número de tablas
+     publicadas.
+   - **En valor absoluto es despreciable.** Toda la base hizo 6 300 243 ms de trabajo en
+     177 días: **36 segundos al día**, de los que ~30 son Realtime. El 84 % es el 84 % de casi
+     nada. Lo de la app —`authenticated`, `anon` y `service_role` juntos— es el 0,6 %.
+     El «crítico» de la 2ª era una proporción; como coste presente no lo es. **Sigue siendo
+     el primer riesgo de escala**: el coste crece con sesiones conectadas × cambios
+     publicados, y la RLS se evalúa por suscriptor.
+
+   Lo segundo en tiempo es `SELECT name FROM pg_timezone_names` (6,5 %, 554 ms de media): la
+   recarga del caché de esquema de PostgREST, 736 veces. Es de la plataforma, no de PortGo.
+   Para el siguiente dato **no hace falta reiniciar nada en producción**: volver a correr la
+   sonda dentro de unas semanas y restar los dos archivos da el ritmo limpio del periodo.
 2. **`EXPLAIN` / `EXPLAIN ANALYZE`,** desde la 2ª auditoría. Ninguna de las cuatro siguientes pudo.
-3. **`pg_stat_statements`.** Está instalada (v1.11) y no se usa. Es lo que le faltó a la 4ª
-   auditoría, y sin ella la 5ª y la 6ª tuvieron el mismo hueco. **Encenderla como práctica es una
-   línea de configuración.**
-4. **`pg_stat_user_indexes`.** Sin `idx_scan` no se puede decidir ningún `DROP INDEX`: es
-   exactamente lo que mantiene `H-17` abierto.
+3. ~~**`pg_stat_statements`.**~~ **Leída el 07/10** (§6.1). La consulta más lenta de la app
+   en promedio es `cola_superadmin()`, 36 ms. Ninguna consulta de PortGo aparece entre las 25
+   que más tiempo consumen salvo los dos cron (`expire_stale_offers`, 18 ms, cada hora; y
+   `sincronizar_estados_pedidos`, 17 ms, cada 15 min). Se solapan **a propósito**
+   (lo dice el comentario de `sincronizar_estados_pedidos()`), y no son lo mismo: la regla (a)
+   solo vence ofertas `enviada`; `expire_stale_offers()` vence también las `contra_oferta`.
+   Quitar el cron horario dejaría las contraofertas sin vencer. No se toca.
+4. ~~**`pg_stat_user_indexes`.**~~ **Leído el 07/10.** De 104 índices de `public`, 47 tienen
+   `idx_scan = 0` desde el 30/03. No son 47 sobrantes: 16 son PK o `UNIQUE` (restricciones,
+   no se tocan) y casi todos los demás son índices de apoyo de FK, que solo se leen al borrar
+   el padre —y aquí casi no se borra—; `S-11` ya decidió conservarlos. Lo que sí decide es
+   `H-17` y `A2-M11`, en sus filas de §3.2.
 5. **La concurrencia real.** La carrera de `A3-C2` no se reprodujo: exige dos aceptaciones
    simultáneas de verdad. Lo verificado es que el índice único existe y que la comprobación
    de estado rechaza el segundo intento. El índice es la garantía real, no la prueba.
 6. **Cuántas sesiones concurrentes hay.** Sin ese dato no se puede justificar el umbral de
-   reparto de Realtime, ni el particionado de `notificaciones`, ni el índice trigram.
+   reparto de Realtime, ni el particionado de `notificaciones`, ni el índice trigram. La sonda
+   del 07/10 solo da una foto de ese instante (7 conexiones de 60, ninguna suscripción
+   Realtime viva): no sirve como medida de carga.
 7. ~~**`A2-C3` ejercitado con una sesión de empresa.**~~ **Medido el 01/10**: ejecutado en
    banco local y, tras el arreglo, por API en pruebas con la sesión de empresa. Ver §3.1.
 
@@ -752,7 +785,7 @@ evita contarlos de más y evita «descubrirlos» una quinta vez.
 | Dinero con dos tipos | — | `M12` | — | `H-18` | **Abierto**, dado por cerrado por error |
 | Referencias polimórficas sin FK | — | `C5` | — | `H-06` | Cerrado a medias — ver §3.1 |
 | La máquina de estados en el render | — | `C3`, `A5` | — | `H-16` | Cerrado · 25/09 |
-| Realtime mal configurado | — | `C1` | — | `H-16` | Publicación corregida; **el coste, sin volver a medir** |
+| Realtime mal configurado | — | `C1` | — | `H-16` | Publicación corregida. Coste medido el 07/10: 84,5 %, pero 34 s al día; no bajó con la corrección (§6.1) |
 
 ### 8.2 Dónde leer el detalle de cada id
 
