@@ -270,7 +270,7 @@ guard_pedido_update:  IF es_admin AND OLD.estado IN ('abierto','en_negociacion')
 - Lo barato e intermedio que sigue sin hacerse: renombrar a `recurso_id`, añadir
   `recurso_tipo`, extender `guard_unidad_existe` a `ofertas`, y un `BEFORE DELETE` lógico.
 
-#### `F-04` — Sin CSP, sin `X-Frame-Options`, sin HSTS · **corregido en `dev` el 07/10, sin promover**
+#### ✓ `F-04` — Sin CSP, sin `X-Frame-Options`, sin HSTS · **cerrado el 07/10, en producción**
 
 **Medido el 28/09:** [`vercel.json`](../vercel.json) solo define cabeceras de caché.
 
@@ -296,7 +296,11 @@ Leaflet (script, hoja, icono y teselas), Lucide, REST, el websocket de Realtime,
 Nominatim y la ventana de la Carta Porte (estilo, script y `onclick` en línea). Los dos
 controles negativos —`fetch` a un dominio ajeno y un script de otro paquete de unpkg— se
 bloquean con su violación registrada. **No probado:** las pantallas con sesión iniciada; las
-cubre la prueba en pantalla en `dev` (regla 48). Regla nueva: 44c.
+cubrió la prueba en pantalla en `dev` del usuario con los tres roles: todo funciona.
+
+**En producción el 07/10** (fusión `e380974`, con permiso explícito). Medido con `curl` tras el
+despliegue: las seis cabeceras en `app.html` y `sw.js`, y la CSP servida es idéntica byte a
+byte a la de `vercel.json`. Regla nueva: 44c.
 
 ### 3.2 El resto, por tema
 
@@ -346,7 +350,7 @@ cubre la prueba en pantalla en `dev` (regla 48). Regla nueva: 44c.
 | `A2-M10` · `A2-M5` | Las cinco tablas de flota son la misma entidad | **Abierto**, y ya no arrastra lo peor: la parte de «documento con vigencia» se cerró con `H-04` (tabla `vigencias`) |
 | `A2-B1`,`B2`,`B5`,`B7`,`B10`,`B11` | Columnas muertas · `calificaciones.admin_id CASCADE` (blanqueo de reputación) · dos padres de identidad · tablas sin `ANALYZE` · uuid que parecen FK · columnas derivables | **Abiertos.** Todos 🟢; ninguno verificado de nuevo desde el 28/08 |
 | `F-05` | Pedidos `abierto`/`en_negociacion` exponen correo y contacto del cliente a todas las empresas | **Abierto.** Minimización de datos |
-| `F-06` · `A3-B2` | `Access-Control-Allow-Origin: '*'` en las dos Edge Functions, una con la clave de servicio | **Corregido el 07/10, en pruebas (gestionar-usuario v12, enviar-notificacion v10), sin promover.** `supabase/functions/_shared/cors.ts`: lista de orígenes (producción, el alias de `dev`, `localhost`); sin `Origin` (Android, servidor) se atiende; cualquier otro, 403 antes de ejecutar nada. Las URL sueltas de despliegue de Vercel no entran: un patrón que las admitiera admitiría un proyecto ajeno con ese nombre. Probado: 11 casos en Deno (más un sabotaje que permitía todo, que la prueba detectó) y por HTTP contra pruebas —los tres orígenes legítimos reciben 204 con su origen; uno ajeno y uno imitador, 403— |
+| `F-06` · `A3-B2` | `Access-Control-Allow-Origin: '*'` en las dos Edge Functions, una con la clave de servicio | **Cerrado el 07/10, en producción** (gestionar-usuario v18, enviar-notificacion v30, con permiso explícito; en pruebas v12 y v10). Medido en producción tras desplegar: producción y `dev` reciben 204 con su origen, uno ajeno 403. `supabase/functions/_shared/cors.ts`: lista de orígenes (producción, el alias de `dev`, `localhost`); sin `Origin` (Android, servidor) se atiende; cualquier otro, 403 antes de ejecutar nada. Las URL sueltas de despliegue de Vercel no entran: un patrón que las admitiera admitiría un proyecto ajeno con ese nombre. Probado: 11 casos en Deno (más un sabotaje que permitía todo, que la prueba detectó) y por HTTP contra pruebas —los tres orígenes legítimos reciben 204 con su origen; uno ajeno y uno imitador, 403— |
 | `F-07` | Contraseñas de 8 sin MFA, sin bloqueo de login, sin leaked-password protection | **Abierto por decisión.** La rotación de contraseñas queda **antes del lanzamiento**, no ahora — decisión tomada, no volver a proponerla |
 | `A3-B3`,`B4` | El `catch` final devuelve `String(err)` al cliente · errores sin `Content-Type: application/json` | **Abiertos**, sin verificar de nuevo |
 | huecos 7,8,10,11,12,13 | 5 de las 11 RPC sin usar · `aprobarCuenta()` mira un error de dos · operador sin fecha no editable · dos formularios de camión · el permiso hazmat de la unidad · el alta de flota del móvil apunta a RPC que producción no tiene | **Abiertos y documentados** en [FLUJO-OPERATIVO.md § Huecos conocidos](FLUJO-OPERATIVO.md) |
