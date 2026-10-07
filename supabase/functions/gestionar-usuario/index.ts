@@ -4,17 +4,16 @@
 // commit al que culpar, es de las cosas mas caras de diagnosticar. Estas son
 // las versiones que corrian el 2026-08-21, verificadas en produccion.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3'
+import { conCors } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+// CORS por lista de orígenes, no '*' (F-06): ver _shared/cors.ts.
+const CABECERAS_PERMITIDAS = 'authorization, x-client-info, apikey, content-type'
 
 // Las tres respuestas llevaban 'Content-Type' solo en el camino bueno, asi que
 // los errores llegaban como texto suelto y el cliente los leia a medias.
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
-    status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status, headers: { 'Content-Type': 'application/json' },
   })
 
 // perfiles.rol tiene CHECK, asi que un valor invalido lo rechaza la base — pero
@@ -37,9 +36,7 @@ async function quedanOtrosSuperadmins(
   return (data?.length ?? 0) > 0
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-
+Deno.serve(conCors(CABECERAS_PERMITIDAS, async (req: Request) => {
   try {
     const authHeader = req.headers.get('Authorization') || ''
     if (!authHeader.startsWith('Bearer ')) {
@@ -246,4 +243,4 @@ Deno.serve(async (req: Request) => {
   } catch (e) {
     return json({ error: 'Error interno al gestionar el usuario.' }, 500)
   }
-})
+}))

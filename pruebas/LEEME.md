@@ -106,6 +106,7 @@ SQL, por eso `verificar-paridad.sh` no lo mide y la sonda sí.
 | `06-sonda-escritura-vistas.mjs` | Intenta escribir en las vistas `*_publico` con una sesión normal. Las escrituras están hechas para no tener efecto aunque pasaran: filtros que no casan con ninguna fila. Cierra H-01 | **No.** Lo intenta y espera un 403 |
 | `07-sonda-acreditacion.mjs` | Intenta declararse los seguros y el permiso SCT sin documento aprobado. Cierra H-02 | **No.** Lo intenta y espera que el guard frene |
 | `08-sonda-preguntar.sh` | Que las confirmaciones de `supabase/*.sh` esperen a que escribas, en vez de comerse el salto de línea que deja un pegado multilínea y cancelarse solas. Cierra R-06 | **No.** Ni base de datos ni red |
+| `15-sonda-csp.mjs` | Sirve el repo con las cabeceras de `vercel.json`, abre las cuatro páginas en Chrome sin interfaz y comprueba que la CSP no bloquea nada que la app use y sí bloquea dos controles ajenos. Sale con 1 si falla. Cierra F-04 | **No.** Una lectura anónima que da 401 |
 
 ```bash
 node pruebas/01-diagnostico.mjs             # contra producción (solo lee)

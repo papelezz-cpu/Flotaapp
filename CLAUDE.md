@@ -192,7 +192,24 @@ No después, no en una tarea aparte. Obligan a tocarlos:
 
 ### Por qué existe esta regla
 
-Porque el objetivo de los tres archivos juntos es **que un cambio nuevo no traiga un fallo viejo**. Las cuatro auditorías de este proyecto encontraron 97 hallazgos numerados, y **23 defectos más que ninguna de ellas vio**: aparecieron al arreglar otra cosa. La mitad de esos 23 son un fallo reintroducido, un arreglo peor que el defecto, o una comprobación que no podía fallar. Todos estaban a una lectura de distancia.
+Porque el objetivo de los tres archivos juntos es **que un cambio nuevo no traiga un fallo viejo**. Las cuatro primeras auditorías de este proyecto encontraron 97 hallazgos numerados, y **23 defectos más que ninguna de ellas vio**: aparecieron al arreglar otra cosa. La mitad de esos 23 son un fallo reintroducido, un arreglo peor que el defecto, o una comprobación que no podía fallar. Todos estaban a una lectura de distancia.
+
+---
+
+## 🛑 RULE #6 — LO QUE SE CREA SE AUDITA Y SE PRUEBA AL TERMINARLO
+
+**Toda creación nueva —una migración, una función, una política, un bucket, una pantalla, un botón— y todo cambio a una existente se audita en cuanto está terminado, y se prueba funcionando.** No en la siguiente auditoría: antes de darla por hecha y antes de pedir permiso de promoción (Regla #2). La Regla #5 evita repetir un fallo viejo; esta busca el fallo nuevo.
+
+Al terminar, y por escrito:
+
+1. **Hallazgos** — qué puede fallar: cada camino de error, el `UPDATE` que afecta 0 filas sin error, el valor vacío, la subida que falla a medias, y qué ve **cada rol**, no solo el que lo pidió.
+2. **Problemas de diseño** — si repite algo que ya existe, si deja una relación sin FK o un texto libre donde hay catálogo, si contradice `FLUJO-OPERATIVO.md` o lo que `docs/AUDITORIA.md` §5 dice que no se toca.
+3. **Problemas de seguridad** — para `anon`, cliente, empresa ajena, superadmin y `service_role`: qué puede leer, escribir, listar o borrar. Todo objeto nuevo nace abierto por los privilegios por omisión; el `REVOKE` va en la misma migración.
+4. **Pruebas de funcionamiento** — en la migración, un bloque de verificación que sabe fallar (con sabotaje en el banco local); por API en `portgo-pruebas`, el caso permitido **y** el prohibido con la sesión de cada rol afectado; y en pantalla en `dev`, la lista de pasos con su resultado esperado, incluido el camino que falla. Un cambio solo de texto o estilo se queda en la prueba de pantalla.
+
+El método detallado, con el hallazgo que justifica cada punto, está en [`docs/AUDITORIA.md` §4.9](docs/AUDITORIA.md). **Lo que se encuentre se registra en `docs/AUDITORIA.md` §3.2 antes de corregirlo**, con id propio (sigue la serie: el próximo es `S-14`). Y al usuario se le entrega la lista de lo revisado, las pruebas con su resultado y **lo que no se pudo verificar** — «no encontré nada» sin esa lista no es un resultado.
+
+**Por qué existe (2026-10-07):** casi todo lo que encontraron la 5ª y la 6ª auditoría —altas sin guard (`Q-01`…`Q-04`), documentos de choferes listables y borrables por cualquier cuenta (`S-01`), la Carta Porte entregando filas enteras (`S-03`)— se había construido en las dos semanas anteriores y llevaba ese tiempo en producción esperando a que alguien auditara. Y aun auditando, al corregir salieron seis defectos más que ningún informe vio, uno de ellos (`S-13`) encontrado por el usuario en pantalla. Esta revisión no sustituye a su prueba: reduce lo que le llega.
 
 ---
 
@@ -273,7 +290,7 @@ The app is served from **Vercel**, same project for both branches (repo `papelez
 
 > ⚠️ **`portgo-pruebas` is a byte-identical copy of production, so the DATA cannot tell you which environment you are looking at.** Same rows, same names, same totals, same screens. On 2026-09-18 that made a test on the wrong build indistinguishable from a test on the right one across every number on two screens — the only cell that differed was a tie-break in a five-row ranking, and it was noticed by luck. **When something must be verified on `dev`, verify which build and which project the page actually loaded before reading a single figure**, with the console snippet in step 6. A screenshot proves nothing about which environment produced it.
 
-`vercel.json` sets the static config: `cleanUrls:false` (keeps the `.html` URLs), no-cache for `sw.js`, revalidate for HTML/manifest.
+`vercel.json` sets the static config: `cleanUrls:false` (keeps the `.html` URLs), no-cache for `sw.js`, revalidate for HTML/manifest — **and, since 2026-10-07 (F-04), the security headers on every route**: a Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy` and `Permissions-Policy`. HSTS comes from Vercel itself. **The CSP pins every external source to its exact path and version** (`supabase-js@2.116.0`, `leaflet@1.9.4`, `lucide@0.460.0`, the two Supabase projects, OSM tiles, Nominatim): bumping a CDN version in `app.html` or adding any new external origin without updating the CSP blanks the app with nothing but a console error. `script-src` keeps `'unsafe-inline'` because of the inline `onclick` handlers — don't remove it without rewriting them. See `docs/AUDITORIA.md` rule 44c.
 
 > ⚠️ **Auth redirect URLs:** the Vercel domain must be in Supabase → Authentication → URL Configuration (Site URL + Redirect URLs), or password-reset links won't redirect. Add any new domain (e.g. a custom domain) there too.
 
@@ -300,11 +317,12 @@ To run locally: `npx serve .` (connects to the live Supabase project; credential
 ├── js/                     # Classic scripts, global scope, order defined in app.html (30 files)
 ├── docs/FLUJO-OPERATIVO.md # Master file #2 (Rule #4/#5): what the system does, by role,
 │                       #   state and guard. Plus the 14 known gaps, with their decision
-├── docs/AUDITORIA.md       # Master file #3 (Rule #5): the four audits consolidated —
-│                       #   what is still open, what must NOT be touched, and the
-│                       #   construction rules each finding produced
+├── docs/AUDITORIA.md       # Master file #3 (Rule #5): the six audits consolidated —
+│                       #   what is still open, what must NOT be touched, the
+│                       #   construction rules each finding produced, and (§4.9) the
+│                       #   post-build audit and tests Rule #6 requires
 ├── docs/CONTRATO-MOVIL.md  # Backend contract for the native iOS/Android clients
-├── Auditoriabd.md          # The 25-section brief the 4th audit answered (template for a 5th)
+├── Auditoriabd.md          # The 25-section brief the 4th–6th audits answered (template for a 7th)
 ├── auditoria-2.md          # 2nd audit, 2026-08-28 — the only one with EXPLAIN / pg_stat_statements
 ├── auditoria-3.md          # 3rd audit, 2026-09-11 — whole web platform
 ├── security-findings.md    # 1st audit, 2026-08-24 — authorized pentest, exercised
@@ -562,6 +580,7 @@ Deploy with `mcp__supabase__deploy_edge_function` (or `supabase functions deploy
 
 ## What to Avoid
 
+- **Don't add a CDN script, bump a CDN version or call a new external host without updating the CSP in `vercel.json`** — and a new domain of our own also goes into the CORS list in `supabase/functions/_shared/cors.ts`. Edge Functions answer `403` to any browser origin not on that list (F-06).
 - **Don't use `localStorage` for auth** — `sessionStorage` is intentional (theme preference is the only `localStorage` use).
 - **Don't add `type="module"` to script tags** — the codebase is classic globals; modules would break cross-file calls.
 - **Don't use `getPublicUrl` on any document bucket** — `unidades`, `registros`, `documentos-viaje`, `operadores`, `documentos-empresa` and `custodios` are all private; store paths and sign at display time.
