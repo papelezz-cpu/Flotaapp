@@ -8,7 +8,7 @@
 # 84 % de CPU atribuido a Realtime (A2-C1) y los índices sobrantes (H-17)
 # siguen siendo hipótesis. docs/AUDITORIA.md §6.
 #
-# ⚠ SOLO LEE. La sesión se abre con default_transaction_read_only=on y el
+# ⚠ SOLO LEE. La sesión se pone en default_transaction_read_only=on y el
 #   guion lo comprueba ANTES de correr una sola consulta: si no quedó puesto,
 #   aborta. Cualquier escritura fallaría con "read-only transaction".
 #
@@ -52,10 +52,12 @@ case "$CONN" in
   *) echo "❌ La cadena no es de producción ($REF). No mido otra base con este nombre."; exit 1 ;;
 esac
 
-# Solo lectura, impuesto por el servidor en cada transacción de la sesión.
-export PGOPTIONS="-c default_transaction_read_only=on"
-
-RO="$(psql "$CONN" -X -At -c "show default_transaction_read_only" 2>&1)" || {
+# Solo lectura con un SET dentro de la sesión, NO con PGOPTIONS: el pooler de
+# Supabase descarta las opciones de arranque y la sesión llegaba en
+# read_only=off (medido el 07/10, el guion se negó a seguir, que era lo
+# correcto). Esta comprobación es de una sesión aparte; la que mide repite el
+# SET y vuelve a comprobarlo en el .sql antes de la primera consulta.
+RO="$(psql "$CONN" -X -q -At -c "set default_transaction_read_only = on" -c "show default_transaction_read_only" 2>&1)" || {
   echo "❌ No pude conectar: $RO"; exit 1; }
 if [ "$RO" != "on" ]; then
   echo "❌ La sesión no quedó en solo lectura (default_transaction_read_only=$RO). No sigo."

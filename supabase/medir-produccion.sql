@@ -18,6 +18,21 @@
 -- codificacion y el servidor los rechaza.
 -- ============================================================================
 
+-- Solo lectura, puesto DENTRO de la sesion. No vale PGOPTIONS: el pooler de
+-- Supabase (Supavisor) descarta las opciones de arranque y la sesion llegaba
+-- con default_transaction_read_only=off (medido el 07/10). Si el SET no
+-- quedo, se para aqui, antes de la primera consulta.
+\set ON_ERROR_STOP on
+set default_transaction_read_only = on;
+select current_setting('default_transaction_read_only') = 'on' as solo_lectura \gset
+\if :solo_lectura
+  \echo '# sesion en solo lectura: comprobado'
+\else
+  \echo 'ERROR: la sesion NO quedo en solo lectura. No se mide nada.'
+  \quit
+\endif
+\set ON_ERROR_STOP off
+
 \pset pager off
 \pset null '-'
 set search_path = public, extensions;
