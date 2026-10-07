@@ -5,6 +5,7 @@
 // las versiones que corrian el 2026-08-21, verificadas en produccion.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
+import { conCors } from '../_shared/cors.ts';
 
 const GMAIL_USER = Deno.env.get('GMAIL_USER')!;
 const GMAIL_PASS = Deno.env.get('GMAIL_PASS')!;
@@ -30,12 +31,10 @@ const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 //   npx supabase secrets set CORREO_SALIDA=bloqueada --project-ref <ref-pruebas>
 const CORREO_BLOQUEADO = (Deno.env.get('CORREO_SALIDA') ?? 'activa').toLowerCase() === 'bloqueada';
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
-};
+// CORS por lista de orígenes, no '*' (F-06): ver _shared/cors.ts.
+const CABECERAS_PERMITIDAS = 'authorization, content-type';
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
 // Escapa HTML: todo el contenido de los templates viene de datos que el usuario controla
 // (nombre, descripción, nota de rechazo…), y se inyecta directo en el cuerpo del correo.
@@ -512,9 +511,7 @@ async function destinatariosEmpresas(
 }
 
 // ── Main handler ───────────────────────────────────────
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
-
+Deno.serve(conCors(CABECERAS_PERMITIDAS, async (req) => {
   try {
     const authHeader = req.headers.get('Authorization') || '';
     if (!authHeader.startsWith('Bearer ')) {
@@ -649,4 +646,4 @@ Deno.serve(async (req) => {
     console.error(err);
     return json({ ok: false, error: String(err) }, 500);
   }
-});
+}));

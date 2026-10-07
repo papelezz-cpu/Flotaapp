@@ -270,11 +270,33 @@ guard_pedido_update:  IF es_admin AND OLD.estado IN ('abierto','en_negociacion')
 - Lo barato e intermedio que sigue sin hacerse: renombrar a `recurso_id`, añadir
   `recurso_tipo`, extender `guard_unidad_existe` a `ofertas`, y un `BEFORE DELETE` lógico.
 
-#### `F-04` — Sin CSP, sin `X-Frame-Options`, sin HSTS
+#### `F-04` — Sin CSP, sin `X-Frame-Options`, sin HSTS · **corregido en `dev` el 07/10, sin promover**
 
-**Medido el 28/09:** [`vercel.json`](../vercel.json) solo define cabeceras de caché. El
-pentest lo puso en cuarto lugar de su orden de corrección con la nota de que
-`X-Frame-Options` y HSTS **no rompen nada**. Sigue sin aplicarse.
+**Medido el 28/09:** [`vercel.json`](../vercel.json) solo define cabeceras de caché.
+
+**Corrección del 07/10 al medir:** HSTS **sí estaba**: Vercel lo envía por defecto
+(`max-age=63072000; includeSubDomains; preload`, medido con `curl -I` en producción). Lo
+que faltaba era el resto, y `vercel.json` lo añade ahora a todas las rutas:
+`Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+`Referrer-Policy` y `Permissions-Policy` (cámara, micrófono, geolocalización, pago y USB
+apagados; la app no usa ninguno).
+
+**Lo que la CSP protege y lo que no.** `script-src` lleva `'unsafe-inline'` porque la app
+tiene 223 `onclick` en `app.html` y cientos más generados por `innerHTML`; quitarlo exige
+reescribir la interfaz. Con eso, la CSP **no** frena un XSS que inyecte un manejador en
+línea. Sí frena: cargar un script de cualquier origen que no sea la lista —incluido otro
+paquete de unpkg o jsdelivr: las fuentes van fijadas a ruta y versión—, enviar datos a un
+servidor ajeno (`connect-src` solo admite los dos proyectos de Supabase y Nominatim),
+`<base>`, `<object>`, formularios a otro sitio, y que otra web enmarque la app
+(`frame-ancestors 'none'`, clickjacking).
+
+**Probado en local (07/10)** con un servidor que aplica las cabeceras de `vercel.json` y
+Chrome sin interfaz: las cuatro páginas sin una sola violación; desde `app.html` pasan el SDK,
+Leaflet (script, hoja, icono y teselas), Lucide, REST, el websocket de Realtime, Storage,
+Nominatim y la ventana de la Carta Porte (estilo, script y `onclick` en línea). Los dos
+controles negativos —`fetch` a un dominio ajeno y un script de otro paquete de unpkg— se
+bloquean con su violación registrada. **No probado:** las pantallas con sesión iniciada; las
+cubre la prueba en pantalla en `dev` (regla 48). Regla nueva: 44c.
 
 ### 3.2 El resto, por tema
 
@@ -324,7 +346,7 @@ pentest lo puso en cuarto lugar de su orden de corrección con la nota de que
 | `A2-M10` · `A2-M5` | Las cinco tablas de flota son la misma entidad | **Abierto**, y ya no arrastra lo peor: la parte de «documento con vigencia» se cerró con `H-04` (tabla `vigencias`) |
 | `A2-B1`,`B2`,`B5`,`B7`,`B10`,`B11` | Columnas muertas · `calificaciones.admin_id CASCADE` (blanqueo de reputación) · dos padres de identidad · tablas sin `ANALYZE` · uuid que parecen FK · columnas derivables | **Abiertos.** Todos 🟢; ninguno verificado de nuevo desde el 28/08 |
 | `F-05` | Pedidos `abierto`/`en_negociacion` exponen correo y contacto del cliente a todas las empresas | **Abierto.** Minimización de datos |
-| `F-06` · `A3-B2` | `Access-Control-Allow-Origin: '*'` en las dos Edge Functions, una con la clave de servicio | **Abierto**, medido el 28/09 en los dos `index.ts` |
+| `F-06` · `A3-B2` | `Access-Control-Allow-Origin: '*'` en las dos Edge Functions, una con la clave de servicio | **Corregido el 07/10, en pruebas (gestionar-usuario v12, enviar-notificacion v10), sin promover.** `supabase/functions/_shared/cors.ts`: lista de orígenes (producción, el alias de `dev`, `localhost`); sin `Origin` (Android, servidor) se atiende; cualquier otro, 403 antes de ejecutar nada. Las URL sueltas de despliegue de Vercel no entran: un patrón que las admitiera admitiría un proyecto ajeno con ese nombre. Probado: 11 casos en Deno (más un sabotaje que permitía todo, que la prueba detectó) y por HTTP contra pruebas —los tres orígenes legítimos reciben 204 con su origen; uno ajeno y uno imitador, 403— |
 | `F-07` | Contraseñas de 8 sin MFA, sin bloqueo de login, sin leaked-password protection | **Abierto por decisión.** La rotación de contraseñas queda **antes del lanzamiento**, no ahora — decisión tomada, no volver a proponerla |
 | `A3-B3`,`B4` | El `catch` final devuelve `String(err)` al cliente · errores sin `Content-Type: application/json` | **Abiertos**, sin verificar de nuevo |
 | huecos 7,8,10,11,12,13 | 5 de las 11 RPC sin usar · `aprobarCuenta()` mira un error de dos · operador sin fecha no editable · dos formularios de camión · el permiso hazmat de la unidad · el alta de flota del móvil apunta a RPC que producción no tiene | **Abiertos y documentados** en [FLUJO-OPERATIVO.md § Huecos conocidos](FLUJO-OPERATIVO.md) |
@@ -516,6 +538,7 @@ discute con su hallazgo delante, no de memoria.**
     `documentos-empresa`— guardan **rutas** en la base y se firman al mostrar (`attrsDoc`,
     `imgDoc`, `urlDocFirmada` en `js/utils.js`). Nunca `getPublicUrl`. *(`S-01`)*
 44b. **Una política de Storage se ata a la carpeta del dueño, también la de lectura.** Un bucket público sirve sus URL sin pasar por RLS, así que la política `SELECT` no hace falta para abrir un archivo: solo decide quién puede **listar** el bucket entero. `bucket_id = 'x'` a secas, en `SELECT`, `INSERT` o `DELETE`, es dejarle a cualquier cuenta enumerar, subir a carpetas ajenas o borrar lo de otros. *(`S-01`: 98 documentos de choferes listables y borrables)*
+44c. **Un origen externo nuevo, o una versión nueva de una librería del CDN, va también a la CSP de `vercel.json`** —y un dominio propio nuevo, además, a la lista de `supabase/functions/_shared/cors.ts`—. Las fuentes de `script-src` y `style-src` están fijadas a ruta y versión (`supabase-js@2.116.0`, `leaflet@1.9.4`, `lucide@0.460.0`): subir la versión en `app.html` sin tocar la CSP deja la app en blanco, sin más aviso que la consola. Comprobar con `node pruebas/15-sonda-csp.mjs` (sale con 1 si algo legítimo se bloquea) y con la consola abierta en `dev`. *(`F-04`, `F-06`)*
 45. **`portgo-pruebas` tiene las direcciones reales de los clientes.** Por eso la sonda de
     correo corre **primero**, antes de replicar: comprobar el bloqueo después de llenar
     pruebas con direcciones reales es comprobarlo demasiado tarde. *(Regla #3)*

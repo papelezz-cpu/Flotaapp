@@ -290,7 +290,7 @@ The app is served from **Vercel**, same project for both branches (repo `papelez
 
 > ⚠️ **`portgo-pruebas` is a byte-identical copy of production, so the DATA cannot tell you which environment you are looking at.** Same rows, same names, same totals, same screens. On 2026-09-18 that made a test on the wrong build indistinguishable from a test on the right one across every number on two screens — the only cell that differed was a tie-break in a five-row ranking, and it was noticed by luck. **When something must be verified on `dev`, verify which build and which project the page actually loaded before reading a single figure**, with the console snippet in step 6. A screenshot proves nothing about which environment produced it.
 
-`vercel.json` sets the static config: `cleanUrls:false` (keeps the `.html` URLs), no-cache for `sw.js`, revalidate for HTML/manifest.
+`vercel.json` sets the static config: `cleanUrls:false` (keeps the `.html` URLs), no-cache for `sw.js`, revalidate for HTML/manifest — **and, since 2026-10-07 (F-04), the security headers on every route**: a Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy` and `Permissions-Policy`. HSTS comes from Vercel itself. **The CSP pins every external source to its exact path and version** (`supabase-js@2.116.0`, `leaflet@1.9.4`, `lucide@0.460.0`, the two Supabase projects, OSM tiles, Nominatim): bumping a CDN version in `app.html` or adding any new external origin without updating the CSP blanks the app with nothing but a console error. `script-src` keeps `'unsafe-inline'` because of the inline `onclick` handlers — don't remove it without rewriting them. See `docs/AUDITORIA.md` rule 44c.
 
 > ⚠️ **Auth redirect URLs:** the Vercel domain must be in Supabase → Authentication → URL Configuration (Site URL + Redirect URLs), or password-reset links won't redirect. Add any new domain (e.g. a custom domain) there too.
 
@@ -580,6 +580,7 @@ Deploy with `mcp__supabase__deploy_edge_function` (or `supabase functions deploy
 
 ## What to Avoid
 
+- **Don't add a CDN script, bump a CDN version or call a new external host without updating the CSP in `vercel.json`** — and a new domain of our own also goes into the CORS list in `supabase/functions/_shared/cors.ts`. Edge Functions answer `403` to any browser origin not on that list (F-06).
 - **Don't use `localStorage` for auth** — `sessionStorage` is intentional (theme preference is the only `localStorage` use).
 - **Don't add `type="module"` to script tags** — the codebase is classic globals; modules would break cross-file calls.
 - **Don't use `getPublicUrl` on any document bucket** — `unidades`, `registros`, `documentos-viaje`, `operadores`, `documentos-empresa` and `custodios` are all private; store paths and sign at display time.
