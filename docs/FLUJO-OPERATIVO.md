@@ -985,8 +985,9 @@ empresas sí pueden volver a ofertar en la solicitud reabierta.
 ⚠ Este párrafo decía «para quien canceló» hasta el 2026-10-02, y el comentario de
 la función dice lo mismo, pero el código no mira quién cancela: si cancela el
 cliente, o el superadmin al resolver una cancelación pedida, la empresa queda
-bloqueada igual aunque no haya sido ella. **Pendiente de decisión del usuario**
-si eso es lo que se quiere.
+bloqueada igual aunque no haya sido ella. **Decisión del usuario (2026-10-07):
+se queda así**, cerrada hasta que decidan cambiarla. No proponerlo de nuevo como
+pendiente.
 
 ---
 
