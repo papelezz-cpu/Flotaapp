@@ -233,7 +233,28 @@ guard_pedido_update:  IF es_admin AND OLD.estado IN ('abierto','en_negociacion')
   columnas en el guard; (3) comprobar que ninguna ruta legítima de empresa escribe en
   `pedidos`. **No se toca sin autorización: es producción y es la Regla #2.**
 
-#### `A2-C2` — El archivado de una reservación pierde 36 de 51 columnas, y no es transaccional
+#### `A2-C2` — El archivado de una reservación pierde 36 de 51 columnas, y no es transaccional · **corregido en `dev` el 07/10, sin promover**
+
+> **Actualización 07/10.** Medido de nuevo: `reservaciones` tiene **55** columnas. Y dos
+> consecuencias que esta entrada no recogía: archivar **sacaba el servicio de los reportes**
+> (`reporte_kpis()` y `desempeno_empresa()` suman `reservaciones`), y el botón salía **en
+> cualquier estado**, también en un viaje `Activa`.
+>
+> **Corrección**, por decisión del usuario del 07/10 (marca, no traslado; solo lo cerrado;
+> sigue contando en reportes; se puede restaurar):
+> `20261007130000_reservaciones_se_archivan_con_marca.sql` añade `archivada_en` /
+> `archivada_por` y `trg_guard_reservacion_archivo` —solo el superadmin, solo `Cancelada`,
+> `Rechazada` o `Completada` **con el pago registrado** (una sin cobrar desaparecería de «Por
+> cobrar», que es un filtro de la misma lista), fecha y autor del servidor, nadie nace
+> archivado, y una archivada no puede dejar de ser archivable sin restaurarla—. El guard es
+> aparte porque `guard_reservacion_update` deja a empresa y cliente cambiar las columnas que
+> no enumera. `reservaciones_historico` queda como **archivo antiguo de solo lectura**
+> (`REVOKE` de escritura; no se borra). En el navegador: `archivarReserva()` /
+> `restaurarReserva()` y el Historial con las dos fuentes (`reservaciones.js?v=69`).
+> Depende de `S-14`. **Probado** en banco local: seis casos (archivar, restaurar, viva,
+> empresa, revertir cobro, alta archivada), idempotente, y el sabotaje sin trigger hace
+> fallar cuatro. Pendiente: pruebas, pantalla en `dev`, producción.
+
 
 - **Medido el 28/09:** `reservaciones` tiene **51** columnas; `reservaciones_historico`,
   **15**. `eliminarReserva()` ([js/reservaciones.js:708](../js/reservaciones.js#L708)) sigue
@@ -248,7 +269,7 @@ guard_pedido_update:  IF es_admin AND OLD.estado IN ('abierto','en_negociacion')
 - **Falla a medias:** `pagos` y `documentos_fiscales` son `NO ACTION`. Con una factura
   detrás, el `DELETE` aborta **después** del `INSERT`, y el reintento choca con la PK
   duplicada. Sin salida por interfaz.
-- **Cabo suelto de `A2-B4`, medido hoy:** la línea `empresa: r.empresa || null` copia una
+- **Cabo suelto de `A2-B4`** *(desaparece con la corrección del 07/10: ya no se copia nada)*, **medido el 28/09:** la línea `empresa: r.empresa || null` copia una
   columna **que no existe en `reservaciones`**, así que el histórico archiva siempre `NULL`.
   (La otra mitad de `B4` sí se cerró el 28/09: la columna «Archivado» ya muestra
   `archivado_en` y la lista ordena por él.)
@@ -337,6 +358,8 @@ byte a la de `vercel.json`. Regla nueva: 44c.
 | `S-10` 🟡 | **La base no se podía reconstruir desde el repositorio.** El plano `supabase/esquema/` (último commit 31/08) tenía 22 de 27 tablas: faltaban `vigencias`, `avisos_superadmin`, `consentimientos_bloqueados` y lo de septiembre. Y rehacer la base aplicando las migraciones desde cero tampoco sirve: varias abortan en una base sin datos («no hay ningún perfil para la prueba»), y 14 tablas centrales nacieron en el panel, no en una migración. 6ª auditoría | **Cerrado el 05/10.** Plano regenerado con `volcar-esquema.sh` (solo lectura de producción): 27 tablas, 8 vistas, 73 políticas, 51 triggers, 15 políticas de Storage, catálogos sin datos personales. **Reconstruido en banco local desde cero:** carga sin errores y coincide con producción en tablas, vistas, funciones (66), índices, FK, CHECK, políticas y triggers. **Regla:** el plano se regenera después de cada promoción a producción que cambie el esquema, y el camino para reconstruir la base es el plano, no reaplicar las migraciones |
 | `S-11` 🟢 | **Dos FK de `vigencias` hacia `auth.users` sin índice** (`revisado_por`, `subido_por`, `ON DELETE SET NULL`): borrar una cuenta recorría `vigencias` entera por cada usuario, la misma ruta (con plazo ARCO) por la que `H-13` indexó otras ocho. La tabla nació después de `H-13`. El informe contaba una tercera, `(cat_clave, tipo_documento)` → `catalogos`: **al medirla se decidió no indexarla**, porque solo la recorre editar un valor del catálogo `vigencia_tipo` (raro, manual) y `vigencias` se escribe en cada guardado por el espejo. 6ª auditoría | **Cerrado el 02/10.** `20261002140000_vigencias_indices_de_fk.sql`: dos índices parciales `WHERE … IS NOT NULL`, como el precedente (hoy 0 de 60 filas con valor: nacen vacíos). El plan del `SET NULL` usa el índice (banco local); un sabotaje sin uno de los dos lo aborta. Pruebas y **producción el 02/10 21:57 UTC** (con permiso explícito). El aviso de zona con `20260922130000_vigencias_espejo_tolerante` es el falso positivo de `PROMOCION-PENDIENTE.md` |
 | `S-12` 🟢 | **Una empresa sin acreditar se crea sola una fila `vigente` en `vigencias`.** `guard_perfil_self_update` protege las fechas de los tres documentos pero no sus rutas (`doc_permiso_sct`, `doc_seguro_rc`, `doc_seguro_carga`); al escribir una, el espejo inserta la fila como `vigente` y el guard de `vigencias` solo vigila UPDATE. Ejecutado en banco local el 01/10. Sin fecha, `empresas_publico` no pinta ningún distintivo (medido); sí aparece en `vigencias_caducidad`, que lee el panel del superadmin | **Cerrado el 05/10.** Pruebas el 05/10, probada en pantalla en `dev` (envío de documentos, aprobación del superadmin y registro de cuenta, sin errores) y **en producción el 05/10 17:48 UTC** (con permiso explícito; el bloque pasó allí). `20261005120000_rutas_de_documentos_acreditados_protegidas.sql`: las tres rutas se suman a las fechas en **los dos** guards — `guard_perfil_self_update` y también `guard_perfil_insert` (Q-01), que tenía el mismo hueco al alta. Solo las escribe `aprobarDocsEmpresa()`, como superadmin (inventario del 05/10); sin datos autodeclarados que limpiar. Inserción sobre las definiciones vivas; 6 casos (las altas con el método de Q-01: uid inventado, FK frente a P0001); contra los guards sin cambiar, la comprobación caza los casos 1, 2 y 5. **Medido por API en pruebas:** escribir `doc_seguro_rc` en el perfil propio da HTTP 400 «No autorizado» |
+| `S-14` 🟡 | **Una reservación cerrada no se podía actualizar si la unidad tenía un viaje posterior que empezaba el día en que esta terminaba.** `check_reservacion_disponibilidad()` (`BEFORE INSERT OR UPDATE`) buscaba solapes con filas `Pendiente`/`Activa` sin mirar el estado de LA PROPIA fila, mientras `reservaciones_sin_solape` solo cuenta filas vivas. Registrar el pago, subir evidencias o archivar una `Completada` fallaba con `RECURSO_NO_DISPONIBLE`. Encontrado el 07/10 al diseñar `A2-C2` (regla 47: lo nuevo se audita), reproducido en banco local antes de corregirlo | **Corregido en `dev` el 07/10, sin promover.** `20261007120000_disponibilidad_solo_mira_filas_vivas.sql`: salida temprana si `NEW.estado` no es `Pendiente`/`Activa`, sustituida sobre la definición viva (acepta saltos `
+`: la versión H-06 se aplicó desde un archivo CRLF al menos en un proyecto). Probada en banco local con la función en CRLF y en LF, idempotente; reactivar o insertar un solape vivo sigue fallando; el sabotaje hace fallar el caso del defecto. Regla 31b |
 | `H-17` | 1 índice redundante (`idx_pedidos_fecha`) y 2 incoherentes con sus hermanos (`idx_lavados_pendientes`, `idx_operadores_pendientes`) | **Abierto, ya con el dato** (07/10, `idx_scan` desde el 30/03): `idx_pedidos_fecha` 16 lecturas frente a 82 de `idx_pedidos_fecha_id`, que lo cubre; `idx_lavados_pendientes` 0 e `idx_operadores_pendientes` 109. El `DROP` del primero ya no espera a nada más que al sí (Regla #1); alinear los otros dos nunca dependió del dato |
 | `H-18` (mitad) | Dinero con dos tipos: catálogo `numeric(14,2)`, flujo `numeric` sin escala | **Abierto, y estaba dado por cerrado.** Medido: `precio_cliente`, `precio_oferta`, `contra_precio`, `precio_acordado` y `pagos.monto` siguen sin escala. El `CHECK` de `aprobacion_cuenta` sí se puso |
 | `H-14` | Grupo repetitivo `contenedor_1/_2` | **Acotado.** Hay `CHECK` de coherencia; la estructura sigue. Decidido no normalizar: añadiría un `JOIN` a la consulta más caliente para modelar un máximo de dos |
@@ -490,6 +513,8 @@ discute con su hallazgo delante, no de memoria.**
     rancio tarda hasta 15 minutos en cuadrar en la base. La normalización que el navegador
     conserva es **en memoria**, cosmética. *(hueco 4, `H-16`)*
 31. **Quién puede hacer qué lo deciden los guards, no la intuición ni la interfaz.**
+31b. **Un chequeo que repite una restricción lleva su misma condición.** `check_reservacion_disponibilidad()` duplicaba `reservaciones_sin_solape` sin su `WHERE estado IN ('Pendiente','Activa')`, y bloqueaba cambios en filas cerradas que la restricción nunca habría tocado. *(`S-14`)*
+31c. **Una columna nueva en una tabla con guard necesita que alguien la vigile.** Los guards de UPDATE enumeran lo prohibido, así que lo que no enumeran queda libre para quien tenga permiso de escritura sobre la fila. *(`A2-C2`: sin su guard, la empresa y el cliente podían archivar)*
 
 ### 4.6 Pruebas y verificación
 

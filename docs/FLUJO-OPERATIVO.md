@@ -724,7 +724,7 @@ que mirar lo mismo — de las cuales hoy solo se ejecutan dos**:
 
 | Capa | Qué es | Quién la ve HOY |
 |---|---|---|
-| `check_reservacion_disponibilidad()` | trigger `BEFORE INSERT OR UPDATE` | **la única que alguien ve.** Lanza `RECURSO_NO_DISPONIBLE`, y en el cierre de acuerdo el cliente lee «❌ Ese recurso ya tiene una reserva en esas fechas. La oferta sigue vigente — elige otra o pide una nueva.» |
+| `check_reservacion_disponibilidad()` | trigger `BEFORE INSERT OR UPDATE`; desde S-14 (07/10) solo comprueba una fila que esté `Pendiente`/`Activa`, igual que la `EXCLUDE` — antes frenaba hasta registrar el pago de una `Completada` si la unidad tenía otro viaje que empezaba ese día | **la única que alguien ve.** Lanza `RECURSO_NO_DISPONIBLE`, y en el cierre de acuerdo el cliente lee «❌ Ese recurso ya tiene una reserva en esas fechas. La oferta sigue vigente — elige otra o pide una nueva.» |
 | `reservaciones_sin_solape` | `EXCLUDE` con GiST, activo solo para `Pendiente` y `Activa` | nadie, salvo en una carrera: dos inserciones simultáneas que ambas pasan el trigger |
 | [js/modal.js](../js/modal.js) | consulta previa en el navegador, antes de insertar | **nadie: ese camino es inalcanzable.** El modal de reserva directa solo lo abren botones de la rejilla oculta — ver *hueco 6*. Si el camino se revive, sería la primera en saltar, con «Este recurso ya está reservado del X al Y. Elige otras fechas.» |
 
@@ -1000,6 +1000,32 @@ atrás.
 `plazo_pago` se copia del pedido a la reservación al cerrar el acuerdo: el
 plazo pactado no cambia porque el cliente edite su perfil después.
 
+### Archivar una reservación — solo superadmin (A2-C2, 07/10)
+
+Botón **«🗃 Archivar»** en el grupo *Superadmin* de la fila, y **solo** cuando la
+reservación está cerrada: `Cancelada`, `Rechazada`, o `Completada` **con el pago
+registrado**. Una `Completada` sin cobrar no se archiva: «Por cobrar» y
+«Vencido» son filtros de la misma lista, y archivarla la escondería de ahí.
+
+Archivar es una **marca** (`archivada_en`, `archivada_por`), no un traslado:
+- la reservación **sale de la lista** de Reservaciones en todas sus pestañas,
+  para todos los roles (`_filtroReservaSQL`);
+- **sigue contando** en Reportes, en *Mi desempeño* y en Cobros: el servicio
+  ocurrió;
+- conserva su expediente, sus mensajes, su pago y su calificación;
+- el superadmin la ve en **Historial** y puede **«↩ Restaurar»**, que la
+  devuelve a la lista.
+
+Lo vigila `trg_guard_reservacion_archivo`: solo el superadmin pone o quita la
+marca; la fecha y el autor los pone la base; ninguna reservación nace archivada;
+y una archivada no puede volver a un estado no archivable —por ejemplo,
+revertir su cobro— sin restaurarla antes.
+
+**Historial** enseña además el **archivo antiguo**: lo archivado antes del
+07/10, cuando archivar copiaba 14 columnas a `reservaciones_historico` y borraba
+la original. Esas filas son de solo lectura y no se pueden restaurar: el resto
+de sus datos ya no existe.
+
 ---
 
 ## 11. Los dos paneles de números
@@ -1165,6 +1191,7 @@ escribir una fila; los guards deciden *qué transición* es legal para ti.
 | *(sin guard: REVOKE)* | calificaciones | **En producción y en pruebas desde el 2026-09-29** (`20260929150000`, Q-03; producción 23:48 UTC). `authenticated` pierde el INSERT directo: se califica solo por `calificar_servicio()`, que ya es lo único que usa la web |
 | `guard_reservacion_insert` | reservaciones | Que un cliente se cree una reserva ya confirmada y con precio puesto por él. **Y, desde `20260930120000` (Q-05; en producción y en pruebas desde el 30/09, producción 17:22 UTC), que una empresa cree reservaciones:** hasta ahora podía crearlas en cualquier estado, con cualquier precio y a nombre de cualquier cliente. La reservación de un acuerdo nace solo en `cerrar_acuerdo()` (marca `portgo.cierre_acuerdo`), también cuando acepta la empresa; el cliente sigue pudiendo agendar desde el catálogo (`Pendiente`, sin precio) |
 | `guard_reservacion_update` | reservaciones | Que el cliente toque precio, unidad o fechas; que suba la evidencia de la empresa; que cualquiera de los dos apruebe su propio cierre o resuelva su propia cancelación — eso lo hace el superadmin |
+| `guard_reservacion_archivo` | reservaciones | **Escrito en `dev` el 07/10 (`20261007130000`, A2-C2).** Que alguien que no sea el superadmin archive o restaure; que se archive una reservación viva o una `Completada` sin cobrar; que la fecha o el autor del archivado los ponga el navegador; que una reservación nazca archivada; que una archivada se vuelva no archivable (revertir su cobro) sin restaurarla |
 | `guard_fleet_resource_update` | flota | Auto-aprobarse un recurso; transferir la propiedad |
 | `guard_fleet_resource_insert` | flota (las cinco tablas) | **En producción y en pruebas desde el 2026-09-29** (`20260929140000`, Q-02; producción 23:48 UTC). Que una empresa cree un recurso ya `aprobada` (o `rechazada`): nace `pendiente` salvo que lo cree el superadmin. La misma migración pone `DEFAULT 'pendiente'` en `camiones`, `custodios` y `patios`, que nacían aprobados por omisión |
 | `guard_perfil_self_update` | perfiles | Cambiarse el rol, el estado de aprobación de la cuenta o los campos de verificación. **Se dispara en toda actualización de `perfiles`, no solo en la propia** — ver abajo |
