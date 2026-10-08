@@ -156,6 +156,11 @@ let _reservAccum  = [];
 // estado='Completada' la cubre exactamente.
 function _filtroReservaSQL(q, filtro = _reservFiltro) {
   const hoy = today();
+  // Las archivadas no salen en la lista, en ninguna pestaña ni en sus globos
+  // (A2-C2). Siguen en reportes y desempeño, y el superadmin las ve en el
+  // Historial. Solo se archiva lo cerrado y cobrado, así que nunca falta algo
+  // de «Por cobrar» ni de «Vencido».
+  q = q.is('archivada_en', null);
   switch (filtro) {
     case 'todas':
       return q;
@@ -705,10 +710,14 @@ async function renderReserv(append = false) {
     }
 
     const unidadLabel = recursoLabelMap[r.unidad] || esc(r.unidad) || '—';
-    // Eliminar (mover a histórico) — solo superadmin. No es una acción de
-    // todos los días: va al panel, no a la fila.
-    if (currentUser.rol === 'superadmin') {
-      grupo('Superadmin', `<button class="btn-edit btn-rechazar" style="font-size:0.72rem" onclick="eliminarReserva('${r.id}')">🗑 Eliminar</button>`);
+    // Archivar — solo superadmin y solo lo cerrado: cancelada, rechazada o
+    // completada con el cobro registrado. Es la misma regla que impone
+    // guard_reservacion_archivo (A2-C2); aquí solo evita ofrecer un botón que
+    // la base iba a rechazar. No es una acción de todos los días: va al panel.
+    const archivable = ['Cancelada', 'Rechazada'].includes(r.estado)
+                    || (r.estado === 'Completada' && r.pagado);
+    if (currentUser.rol === 'superadmin' && archivable) {
+      grupo('Superadmin', `<button class="btn-edit" style="font-size:0.72rem" onclick="archivarReserva('${r.id}')">🗃 Archivar</button>`);
     }
 
     const abierta = _reservAbiertas.has(r.id);
@@ -841,53 +850,34 @@ function cancelarReserva(reservaId, unidad) {
   }, { danger: true, confirmLabel: 'Sí, cancelar' });
 }
 
-// ── ELIMINAR RESERVA (superadmin) → mover a histórico ──
-function eliminarReserva(reservaId) {
-  showConfirm('¿Archivar esta reservación? Se moverá al historial y desaparecerá de la lista activa.', async () => {
-
-  // 1. Obtener la reservación completa
-  const { data: r, error: fetchErr } = await sb.from('reservaciones').select('*').eq('id', reservaId).single();
-  if (fetchErr || !r) { showToast('Error al obtener la reservación'); return; }
-
-    // 2. Insertar en histórico
-    const { error: insertErr } = await sb.from('reservaciones_historico').insert({
-      id:              r.id,
-      unidad:          r.unidad,
-      recurso_tipo:    r.recurso_tipo,
-      cliente:         r.cliente,
-      cliente_email:   r.cliente_email,
-      cliente_user_id: r.cliente_user_id,
-      empresa:         r.empresa || null,
-      fecha_ini:       r.fecha_ini,
-      fecha_fin:       r.fecha_fin,
-      descripcion:     r.descripcion,
-      estado:          r.estado,
-      tracking_estado: r.tracking_estado,
-      created_at:      r.created_at,
-      archivado_por:   currentUser.id,
-      // La marca de archivado NO se manda: la pone el `DEFAULT now()` de la
-      // columna. Dos motivos, y el segundo es el que importa (H-22, 2026-09-25):
-      //
-      //   · `new Date().toISOString()` era el reloj del NAVEGADOR. `now()` es el
-      //     del servidor, que es el mismo para todas las filas y no arrastra el
-      //     desajuste ni la zona del cliente.
-      //   · y así el nombre de la columna deja de aparecer aquí, lo que permite
-      //     renombrarla (`archivado_at` → `archivado_en`, para que siga la
-      //     convención `_en` del resto del esquema) **sin ventana de rotura en
-      //     ningún orden de despliegue**. Es lo mismo que hizo `_pv()` en H-05.
-      //
-      // Nadie LEE esta columna: no se pinta, no se ordena por ella, no aparece en
-      // ninguna política ni función. Medido el 2026-09-25.
-    });
-    if (insertErr) { showToast('Error al archivar: ' + (insertErr.message || '')); return; }
-
-    // 3. Eliminar de la tabla activa
-    const { error: delErr } = await sb.from('reservaciones').delete().eq('id', reservaId);
-    if (delErr) { showToast('Error al eliminar: ' + (delErr.message || '')); return; }
-
+// ── ARCHIVAR / RESTAURAR (superadmin) ──
+// Archivar es una MARCA, no un traslado (A2-C2, 07/10). Antes esto copiaba 14
+// de 55 columnas a reservaciones_historico y BORRABA la original: se perdían el
+// precio, el pago, las evidencias y la cancelación, caían en cascada el
+// expediente y los mensajes, y el servicio desaparecía de los reportes.
+// Ahora la fila se queda donde está y solo sale de la lista.
+//
+// El valor de archivada_en que se manda es solo un «sí»: guard_reservacion_archivo
+// lo sustituye por now() del servidor y pone archivada_por. También es el guard
+// —no este código— el que decide quién (solo superadmin) y qué (solo lo cerrado).
+function archivarReserva(reservaId) {
+  showConfirm('¿Archivar esta reservación? Sale de la lista, pero sigue contando en reportes y desempeño, y puedes restaurarla desde el Historial.', async () => {
+    const ok = await actualizarConfirmado('reservaciones', { id: reservaId },
+      { archivada_en: new Date().toISOString() }, 'la reservación');
+    if (!ok) return;
     await renderReserv();
-    showToast('✓ Reservación archivada en el historial');
-  });
+    showToast('✓ Reservación archivada');
+  }, { confirmLabel: 'Archivar' });
+}
+
+function restaurarReserva(reservaId) {
+  showConfirm('¿Restaurar esta reservación? Vuelve a la lista de Reservaciones.', async () => {
+    const ok = await actualizarConfirmado('reservaciones', { id: reservaId },
+      { archivada_en: null }, 'la reservación');
+    if (!ok) return;
+    await renderHistorialReservas();
+    showToast('✓ Reservación restaurada');
+  }, { confirmLabel: 'Restaurar' });
 }
 
 // ── GPS TEMPORAL (empresa guarda, cliente ve al iniciar) ──
@@ -1601,47 +1591,82 @@ async function renderHistorialReservas() {
   if (!el) return;
   el.innerHTML = `<div class="empty-state"><div class="icon">⏳</div>Cargando historial…</div>`;
 
-  // Ordenado por FECHA DE ARCHIVADO, no por `created_at`. Un historial se lee
-  // por lo último que entró en él; ordenarlo por cuándo se creó la reservación
-  // coloca lo recién archivado en medio de la lista, y eso es lo que hizo pensar
-  // al usuario que no había llegado (2026-09-28). Aquí coincidió que era la
-  // primera —la reserva era la más reciente de las ocho— pero fue casualidad.
-  const { data, error } = await sb.from('reservaciones_historico')
-    .select('*')
-    .order('archivado_en', { ascending: false })
-    .limit(100);
+  // Dos fuentes (A2-C2, 07/10):
+  //   · las archivadas con la marca, que siguen enteras en reservaciones y se
+  //     pueden restaurar;
+  //   · el archivo antiguo (reservaciones_historico, solo lectura): lo
+  //     archivado antes del 07/10, con 14 columnas; lo demás se perdió al
+  //     borrar la original, así que no se puede devolver a la lista.
+  // Las dos, por FECHA DE ARCHIVADO: un historial se lee por lo último que
+  // entró en él (lo encontró el usuario el 2026-09-28, probando H-22).
+  const [nuevas, antiguas] = await Promise.all([
+    sb.from('reservaciones')
+      .select('id,unidad,cliente,propietario_id,fecha_ini,fecha_fin,estado,archivada_en')
+      .not('archivada_en', 'is', null)
+      .order('archivada_en', { ascending: false })
+      .limit(100),
+    sb.from('reservaciones_historico')
+      .select('id,unidad,cliente,empresa,fecha_ini,fecha_fin,estado,archivado_en')
+      .order('archivado_en', { ascending: false })
+      .limit(100),
+  ]);
+  if (nuevas.error || antiguas.error) {
+    console.error('Historial de reservaciones', nuevas.error || antiguas.error);
+    el.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar historial.</div>`;
+    return;
+  }
+  const filas = nuevas.data || [], viejas = antiguas.data || [];
+  if (!filas.length && !viejas.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">🗃</div>No hay reservaciones archivadas.</div>`;
+    return;
+  }
 
-  if (error) { el.innerHTML = `<div class="empty-state"><div class="icon">❌</div>Error al cargar historial.</div>`; return; }
-  if (!data?.length) { el.innerHTML = `<div class="empty-state"><div class="icon">🗃</div>No hay reservaciones archivadas.</div>`; return; }
+  // La empresa sale de propietario_id, que está en la fila (como en renderReserv).
+  const ids = [...new Set(filas.map(r => r.propietario_id).filter(Boolean))];
+  const empresa = {};
+  if (ids.length) {
+    const { data: perf } = await sb.from('perfiles').select('user_id,nombre').in('user_id', ids);
+    (perf || []).forEach(p => { empresa[p.user_id] = p.nombre; });
+  }
 
-  el.innerHTML = `
-    <table class="rep-table" style="width:100%">
+  const cabecera = extra => `
       <thead>
         <tr>
           <th>Unidad</th><th>Cliente</th><th>Empresa</th><th>Inicio</th><th>Fin</th>
-          <th>Estado</th><th>Archivado</th>
+          <th>Estado</th><th>Archivado</th>${extra}
         </tr>
-      </thead>
-      <tbody>
-        ${data.map(r => `
-        <tr>
+      </thead>`;
+  const celdas = (r, emp, archivado) => `
           <td>${esc(r.unidad || '—')}</td>
           <td>${esc(r.cliente || '—')}</td>
-          <td>${esc(r.empresa || '—')}</td>
+          <td>${esc(emp || '—')}</td>
           <td>${fmtFecha(r.fecha_ini)}</td>
           <td>${fmtFecha(r.fecha_fin)}</td>
           <td><span class="badge badge-maint">${esc(r.estado || '—')}</span></td>
-          <!-- La columna se llama Archivado y hasta el 2026-09-28 pintaba
-               created_at: la fecha en que se CREO la reservacion, no la de
-               archivado. Lo encontro el usuario probando H-22: archivo una
-               reserva, busco la fecha de hoy en esta columna y no la vio, porque
-               esa fila se habia creado el 21. La fila estaba, y primera.
-               OJO: nada de acentos graves aqui dentro, esto va dentro de un
-               template literal y lo cerrarian. -->
-          <td style="font-size:0.75rem;color:var(--text-muted)">${r.archivado_en ? fmtFecha(r.archivado_en) : '—'}</td>
+          <td style="font-size:0.75rem;color:var(--text-muted)">${archivado ? fmtFecha(archivado) : '—'}</td>`;
+
+  el.innerHTML = `
+    ${filas.length ? `
+    <table class="rep-table" style="width:100%">
+      ${cabecera('<th></th>')}
+      <tbody>
+        ${filas.map(r => `
+        <tr>${celdas(r, empresa[r.propietario_id], r.archivada_en)}
+          <td><button class="btn-edit" style="font-size:0.72rem" onclick="restaurarReserva('${r.id}')">↩ Restaurar</button></td>
         </tr>`).join('')}
       </tbody>
-    </table>`;
+    </table>` : `<div class="empty-state"><div class="icon">🗃</div>No hay reservaciones archivadas desde el 07/10.</div>`}
+    ${viejas.length ? `
+    <div class="section-title" style="margin-top:1.5rem;font-size:0.95rem">Archivo antiguo (antes del 07/10/2026)</div>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 0.5rem">
+      Solo se conservaron estos datos: el resto de cada reservación se perdió al archivarla. No se pueden restaurar.
+    </p>
+    <table class="rep-table" style="width:100%">
+      ${cabecera('')}
+      <tbody>
+        ${viejas.map(r => `<tr>${celdas(r, r.empresa, r.archivado_en)}</tr>`).join('')}
+      </tbody>
+    </table>` : ''}`;
 }
 
 // Helper: envía email via edge function (fire-and-forget)
