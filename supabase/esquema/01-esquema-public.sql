@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict V3Y9AAe2BYCPqjFDdVyaDUgwKtIGqIbceqplijdpNJC3qqVUlyqMCEC6aOVvTZL
+\restrict jccwd0FrBRzaulfkdj1pBteOeb3CxqHzLbp3h0d0aCJr2cjUBKZlUaErOBeE2j8
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -5229,13 +5229,6 @@ CREATE INDEX idx_catalogos_clave ON public.catalogos USING btree (clave, orden) 
 
 
 --
--- Name: idx_consentimientos_tipo; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_consentimientos_tipo ON public.consentimientos USING btree (tipo, version);
-
-
---
 -- Name: idx_consentimientos_user; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -5289,13 +5282,6 @@ CREATE INDEX idx_expdocs_expediente ON public.expediente_documentos USING btree 
 --
 
 CREATE INDEX idx_expedientes_incidente_por ON public.expedientes USING btree (incidente_reportado_por) WHERE (incidente_reportado_por IS NOT NULL);
-
-
---
--- Name: idx_expedientes_reserva; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_expedientes_reserva ON public.expedientes USING btree (reserva_id);
 
 
 --
@@ -5446,13 +5432,6 @@ COMMENT ON INDEX public.idx_pedidos_acordados_fin IS 'Para la regla (d) de sincr
 
 
 --
--- Name: idx_pedidos_categoria_carga; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_pedidos_categoria_carga ON public.pedidos USING btree (categoria_carga) WHERE (categoria_carga IS NOT NULL);
-
-
---
 -- Name: idx_pedidos_cliente; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -5464,13 +5443,6 @@ CREATE INDEX idx_pedidos_cliente ON public.pedidos USING btree (cliente_id);
 --
 
 CREATE INDEX idx_pedidos_cola_revision ON public.pedidos USING btree (estado, created_at) WHERE (estado = ANY (ARRAY['pendiente_revision'::text, 'pendiente_acuerdo'::text]));
-
-
---
--- Name: idx_pedidos_fecha; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_pedidos_fecha ON public.pedidos USING btree (created_at DESC);
 
 
 --
@@ -8153,5 +8125,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict V3Y9AAe2BYCPqjFDdVyaDUgwKtIGqIbceqplijdpNJC3qqVUlyqMCEC6aOVvTZL
+\unrestrict jccwd0FrBRzaulfkdj1pBteOeb3CxqHzLbp3h0d0aCJr2cjUBKZlUaErOBeE2j8
 
