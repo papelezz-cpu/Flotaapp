@@ -302,6 +302,12 @@ Las **tres** escrituras tienen que ocurrir. Si el perfil no se crea, la cuenta
 queda inutilizable: la app decide el rol leyendo `perfiles`, así que sin fila no
 se puede entrar aunque la solicitud esté aprobada.
 
+**Una solicitud por usuario** (A2-M14, `UNIQUE (user_id)` desde
+`20261009140000`). El re-registro tras un rechazo **actualiza** esa fila, no
+crea otra; y si un reintento intenta insertar una segunda, la app responde «Ya
+recibimos tu solicitud de registro: está pendiente de revisión.» en vez del
+error de la base.
+
 **El globo de «Por aprobar» cuenta `perfiles.aprobacion_cuenta = 'pendiente'`,
 no `solicitudes_cuenta`.** Si los dos números no coinciden, hay altas a medias.
 

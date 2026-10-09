@@ -812,6 +812,14 @@ async function doRegistro() {
 
     const { error: eSol } = await sb.from('solicitudes_cuenta')
       .insert({ user_id: userId, rol: _regRol, ...solicitudPayload });
+    // A2-M14: una solicitud por usuario (UNIQUE desde 20261009140000). Si ya
+    // existe —un reintento tras un fallo posterior—, no es un error: la
+    // solicitud está hecha y solo falta que la revisen.
+    if (eSol?.code === '23505') {
+      showErr('Ya recibimos tu solicitud de registro: está pendiente de revisión.');
+      if (btn) { btn.disabled = false; btn.textContent = 'Enviar solicitud de registro'; }
+      return;
+    }
     if (eSol) { _fallo(eSol, 'solicitud'); return; }
   }
 
