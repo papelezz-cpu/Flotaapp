@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict mdlcAPjThJEoR1wjGdDCRwTPdN8hcIvKngPOR2zqitO9WnPLClZHwYU7wnjQLxg
+\restrict gva9DQq47cHQqlDsmwlV63kLBrVy5aZMPhjPlmHpAVby0XrXnc1Nh2lmcva2Joe
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -679,6 +679,13 @@ CREATE FUNCTION public.check_reservacion_disponibilidad() RETURNS trigger
     SET search_path TO 'public', 'pg_temp'
     AS $$
 BEGIN
+  -- S-14: solo una fila viva puede solaparse, igual que en
+  -- reservaciones_sin_solape (WHERE estado IN ('Pendiente','Activa')).
+  -- Sin esto, una reservacion cerrada no se podia ni marcar pagada si la
+  -- unidad ya tenia otro viaje que empezaba el dia en que esta terminaba.
+  IF NEW.estado NOT IN ('Pendiente', 'Activa') THEN
+    RETURN NEW;
+  END IF;
   IF EXISTS (
     SELECT 1 FROM reservaciones
     WHERE unidad = NEW.unidad
@@ -1760,6 +1767,56 @@ $$;
 
 
 ALTER FUNCTION public.guard_perfil_self_update() OWNER TO postgres;
+
+--
+-- Name: guard_reservacion_archivo(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.guard_reservacion_archivo() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+begin
+  if tg_op = 'INSERT' then
+    -- Nadie nace archivado: una reserva oculta desde el primer segundo no la
+    -- vería ni quien la creó.
+    new.archivada_en  := null;
+    new.archivada_por := null;
+    return new;
+  end if;
+
+  if new.archivada_en is distinct from old.archivada_en then
+    if not public.is_superadmin() then
+      raise exception 'No autorizado: solo el superadmin archiva o restaura una reservacion'
+        using hint = 'A2-C2';
+    end if;
+    if new.archivada_en is null then          -- restaurar
+      new.archivada_por := null;
+      return new;
+    end if;
+    if old.archivada_en is null then          -- archivar: fecha y autor, del servidor
+      new.archivada_en  := now();
+      new.archivada_por := auth.uid();
+    else                                      -- ya archivada: no se vuelve a sellar
+      new.archivada_en  := old.archivada_en;
+      new.archivada_por := old.archivada_por;
+    end if;
+  else
+    new.archivada_por := old.archivada_por;   -- el autor no se toca por separado
+  end if;
+
+  if new.archivada_en is not null
+     and not (new.estado in ('Cancelada', 'Rechazada')
+              or (new.estado = 'Completada' and coalesce(new.pagado, false))) then
+    raise exception 'Solo se archiva una reservacion cerrada: cancelada, rechazada, o completada con el pago registrado. Si esta archivada, restaurala antes de cambiarla.'
+      using hint = 'A2-C2';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION public.guard_reservacion_archivo() OWNER TO postgres;
 
 --
 -- Name: guard_reservacion_insert(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -4546,6 +4603,8 @@ CREATE TABLE public.reservaciones (
     documentos_carga text[],
     gps_link text,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    archivada_en timestamp with time zone,
+    archivada_por uuid,
     CONSTRAINT reservaciones_estado_check CHECK ((estado = ANY (ARRAY['Pendiente'::text, 'Activa'::text, 'PorAprobar'::text, 'CancelacionSolicitada'::text, 'Completada'::text, 'Cancelada'::text, 'Rechazada'::text]))),
     CONSTRAINT reservaciones_partes_presentes CHECK (((estado = ANY (ARRAY['Completada'::text, 'Cancelada'::text, 'Rechazada'::text])) OR ((cliente_user_id IS NOT NULL) AND (propietario_id IS NOT NULL)))),
     CONSTRAINT reservaciones_precio_acordado_positivo CHECK (((precio_acordado IS NULL) OR (precio_acordado > (0)::numeric))),
@@ -4607,6 +4666,20 @@ COMMENT ON COLUMN public.reservaciones.num_pedido_factura IS 'Carta Porte (SAT) 
 
 
 --
+-- Name: COLUMN reservaciones.archivada_en; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.reservaciones.archivada_en IS 'A2-C2: cuándo el superadmin la archivó (now() del servidor). NULL = en la lista. Archivar solo la oculta de Reservaciones: sigue en reportes, cobros y desempeño. La pone y la quita guard_reservacion_archivo.';
+
+
+--
+-- Name: COLUMN reservaciones.archivada_por; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.reservaciones.archivada_por IS 'A2-C2: el superadmin que la archivó. Lo pone guard_reservacion_archivo; no se escribe a mano.';
+
+
+--
 -- Name: reservaciones_historico; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -4630,6 +4703,13 @@ CREATE TABLE public.reservaciones_historico (
 
 
 ALTER TABLE public.reservaciones_historico OWNER TO postgres;
+
+--
+-- Name: TABLE reservaciones_historico; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.reservaciones_historico IS 'ARCHIVO ANTIGUO, solo lectura desde el 07/10 (A2-C2). Lo archivado antes de esa fecha, con 14 de sus columnas: el resto se perdió al borrar la original. Lo nuevo se archiva con reservaciones.archivada_en y no pasa por aquí.';
+
 
 --
 -- Name: COLUMN reservaciones_historico.archivado_en; Type: COMMENT; Schema: public; Owner: postgres
@@ -5339,6 +5419,13 @@ CREATE INDEX idx_plantillas_cliente ON public.plantillas_pedido USING btree (cli
 
 
 --
+-- Name: idx_reservaciones_archivada_por; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_reservaciones_archivada_por ON public.reservaciones USING btree (archivada_por) WHERE (archivada_por IS NOT NULL);
+
+
+--
 -- Name: idx_reservaciones_canc_resuelta_por; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -5738,6 +5825,13 @@ CREATE TRIGGER trg_guard_perfil_self_update BEFORE UPDATE ON public.perfiles FOR
 
 
 --
+-- Name: reservaciones trg_guard_reservacion_archivo; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_reservacion_archivo BEFORE INSERT OR UPDATE ON public.reservaciones FOR EACH ROW EXECUTE FUNCTION public.guard_reservacion_archivo();
+
+
+--
 -- Name: reservaciones trg_guard_reservacion_insert; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -6127,6 +6221,14 @@ ALTER TABLE ONLY public.perfiles
 
 ALTER TABLE ONLY public.plantillas_pedido
     ADD CONSTRAINT plantillas_pedido_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: reservaciones reservaciones_archivada_por_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reservaciones
+    ADD CONSTRAINT reservaciones_archivada_por_fkey FOREIGN KEY (archivada_por) REFERENCES auth.users(id) ON DELETE SET NULL;
 
 
 --
@@ -7263,6 +7365,14 @@ GRANT ALL ON FUNCTION public.guard_perfil_self_update() TO service_role;
 
 
 --
+-- Name: FUNCTION guard_reservacion_archivo(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.guard_reservacion_archivo() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.guard_reservacion_archivo() TO service_role;
+
+
+--
 -- Name: FUNCTION guard_reservacion_insert(); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -7804,7 +7914,7 @@ GRANT ALL ON TABLE public.reservaciones TO service_role;
 -- Name: TABLE reservaciones_historico; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE public.reservaciones_historico TO authenticated;
+GRANT SELECT ON TABLE public.reservaciones_historico TO authenticated;
 GRANT ALL ON TABLE public.reservaciones_historico TO service_role;
 
 
@@ -7895,5 +8005,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mdlcAPjThJEoR1wjGdDCRwTPdN8hcIvKngPOR2zqitO9WnPLClZHwYU7wnjQLxg
+\unrestrict gva9DQq47cHQqlDsmwlV63kLBrVy5aZMPhjPlmHpAVby0XrXnc1Nh2lmcva2Joe
 

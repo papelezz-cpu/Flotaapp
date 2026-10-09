@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1bNWziD9TesAvZG3i8pHCGfOJ7USqDYelBsRJcMYExGZRsMfMiz7KsfCT0q8p8d
+\restrict noLeQZ5EeldBCTdRMuxTAlLCdFB3kxs0t17JXsskFqbxMAJtHfdTJw7XNXyNH2N
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -142,5 +142,5 @@ eddea40f-2927-4876-9fce-530923b6f69a	ingreso_puerto	Factura comercial	Factura de
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1bNWziD9TesAvZG3i8pHCGfOJ7USqDYelBsRJcMYExGZRsMfMiz7KsfCT0q8p8d
+\unrestrict noLeQZ5EeldBCTdRMuxTAlLCdFB3kxs0t17JXsskFqbxMAJtHfdTJw7XNXyNH2N
 
