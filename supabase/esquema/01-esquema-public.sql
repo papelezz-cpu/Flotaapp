@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gva9DQq47cHQqlDsmwlV63kLBrVy5aZMPhjPlmHpAVby0XrXnc1Nh2lmcva2Joe
+\restrict V3Y9AAe2BYCPqjFDdVyaDUgwKtIGqIbceqplijdpNJC3qqVUlyqMCEC6aOVvTZL
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -1404,6 +1404,51 @@ COMMENT ON FUNCTION public.guard_oferta_insert() IS 'Q-04: un usuario final que 
 
 
 --
+-- Name: guard_oferta_unidad(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.guard_oferta_unidad() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $_$
+declare
+  v_tipo  text;
+  v_tabla text;
+  v_hay   boolean;
+begin
+  if new.camion_id is null then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' and new.camion_id is not distinct from old.camion_id then
+    return new;
+  end if;
+
+  select public.recurso_tipo_de_servicio(p.tipo_camion) into v_tipo
+    from public.pedidos p where p.id = new.pedido_id;
+  v_tabla := case v_tipo
+               when 'camion'   then 'camiones'
+               when 'custodio' then 'custodios'
+               when 'patio'    then 'patios'
+               when 'lavado'   then 'lavados'
+             end;
+  if v_tabla is null then
+    raise exception 'La oferta no tiene una solicitud válida a la que asociar la unidad %', new.camion_id
+      using hint = 'A2-C5';
+  end if;
+
+  execute format('select exists (select 1 from public.%I where id = $1)', v_tabla)
+     into v_hay using new.camion_id;
+  if not v_hay then
+    raise exception 'La unidad % no existe entre tus % (o no es del tipo que pide la solicitud)', new.camion_id, v_tabla
+      using hint = 'A2-C5';
+  end if;
+  return new;
+end $_$;
+
+
+ALTER FUNCTION public.guard_oferta_unidad() OWNER TO postgres;
+
+--
 -- Name: guard_oferta_update(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -1767,6 +1812,58 @@ $$;
 
 
 ALTER FUNCTION public.guard_perfil_self_update() OWNER TO postgres;
+
+--
+-- Name: guard_recurso_delete(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.guard_recurso_delete() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_tipo    text := case tg_table_name
+                      when 'camiones'  then 'camion'
+                      when 'custodios' then 'custodio'
+                      when 'patios'    then 'patio'
+                      when 'lavados'   then 'lavado'
+                    end;
+  v_reserva uuid;
+  v_pedido  uuid;
+begin
+  if v_tipo is null then
+    raise exception 'guard_recurso_delete: tabla no prevista (%)', tg_table_name;
+  end if;
+
+  select r.id into v_reserva
+    from public.reservaciones r
+   where r.unidad = old.id
+     and r.recurso_tipo = v_tipo
+     and r.estado in ('Pendiente', 'Activa', 'PorAprobar', 'CancelacionSolicitada')
+   limit 1;
+  if v_reserva is not null then
+    raise exception 'No se puede eliminar %: tiene un servicio en curso (reservación %). Espera a que se cierre o se cancele.', old.id, v_reserva
+      using hint = 'A2-C5';
+  end if;
+
+  select p.id into v_pedido
+    from public.ofertas o
+    join public.pedidos p on p.id = o.pedido_id
+   where o.camion_id = old.id
+     and o.estado in ('enviada', 'contra_oferta', 'aceptada')
+     and p.estado in ('abierto', 'en_negociacion', 'pendiente_acuerdo')
+     and public.recurso_tipo_de_servicio(p.tipo_camion) = v_tipo
+   limit 1;
+  if v_pedido is not null then
+    raise exception 'No se puede eliminar %: está ofrecida en una solicitud que sigue abierta (%). Retira la oferta o espera a que se resuelva.', old.id, v_pedido
+      using hint = 'A2-C5';
+  end if;
+
+  return old;
+end $$;
+
+
+ALTER FUNCTION public.guard_recurso_delete() OWNER TO postgres;
 
 --
 -- Name: guard_reservacion_archivo(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -5748,6 +5845,13 @@ CREATE TRIGGER trg_guard_oferta_insert BEFORE INSERT ON public.ofertas FOR EACH 
 
 
 --
+-- Name: ofertas trg_guard_oferta_unidad; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_oferta_unidad BEFORE INSERT OR UPDATE OF camion_id ON public.ofertas FOR EACH ROW EXECUTE FUNCTION public.guard_oferta_unidad();
+
+
+--
 -- Name: ofertas trg_guard_oferta_update; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -5822,6 +5926,34 @@ CREATE TRIGGER trg_guard_perfil_insert BEFORE INSERT ON public.perfiles FOR EACH
 --
 
 CREATE TRIGGER trg_guard_perfil_self_update BEFORE UPDATE ON public.perfiles FOR EACH ROW EXECUTE FUNCTION public.guard_perfil_self_update();
+
+
+--
+-- Name: camiones trg_guard_recurso_delete; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_recurso_delete BEFORE DELETE ON public.camiones FOR EACH ROW EXECUTE FUNCTION public.guard_recurso_delete();
+
+
+--
+-- Name: custodios trg_guard_recurso_delete; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_recurso_delete BEFORE DELETE ON public.custodios FOR EACH ROW EXECUTE FUNCTION public.guard_recurso_delete();
+
+
+--
+-- Name: lavados trg_guard_recurso_delete; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_recurso_delete BEFORE DELETE ON public.lavados FOR EACH ROW EXECUTE FUNCTION public.guard_recurso_delete();
+
+
+--
+-- Name: patios trg_guard_recurso_delete; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_guard_recurso_delete BEFORE DELETE ON public.patios FOR EACH ROW EXECUTE FUNCTION public.guard_recurso_delete();
 
 
 --
@@ -7317,6 +7449,14 @@ GRANT ALL ON FUNCTION public.guard_oferta_insert() TO service_role;
 
 
 --
+-- Name: FUNCTION guard_oferta_unidad(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.guard_oferta_unidad() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.guard_oferta_unidad() TO service_role;
+
+
+--
 -- Name: FUNCTION guard_oferta_update(); Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -7362,6 +7502,14 @@ GRANT ALL ON FUNCTION public.guard_perfil_insert() TO service_role;
 
 REVOKE ALL ON FUNCTION public.guard_perfil_self_update() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.guard_perfil_self_update() TO service_role;
+
+
+--
+-- Name: FUNCTION guard_recurso_delete(); Type: ACL; Schema: public; Owner: postgres
+--
+
+REVOKE ALL ON FUNCTION public.guard_recurso_delete() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.guard_recurso_delete() TO service_role;
 
 
 --
@@ -8005,5 +8153,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gva9DQq47cHQqlDsmwlV63kLBrVy5aZMPhjPlmHpAVby0XrXnc1Nh2lmcva2Joe
+\unrestrict V3Y9AAe2BYCPqjFDdVyaDUgwKtIGqIbceqplijdpNJC3qqVUlyqMCEC6aOVvTZL
 
