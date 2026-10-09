@@ -747,23 +747,55 @@ async function renderMisPendientes() {
   list.innerHTML = rows.join('');
 }
 
+// ── BORRAR UN RECURSO: primero la fila, los archivos después (S-15) ──
+// Antes se borraban los archivos de Storage y DESPUÉS la fila. Si la base
+// rechazaba el borrado —guard_operador_delete (S-08) con un chofer en un viaje
+// vivo, guard_recurso_delete (A2-C5) con una unidad en uso, o la RLS—, las
+// fotos y documentos ya se habían perdido y el recurso seguía ahí sin ellos.
+// Y un borrado que la RLS frena no da error: afecta 0 filas. Por eso se pide
+// .select('id') y solo cuenta como borrado si volvió la fila.
+// Devuelve true si la fila se borró. `bucket`/`rutas` son lo que hay que
+// limpiar después; se leen ANTES porque con la fila desaparece la lista.
+async function _borrarRecurso(tabla, id, { soloMio = false, bucket = null, rutas = [] } = {}) {
+  let q = sb.from(tabla).delete().eq('id', id);
+  if (soloMio) q = q.eq('propietario_id', currentUser.id);
+  const { data, error } = await q.select('id');
+  if (error) {
+    console.error(`No se pudo eliminar ${tabla} ${id}`, error);
+    showToast(error.message || 'No se pudo eliminar', 'error');
+    return false;
+  }
+  if (!data?.length) {
+    showToast('No se pudo eliminar: no tienes permiso o ya no existe.', 'error');
+    return false;
+  }
+  const limpias = rutas.filter(Boolean);
+  if (bucket && limpias.length) {
+    const { error: eArch } = await sb.storage.from(bucket).remove(limpias);
+    // La fila ya no existe: un archivo que no se pudo borrar queda huérfano,
+    // pero el recurso sí se eliminó. Se registra, no se le presenta como fallo.
+    if (eArch) console.error(`${id} eliminado, pero sus archivos no se pudieron borrar`, eArch);
+  }
+  return true;
+}
+
 function eliminarMiRecurso(tabla, id) {
   showConfirm(`¿Eliminar ${id}? Esta acción no se puede deshacer.`, async () => {
-  if (tabla === 'camiones') {
-    const { data: c } = await sb.from('camiones').select('archivos').eq('id', id).single();
-    if (c?.archivos?.length) await sb.storage.from('unidades').remove(c.archivos);
-  }
-  if (tabla === 'operadores') {
-    const { data: op } = await sb.from('operadores').select('foto_operador, foto_licencia').eq('id', id).single();
-    // Storage espera RUTAS: con las URL guardadas antes, este remove nunca
-    // borró nada. rutaDocStorage acepta las dos formas.
-    const files = [op?.foto_operador, op?.foto_licencia].map(v => rutaDocStorage('operadores', v)).filter(Boolean);
-    if (files.length) await sb.storage.from('operadores').remove(files);
-  }
-  const { error } = await sb.from(tabla).delete().eq('id', id).eq('propietario_id', currentUser.id);
-  if (error) { showToast('Error al eliminar', 'error'); return; }
-  showToast(`${id} eliminado`);
-  renderMisPendientes();
+    let bucket = null, rutas = [];
+    if (tabla === 'camiones') {
+      const { data: c } = await sb.from('camiones').select('archivos').eq('id', id).single();
+      bucket = 'unidades'; rutas = c?.archivos || [];
+    }
+    if (tabla === 'operadores') {
+      const { data: op } = await sb.from('operadores').select('foto_operador, foto_licencia').eq('id', id).single();
+      // Storage espera RUTAS: con las URL guardadas antes, este remove nunca
+      // borró nada. rutaDocStorage acepta las dos formas.
+      bucket = 'operadores';
+      rutas = [op?.foto_operador, op?.foto_licencia].map(v => rutaDocStorage('operadores', v));
+    }
+    if (!await _borrarRecurso(tabla, id, { soloMio: true, bucket, rutas })) return;
+    showToast(`${id} eliminado`);
+    renderMisPendientes();
   }, { danger: true, confirmLabel: 'Eliminar' });
 }
 
@@ -931,9 +963,7 @@ function rechazarUnidad(id) {
 function eliminarUnidad(id) {
   showConfirm(`¿Eliminar la unidad ${id}? Esta acción no se puede deshacer.`, async () => {
     const { data: c } = await sb.from('camiones').select('archivos').eq('id', id).single();
-    if (c?.archivos?.length) await sb.storage.from('unidades').remove(c.archivos);
-    const { error } = await sb.from('camiones').delete().eq('id', id);
-    if (error) { showToast('Error: no tienes permiso para eliminar esta unidad'); return; }
+    if (!await _borrarRecurso('camiones', id, { bucket: 'unidades', rutas: c?.archivos || [] })) return;
     await renderAdmin();
     showToast(`Unidad ${id} eliminada`);
   }, { danger: true, confirmLabel: 'Eliminar' });
@@ -1374,7 +1404,7 @@ async function guardarEdicionCustodio() {
 
 function eliminarCustodio(id) {
   showConfirm(`¿Eliminar custodio ${id}? Esta acción no se puede deshacer.`, async () => {
-    await sb.from('custodios').delete().eq('id', id);
+    if (!await _borrarRecurso('custodios', id)) return;
     await renderAdminCustodios();
     showToast(`Custodio ${id} eliminado`);
   }, { danger: true, confirmLabel: 'Eliminar' });
@@ -1525,7 +1555,7 @@ async function guardarEdicionPatio() {
 
 function eliminarPatio(id) {
   showConfirm(`¿Eliminar patio ${id}? Esta acción no se puede deshacer.`, async () => {
-    await sb.from('patios').delete().eq('id', id);
+    if (!await _borrarRecurso('patios', id)) return;
     await renderAdminPatios();
     showToast(`Patio ${id} eliminado`);
   }, { danger: true, confirmLabel: 'Eliminar' });
@@ -1666,7 +1696,7 @@ async function guardarEdicionLavado() {
 
 function eliminarLavado(id) {
   showConfirm(`¿Eliminar servicio de lavado ${id}? Esta acción no se puede deshacer.`, async () => {
-  await sb.from('lavados').delete().eq('id', id);
+  if (!await _borrarRecurso('lavados', id)) return;
   await renderAdminLavados();
   showToast(`Servicio ${id} eliminado`);
   }, { danger: true, confirmLabel: 'Eliminar' });
