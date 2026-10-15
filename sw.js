@@ -1,5 +1,5 @@
 // ── SERVICE WORKER — PortGo ────────────────────────────
-const CACHE      = 'portgo-v265';
+const CACHE      = 'portgo-v266';
 const DATA_CACHE = 'portgo-data-v1';
 
 const SHELL = [
@@ -9,8 +9,11 @@ const SHELL = [
   '/privacidad.html',
   '/terminos.html',
   '/manifest.json',
-  '/icon.svg',
-  '/icon-light.svg',
+  '/img/logo.png',
+  '/img/favicon-32.png',
+  '/img/apple-touch-icon.png',
+  '/img/icon-192.png',
+  '/img/icon-512.png',
   '/css/base.css',
   '/css/layout.css',
   '/css/components.css',

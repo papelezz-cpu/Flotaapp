@@ -2,7 +2,7 @@
 
 function _aplicarLogo(isLight) {
   document.querySelectorAll('.logo-icon').forEach(el => {
-    el.src = isLight ? 'icon-light.svg' : 'icon.svg';
+    el.src = 'img/logo.png'; // el emblema dorado sirve en ambos temas
   });
 }
 
