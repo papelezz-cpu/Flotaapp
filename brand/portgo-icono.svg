@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PortGo">
+  <title>PortGo</title>
+  <rect width="512" height="512" rx="116" fill="#0f2a26"/>
+  <g transform="translate(-22,22) scale(1.18)" transform-origin="256 256">
+    <polygon points="256.0,138.0 286.0,256.0 226.0,256.0" fill="#2dd4bf"/>
+    <polygon points="374.0,256.0 256.0,286.0 256.0,226.0" fill="#2dd4bf"/>
+    <polygon points="256.0,374.0 226.0,256.0 286.0,256.0" fill="#2dd4bf"/>
+    <polygon points="138.0,256.0 256.0,226.0 256.0,286.0" fill="#2dd4bf"/>
+    <polygon points="306.9,306.9 240.4,271.6 271.6,240.4" fill="#2dd4bf"/>
+    <polygon points="205.1,306.9 240.4,240.4 271.6,271.6" fill="#2dd4bf"/>
+    <polygon points="205.1,205.1 271.6,240.4 240.4,271.6" fill="#2dd4bf"/>
+    <line x1="256" y1="256" x2="362.1" y2="149.9" stroke="#2dd4bf" stroke-width="26" stroke-linecap="round"/>
+  <polygon points="394.6,117.4 387.6,175.4 336.6,124.4" fill="#2dd4bf"/>
+    <circle cx="256" cy="256" r="29" fill="none" stroke="#2dd4bf" stroke-width="19"/>
+  </g>
+</svg>
