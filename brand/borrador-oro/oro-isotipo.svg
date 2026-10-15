@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PortGo">
+  <title>PortGo</title>
+  <defs>
+    <linearGradient id="oro" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0"   stop-color="#F0D49B"/>
+      <stop offset=".42" stop-color="#C9A571"/>
+      <stop offset="1"   stop-color="#6B4F2E"/>
+    </linearGradient>
+    <linearGradient id="oroClaro" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0"   stop-color="#FBE9C4"/>
+      <stop offset=".5"  stop-color="#D9B87E"/>
+      <stop offset="1"   stop-color="#8A6D4E"/>
+    </linearGradient>
+    <linearGradient id="acero" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0"   stop-color="#E4E7E8"/>
+      <stop offset=".5"  stop-color="#A8ACAE"/>
+      <stop offset="1"   stop-color="#5E6061"/>
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="206" fill="none" stroke="url(#oro)" stroke-width="7"/>
+  <circle cx="256.0" cy="50.0" r="14" fill="url(#oroClaro)"/>
+  <circle cx="462.0" cy="256.0" r="14" fill="url(#oroClaro)"/>
+  <circle cx="256.0" cy="462.0" r="14" fill="url(#oroClaro)"/>
+  <circle cx="50.0" cy="256.0" r="14" fill="url(#oroClaro)"/>
+  <path d="M 404.5 202.0 A 158 158 0 0 1 202.0 404.5" fill="none" stroke="url(#acero)" stroke-width="28"/>
+  <polygon points="163.5,390.5 215.1,377.3 194.6,433.7" fill="url(#acero)"/>
+  <path d="M 107.5 310.0 A 158 158 0 0 1 310.0 107.5" fill="none" stroke="url(#oro)" stroke-width="28"/>
+  <polygon points="348.5,121.5 296.9,134.7 317.4,78.3" fill="url(#oro)"/>
+  <polygon points="256.0,144.0 285.0,256.0 227.0,256.0" fill="url(#acero)"/>
+  <polygon points="368.0,256.0 256.0,285.0 256.0,227.0" fill="url(#acero)"/>
+  <polygon points="256.0,368.0 227.0,256.0 285.0,256.0" fill="url(#acero)"/>
+  <polygon points="144.0,256.0 256.0,227.0 256.0,285.0" fill="url(#acero)"/>
+  <polygon points="304.1,304.1 241.2,270.8 270.8,241.2" fill="url(#oro)"/>
+  <polygon points="207.9,304.1 241.2,241.2 270.8,270.8" fill="url(#oro)"/>
+  <polygon points="207.9,207.9 270.8,241.2 241.2,270.8" fill="url(#oro)"/>
+  <line x1="256" y1="256" x2="394.6" y2="117.4" stroke="url(#oroClaro)" stroke-width="30" stroke-linecap="round"/>
+  <polygon points="431.4,80.6 424.3,147.1 364.9,87.7" fill="url(#oroClaro)"/>
+  <circle cx="256" cy="256" r="28" fill="none" stroke="url(#oroClaro)" stroke-width="18"/>
+</svg>
