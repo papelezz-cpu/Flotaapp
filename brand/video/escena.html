@@ -1,0 +1,248 @@
+<!-- Escenario del video PortGo · tema Evolución (teal + bronce).
+     seek(t) deja la escena en el segundo t de forma determinista: no hay
+     animaciones de CSS ni requestAnimationFrame, así que la captura cuadro a
+     cuadro sale idéntica sin importar lo que tarde el render.
+     Todo se dimensiona en vmin para que el mismo archivo sirva en 9:16, 16:9 y 1:1.
+
+     Las afirmaciones del guion salen de docs/FLUJO-OPERATIVO.md: ofertas de
+     varias empresas, revisión de permiso SCT y seguros, seguimiento por etapas
+     y la fecha límite de vacíos con sus demoras. NO se menciona chat: se
+     retiró del producto a propósito (FLUJO-OPERATIVO, "Cómo se hablan"). -->
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAF8F3; --surface:#FFFFFF; --ink:#1C2A33; --muted:#5E6B70;
+    --teal:#1F6F6A; --bronze:#A8712F; --bronze-soft:#F3ECE0; --bronze-text:#8A5A22;
+    --border:#ECE5D8; --border-warm:#E6DCCB; --alert:#C2462E;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--bg)}
+  body{font-family:'DM Sans',system-ui,sans-serif;color:var(--ink);
+       display:flex;align-items:center;justify-content:center}
+  #esc{position:relative;width:100%;height:100%;overflow:hidden}
+  .cap{position:absolute;inset:0;display:flex;flex-direction:column;
+       align-items:center;justify-content:center;padding:0 7vmin;text-align:center;
+       will-change:opacity,transform}
+  .kicker{font-size:2.5vmin;font-weight:500;letter-spacing:.42vmin;
+          text-transform:uppercase;color:var(--muted);margin-bottom:2.6vmin}
+  .tit{font-family:'Sora',sans-serif;font-size:7.2vmin;font-weight:700;
+       line-height:1.12;letter-spacing:-.18vmin}
+  .tit em{font-style:normal;color:var(--teal)}
+  .tit b{font-weight:700;color:var(--bronze)}
+  .sub{font-size:3.2vmin;color:var(--muted);line-height:1.45;margin-top:3vmin;max-width:64vmin}
+
+  /* 1 · el desorden del WhatsApp */
+  .burbujas{display:flex;flex-direction:column;gap:1.8vmin;margin-top:4.5vmin;width:min(68vmin,86%)}
+  .bur{align-self:flex-start;background:var(--surface);border:1px solid var(--border);
+       border-radius:2.2vmin 2.2vmin 2.2vmin .5vmin;padding:1.9vmin 2.6vmin;
+       font-size:2.6vmin;color:var(--muted);text-align:left;
+       box-shadow:0 .4vmin 1.6vmin rgba(28,42,51,.06)}
+  .bur.yo{align-self:flex-end;background:var(--teal);color:#fff;border-color:var(--teal);
+          border-radius:2.2vmin 2.2vmin .5vmin 2.2vmin}
+
+  /* 3 · la marca */
+  .marca{display:flex;align-items:center;gap:3.4vmin;will-change:opacity,transform}
+  .marca img{width:26vmin;height:26vmin;object-fit:contain;flex:0 0 auto}
+  .wm{font-family:'Sora',sans-serif;font-size:11vmin;font-weight:700;
+      letter-spacing:-.5vmin;line-height:1}
+  .wm span{color:var(--bronze)}
+  .baja{font-size:2.4vmin;font-weight:500;letter-spacing:.42vmin;
+        color:var(--muted);margin-top:1.4vmin;text-transform:uppercase;line-height:1.6}
+
+  /* 4 · pasos */
+  .pasos{display:flex;gap:2.6vmin;margin-top:5vmin;width:min(84vmin,94%);
+         justify-content:center;flex-wrap:wrap}
+  .paso{flex:1 1 20vmin;min-width:20vmin;background:var(--surface);
+        border:1px solid var(--border);border-radius:2.4vmin;padding:3.4vmin 2.4vmin;
+        box-shadow:0 .8vmin 2.8vmin rgba(28,42,51,.07);will-change:opacity,transform}
+  .num{width:6.4vmin;height:6.4vmin;border-radius:1.6vmin;background:var(--bronze-soft);
+       border:1px solid var(--border-warm);color:var(--bronze-text);
+       display:flex;align-items:center;justify-content:center;
+       font-size:3vmin;font-weight:700;margin:0 auto 2.2vmin}
+  .paso h4{font-family:'Sora',sans-serif;font-size:3vmin;font-weight:700;margin-bottom:1.1vmin}
+  .paso p{font-size:2.3vmin;color:var(--muted);line-height:1.4}
+
+  /* 5 · confianza */
+  .sellos{display:flex;flex-direction:column;gap:2.2vmin;margin-top:4.5vmin;width:min(66vmin,88%)}
+  .sello{display:flex;align-items:center;gap:2.4vmin;background:var(--surface);
+         border:1px solid var(--border);border-radius:1.9vmin;padding:2.5vmin 3vmin;
+         text-align:left;will-change:opacity,transform}
+  .tick{flex:0 0 auto;width:5vmin;height:5vmin;border-radius:1.3vmin;
+        background:var(--bronze-soft);border:1px solid var(--border-warm);
+        color:var(--bronze-text);display:flex;align-items:center;justify-content:center;
+        font-size:2.6vmin;font-weight:700}
+  .sello span{font-size:2.8vmin;font-weight:500}
+
+  /* 6 · demoras — el reemplazo del chat */
+  .dem{margin-top:4.5vmin;width:min(72vmin,92%);background:var(--surface);
+       border:1px solid var(--border);border-radius:2.6vmin;overflow:hidden;
+       box-shadow:0 1.2vmin 3.4vmin rgba(28,42,51,.09);will-change:opacity,transform}
+  .dem-top{background:var(--bronze-soft);border-bottom:1px solid var(--border-warm);
+           padding:2.2vmin 3vmin;font-size:2.4vmin;font-weight:600;color:var(--bronze-text);
+           letter-spacing:.2vmin;text-transform:uppercase;text-align:left}
+  .dem-body{padding:3.4vmin 3vmin;display:flex;align-items:center;gap:3vmin}
+  .dem-dias{flex:0 0 auto;width:17vmin;height:17vmin;border-radius:50%;
+            border:.9vmin solid var(--alert);display:flex;flex-direction:column;
+            align-items:center;justify-content:center;color:var(--alert)}
+  .dem-n{font-family:'Sora',sans-serif;font-size:7vmin;font-weight:700;line-height:1}
+  .dem-l{font-size:1.9vmin;font-weight:600;letter-spacing:.2vmin;text-transform:uppercase}
+  .dem-txt{text-align:left}
+  .dem-txt strong{display:block;font-family:'Sora',sans-serif;font-size:3.2vmin;margin-bottom:.9vmin}
+  .dem-txt p{font-size:2.4vmin;color:var(--muted);line-height:1.45}
+
+  .url{font-family:'Sora',sans-serif;font-size:4vmin;font-weight:700;
+       color:var(--bronze);margin-top:5vmin}
+
+  @media (min-aspect-ratio: 13/10){
+    .sub{max-width:112vmin}
+    .burbujas{width:min(104vmin,70%)}
+    .pasos{width:min(152vmin,92%)}
+    .sellos{width:min(104vmin,74%)}
+    .dem{width:min(112vmin,78%)}
+  }
+  @media (max-aspect-ratio: 13/10){
+    .sub{max-width:76vmin}
+    .pasos{flex-direction:column;gap:2vmin;width:min(76vmin,92%)}
+    .paso{display:flex;align-items:flex-start;gap:2.8vmin;text-align:left;
+          padding:2.8vmin 3vmin;flex:0 0 auto}
+    .num{margin:0;flex:0 0 auto;width:7vmin;height:7vmin;font-size:3.3vmin}
+    .paso h4{font-size:3.2vmin;margin-bottom:.7vmin}
+    .paso p{font-size:2.5vmin}
+  }
+</style>
+
+<div id="esc">
+  <!-- 1 · el problema -->
+  <div class="cap" id="s1">
+    <div class="kicker">Sacar carga del puerto de Manzanillo</div>
+    <div class="tit">¿Otra vez buscando<br>camión por <em>WhatsApp</em>?</div>
+    <div class="burbujas">
+      <div class="bur" id="b1">¿Tienes un torton para el jueves?</div>
+      <div class="bur yo" id="b2">Déjame checo y te aviso…</div>
+      <div class="bur" id="b3">¿Y cuánto me cobrarías?</div>
+    </div>
+  </div>
+
+  <!-- 2 · por qué duele -->
+  <div class="cap" id="s2">
+    <div class="tit">Diez llamadas.<br>Ningún precio <em>comparable</em>.</div>
+    <div class="sub">No sabes si te están cobrando de más, ni si la unidad trae los papeles en regla para entrar a puerto.</div>
+  </div>
+
+  <!-- 3 · la marca -->
+  <div class="cap" id="s3">
+    <div class="marca" id="marca">
+      <img src="logo.png" alt="PortGo">
+      <div style="text-align:left">
+        <div class="wm">Port<span>Go</span></div>
+        <div class="baja">Plataforma digital<br>que mueve al mundo</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 · cómo funciona -->
+  <div class="cap" id="s4">
+    <div class="tit" style="font-size:6.2vmin">Publica una vez.<br>Que <em>te ofrezcan</em> a ti.</div>
+    <div class="pasos">
+      <div class="paso" id="p1"><div class="num">1</div><h4>Describe tu carga</h4>
+        <p>Qué mueves, de dónde a dónde y cuándo. El sistema te propone la unidad.</p></div>
+      <div class="paso" id="p2"><div class="num">2</div><h4>Recibes ofertas</h4>
+        <p>Varias empresas te cotizan. Compáralas lado a lado o haz contraoferta.</p></div>
+      <div class="paso" id="p3"><div class="num">3</div><h4>Eliges y listo</h4>
+        <p>Aceptas la que te conviene y sigues tu carga hasta la entrega.</p></div>
+    </div>
+  </div>
+
+  <!-- 5 · confianza -->
+  <div class="cap" id="s5">
+    <div class="tit" style="font-size:6.4vmin">Con quien <em>sí</em> puede<br>entrar a puerto.</div>
+    <div class="sellos">
+      <div class="sello" id="t1"><div class="tick">✓</div><span>Permiso SCT y seguros vigentes, revisados uno por uno</span></div>
+      <div class="sello" id="t2"><div class="tick">✓</div><span>Seguimiento del viaje, de la recolección a la entrega</span></div>
+    </div>
+  </div>
+
+  <!-- 6 · demoras (reemplaza al chat) -->
+  <div class="cap" id="s6">
+    <div class="tit" style="font-size:6.2vmin">Y te avisa antes de que<br>corran las <b>demoras</b>.</div>
+    <div class="dem" id="demcard">
+      <div class="dem-top">Entrega de vacíos</div>
+      <div class="dem-body">
+        <div class="dem-dias"><span class="dem-n" id="demn">3</span><span class="dem-l">días</span></div>
+        <div class="dem-txt">
+          <strong>Devolver antes del 18/10</strong>
+          <p>El contenedor vacío tiene fecha límite. Pasada, el naviero cobra por día.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7 · cierre -->
+  <div class="cap" id="s7">
+    <img src="logo.png" alt="PortGo" style="width:19vmin;height:19vmin;object-fit:contain">
+    <div class="wm" style="font-size:9vmin;margin-top:3vmin">Port<span>Go</span></div>
+    <div class="sub" style="margin-top:2.4vmin;font-size:3.3vmin">Cotiza tu próximo viaje desde el puerto<br>sin hacer una sola llamada.</div>
+    <div class="url" id="url">portgo.mx</div>
+  </div>
+</div>
+
+<script>
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const p=(t,a,b)=>clamp((t-a)/(b-a),0,1);
+const out=x=>1-Math.pow(1-x,3);
+const io =x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const $=id=>document.getElementById(id);
+
+const ESCENAS=[['s1',0.0,3.6],['s2',3.6,6.6],['s3',6.6,9.6],['s4',9.6,16.0],
+               ['s5',16.0,19.6],['s6',19.6,23.6],['s7',23.6,27.2]];
+const DUR=27.2, FADE=0.45;
+
+function capa(id,t,ini,fin){
+  const el=$(id);
+  const ent=p(t,ini,ini+FADE), sal=1-p(t,fin-FADE,fin);
+  const vis=Math.min(ent,sal);
+  el.style.opacity=vis;
+  el.style.transform=`translateY(${(1-out(ent))*3.2}vmin) scale(${0.985+0.015*out(ent)})`;
+}
+
+function seek(t){
+  for(const [id,a,b] of ESCENAS) capa(id,t,a,b);
+
+  // 1 · burbujas escalonadas
+  ['b1','b2','b3'].forEach((id,i)=>{
+    const k=out(p(t,0.9+i*0.52,1.5+i*0.52));
+    $(id).style.opacity=k; $(id).style.transform=`translateY(${(1-k)*2.2}vmin)`;
+  });
+
+  // 3 · el emblema entra con escala; es PNG, no se puede trazar como el SVG
+  const m=out(p(t,6.9,8.4));
+  $('marca').style.transform=`scale(${0.9+0.1*m})`;
+
+  // 4 · tarjetas de pasos
+  ['p1','p2','p3'].forEach((id,i)=>{
+    const k=out(p(t,10.3+i*0.42,11.1+i*0.42));
+    $(id).style.opacity=k; $(id).style.transform=`translateY(${(1-k)*3.4}vmin)`;
+  });
+
+  // 5 · sellos
+  ['t1','t2'].forEach((id,i)=>{
+    const k=out(p(t,16.5+i*0.36,17.2+i*0.36));
+    $(id).style.opacity=k; $(id).style.transform=`translateX(${(1-k)*-3}vmin)`;
+  });
+
+  // 6 · la tarjeta de demoras entra y el contador baja 7→3
+  const d=out(p(t,20.2,21.0));
+  $('demcard').style.opacity=d;
+  $('demcard').style.transform=`translateY(${(1-d)*3.4}vmin) scale(${0.97+0.03*d})`;
+  const cuenta=p(t,21.1,22.4);
+  $('demn').textContent = Math.round(7 - 4*io(cuenta));
+
+  // 7 · la URL late una vez al entrar
+  const u=p(t,24.3,24.9);
+  $('url').style.opacity=out(p(t,24.1,24.7));
+  $('url').style.transform=`scale(${u>0?1+0.06*Math.sin(io(u)*Math.PI):1})`;
+}
+window.seek=seek; window.DUR=DUR;
+seek(0);
+</script>
