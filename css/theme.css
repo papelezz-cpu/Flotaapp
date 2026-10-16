@@ -37,8 +37,9 @@
 
   --pg-bronze:        #A8712F;  /* "Go", íconos del header, acentos */
   --pg-bronze-rgb:    168,113,47;
+  --pg-bronze-soft:   #F3ECE0;  /* fondo del chip del ícono (= pastilla) */
   --pg-bronze-light:  #C9A06A;  /* borde en hover */
-  --pg-bronze-text:   #8A5A22;  /* bronce para texto pequeño */
+  --pg-bronze-text:   #8A5A22;  /* bronce para texto pequeño e íconos */
 
   /* Estados */
   --pg-alert:         #C2462E;
@@ -126,7 +127,8 @@ body.light .home-card:hover {
 body.light .hc-icon {
   width: 54px; height: 54px; margin: 0 auto 14px;
   display: flex; align-items: center; justify-content: center;
-  background: var(--pg-teal-soft); color: var(--pg-teal);
+  background: var(--pg-bronze-soft); color: var(--pg-bronze-text);
+  border: 1px solid var(--pg-border-warm);
   border-radius: 15px;
 }
 body.light .hc-title { color: var(--pg-ink); }
@@ -384,10 +386,14 @@ body.light .ped-serv-btn:focus-visible {
   box-shadow: var(--pg-shadow-hover);
 }
 
-/* El chip del ícono se queda teal: es lo que separa la acción de la marca */
+/* El chip del ícono en bronce claro, igual que la pastilla de usuario.
+   El ícono va en --pg-bronze-text y no en --pg-bronze: sobre este crema
+   el primero da 5.0:1 y el segundo 3.5:1. El teal anterior daba 5.0:1,
+   así que la legibilidad queda igual que antes. */
 body.light .hc-icon {
-  background: var(--pg-teal-soft);
-  color: var(--pg-teal);
+  background: var(--pg-bronze-soft);
+  color: var(--pg-bronze-text);
+  border: 1px solid var(--pg-border-warm);
   border-radius: var(--pg-radius-chip);
 }
 
