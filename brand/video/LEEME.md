@@ -38,6 +38,15 @@ libre entre cliente y empresa se retiró del producto a propósito
 En su lugar la apertura cuenta **llamadas**: un contador que sube de 1 a 10, y
 dos cotizaciones que no se parecen con una incógnita al lado.
 
+## El puerto, en general
+
+El guion dice «sacar carga del puerto», sin nombrar Manzanillo. Es decisión de
+posicionamiento, no un descuido. **Ojo: el resto del producto sí lo nombra** —
+ lo lleva en la meta descripción, el badge «Puerto de Manzanillo ·
+Red verificada», el pie y las rutas de ejemplo;  en tres sitios. Si
+el mensaje va a ser genérico, esos contradicen al video. ( es otra
+cosa: ahí Manzanillo es el centro por omisión del mapa y debe quedarse.)
+
 ## Cómo se vuelve a generar
 
 `escena.html` es el video. No usa animaciones de CSS: expone `seek(t)`, que
