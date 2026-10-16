@@ -1454,6 +1454,46 @@ body.light .rechazo-info   { background: rgba(197,48,48,0.05); border-color: rgb
   animation: logoBrillo .9s ease-out .05s forwards;
 }
 @keyframes logoBrillo { to { background-position: -30% 0; opacity: 0; } }
+/* Espiral: las mitades de arriba (arco plateado) y de abajo (arco dorado) giran
+   en sentidos opuestos hacia el centro; cada vez que se cruzan cambia cuál va
+   encima (logoTejer), y así se entrelazan. Cruces en p = .059, .206, .450. */
+.logo-pieza.espiral { opacity: 1; animation: none; }
+.logo-pieza.espiral-arriba { animation: logoEspiralArriba 1.8s linear forwards, logoTejer 1.8s linear forwards; }
+.logo-pieza.espiral-abajo  { z-index: 2; animation: logoEspiralAbajo 1.8s linear forwards; }
+@keyframes logoEspiralArriba {
+  0.0% { transform: rotate(-540.0deg) translateY(-60.0px) rotate(90.0deg) scale(0.400); opacity: 0.00; }
+  8.3% { transform: rotate(-415.9deg) translateY(-46.2px) rotate(69.3deg) scale(0.538); opacity: 0.56; }
+  16.7% { transform: rotate(-312.5deg) translateY(-34.7px) rotate(52.1deg) scale(0.653); }
+  25.0% { transform: rotate(-227.8deg) translateY(-25.3px) rotate(38.0deg) scale(0.747); }
+  33.3% { transform: rotate(-160.0deg) translateY(-17.8px) rotate(26.7deg) scale(0.822); }
+  41.7% { transform: rotate(-107.2deg) translateY(-11.9px) rotate(17.9deg) scale(0.881); }
+  50.0% { transform: rotate(-67.5deg) translateY(-7.5px) rotate(11.2deg) scale(0.925); }
+  58.3% { transform: rotate(-39.1deg) translateY(-4.3px) rotate(6.5deg) scale(0.957); }
+  66.7% { transform: rotate(-20.0deg) translateY(-2.2px) rotate(3.3deg) scale(0.978); }
+  75.0% { transform: rotate(-8.4deg) translateY(-0.9px) rotate(1.4deg) scale(0.991); }
+  83.3% { transform: rotate(-2.5deg) translateY(-0.3px) rotate(0.4deg) scale(0.997); }
+  91.7% { transform: rotate(-0.3deg) translateY(-0.0px) rotate(0.1deg) scale(1.000); }
+  100.0% { transform: rotate(-0.0deg) translateY(-0.0px) rotate(0.0deg) scale(1.000); }
+}
+@keyframes logoEspiralAbajo {
+  0.0% { transform: rotate(540.0deg) translateY(60.0px) rotate(-90.0deg) scale(0.400); opacity: 0.00; }
+  8.3% { transform: rotate(415.9deg) translateY(46.2px) rotate(-69.3deg) scale(0.538); opacity: 0.56; }
+  16.7% { transform: rotate(312.5deg) translateY(34.7px) rotate(-52.1deg) scale(0.653); }
+  25.0% { transform: rotate(227.8deg) translateY(25.3px) rotate(-38.0deg) scale(0.747); }
+  33.3% { transform: rotate(160.0deg) translateY(17.8px) rotate(-26.7deg) scale(0.822); }
+  41.7% { transform: rotate(107.2deg) translateY(11.9px) rotate(-17.9deg) scale(0.881); }
+  50.0% { transform: rotate(67.5deg) translateY(7.5px) rotate(-11.2deg) scale(0.925); }
+  58.3% { transform: rotate(39.1deg) translateY(4.3px) rotate(-6.5deg) scale(0.957); }
+  66.7% { transform: rotate(20.0deg) translateY(2.2px) rotate(-3.3deg) scale(0.978); }
+  75.0% { transform: rotate(8.4deg) translateY(0.9px) rotate(-1.4deg) scale(0.991); }
+  83.3% { transform: rotate(2.5deg) translateY(0.3px) rotate(-0.4deg) scale(0.997); }
+  91.7% { transform: rotate(0.3deg) translateY(0.0px) rotate(-0.1deg) scale(1.000); }
+  100.0% { transform: rotate(0.0deg) translateY(0.0px) rotate(-0.0deg) scale(1.000); }
+}
+@keyframes logoTejer {
+  0%, 5.9% { z-index: 1; }  6%, 20.5% { z-index: 3; }
+  20.6%, 44.9% { z-index: 1; }  45%, 100% { z-index: 3; }
+}
 @media (prefers-reduced-motion: reduce) {
   .logo-pieza, .home-logo-wrap.armado::after { animation: none; display: none; }
 }

@@ -63,8 +63,13 @@ function _hcIcon(name) {
 
 // Armado del emblema de la portada: una vez por carga de página, con sesión
 // (antes de iniciar sesión la portada queda tapada por el login).
+// Efectos: 'armado' (centro + ocho piezas del anillo) | 'espiral' (las dos
+// mitades se entrelazan girando). Para probar otro: ?logo=armado en la URL.
+const LOGO_EFECTO = 'espiral';
 let _logoArmado = false;
 function armarLogoHome() {
+  const efecto = new URLSearchParams(location.search).get('logo') || LOGO_EFECTO;
+  if (efecto === 'espiral') return _logoEspiral();
   const wrap = document.getElementById('home-logo');
   if (!wrap || _logoArmado || !currentUser) return;
   _logoArmado = true;
@@ -91,12 +96,36 @@ function armarLogoHome() {
       '--r': `${i % 2 ? 35 : -35}deg`, '--s': '0.8', '--d': `${(0.25 + i * 0.07).toFixed(2)}s`
     });
   }
+  _logoAnimar(wrap, piezas, 1550);
+}
+
+// Corte por la diagonal de la flecha (~33.5°): arriba el arco plateado, abajo el dorado
+function _logoEspiral() {
+  const wrap = document.getElementById('home-logo');
+  if (!wrap || _logoArmado || !currentUser) return;
+  _logoArmado = true;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const mitades = {
+    'espiral-arriba': 'polygon(-33.4% 105.2%, 133.4% -5.2%, 133.4% -100%, -100% -100%, -100% 105.2%)',
+    'espiral-abajo':  'polygon(-33.4% 105.2%, 133.4% -5.2%, 200% -5.2%, 200% 200%, -100% 200%)'
+  };
+  const piezas = Object.entries(mitades).map(([cls, clip]) => {
+    const img = document.createElement('img');
+    img.src = 'img/logo.png'; img.alt = ''; img.className = `logo-pieza espiral ${cls}`;
+    img.style.clipPath = img.style.webkitClipPath = clip;
+    wrap.appendChild(img);
+    return img;
+  });
+  _logoAnimar(wrap, piezas, 1800);
+}
+
+function _logoAnimar(wrap, piezas, ms) {
   wrap.classList.remove('armado'); wrap.classList.add('armando');
-  // Última pieza: 0.25 + 7·0.07 + 0.75 ≈ 1.5 s. Entonces se muestra la imagen entera
+  // Al terminar la última pieza se muestra la imagen entera (armado: 0.25 + 7·0.07 + 0.75 ≈ 1.5 s)
   setTimeout(() => {
     wrap.classList.replace('armando', 'armado');
     piezas.forEach(p => p.remove());
-  }, 1550);
+  }, ms);
 }
 
 function renderHome() {
