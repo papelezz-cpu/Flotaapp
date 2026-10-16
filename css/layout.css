@@ -14,8 +14,10 @@ header {
 
 /* ── LOGO ────────────────────────────────────────────── */
 .logo {
-  font-family: 'Syne', sans-serif;
-  font-weight: 800; font-size: 1.3rem;
+  font-family: 'Sora', 'Syne', sans-serif;
+  font-weight: 700; font-size: 1.3rem;
+  /* --white se invierte con el tema: tinta en claro, claro en oscuro.
+     Fijarlo a --pg-ink dejaba el logotipo invisible en modo oscuro. */
   color: var(--white); letter-spacing: -0.5px;
   display: flex; align-items: center; gap: 8px;
 }

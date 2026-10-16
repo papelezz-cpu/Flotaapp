@@ -3,19 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#0d9488">
+<meta name="theme-color" content="#1F6F6A">
 <title>PortGo — La logística del puerto, por fin clara</title>
 <meta name="description" content="Conecta con transportistas verificados, compara ofertas reales y rastrea cada embarque del puerto de Manzanillo. Una plataforma, cero llamadas a ciegas.">
 <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --sand:#faf8f3; --surface:#ffffff; --ink:#102a26; --muted:#4f6661; --muted2:#7c8a85;
-    --teal:#0d9488; --teal-dark:#0f766e; --teal-soft:#e3f1ee; --line:#e6e1d6; --line2:#ece7da;
-    --ink-deep:#102a26; --coral:#c0573a; --coral-soft:#fbeee8;
+    /* Tema Evolución: mismos valores que los tokens --pg-* de css/theme.css */
+    --sand:#faf8f3; --surface:#ffffff; --ink:#1C2A33; --muted:#5E6B70; --muted2:#7A858A;
+    --teal:#1F6F6A; --teal-dark:#17544F; --teal-soft:#E3EEEB; --line:#ECE5D8; --line2:#EDE6DA;
+    --ink-deep:#1C2A33; --coral:#C2462E; --coral-soft:#FBEEE8;
+    --bronze:#A8712F; --bronze-light:#C9A06A;
   }
   *{ margin:0; padding:0; box-sizing:border-box; }
   html{ scroll-behavior:smooth; }
@@ -39,7 +41,8 @@
   .nav-inner{ display:flex; align-items:center; justify-content:space-between; padding:16px 32px; max-width:1180px; margin:0 auto; }
   .brand{ display:flex; align-items:center; gap:10px; }
   .brand-mark{ width:36px; height:36px; object-fit:contain; display:block; }
-  .brand-name{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:22px; }
+  .brand-name{ font-family:'Sora','Space Grotesk',sans-serif; font-weight:700; font-size:22px; letter-spacing:-.5px; }
+  .brand-name .go{ color:var(--bronze); }
   .nav-links{ display:flex; align-items:center; gap:32px; font-size:14.5px; color:var(--muted); }
   .nav-cta{ display:flex; align-items:center; gap:14px; }
   .nav-enter{ font-size:14.5px; color:var(--muted); cursor:pointer; }
@@ -184,7 +187,7 @@
   <div class="nav-inner">
     <a class="brand" href="app.html">
       <img class="brand-mark" src="img/logo.png" alt="">
-      <span class="brand-name">PortGo</span>
+      <span class="brand-name">Port<span class="go">Go</span></span>
     </a>
     <nav class="nav-links">
       <a href="#como">Cómo funciona</a>
@@ -245,38 +248,38 @@
         <rect x="0" y="356" width="480" height="14" fill="#7c8a85" opacity="0.35"/>
         <!-- pilas de contenedores -->
         <g>
-          <rect x="40"  y="250" width="58" height="26" rx="3" fill="#0d9488"/>
-          <rect x="40"  y="278" width="58" height="22" rx="3" fill="#0f766e"/>
-          <rect x="102" y="262" width="58" height="38" rx="3" fill="#c0573a"/>
-          <rect x="360" y="258" width="56" height="42" rx="3" fill="#e0a23e"/>
-          <rect x="418" y="270" width="50" height="30" rx="3" fill="#0d9488"/>
+          <rect x="40"  y="250" width="58" height="26" rx="3" fill="#1F6F6A"/>
+          <rect x="40"  y="278" width="58" height="22" rx="3" fill="#17544F"/>
+          <rect x="102" y="262" width="58" height="38" rx="3" fill="#C2462E"/>
+          <rect x="360" y="258" width="56" height="42" rx="3" fill="#C9A06A"/>
+          <rect x="418" y="270" width="50" height="30" rx="3" fill="#1F6F6A"/>
         </g>
         <!-- carretera -->
-        <rect x="0" y="370" width="480" height="150" fill="#cfe5e0"/>
+        <rect x="0" y="370" width="480" height="150" fill="#D4E5E1"/>
         <g stroke="#ffffff" stroke-width="5" stroke-dasharray="26 22" stroke-linecap="round" opacity="0.85">
           <line x1="0" y1="470" x2="480" y2="470"/>
         </g>
         <!-- tractocamión (primer plano) -->
         <g>
           <!-- caja/remolque -->
-          <rect x="58" y="372" width="190" height="92" rx="6" fill="#0f766e"/>
-          <rect x="58" y="372" width="190" height="92" rx="6" fill="none" stroke="#0c5f59" stroke-width="2"/>
-          <line x1="120" y1="376" x2="120" y2="460" stroke="#0c5f59" stroke-width="2"/>
-          <line x1="184" y1="376" x2="184" y2="460" stroke="#0c5f59" stroke-width="2"/>
+          <rect x="58" y="372" width="190" height="92" rx="6" fill="#17544F"/>
+          <rect x="58" y="372" width="190" height="92" rx="6" fill="none" stroke="#123F3B" stroke-width="2"/>
+          <line x1="120" y1="376" x2="120" y2="460" stroke="#123F3B" stroke-width="2"/>
+          <line x1="184" y1="376" x2="184" y2="460" stroke="#123F3B" stroke-width="2"/>
           <!-- cabina -->
-          <path d="M250 392 h44 a10 10 0 0 1 9 6 l14 30 a8 8 0 0 1 1 4 v32 h-68 z" fill="#0d9488"/>
-          <path d="M256 398 h34 a8 8 0 0 1 7 4 l11 24 h-52 z" fill="#bfe3dc"/>
+          <path d="M250 392 h44 a10 10 0 0 1 9 6 l14 30 a8 8 0 0 1 1 4 v32 h-68 z" fill="#1F6F6A"/>
+          <path d="M256 398 h34 a8 8 0 0 1 7 4 l11 24 h-52 z" fill="#CFE2DE"/>
           <!-- chasis -->
-          <rect x="58" y="464" width="270" height="8" rx="3" fill="#102a26"/>
+          <rect x="58" y="464" width="270" height="8" rx="3" fill="#1C2A33"/>
           <!-- ruedas -->
-          <g fill="#102a26">
+          <g fill="#1C2A33">
             <circle cx="108" cy="476" r="20"/><circle cx="170" cy="476" r="20"/><circle cx="300" cy="476" r="20"/>
           </g>
-          <g fill="#5ec5b8">
+          <g fill="#4A9E96">
             <circle cx="108" cy="476" r="8"/><circle cx="170" cy="476" r="8"/><circle cx="300" cy="476" r="8"/>
           </g>
           <!-- faro -->
-          <rect x="316" y="448" width="8" height="9" rx="2" fill="#ffe7a8"/>
+          <rect x="316" y="448" width="8" height="9" rx="2" fill="#F0DCBA"/>
         </g>
       </svg>
     </div>
@@ -483,7 +486,7 @@
         <div class="phone-notch"><span></span></div>
         <div class="phone-body">
           <div class="pa-top">
-            <div style="display:flex; align-items:center; gap:7px;"><img src="img/logo.png" alt="" style="width:26px; height:26px; object-fit:contain;"><span style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px;">PortGo</span></div>
+            <div style="display:flex; align-items:center; gap:7px;"><img src="img/logo.png" alt="" style="width:26px; height:26px; object-fit:contain;"><span style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px;">Port<span class="go">Go</span></span></div>
             <i data-lucide="bell" width="19" height="19" style="color:var(--muted2);"></i>
           </div>
           <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:20px; margin-bottom:3px;">Hola, Carlos</div>
@@ -547,7 +550,7 @@
   <div class="wrap" style="padding-top:56px; padding-bottom:32px;">
     <div class="footer-grid">
       <div>
-        <div class="brand" style="margin-bottom:14px;"><img class="brand-mark" src="img/logo.png" alt="" style="width:30px; height:30px;"><span class="brand-name" style="font-size:19px; color:#fff;">PortGo</span></div>
+        <div class="brand" style="margin-bottom:14px;"><img class="brand-mark" src="img/logo.png" alt="" style="width:30px; height:30px;"><span class="brand-name" style="font-size:19px; color:#fff;">Port<span class="go">Go</span></span></div>
         <p class="footer-about">La plataforma que conecta carga y transportistas verificados en el puerto de Manzanillo.</p>
       </div>
       <div class="footer-col"><h4>Plataforma</h4><a href="#como">Cómo funciona</a><a href="#servicios">Servicios</a><a href="app.html">Rastreo</a></div>

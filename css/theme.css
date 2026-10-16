@@ -1,89 +1,139 @@
 /* ══════════════════════════════════════════════════════════════
-   PortGo · TEMA "MAREA" (teal / arena)
-   Drop-in: reemplaza css/theme.css. Se carga al final, así que
-   re-pinta toda la app. El modo claro (default) = tema Marea.
-   No cambia el markup ni el JS: solo color, superficie y borde.
+   PortGo · TEMA "EVOLUCIÓN" (teal + bronce)
+   Alinea la interfaz con el emblema de brújula metálica. El teal se
+   profundiza y el bronce entra como acento: logotipo, íconos del
+   header y bordes en hover. Solo color y forma; no toca markup ni JS.
+
+   Los hexes viejos ya no viven sueltos: todo pasa por estos tokens.
+   Las variantes con alfa usan los *-rgb para poder componer rgba().
    ══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Fondos */
+  --pg-bg:            #FAF8F3;  /* fondo de página, crema */
+  --pg-surface:       #FFFFFF;  /* tarjetas, header */
+  --pg-surface-2:     #F7F3EC;  /* superficie neutra cálida (derivado) */
+  --pg-surface-warm:  #F3ECE0;  /* pastilla de usuario */
+  --pg-surface-btn:   #FFF9F0;  /* botones de ícono del header */
+
+  /* Bordes */
+  --pg-border:        #ECE5D8;
+  --pg-border-warm:   #E6DCCB;
+  --pg-divider:       #EDE6DA;
+
+  /* Texto */
+  --pg-ink:           #1C2A33;
+  --pg-ink-rgb:       28,42,51;
+  --pg-ink-muted:     #5E6B70;
+  --pg-ink-soft:      #7A858A;  /* tercer nivel (derivado) */
+
+  /* Marca */
+  --pg-teal:          #1F6F6A;
+  --pg-teal-rgb:      31,111,106;
+  --pg-teal-deep:     #17544F;  /* hover (derivado) */
+  --pg-teal-light:    #2A8B85;  /* degradados (derivado) */
+  --pg-teal-soft:     #E3EEEB;  /* fondo del chip del ícono */
+  --pg-teal-border:   #D4E5E1;  /* derivado */
+
+  --pg-bronze:        #A8712F;  /* "Go", íconos del header, acentos */
+  --pg-bronze-rgb:    168,113,47;
+  --pg-bronze-light:  #C9A06A;  /* borde en hover */
+  --pg-bronze-text:   #8A5A22;  /* bronce para texto pequeño */
+
+  /* Estados */
+  --pg-alert:         #C2462E;
+  --pg-alert-rgb:     194,70,46;
+  --pg-danger-text:   #A63A26;
+  --pg-danger-border: #E8C9BF;
+  --pg-green:         #15924E;
+  --pg-amber:         #B27A14;
+
+  /* Forma */
+  --pg-radius-card:   18px;
+  --pg-radius-chip:   14px;
+  --pg-radius-btn:    12px;
+  --pg-shadow-hover:  0 6px 20px rgba(120,84,40,.10);
+}
 
 /* ── LIGHT MODE = MAREA (default) ────────────────────── */
 body.light {
   /* Paleta núcleo remapeada a Marea */
-  --navy:         #faf8f3;  /* fondo base (arena) */
+  --navy:         var(--pg-bg);  /* fondo base (arena) */
   --navy-mid:     #ffffff;  /* superficie de tarjetas */
-  --navy-light:   #eef5f3;  /* hover sutil */
-  --steel:        #cfe5e0;  /* bordes/realces suaves */
-  --accent:       #0d9488;  /* teal océano */
-  --accent-bright:#0f766e;  /* teal oscuro (hover) */
-  --silver:       #4f6661;  /* texto secundario fuerte */
-  --white:        #102a26;  /* "tinta" (texto sobre claro) */
-  --text-main:    #102a26;
-  --text-muted:   #7c8a85;
+  --navy-light:   var(--pg-teal-soft);  /* hover sutil */
+  --steel:        var(--pg-teal-border);  /* bordes/realces suaves */
+  --accent:       var(--pg-teal);  /* teal océano */
+  --accent-bright:var(--pg-teal-deep);  /* teal oscuro (hover) */
+  --silver:       var(--pg-ink-muted);  /* texto secundario fuerte */
+  --white:        var(--pg-ink);  /* "tinta" (texto sobre claro) */
+  --text-main:    var(--pg-ink);
+  --text-muted:   var(--pg-ink-soft);
   --nav-mobile-bg:#ffffff;
 
   /* Tokens semánticos (faltaban en :root; aquí quedan en Marea) */
   --surface:      #ffffff;
-  --surface-2:    #f3faf8;
+  --surface-2:    var(--pg-surface-2);
   --card-bg:      #ffffff;
-  --border:       #e6e1d6;
-  --text:         #102a26;
+  --border:       var(--pg-border);
+  --text:         var(--pg-ink);
 
   /* Estados (se conservan, armonizan con teal) */
-  --green:        #15924e;
-  --amber:        #c77c11;
-  --red:          #d4513a;
-  --danger:       #d4513a;
+  --green:        var(--pg-green);
+  --amber:        var(--pg-amber);
+  --red:          var(--pg-alert);
+  --danger:       var(--pg-alert);
 }
 
 /* Fondo: degradado teal muy sutil sobre arena */
 body.light::before {
   background:
-    radial-gradient(ellipse 80% 50% at 18% 0%, rgba(13,148,136,0.08) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 85% 100%, rgba(13,148,136,0.05) 0%, transparent 60%);
+    radial-gradient(ellipse 80% 50% at 18% 0%, rgba(var(--pg-teal-rgb),0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 85% 100%, rgba(var(--pg-teal-rgb),0.05) 0%, transparent 60%);
 }
 
 /* ── HEADER + NAV ────────────────────────────────────── */
 body.light header {
   background: rgba(250,248,243,0.88);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid #ece7da;
+  border-bottom: 1px solid var(--pg-divider);
 }
-body.light .nav-tabs { background: #f1efe9; }
-body.light .nav-tab  { color: #7c8a85; }
-body.light .nav-tab:not(.active):hover { color: #102a26; background: rgba(13,148,136,0.07); }
-body.light .nav-tab.active { color: #0d9488; }
+body.light .nav-tabs { background: var(--pg-surface-warm); }
+body.light .nav-tab  { color: var(--pg-ink-soft); }
+body.light .nav-tab:not(.active):hover { color: var(--pg-ink); background: rgba(var(--pg-teal-rgb),0.07); }
+body.light .nav-tab.active { color: var(--pg-teal); }
 
 @media (max-width: 640px) {
   body.light .nav-tabs {
     background: #ffffff;
-    border-bottom: 1px solid #ece7da;
-    box-shadow: 0 12px 32px rgba(16,42,38,0.10);
+    border-bottom: 1px solid var(--pg-divider);
+    box-shadow: 0 12px 32px rgba(var(--pg-ink-rgb),0.10);
   }
-  body.light .nav-tab { color: #102a26; }
-  body.light .nav-tab:not(.active):hover { background: rgba(13,148,136,0.08); }
+  body.light .nav-tab { color: var(--pg-ink); }
+  body.light .nav-tab:not(.active):hover { background: rgba(var(--pg-teal-rgb),0.08); }
 }
 
 /* ── HOME · TARJETAS "ARENA LIMPIA" ──────────────────── */
 body.light .home-card {
   background: #ffffff;
-  border: 1px solid #e6e1d6;
-  box-shadow: 0 1px 3px rgba(16,42,38,0.05);
+  border: 1px solid var(--pg-border);
+  box-shadow: 0 1px 3px rgba(var(--pg-ink-rgb),0.05);
 }
 body.light .home-card:hover {
-  border-color: rgba(13,148,136,0.45);
-  box-shadow: 0 14px 34px rgba(13,148,136,0.12);
+  border-color: rgba(var(--pg-teal-rgb),0.45);
+  box-shadow: 0 14px 34px rgba(var(--pg-teal-rgb),0.12);
   transform: translateY(-5px);
 }
 body.light .hc-icon {
   width: 54px; height: 54px; margin: 0 auto 14px;
   display: flex; align-items: center; justify-content: center;
-  background: #e3f1ee; color: #0d9488;
+  background: var(--pg-teal-soft); color: var(--pg-teal);
   border-radius: 15px;
 }
-body.light .hc-title { color: #102a26; }
-body.light .hc-desc  { color: #7c8a85; }
+body.light .hc-title { color: var(--pg-ink); }
+body.light .hc-desc  { color: var(--pg-ink-soft); }
 body.light .hc-bg-emoji { display: none; }
 /* Badge de avisos (aprobaciones / vigencias): rojo sólido y legible sobre tarjeta clara */
-body.light .hc-badge { background: #d4513a; color: #fff; box-shadow: 0 2px 8px rgba(212,81,58,0.35); }
+body.light .hc-badge { background: var(--pg-alert); color: #fff; box-shadow: 0 2px 8px rgba(var(--pg-alert-rgb),0.35); }
 
 /* Íconos SVG nítidos y centrados en ambos modos.
    margin:0 auto centra el SVG en modo oscuro (donde .hc-icon NO es
@@ -93,30 +143,30 @@ body:not(.light) .hc-icon { color: #ffffff; }
 
 /* ── HERO / STATS ────────────────────────────────────── */
 body.light .hero {
-  background: linear-gradient(135deg, #ffffff, #e3f1ee);
-  border-color: #d6ebe6;
+  background: linear-gradient(135deg, #ffffff, var(--pg-teal-soft));
+  border-color: var(--pg-teal-border);
 }
-body.light .stat-card { background: rgba(255,255,255,0.9); border-color: #e6e1d6; }
+body.light .stat-card { background: rgba(255,255,255,0.9); border-color: var(--pg-border); }
 
 /* ── TRUCK CARD ──────────────────────────────────────── */
-body.light .truck-card { background: #fff; border-color: #e6e1d6; }
+body.light .truck-card { background: #fff; border-color: var(--pg-border); }
 body.light .truck-card:hover {
-  border-color: rgba(13,148,136,0.5);
-  box-shadow: 0 12px 32px rgba(13,148,136,0.12);
+  border-color: rgba(var(--pg-teal-rgb),0.5);
+  box-shadow: 0 12px 32px rgba(var(--pg-teal-rgb),0.12);
 }
 body.light .truck-img-area {
   background: linear-gradient(135deg, rgba(227,241,238,0.9), rgba(207,229,224,0.5));
-  border-color: rgba(13,148,136,0.12);
+  border-color: rgba(var(--pg-teal-rgb),0.12);
 }
-body.light .truck-footer { border-color: rgba(13,148,136,0.12); }
-body.light .truck-img-area::after { background: linear-gradient(135deg, transparent 40%, rgba(13,148,136,0.06)); }
+body.light .truck-footer { border-color: rgba(var(--pg-teal-rgb),0.12); }
+body.light .truck-img-area::after { background: linear-gradient(135deg, transparent 40%, rgba(var(--pg-teal-rgb),0.06)); }
 
 /* ── BÚSQUEDA / FORM INPUTS ──────────────────────────── */
 body.light .search-group input,
 body.light .search-group select {
-  background: #faf8f3;
-  border-color: #e0dacb;
-  color: #102a26;
+  background: var(--pg-bg);
+  border-color: var(--pg-border-warm);
+  color: var(--pg-ink);
 }
 body.light .search-group select option { background: #fff; }
 
@@ -125,160 +175,231 @@ body.light .search-group select option { background: #fff; }
 body.light .form-group input:not([type=checkbox]):not([type=radio]),
 body.light .form-group textarea,
 body.light .form-group select {
-  background: #faf8f3;
-  border-color: #e0dacb;
-  color: #102a26;
+  background: var(--pg-bg);
+  border-color: var(--pg-border-warm);
+  color: var(--pg-ink);
 }
 body.light .form-group input::placeholder,
-body.light .form-group textarea::placeholder { color: #a7b1ad; }
+body.light .form-group textarea::placeholder { color: var(--pg-ink-soft); }
 body.light .form-group input:focus,
 body.light .form-group textarea:focus,
 body.light .form-group select:focus {
-  border-color: #0d9488;
-  box-shadow: 0 0 0 3px rgba(13,148,136,0.14);
+  border-color: var(--pg-teal);
+  box-shadow: 0 0 0 3px rgba(var(--pg-teal-rgb),0.14);
 }
 body.light .form-group select option { background: #fff; }
 body.light .cat-search-input:focus,
 body.light .ped-geo-input:focus,
-body.light .apr-emp-filter input:focus { border-color: #0d9488; }
+body.light .apr-emp-filter input:focus { border-color: var(--pg-teal); }
 
 /* ── TABLA DE RESERVACIONES ──────────────────────────── */
-body.light .reserv-table      { background: #fff; border-color: #e6e1d6; }
-body.light .reserv-row.header { background: rgba(13,148,136,0.06); }
-body.light .reserv-row:hover  { background: rgba(13,148,136,0.05); }
-body.light .reserv-row        { border-bottom-color: rgba(13,148,136,0.08); }
+body.light .reserv-table      { background: #fff; border-color: var(--pg-border); }
+body.light .reserv-row.header { background: rgba(var(--pg-teal-rgb),0.06); }
+body.light .reserv-row:hover  { background: rgba(var(--pg-teal-rgb),0.05); }
+body.light .reserv-row        { border-bottom-color: rgba(var(--pg-teal-rgb),0.08); }
 
 /* ── ADMIN CARD ──────────────────────────────────────── */
-body.light .admin-card { background: #fff; border-color: #e6e1d6; }
+body.light .admin-card { background: #fff; border-color: var(--pg-border); }
 
 /* ── MODAL ───────────────────────────────────────────── */
-body.light .modal         { background: #fff; border-color: #e6e1d6; }
-body.light .modal-overlay { background: rgba(16,42,38,0.45); backdrop-filter: blur(6px); }
-body.light .btn-cancel        { background: #f1efe9; border-color: #e0dacb; color: #4f6661; }
-body.light .btn-confirm       { background: #0d9488; color: #fff; border-color: #0d9488; }
-body.light .btn-confirm:hover { background: #0f766e; }
+body.light .modal         { background: #fff; border-color: var(--pg-border); }
+body.light .modal-overlay { background: rgba(var(--pg-ink-rgb),0.45); backdrop-filter: blur(6px); }
+body.light .btn-cancel        { background: var(--pg-surface-warm); border-color: var(--pg-border-warm); color: var(--pg-ink-muted); }
+body.light .btn-confirm       { background: var(--pg-teal); color: #fff; border-color: var(--pg-teal); }
+body.light .btn-confirm:hover { background: var(--pg-teal-deep); }
 
 /* ── BOTONES SECUNDARIOS / LISTAS ────────────────────── */
-body.light .truck-list-item { background: #f3faf8; }
-body.light .btn-detail { background: rgba(13,148,136,0.1); border-color: rgba(13,148,136,0.3); color: #0d9488; }
-body.light .btn-detail:hover { background: rgba(13,148,136,0.18); }
-body.light .btn-edit   { background: rgba(13,148,136,0.1); border-color: rgba(13,148,136,0.3); color: #0d9488; }
+body.light .truck-list-item { background: var(--pg-surface-2); }
+body.light .btn-detail { background: rgba(var(--pg-teal-rgb),0.1); border-color: rgba(var(--pg-teal-rgb),0.3); color: var(--pg-teal); }
+body.light .btn-detail:hover { background: rgba(var(--pg-teal-rgb),0.18); }
+body.light .btn-edit   { background: rgba(var(--pg-teal-rgb),0.1); border-color: rgba(var(--pg-teal-rgb),0.3); color: var(--pg-teal); }
 
 /* ── USER CHIP / THEME / NOTIF ───────────────────────── */
-body.light .user-chip  { background: rgba(13,148,136,0.1); border-color: rgba(13,148,136,0.22); }
-body.light .btn-theme  { background: #f1efe9; border-color: #e0dacb; }
-body.light .btn-notif  { background: #f1efe9; border-color: #e0dacb; }
-body.light .notif-panel  { background: #fff; border-color: #e6e1d6; box-shadow: 0 12px 32px rgba(16,42,38,0.12); }
-body.light .notif-item:hover { background: rgba(13,148,136,0.06); }
-body.light .notif-badge  { border-color: #faf8f3; }
+body.light .user-chip  { background: rgba(var(--pg-teal-rgb),0.1); border-color: rgba(var(--pg-teal-rgb),0.22); }
+body.light .btn-theme  { background: var(--pg-surface-warm); border-color: var(--pg-border-warm); }
+body.light .btn-notif  { background: var(--pg-surface-warm); border-color: var(--pg-border-warm); }
+body.light .notif-panel  { background: #fff; border-color: var(--pg-border); box-shadow: 0 12px 32px rgba(var(--pg-ink-rgb),0.12); }
+body.light .notif-item:hover { background: rgba(var(--pg-teal-rgb),0.06); }
+body.light .notif-badge  { border-color: var(--pg-bg); }
 
 /* ── LOGIN (login.css ya trae Marea; respaldo) ───────── */
-body.light .login-box { background: #fff; border-color: #e6e1d6; }
+body.light .login-box { background: #fff; border-color: var(--pg-border); }
 
 /* ══ COMPONENTES QUE EN "light" VENÍAN EN AZUL ══════════
    theme.css carga después de components.css, así que estas
    reglas ganan y los re-pintan a teal.                    */
 
 /* Pills de filtro de solicitudes */
-body.light .ped-filtro-pill { border-color: rgba(13,148,136,0.18); color: #7c8a85; background: rgba(13,148,136,0.03); }
-body.light .ped-filtro-pill:hover { border-color: rgba(13,148,136,0.5); color: #102a26; background: rgba(13,148,136,0.07); }
-body.light .ped-filtro-pill.active { background: rgba(13,148,136,0.1); border-color: #0d9488; color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
+body.light .ped-filtro-pill { border-color: rgba(var(--pg-teal-rgb),0.18); color: var(--pg-ink-soft); background: rgba(var(--pg-teal-rgb),0.03); }
+body.light .ped-filtro-pill:hover { border-color: rgba(var(--pg-teal-rgb),0.5); color: var(--pg-ink); background: rgba(var(--pg-teal-rgb),0.07); }
+body.light .ped-filtro-pill.active { background: rgba(var(--pg-teal-rgb),0.1); border-color: var(--pg-teal); color: var(--pg-teal); box-shadow: 0 0 0 3px rgba(var(--pg-teal-rgb),0.1); }
 
 /* Banner categoría nueva solicitud */
-body.light .np-cat-banner { background: rgba(13,148,136,0.06); border-color: rgba(13,148,136,0.2); }
-body.light .np-cap-info { background: rgba(13,148,136,0.06); border-color: rgba(13,148,136,0.22); }
-body.light .np-cap-cont-item { background: rgba(13,148,136,0.05); border-color: rgba(13,148,136,0.15); }
+body.light .np-cat-banner { background: rgba(var(--pg-teal-rgb),0.06); border-color: rgba(var(--pg-teal-rgb),0.2); }
+body.light .np-cap-info { background: rgba(var(--pg-teal-rgb),0.06); border-color: rgba(var(--pg-teal-rgb),0.22); }
+body.light .np-cap-cont-item { background: rgba(var(--pg-teal-rgb),0.05); border-color: rgba(var(--pg-teal-rgb),0.15); }
 
 /* Chips de cargo / recursos */
-body.light .cargo-chip { background: rgba(13,148,136,0.08); border-color: rgba(13,148,136,0.25); color: #0d9488; }
-body.light .cargo-chip-toggle { background: #f1efe9; border-color: rgba(13,148,136,0.22); color: #7c8a85; }
-body.light .cargo-chip-toggle.selected { background: rgba(13,148,136,0.1); border-color: rgba(13,148,136,0.5); color: #0d9488; }
+body.light .cargo-chip { background: rgba(var(--pg-teal-rgb),0.08); border-color: rgba(var(--pg-teal-rgb),0.25); color: var(--pg-teal); }
+body.light .cargo-chip-toggle { background: var(--pg-surface-warm); border-color: rgba(var(--pg-teal-rgb),0.22); color: var(--pg-ink-soft); }
+body.light .cargo-chip-toggle.selected { background: rgba(var(--pg-teal-rgb),0.1); border-color: rgba(var(--pg-teal-rgb),0.5); color: var(--pg-teal); }
 
 /* Tabs de recurso */
-body.light .recurso-tab { border-color: rgba(13,148,136,0.2); color: #7c8a85; }
-body.light .recurso-tab:hover { border-color: rgba(13,148,136,0.5); color: #102a26; background: rgba(13,148,136,0.06); }
-body.light .recurso-tab.active { background: rgba(13,148,136,0.1); border-color: rgba(13,148,136,0.5); color: #0d9488; }
+body.light .recurso-tab { border-color: rgba(var(--pg-teal-rgb),0.2); color: var(--pg-ink-soft); }
+body.light .recurso-tab:hover { border-color: rgba(var(--pg-teal-rgb),0.5); color: var(--pg-ink); background: rgba(var(--pg-teal-rgb),0.06); }
+body.light .recurso-tab.active { background: rgba(var(--pg-teal-rgb),0.1); border-color: rgba(var(--pg-teal-rgb),0.5); color: var(--pg-teal); }
 
 /* Pedidos (cards y meta) */
-body.light .pedido-card    { background: #fff; border-color: #e6e1d6; }
-body.light .pedido-card:hover { border-color: rgba(13,148,136,0.4); }
-body.light .pedido-footer  { border-top-color: rgba(13,148,136,0.12); }
-body.light .pedido-desc    { border-left-color: rgba(13,148,136,0.3); }
-body.light .oferta-item    { background: #f3faf8; border-color: rgba(13,148,136,0.14); }
-body.light .ped-num-ofertas { background: rgba(13,148,136,0.1); border-color: rgba(13,148,136,0.2); color: #0d9488; }
-body.light .btn-ver-pedido  { background: rgba(13,148,136,0.1); border-color: rgba(13,148,136,0.3); color: #0d9488; }
-body.light .btn-ver-pedido:hover { background: rgba(13,148,136,0.18); }
-body.light .badge-acordado  { background: rgba(13,148,136,0.13); color: #0d9488; }
-body.light .ped-cliente-grupo-title { color: #0d9488; border-left-color: #0d9488; }
+body.light .pedido-card    { background: #fff; border-color: var(--pg-border); }
+body.light .pedido-card:hover { border-color: rgba(var(--pg-teal-rgb),0.4); }
+body.light .pedido-footer  { border-top-color: rgba(var(--pg-teal-rgb),0.12); }
+body.light .pedido-desc    { border-left-color: rgba(var(--pg-teal-rgb),0.3); }
+body.light .oferta-item    { background: var(--pg-surface-2); border-color: rgba(var(--pg-teal-rgb),0.14); }
+body.light .ped-num-ofertas { background: rgba(var(--pg-teal-rgb),0.1); border-color: rgba(var(--pg-teal-rgb),0.2); color: var(--pg-teal); }
+body.light .btn-ver-pedido  { background: rgba(var(--pg-teal-rgb),0.1); border-color: rgba(var(--pg-teal-rgb),0.3); color: var(--pg-teal); }
+body.light .btn-ver-pedido:hover { background: rgba(var(--pg-teal-rgb),0.18); }
+body.light .badge-acordado  { background: rgba(var(--pg-teal-rgb),0.13); color: var(--pg-teal); }
+body.light .ped-cliente-grupo-title { color: var(--pg-teal); border-left-color: var(--pg-teal); }
 
 /* Botones de servicio (grid) */
-body.light .ped-serv-btn { background: #fff; border-color: #e6e1d6; }
-body.light .ped-serv-btn:hover { border-color: rgba(13,148,136,0.45); box-shadow: 0 10px 28px rgba(13,148,136,0.12); }
+body.light .ped-serv-btn { background: #fff; border-color: var(--pg-border); }
+body.light .ped-serv-btn:hover { border-color: rgba(var(--pg-teal-rgb),0.45); box-shadow: 0 10px 28px rgba(var(--pg-teal-rgb),0.12); }
 
 /* Catálogo: pills y tarjetas de empresa */
-body.light .cat-pill { background: rgba(13,148,136,0.06); border-color: rgba(13,148,136,0.2); color: #7c8a85; }
-body.light .cat-pill:hover { background: rgba(13,148,136,0.13); color: #102a26; }
-body.light .cat-pill.active { background: #0d9488; border-color: #0d9488; color: #fff; box-shadow: 0 4px 14px rgba(13,148,136,0.32); }
+body.light .cat-pill { background: rgba(var(--pg-teal-rgb),0.06); border-color: rgba(var(--pg-teal-rgb),0.2); color: var(--pg-ink-soft); }
+body.light .cat-pill:hover { background: rgba(var(--pg-teal-rgb),0.13); color: var(--pg-ink); }
+body.light .cat-pill.active { background: var(--pg-teal); border-color: var(--pg-teal); color: #fff; box-shadow: 0 4px 14px rgba(var(--pg-teal-rgb),0.32); }
 
-body.light .empresa-card { background: #fff; border-color: #e6e1d6; }
-body.light .empresa-card:hover { border-color: rgba(13,148,136,0.4); box-shadow: 0 16px 40px rgba(13,148,136,0.1); }
-body.light .empresa-card-top { border-color: rgba(13,148,136,0.1); }
-body.light .emp-rec-bloque { border-color: rgba(13,148,136,0.08); }
-body.light .empresa-card-footer { border-color: rgba(13,148,136,0.1); }
-body.light .emp-avail-bar { background: rgba(16,42,38,0.07); }
-body.light .cargo-chip-sm { background: #f1efe9; border-color: #e0dacb; color: #7c8a85; }
-body.light .emp-icon-badge { background: #f1efe9; }
-body.light .emp-info-chip { background: rgba(13,148,136,0.09); border-color: rgba(13,148,136,0.2); color: #0d9488; }
-body.light .btn-emp-solicitar { background: linear-gradient(135deg, #0d9488, #14b8a6); }
-body.light .btn-emp-perfil:hover { border-color: #0d9488; color: #0d9488; }
-body.light .emp-btn-resenas { color: #0d9488; border-color: #e6e1d6; }
-body.light .emp-btn-resenas:hover { background: #0d9488; color: #fff; }
+body.light .empresa-card { background: #fff; border-color: var(--pg-border); }
+body.light .empresa-card:hover { border-color: rgba(var(--pg-teal-rgb),0.4); box-shadow: 0 16px 40px rgba(var(--pg-teal-rgb),0.1); }
+body.light .empresa-card-top { border-color: rgba(var(--pg-teal-rgb),0.1); }
+body.light .emp-rec-bloque { border-color: rgba(var(--pg-teal-rgb),0.08); }
+body.light .empresa-card-footer { border-color: rgba(var(--pg-teal-rgb),0.1); }
+body.light .emp-avail-bar { background: rgba(var(--pg-ink-rgb),0.07); }
+body.light .cargo-chip-sm { background: var(--pg-surface-warm); border-color: var(--pg-border-warm); color: var(--pg-ink-soft); }
+body.light .emp-icon-badge { background: var(--pg-surface-warm); }
+body.light .emp-info-chip { background: rgba(var(--pg-teal-rgb),0.09); border-color: rgba(var(--pg-teal-rgb),0.2); color: var(--pg-teal); }
+body.light .btn-emp-solicitar { background: linear-gradient(135deg, var(--pg-teal), var(--pg-teal-light)); }
+body.light .btn-emp-perfil:hover { border-color: var(--pg-teal); color: var(--pg-teal); }
+body.light .emp-btn-resenas { color: var(--pg-teal); border-color: var(--pg-border); }
+body.light .emp-btn-resenas:hover { background: var(--pg-teal); color: #fff; }
 
 /* Catálogo búsqueda + cargar más + volver */
-body.light .cat-search-input { background: #fff; border-color: #e6e1d6; }
-body.light .btn-cargar-mas:hover { border-color: #0d9488; color: #0d9488; }
-body.light .btn-back-home:hover { border-color: #0d9488; color: #0d9488; }
+body.light .cat-search-input { background: #fff; border-color: var(--pg-border); }
+body.light .btn-cargar-mas:hover { border-color: var(--pg-teal); color: var(--pg-teal); }
+body.light .btn-back-home:hover { border-color: var(--pg-teal); color: var(--pg-teal); }
 
 /* Timeline de solicitud */
-body.light .ped-tl-dot { background: #fff; border-color: #e6e1d6; }
-body.light .ped-tl-dot.active { background: #0d9488; border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,0.2); }
-body.light .ped-tl-line { background: #e6e1d6; }
+body.light .ped-tl-dot { background: #fff; border-color: var(--pg-border); }
+body.light .ped-tl-dot.active { background: var(--pg-teal); border-color: var(--pg-teal); box-shadow: 0 0 0 3px rgba(var(--pg-teal-rgb),0.2); }
+body.light .ped-tl-line { background: var(--pg-border); }
 
 /* Aprobaciones / revisiones (superadmin) */
-body.light .apr-card { background: #fff; border-color: #e6e1d6; }
-body.light .apr-oferta-box { background: rgba(13,148,136,0.05); border-color: rgba(13,148,136,0.15); }
-body.light .apr-oferta-title { color: #0d9488; }
-body.light .apr-count { background: #0d9488; }
-body.light .apr-empresa-header { background: #f3faf8; }
-body.light .apr-empresa-header:hover { background: #e3f1ee; }
-body.light .apr-ec { background: rgba(13,148,136,0.12); color: #0d9488; }
+body.light .apr-card { background: #fff; border-color: var(--pg-border); }
+body.light .apr-oferta-box { background: rgba(var(--pg-teal-rgb),0.05); border-color: rgba(var(--pg-teal-rgb),0.15); }
+body.light .apr-oferta-title { color: var(--pg-teal); }
+body.light .apr-count { background: var(--pg-teal); }
+body.light .apr-empresa-header { background: var(--pg-surface-2); }
+body.light .apr-empresa-header:hover { background: var(--pg-teal-soft); }
+body.light .apr-ec { background: rgba(var(--pg-teal-rgb),0.12); color: var(--pg-teal); }
 
 
 /* Geo autocomplete */
-body.light .geo-dropdown { background: #fff; border-color: #e6e1d6; box-shadow: 0 8px 28px rgba(16,42,38,0.14); }
-body.light .geo-item { color: #102a26; border-bottom-color: rgba(13,148,136,0.08); }
-body.light .geo-item:hover { background: #e3f1ee; }
+body.light .geo-dropdown { background: #fff; border-color: var(--pg-border); box-shadow: 0 8px 28px rgba(var(--pg-ink-rgb),0.14); }
+body.light .geo-item { color: var(--pg-ink); border-bottom-color: rgba(var(--pg-teal-rgb),0.08); }
+body.light .geo-item:hover { background: var(--pg-teal-soft); }
 
 /* Reportes */
 body.light .rep-kpi-card,
-body.light .rep-section { background: #fff; border-color: #e6e1d6; }
-body.light .rep-date-filter { background: #f3faf8; border-color: #e6e1d6; }
-body.light .rep-date-filter input[type=date] { background: #fff; border-color: #e6e1d6; color: #102a26; }
-body.light .rep-rank, body.light .rep-bar-fill { background: #0d9488; }
+body.light .rep-section { background: #fff; border-color: var(--pg-border); }
+body.light .rep-date-filter { background: var(--pg-surface-2); border-color: var(--pg-border); }
+body.light .rep-date-filter input[type=date] { background: #fff; border-color: var(--pg-border); color: var(--pg-ink); }
+body.light .rep-rank, body.light .rep-bar-fill { background: var(--pg-teal); }
 
 /* Próximamente */
-body.light .btn-prox { border-color: #e0dacb; }
-body.light .prox-badge { background: rgba(13,148,136,0.08); border-color: rgba(13,148,136,0.2); color: #0d9488; }
+body.light .btn-prox { border-color: var(--pg-border-warm); }
+body.light .prox-badge { background: rgba(var(--pg-teal-rgb),0.08); border-color: rgba(var(--pg-teal-rgb),0.2); color: var(--pg-teal); }
 
 /* Vigencias / operadores */
 body.light .vig-empresa-card { background: #fff; }
-body.light .operador-card { background: #fff; border-color: #e6e1d6; }
+body.light .operador-card { background: #fff; border-color: var(--pg-border); }
 
 /* ── DARK MODE: realces teal (coherencia de marca) ────
    La app por defecto es clara; esto solo aplica si el
    usuario activa el modo oscuro manualmente.            */
 body:not(.light) {
-  --accent:        #2dd4bf;
-  --accent-bright: #5eead4;
+  /* En oscuro el teal profundo no contrasta: se aclara, manteniendo
+     el mismo matiz que el claro para que la marca no cambie de tono. */
+  --accent:        #45A79F;
+  --accent-bright: #6FC6BE;
 }
-body:not(.light) header { border-bottom-color: rgba(45,212,191,0.18); }
+body:not(.light) header { border-bottom-color: rgba(var(--pg-teal-rgb),0.18); }
+
+/* ══════════════════════════════════════════════════════════════
+   ACENTOS DE BRONCE
+   Van al final a propósito: theme.css es el último archivo que
+   carga, así que estas reglas ganan sin tocar components.css.
+   El bronce se reserva a íconos, logotipo y bordes — nunca a
+   texto pequeño, que usa --pg-bronze-text por contraste.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Logotipo: "Port" en tinta, "Go" en bronce */
+.logo-go { color: var(--pg-bronze); }
+body:not(.light) .logo-go { color: var(--pg-bronze-light); }
+
+/* Botones de ícono del header (tema, campana) */
+body.light .btn-theme,
+body.light .btn-notif {
+  background: var(--pg-surface-btn);
+  border-color: var(--pg-border-warm);
+  color: var(--pg-bronze);
+  border-radius: var(--pg-radius-btn);
+}
+body.light .btn-theme:hover,
+body.light .btn-notif:hover { border-color: var(--pg-bronze-light); }
+
+/* Pastilla de usuario: cálida, no teal */
+body.light .user-chip {
+  background: var(--pg-surface-warm);
+  border-color: var(--pg-border-warm);
+}
+body.light .btn-logout {
+  background: #fff;
+  border-color: var(--pg-danger-border);
+  color: var(--pg-danger-text);
+  font-weight: 600;
+}
+
+/* Tarjetas: el hover pasa de teal a bronce.
+   :focus-visible replica el hover — el spec lo pide explícitamente
+   y antes solo existía el estado de ratón. */
+body.light .home-card:hover,
+body.light .home-card:focus-visible,
+body.light .truck-card:hover,
+body.light .pedido-card:hover,
+body.light .empresa-card:hover,
+body.light .ped-serv-btn:hover,
+body.light .ped-serv-btn:focus-visible {
+  border-color: var(--pg-bronze-light);
+  box-shadow: var(--pg-shadow-hover);
+}
+
+/* El chip del ícono se queda teal: es lo que separa la acción de la marca */
+body.light .hc-icon {
+  background: var(--pg-teal-soft);
+  color: var(--pg-teal);
+  border-radius: var(--pg-radius-chip);
+}
+
+/* Badges de conteo */
+body.light .hc-badge,
+body.light .notif-badge,
+body.light .apr-count {
+  background: var(--pg-alert);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(var(--pg-alert-rgb),0.32);
+}
+
+/* .logo y .login-logo son flex con gap para separar el emblema del texto.
+   Sin este envoltorio el gap caía también entre "Port" y "Go". */
+.logo-text { display: inline; }

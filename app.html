@@ -23,20 +23,20 @@
 
   <!-- Fuentes -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
   <!-- Estilos -->
   <link rel="stylesheet" href="css/base.css?v=8">
-  <link rel="stylesheet" href="css/layout.css?v=5">
-  <link rel="stylesheet" href="css/components.css?v=42">
+  <link rel="stylesheet" href="css/layout.css?v=6">
+  <link rel="stylesheet" href="css/components.css?v=43">
   <!-- Mapa para marcar origen y destino. Leaflet + OpenStreetMap: sin API key
        ni facturación, y ya usamos Nominatim (mismo proyecto) para geocodificar. -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H"
         crossorigin="anonymous" referrerpolicy="no-referrer">
-  <link rel="stylesheet" href="css/login.css?v=6">
+  <link rel="stylesheet" href="css/login.css?v=7">
   <link rel="stylesheet" href="css/detalle.css?v=2">
-  <link rel="stylesheet" href="css/theme.css?v=7">
+  <link rel="stylesheet" href="css/theme.css?v=8">
   <style>
     /* Botones de confirmación — forzados para ambos modos */
     .btn-confirm { color: #fff !important; }
@@ -56,7 +56,7 @@
   <div class="header-inner">
     <div class="logo" onclick="showView('home', null)" style="cursor:pointer">
       <img src="img/logo.png" class="logo-icon" alt="PortGo">
-      PortGo
+      <span class="logo-text">Port<span class="logo-go">Go</span></span>
     </div>
     <div class="header-right">
       <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
@@ -102,7 +102,7 @@
   <div class="home-page">
     <div class="home-hero">
       <img src="img/logo.png" class="home-logo-img" alt="PortGo">
-      <h1 class="home-greeting" id="home-greeting">Bienvenido 👋</h1>
+      <h1 class="home-greeting" id="home-greeting">Bienvenido</h1>
       <p class="home-sub">¿Qué quieres hacer hoy?</p>
     </div>
     <div class="home-grid" id="home-grid"></div>
@@ -2505,7 +2505,7 @@
   <div class="login-box">
     <div class="login-logo">
       <img src="img/logo.png" class="logo-icon" alt="PortGo">
-      PortGo
+      <span class="logo-text">Port<span class="logo-go">Go</span></span>
     </div>
 
     <!-- Tabs -->
@@ -2813,7 +2813,7 @@
 <script src="js/config.js?v=13"></script>
 <script src="js/auth.js?v=26"></script>
 <script src="js/theme.js?v=12"></script>
-<script src="js/views.js?v=36"></script>
+<script src="js/views.js?v=37"></script>
 <script src="js/camiones.js?v=13"></script>
 <script src="js/recursos.js?v=13"></script>
 <script src="js/reservaciones.js?v=69"></script>

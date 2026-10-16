@@ -66,7 +66,7 @@ function renderHome() {
   if (el && currentUser?.nombre) {
     const h = new Date().getHours();
     const saludo = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
-    el.textContent = `${saludo}, ${currentUser.nombre.split(' ')[0]} 👋`;
+    el.textContent = `${saludo}, ${currentUser.nombre.split(' ')[0]}`;
   }
   const grid = document.getElementById('home-grid');
   if (!grid) return;

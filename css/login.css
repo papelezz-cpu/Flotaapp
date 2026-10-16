@@ -38,8 +38,8 @@ body:not(.logged-in) #login-overlay { cursor: default; }
 
 .login-logo {
   display: flex; align-items: center; gap: 11px;
-  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1.55rem;
-  color: #102a26; margin-bottom: 6px; letter-spacing: -0.01em;
+  font-family: 'Sora', sans-serif; font-weight: 700; font-size: 1.55rem;
+  color: var(--pg-ink); margin-bottom: 6px; letter-spacing: -0.5px;
 }
 .login-logo .logo-icon { width: 42px; height: 42px; }
 .login-sub { color: #7c8a85; font-size: 0.88rem; margin-bottom: 26px; }
@@ -58,7 +58,7 @@ body:not(.logged-in) #login-overlay { cursor: default; }
   cursor: pointer; transition: background 0.18s, color 0.18s, box-shadow 0.18s;
 }
 .login-tab.active {
-  background: #ffffff; color: #0d9488;
+  background: #ffffff; color: var(--pg-teal);
   box-shadow: 0 1px 3px rgba(16,42,38,0.10);
 }
 .login-tab:not(.active):hover { color: #102a26; }
@@ -105,19 +105,19 @@ body:not(.logged-in) #login-overlay { cursor: default; }
 #login-overlay .form-group textarea:focus,
 #login-overlay .form-group select:focus {
   outline: none; background: #fff;
-  border-color: #0d9488;
+  border-color: var(--pg-teal);
   box-shadow: 0 0 0 3px rgba(13,148,136,0.14);
 }
 #login-overlay .form-group select option { background: #fff; }
 
 /* ── BOTONES ─────────────────────────────────────────── */
 .btn-login {
-  width: 100%; padding: 13px; background: #0d9488; border: none;
+  width: 100%; padding: 13px; background: var(--pg-teal); border: none;
   border-radius: 12px; color: #fff;
   font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 0.98rem;
   cursor: pointer; transition: background 0.2s, transform 0.05s; margin-top: 8px;
 }
-.btn-login:hover { background: #0f766e; }
+.btn-login:hover { background: var(--pg-teal-deep); }
 .btn-login:active { transform: translateY(1px); }
 
 .btn-forgot {
@@ -125,13 +125,13 @@ body:not(.logged-in) #login-overlay { cursor: default; }
   color: #7c8a85; cursor: pointer; font-size: 0.83rem;
   margin-top: 4px; transition: color 0.2s;
 }
-.btn-forgot:hover { color: #0d9488; }
+.btn-forgot:hover { color: var(--pg-teal); }
 
 .login-soporte {
   text-align: center; font-size: 0.8rem; color: #7c8a85;
   margin-top: 16px;
 }
-.login-soporte a { color: #0d9488; text-decoration: none; font-weight: 600; }
+.login-soporte a { color: var(--pg-teal); text-decoration: none; font-weight: 600; }
 .login-soporte a:hover { text-decoration: underline; }
 
 /* ── REGISTRO EXPANDIDO ──────────────────────────────── */
@@ -152,19 +152,19 @@ body:not(.logged-in) #login-overlay { cursor: default; }
   transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
   background: #fff;
 }
-.reg-role-card:hover { border-color: #0d9488; background: #f3faf8; }
+.reg-role-card:hover { border-color: var(--pg-teal); background: #f3faf8; }
 .reg-role-card.selected {
-  border-color: #0d9488; background: #e3f1ee;
+  border-color: var(--pg-teal); background: #e3f1ee;
   box-shadow: 0 0 0 3px rgba(13,148,136,0.12);
 }
-.reg-role-icon { font-size: 2rem; margin-bottom: 8px; color: #0d9488; }
+.reg-role-icon { font-size: 2rem; margin-bottom: 8px; color: var(--pg-teal); }
 .reg-role-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; color: #102a26; }
 .reg-role-desc { font-size: 0.77rem; color: #7c8a85; line-height: 1.45; }
 
 .reg-section-title {
   font-size: 0.72rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.07em;
-  color: #0d9488; margin: 20px 0 12px;
+  color: var(--pg-teal); margin: 20px 0 12px;
   padding-top: 16px; border-top: 1px solid #ece7da;
 }
 
@@ -174,13 +174,13 @@ body:not(.logged-in) #login-overlay { cursor: default; }
   margin-bottom: 14px; display: flex; align-items: center; gap: 5px;
   font-weight: 500;
 }
-.reg-back-btn:hover { color: #0d9488; }
+.reg-back-btn:hover { color: var(--pg-teal); }
 
 .reg-role-badge {
   display: inline-flex; align-items: center; gap: 6px;
   background: #e3f1ee; border: 1px solid #bfe0d9;
   border-radius: 999px; padding: 5px 13px;
-  font-size: 0.78rem; font-weight: 600; color: #0f766e;
+  font-size: 0.78rem; font-weight: 600; color: var(--pg-teal-deep);
   margin-bottom: 16px;
 }
 
@@ -190,12 +190,12 @@ body:not(.logged-in) #login-overlay { cursor: default; }
   border: 1.5px dashed #9cd1c9; border-radius: 11px;
   padding: 12px 14px; cursor: pointer;
   transition: border-color 0.18s, background 0.18s, color 0.18s;
-  font-size: 0.83rem; color: #0d9488; gap: 8px;
+  font-size: 0.83rem; color: var(--pg-teal); gap: 8px;
   background: #f3faf8;
 }
 .reg-file-label:hover {
-  border-color: #0d9488; background: #e3f1ee;
-  color: #0f766e;
+  border-color: var(--pg-teal); background: #e3f1ee;
+  color: var(--pg-teal-deep);
 }
 .reg-file-label input[type=file] { display: none; }
 .reg-file-label > span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
@@ -214,7 +214,7 @@ body:not(.logged-in) #login-overlay { cursor: default; }
   cursor: pointer; font-size: 0.84rem; font-weight: 600;
   transition: all 0.18s;
 }
-.reg-tipo-btn.active { border-color: #0d9488; color: #0f766e; background: #e3f1ee; }
+.reg-tipo-btn.active { border-color: var(--pg-teal); color: var(--pg-teal-deep); background: #e3f1ee; }
 
 .reg-optional { font-size: 0.72rem; color: #9aa6a1; font-weight: 400; margin-left: 4px; }
 
@@ -233,6 +233,6 @@ body:not(.logged-in) #login-overlay { cursor: default; }
 }
 .reg-consent input[type=checkbox] {
   flex-shrink: 0; width: 18px; height: 18px; margin-top: 1px;
-  accent-color: #0d9488; cursor: pointer;
+  accent-color: var(--pg-teal); cursor: pointer;
 }
-.reg-consent a { color: #0d9488; font-weight: 600; }
+.reg-consent a { color: var(--pg-teal); font-weight: 600; }
