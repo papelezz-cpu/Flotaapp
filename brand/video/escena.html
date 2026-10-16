@@ -13,7 +13,7 @@
 <style>
   :root{
     --bg:#FAF8F3; --surface:#FFFFFF; --ink:#1C2A33; --muted:#5E6B70;
-    --teal:#1F6F6A; --bronze:#A8712F; --bronze-soft:#F3ECE0; --bronze-text:#8A5A22;
+    --bronze:#A8712F; --bronze-soft:#F3ECE0; --bronze-text:#8A5A22;
     --border:#ECE5D8; --border-warm:#E6DCCB; --alert:#C2462E;
   }
   *{margin:0;padding:0;box-sizing:border-box}
@@ -28,18 +28,26 @@
           text-transform:uppercase;color:var(--muted);margin-bottom:2.6vmin}
   .tit{font-family:'Sora',sans-serif;font-size:7.2vmin;font-weight:700;
        line-height:1.12;letter-spacing:-.18vmin}
-  .tit em{font-style:normal;color:var(--teal)}
+  .tit em{font-style:normal;color:var(--bronze)}
   .tit b{font-weight:700;color:var(--bronze)}
   .sub{font-size:3.2vmin;color:var(--muted);line-height:1.45;margin-top:3vmin;max-width:64vmin}
 
-  /* 1 · el desorden del WhatsApp */
-  .burbujas{display:flex;flex-direction:column;gap:1.8vmin;margin-top:4.5vmin;width:min(68vmin,86%)}
-  .bur{align-self:flex-start;background:var(--surface);border:1px solid var(--border);
-       border-radius:2.2vmin 2.2vmin 2.2vmin .5vmin;padding:1.9vmin 2.6vmin;
-       font-size:2.6vmin;color:var(--muted);text-align:left;
-       box-shadow:0 .4vmin 1.6vmin rgba(28,42,51,.06)}
-  .bur.yo{align-self:flex-end;background:var(--teal);color:#fff;border-color:var(--teal);
-          border-radius:2.2vmin 2.2vmin .5vmin 2.2vmin}
+  /* 1 · el contador de llamadas */
+  .cont{margin-top:5vmin;display:flex;flex-direction:column;align-items:center;gap:1.6vmin}
+  .cont-n{font-family:'Sora',sans-serif;font-size:18vmin;font-weight:700;line-height:1;
+          color:var(--bronze);letter-spacing:-.8vmin}
+  .cont-l{font-size:2.6vmin;font-weight:600;letter-spacing:.42vmin;text-transform:uppercase;
+          color:var(--muted)}
+
+  /* 2 · precios que no se pueden comparar */
+  .precios{display:flex;gap:2.4vmin;margin-top:5vmin;flex-wrap:wrap;justify-content:center}
+  .pz{background:var(--surface);border:1px solid var(--border);border-radius:2vmin;
+      padding:2.6vmin 3.4vmin;text-align:left;box-shadow:0 .6vmin 2vmin rgba(28,42,51,.06);
+      will-change:opacity,transform}
+  .pz small{display:block;font-size:2vmin;color:var(--muted);margin-bottom:.8vmin}
+  .pz strong{font-family:'Sora',sans-serif;font-size:4.2vmin;font-weight:700}
+  .pz.q{color:var(--muted);font-size:4.2vmin;display:flex;align-items:center;
+        font-family:'Sora',sans-serif;font-weight:700}
 
   /* 3 · la marca */
   .marca{display:flex;align-items:center;gap:3.4vmin;will-change:opacity,transform}
@@ -96,7 +104,6 @@
 
   @media (min-aspect-ratio: 13/10){
     .sub{max-width:112vmin}
-    .burbujas{width:min(104vmin,70%)}
     .pasos{width:min(152vmin,92%)}
     .sellos{width:min(104vmin,74%)}
     .dem{width:min(112vmin,78%)}
@@ -116,18 +123,23 @@
   <!-- 1 · el problema -->
   <div class="cap" id="s1">
     <div class="kicker">Sacar carga del puerto de Manzanillo</div>
-    <div class="tit">¿Otra vez buscando<br>camión por <em>WhatsApp</em>?</div>
-    <div class="burbujas">
-      <div class="bur" id="b1">¿Tienes un torton para el jueves?</div>
-      <div class="bur yo" id="b2">Déjame checo y te aviso…</div>
-      <div class="bur" id="b3">¿Y cuánto me cobrarías?</div>
+    <div class="tit">¿Otra vez <em>llamando</em><br>a diez transportistas?</div>
+    <div class="cont">
+      <div class="cont-n" id="contn">1</div>
+      <div class="cont-l">llamadas para mover una caja</div>
     </div>
+  </div>
   </div>
 
   <!-- 2 · por qué duele -->
   <div class="cap" id="s2">
     <div class="tit">Diez llamadas.<br>Ningún precio <em>comparable</em>.</div>
     <div class="sub">No sabes si te están cobrando de más, ni si la unidad trae los papeles en regla para entrar a puerto.</div>
+    <div class="precios">
+      <div class="pz" id="z1"><small>Transportes A</small><strong>$9,800</strong></div>
+      <div class="pz" id="z2"><small>Fletes B</small><strong>$14,200</strong></div>
+      <div class="pz q" id="z3">?</div>
+    </div>
   </div>
 
   <!-- 3 · la marca -->
@@ -209,10 +221,13 @@ function capa(id,t,ini,fin){
 function seek(t){
   for(const [id,a,b] of ESCENAS) capa(id,t,a,b);
 
-  // 1 · burbujas escalonadas
-  ['b1','b2','b3'].forEach((id,i)=>{
-    const k=out(p(t,0.9+i*0.52,1.5+i*0.52));
-    $(id).style.opacity=k; $(id).style.transform=`translateY(${(1-k)*2.2}vmin)`;
+  // 1 · el contador sube de 1 a 10: son llamadas, no mensajes
+  $('contn').textContent = Math.max(1, Math.round(io(p(t,0.8,3.0))*10));
+
+  // 2 · dos cotizaciones que no se parecen, y una incógnita
+  ['z1','z2','z3'].forEach((id,i)=>{
+    const k=out(p(t,4.5+i*0.4,5.2+i*0.4));
+    $(id).style.opacity=k; $(id).style.transform=`translateY(${(1-k)*2.6}vmin)`;
   });
 
   // 3 · el emblema entra con escala; es PNG, no se puede trazar como el SVG

@@ -9,8 +9,10 @@ Tres proporciones del mismo anuncio, 27.2 s, 30 fps, H.264 `yuv420p` con
 | `portgo-horizontal.mp4` | 1920×1080 | LinkedIn, YouTube, la landing |
 | `portgo-cuadrado.mp4`   | 1080×1080 | Feed de Instagram, Facebook, LinkedIn |
 
-Usa el tema Evolución (teal + bronce) y el emblema de `img/logo.png`, así que
-va a juego con lo que el usuario ve al entrar.
+Usa **un solo acento, el bronce** del emblema, y `img/logo.png`. El teal no
+aparece: junto al logo metálico, dos acentos leían como dos marcas. El rojo
+del contador de días no es un tercer acento, es color de estado — el mismo
+`--pg-alert` que la app usa en sus badges.
 
 ## Qué afirma, y de dónde sale
 
@@ -23,10 +25,18 @@ Nada del guion es invento. Cada afirmación está respaldada:
 | Seguimiento de la recolección a la entrega | `tracking_estado`, cinco pasos por `recurso_tipo` |
 | Fecha límite de vacíos y las demoras | `expedientes.fecha_limite_vacios`; `estadoVacios()` en `js/expedientes.js` le muestra al cliente «Devolver antes del …» con cuenta de días |
 
-**El guion anterior decía «chat directo con el transportista». Eso ya no
-existe**: el texto libre se retiró a propósito y se sustituyó por botones de
-aviso con forma fija (`FLUJO-OPERATIVO.md`, «Cómo se hablan entre ellos`).
-Prometerlo mandaba al cliente a buscar una pantalla que no está.
+**Ninguna pantalla del video muestra un chat, y eso es deliberado.** El texto
+libre entre cliente y empresa se retiró del producto a propósito
+(`FLUJO-OPERATIVO.md`, «Cómo se hablan entre ellos»), así que:
+
+- se quitó la afirmación «chat directo con el transportista»;
+- y se quitaron también las **burbujas de conversación** con las que abría el
+  video. Estaban ahí para pintar el problema —así se busca camión hoy— pero
+  enseñar una interfaz de chat en un anuncio crea la expectativa de que el
+  producto la tiene.
+
+En su lugar la apertura cuenta **llamadas**: un contador que sube de 1 a 10, y
+dos cotizaciones que no se parecen con una incógnita al lado.
 
 ## Cómo se vuelve a generar
 
