@@ -61,7 +61,46 @@ function _hcIcon(name) {
 
 // ── HOME PAGE ─────────────────────────────────────────
 
+// Armado del emblema de la portada: una vez por carga de página, con sesión
+// (antes de iniciar sesión la portada queda tapada por el login).
+let _logoArmado = false;
+function armarLogoHome() {
+  const wrap = document.getElementById('home-logo');
+  if (!wrap || _logoArmado || !currentUser) return;
+  _logoArmado = true;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+
+  const T = 120, c = T / 2, rIn = T * 0.27, rOut = T * 0.8, N = 8;
+  const pt = (r, a) => `${(c + r * Math.cos(a)).toFixed(2)} ${(c + r * Math.sin(a)).toFixed(2)}`;
+  const piezas = [];
+  const pieza = (clip, vars) => {
+    const img = document.createElement('img');
+    img.src = 'img/logo.png'; img.alt = ''; img.className = 'logo-pieza';
+    img.style.clipPath = img.style.webkitClipPath = clip;
+    Object.entries(vars).forEach(([k, v]) => img.style.setProperty(k, v));
+    wrap.appendChild(img); piezas.push(img);
+  };
+  // El centro (rosa de los vientos) entra girando
+  pieza(`circle(${rIn + 0.5}px at 50% 50%)`, { '--r': '-200deg', '--s': '0.2', '--d': '0s' });
+  // Ocho piezas del anillo llegan desde fuera, cada una por su lado
+  for (let i = 0; i < N; i++) {
+    const a0 = (i / N) * 2 * Math.PI - Math.PI / 2, a1 = a0 + 2 * Math.PI / N, am = (a0 + a1) / 2;
+    const d = `M ${pt(rIn, a0)} L ${pt(rOut, a0)} A ${rOut} ${rOut} 0 0 1 ${pt(rOut, a1)} L ${pt(rIn, a1)} A ${rIn} ${rIn} 0 0 0 ${pt(rIn, a0)} Z`;
+    pieza(`path('${d}')`, {
+      '--x': `${(Math.cos(am) * 70).toFixed(1)}px`, '--y': `${(Math.sin(am) * 70).toFixed(1)}px`,
+      '--r': `${i % 2 ? 35 : -35}deg`, '--s': '0.8', '--d': `${(0.25 + i * 0.07).toFixed(2)}s`
+    });
+  }
+  wrap.classList.remove('armado'); wrap.classList.add('armando');
+  // Última pieza: 0.25 + 7·0.07 + 0.75 ≈ 1.5 s. Entonces se muestra la imagen entera
+  setTimeout(() => {
+    wrap.classList.replace('armando', 'armado');
+    piezas.forEach(p => p.remove());
+  }, 1550);
+}
+
 function renderHome() {
+  armarLogoHome();
   const el = document.getElementById('home-greeting');
   if (el && currentUser?.nombre) {
     const h = new Date().getHours();
